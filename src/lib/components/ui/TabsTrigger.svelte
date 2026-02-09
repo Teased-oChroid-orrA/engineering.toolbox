@@ -4,7 +4,8 @@
   import { get } from 'svelte/store';
 
   export let value: string;
-  export let className = '';
+  let className: string | undefined | null = undefined;
+  export { className as class };
 
   const { value: active } = useTabs();
 
@@ -20,6 +21,7 @@
     isActive ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900',
     className
   )}
+  {...$$restProps}
 >
   <slot />
 </button>

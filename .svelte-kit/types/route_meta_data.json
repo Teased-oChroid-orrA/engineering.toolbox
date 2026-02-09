@@ -1,0 +1,30 @@
+{
+	"/": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/buckling": [
+		"src/routes/+layout.ts"
+	],
+	"/bushing": [
+		"src/routes/+layout.ts"
+	],
+	"/inspector": [
+		"src/routes/+layout.ts"
+	],
+	"/profile": [
+		"src/routes/+layout.ts"
+	],
+	"/properties": [
+		"src/routes/+layout.ts"
+	],
+	"/shear": [
+		"src/routes/+layout.ts"
+	],
+	"/suite": [
+		"src/routes/+layout.ts"
+	],
+	"/surface": [
+		"src/routes/+layout.ts"
+	]
+}

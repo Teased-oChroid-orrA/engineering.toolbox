@@ -6,7 +6,8 @@
 
   export let checked = false;
   export let disabled = false;
-  export let className = '';
+  let className: string | undefined | null = undefined;
+  export { className as class };
   export let ariaLabel = 'Toggle';
 
   function toggle() {
@@ -28,6 +29,7 @@
     checked ? 'bg-teal-400/80' : 'bg-white/10',
     className
   )}
+  {...$$restProps}
 >
   <span
     class={cn(

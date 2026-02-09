@@ -3,7 +3,8 @@
 
   export let variant: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' = 'primary';
   export let size: 'sm' | 'md' | 'lg' | 'icon' = 'md';
-  export let className = '';
+  let className: string | undefined | null = undefined;
+  export { className as class };
   export let type: 'button' | 'submit' | 'reset' = 'button';
   export let disabled = false;
 
@@ -26,6 +27,6 @@
   };
 </script>
 
-<button {type} class={cn(base, variants[variant], sizes[size], className)} {disabled}>
+<button {type} class={cn(base, variants[variant], sizes[size], className)} {disabled} {...$$restProps}>
   <slot />
 </button>

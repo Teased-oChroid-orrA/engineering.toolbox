@@ -4,7 +4,8 @@
   // FIX: Added 'items' prop to support dynamic options
   export let items: { value: string | number; label: string }[] = [];
   export let value: string | number;
-  export let className = '';
+  let className: string | undefined | null = undefined;
+  export { className as class };
   export let disabled = false;
   export let name: string | undefined = undefined;
   export let id: string | undefined = undefined;
@@ -23,6 +24,7 @@
       'disabled:cursor-not-allowed disabled:opacity-50',
       className
     )}
+    {...$$restProps}
   >
     {#each items as item}
       <option value={item.value} class="bg-surface-900 text-white">

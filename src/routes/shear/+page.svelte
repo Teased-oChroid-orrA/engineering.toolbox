@@ -17,7 +17,7 @@
     toughness: 0.75,
     interactionExponent: undefined,
     plateMat: MATERIALS[0].id, fastenerFsu_ksi: 95,
-    modeHint: 'Auto', isCountersunk: false, csAngleDeg: 100
+    isCountersunk: false, csAngleDeg: 100
   };
 
   // Interaction exponent helpers (WP2.4)

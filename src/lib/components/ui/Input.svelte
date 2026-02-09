@@ -13,7 +13,8 @@
   export let placeholder = '';
   export let disabled = false;
   export let readonly = false;
-  export let className = '';
+  let className: string | undefined | null = undefined;
+  export { className as class };
   export let name: string | undefined = undefined;
   export let id: string | undefined = undefined;
 
@@ -133,6 +134,7 @@
     on:focus={onFocus}
     on:blur={onBlur}
     on:keydown={onKeydown}
+    {...$$restProps}
   />
 {:else}
   <input
@@ -159,5 +161,6 @@
     on:focus={onFocus}
     on:blur={onBlur}
     on:keydown={onKeydown}
+    {...$$restProps}
   />
 {/if}
