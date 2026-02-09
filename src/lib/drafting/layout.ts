@@ -117,7 +117,7 @@ export class Layout {
   }
 
   private getBox<T extends Box | { box: Box }>(item: T): Box {
-    // @ts-expect-error runtime check
+    // Runtime guard for mixed input item shapes.
     return (item && typeof item === 'object' && 'box' in item ? (item as any).box : item) as Box;
   }
 

@@ -2,7 +2,7 @@
   // Pure renderer for point cloud and common overlays.
   // Meant to be used inside an <svg> element; event wiring stays in SurfaceViewport/SurfaceToolbox.
 
-  export type DrawNode = { i: number; x: number; y: number; z?: number; t?: number };
+  type DrawNode = { i: number; x: number; y: number; z?: number; t?: number };
 
   export let projectedDraw: DrawNode[] = [];
 
@@ -86,7 +86,16 @@
     stroke={stroke}
     stroke-width={2}
     opacity={typeof node.z === 'number' ? depthOpacity(node.z) : 1}
+    role="button"
+    tabindex="0"
+    aria-label={`Point ${i}`}
     onclick={(e) => handlePointClick(i, e)}
+    onkeydown={(e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handlePointClick(i, e as unknown as MouseEvent);
+      }
+    }}
   />
 {/each}
 

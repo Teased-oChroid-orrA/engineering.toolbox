@@ -78,8 +78,8 @@ export async function exportCsvPreset(ctx: any, mode: 'current_view' | 'filtered
       const resp = (await ctx.invoke('inspector_get_row_slice', { start: 0, end })) as any;
       rows = (Array.isArray(resp) ? resp : resp.rows) as string[][];
     } else {
-      const sel = new Set(ctx.visibleColIdxs.length ? ctx.visibleColIdxs : Array.from({ length: ctx.headers.length }, (_, i) => i));
-      const sorted = Array.from(sel).sort((a, b) => a - b);
+      const sel = new Set<number>(ctx.visibleColIdxs.length ? ctx.visibleColIdxs : Array.from({ length: ctx.headers.length }, (_, i) => i));
+      const sorted = Array.from(sel).sort((a: number, b: number) => a - b);
       outHeaders = sorted.map((i) => ctx.headers[i] ?? `c${i}`);
       const end = Math.max(0, Math.min(ctx.totalFilteredCount, 200_000));
       const resp = (await ctx.invoke('inspector_get_row_slice', { start: 0, end, cols: sorted })) as any;
@@ -127,7 +127,7 @@ export function saveCurrentAsRecipe(ctx: any) {
     .map((x: string) => x.trim())
     .filter((x: string) => x.length > 0)
     .slice(0, 8);
-  const vars = Array.from(new Set((name.match(/\{[a-zA-Z0-9_]+\}/g) ?? []).map((x) => x.slice(1, -1))));
+  const vars = Array.from(new Set((name.match(/\{[a-zA-Z0-9_]+\}/g) ?? []).map((x: string) => x.slice(1, -1))));
   const r = {
     id: ctx.newRecipeId(),
     name,

@@ -1097,7 +1097,6 @@
       set preMergedTotalRowCount(v: number) { preMergedTotalRowCount = v; },
       get preMergedTotalFilteredCount() { return preMergedTotalFilteredCount; },
       set preMergedTotalFilteredCount(v: number) { preMergedTotalFilteredCount = v; },
-      get upsertWorkspaceDatasetInList() { return upsertWorkspaceDatasetInList; },
       activateWorkspaceDataset
     };
   }
@@ -1570,7 +1569,7 @@
       get showSchemaModal() { return showSchemaModal; },
       set showSchemaModal(v: boolean) { showSchemaModal = v; },
       get schemaDriftBaseline() { return schemaDriftBaseline; },
-      set schemaDriftBaseline(v: SchemaColStat[]) { schemaDriftBaseline = v; },
+      set schemaDriftBaseline(v: SchemaColStat[] | null) { schemaDriftBaseline = v; },
       get recipeNotice() { return recipeNotice; },
       set recipeNotice(v: string | null) { recipeNotice = v; },
       get categoryGate() { return categoryGate; },
@@ -1935,7 +1934,7 @@
 
   <!-- Tier 1: Load + Search Controls -->
   <InspectorTopControls
-    {topControlSpans}
+    topControlSpans={topControlSpans as Record<string, string>}
     {headerMode}
     {hasLoaded}
     {isLoading}
@@ -1954,13 +1953,13 @@
     {activeDatasetId}
     {datasetId}
     {totalRowCount}
-    onHeaderModeChange={(value) => { headerMode = value; }}
-    onTargetColChange={(value) => { targetColIdx = value; scheduleFilter(); }}
-    onMatchModeChange={(value) => { matchMode = value; }}
-    onQueryScopeChange={(value) => { queryScope = value; onQueryScopeChange(); }}
-    onQueryChange={(value) => { query = value; }}
-    onMaxRowsScanTextChange={(value) => { maxRowsScanText = value; }}
-    onTier2Toggle={(value) => { tier2Open = value; }}
+    onHeaderModeChange={(value: 'auto' | 'yes' | 'no') => { headerMode = value; }}
+    onTargetColChange={(value: number | null) => { targetColIdx = value; scheduleFilter(); }}
+    onMatchModeChange={(value: 'fuzzy' | 'exact' | 'regex') => { matchMode = value; }}
+    onQueryScopeChange={(value: 'current' | 'all' | 'ask') => { queryScope = value; onQueryScopeChange(); }}
+    onQueryChange={(value: string) => { query = value; }}
+    onMaxRowsScanTextChange={(value: string) => { maxRowsScanText = value; }}
+    onTier2Toggle={(value: boolean) => { tier2Open = value; }}
     onOpenColumnPicker={openColumnPicker}
     onOpenBuilder={() => { showSvarBuilder = true; }}
     onSetRegexMode={() => { matchMode = 'regex'; }}
@@ -2132,13 +2131,13 @@
     {recipes}
     onClose={() => (showRecipeModal = false)}
     onReset={() => resetModalPos('recipes')}
-    onBeginDrag={(e) => beginDragModal('recipes', e)}
-    onSetRecipeName={(v) => (recipeName = v)}
-    onSetRecipeTags={(v) => (recipeTags = v)}
+    onBeginDrag={(e: MouseEvent) => beginDragModal('recipes', e)}
+    onSetRecipeName={(v: string) => (recipeName = v)}
+    onSetRecipeTags={(v: string) => (recipeTags = v)}
     onSave={saveCurrentAsRecipe}
     onExport={exportRecipesCurrent}
     onImport={importRecipesFile}
-    onSetImportMode={(v) => (importMode = v)}
+    onSetImportMode={(v: 'current' | 'file') => (importMode = v)}
     onToggleFavorite={toggleRecipeFavorite}
     onApply={applyRecipe}
     onDelete={deleteRecipe}
@@ -2168,17 +2167,17 @@
     catSelected={catF.selected}
     onClose={() => (showSchemaModal = false)}
     onReset={() => resetModalPos('schema')}
-    onBeginDrag={(e) => beginDragModal('schema', e)}
+    onBeginDrag={(e: MouseEvent) => beginDragModal('schema', e)}
     onRefresh={() => void computeSchemaStats()}
-    onSetSampleTier={(v) => (schemaSampleTier = v)}
-    onSetSampleN={(v) => (schemaSampleN = v)}
-    onSetSearch={(v) => (schemaSearch = v)}
+    onSetSampleTier={(v: string) => (schemaSampleTier = v as any)}
+    onSetSampleN={(v: number) => (schemaSampleN = v)}
+    onSetSearch={(v: string) => (schemaSearch = v)}
     onSetDriftBaseline={setSchemaDriftBaseline}
     onActionTarget={schemaActionTarget}
     onActionCategory={schemaActionCategory}
     onActionNumeric={schemaActionNumericRange}
     onActionDate={schemaActionDateRange}
-    onAddTopToCategory={(idx, val) => {
+    onAddTopToCategory={(idx: number, val: string) => {
       schemaActionCategory(idx, false);
       const s2 = new Set(catF.selected);
       s2.add(val);
@@ -2237,9 +2236,9 @@
     svarFilterSet={svarFilterSet}
     onClose={() => (showSvarBuilder = false)}
     onReset={() => resetModalPos('svar')}
-    onBeginDrag={(e) => beginDragModal('svar', e)}
+    onBeginDrag={(e: MouseEvent) => beginDragModal('svar', e)}
     onApply={applySvarBuilderToFilters}
-    onChange={(ev) => {
+    onChange={(ev: any) => {
       const next = ev?.value ?? ev?.detail?.value;
       if (next) svarFilterSet = next as IFilterSet;
     }}
@@ -2262,20 +2261,20 @@
     {genClauses}
     {genAddKind}
     onClose={() => (showRegexGenerator = false)}
-    onSetTab={(v) => (genTab = v)}
-    onToggleFlag={(k) => {
+    onSetTab={(v: GenTab) => (genTab = v)}
+    onToggleFlag={(k: 'i' | 'm' | 's') => {
       if (k === 'i') genFlagI = !genFlagI;
       if (k === 'm') genFlagM = !genFlagM;
       if (k === 's') genFlagS = !genFlagS;
     }}
     onApplyRegex={applyGeneratedRegex}
-    onSetTestText={(v) => (testText = v)}
-    onSetBuildMode={(v) => (genBuildMode = v)}
+    onSetTestText={(v: string) => (testText = v)}
+    onSetBuildMode={(v: BuildMode) => (genBuildMode = v)}
     onMoveClause={moveClause}
     onRemoveClause={removeClause}
-    onUpdateClauseKind={(idx, v) => (genClauses[idx].kind = v)}
-    onUpdateClauseField={(idx, key, v) => ((genClauses[idx] as any)[key] = v)}
-    onAddClause={(v) => addClause(v)}
+    onUpdateClauseKind={(idx: number, v: ClauseKind) => (genClauses[idx].kind = v)}
+    onUpdateClauseField={(idx: number, key: string, v: any) => ((genClauses[idx] as any)[key] = v)}
+    onAddClause={(v: ClauseKind) => addClause(v)}
     onClearClauses={() => {
       genClauses = [newClause('contains', '')];
       testText = '';
@@ -2288,6 +2287,6 @@
     floatingStyle={floatingStyle('shortcuts')}
     onClose={() => (showShortcuts = false)}
     onReset={() => resetModalPos('shortcuts')}
-    onBeginDrag={(e) => beginDragModal('shortcuts', e)}
+    onBeginDrag={(e: MouseEvent) => beginDragModal('shortcuts', e)}
   />
 </div>

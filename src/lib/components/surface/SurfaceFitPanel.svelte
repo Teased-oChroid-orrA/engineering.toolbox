@@ -253,9 +253,9 @@
           {/if}
 
 	          {#if sliceRes && sliceRes.slices.length > 0}
-	            {@const vals = sliceRes.slices.map(s => (sliceMetric==='p95' ? s.p95Abs : s.rms))}
+		            {@const vals = sliceRes.slices.map((s: any) => (sliceMetric==='p95' ? s.p95Abs : s.rms))}
 	            {@const vMax = Math.max(...vals, 1e-12)}
-	            {@const worst = sliceRes.slices.reduce((a, b) => {
+		            {@const worst = sliceRes.slices.reduce((a: any, b: any) => {
 	              const av = sliceMetric === 'p95' ? a.p95Abs : a.rms;
 	              const bv = sliceMetric === 'p95' ? b.p95Abs : b.rms;
 	              return bv > av ? b : a;
@@ -273,8 +273,8 @@
                   stroke="currentColor"
                   stroke-width="2"
                   class="text-white/70"
-                  points={sliceRes.slices
-                    .map((s, i) => {
+	                  points={sliceRes.slices
+	                    .map((s: any, i: number) => {
                       const x = (i / Math.max(1, sliceRes.slices.length - 1)) * 236 + 2;
                       const v = sliceMetric === 'p95' ? s.p95Abs : s.rms;
                       const y = 66 - (v / vMax) * 62;

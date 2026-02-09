@@ -9,8 +9,8 @@
 </script>
 
 <div class={`animate-pulse space-y-3 ${className}`}>
-  <div class="h-4 rounded bg-surface-200-800 w-1/2" />
+  <div class="h-4 rounded bg-surface-200-800 w-1/2"></div>
   {#each Array(lines) as _, i (i)}
-    <div class="h-3 rounded bg-surface-200-800" />
+    <div class="h-3 rounded bg-surface-200-800"></div>
   {/each}
 </div>

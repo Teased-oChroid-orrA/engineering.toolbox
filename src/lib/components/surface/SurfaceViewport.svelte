@@ -2,7 +2,6 @@
   // Minimal, stable SurfaceViewport module.
   // It renders projected points (projectedDraw) and overlays (selection / probe / interp),
   // and delegates all interaction back to SurfaceToolbox via passed-in handlers.
-  import type { SvelteComponent } from 'svelte';
   import SurfacePointRenderer from './SurfacePointRenderer.svelte';
 
   export let viewportEl: HTMLDivElement | null = null;
@@ -60,18 +59,37 @@
 
   // Present for compatibility with older refactors; not required by this minimal viewport.
   export let sortedEdges: any[] = [];
+
+  $: {
+    // Keep compatibility props "used" for strict warning hygiene.
+    void probe;
+    void probeBoltDia;
+    void maxTaperDeg;
+    void zoomK;
+    void updateProbeFromEvent;
+    void points;
+    void evalRes;
+    void heatScale;
+    void project;
+    void sortedEdges;
+  }
 </script>
 
 <div
   class="relative w-full h-full overflow-hidden rounded-2xl border border-white/10 bg-black/20"
   bind:this={viewportEl}
+  role="region"
+  aria-label="Surface viewport"
   oncontextmenu={(e) => { e.preventDefault(); onViewportContextMenu(e); }}
 >
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex a11y_no_noninteractive_element_interactions -->
   <svg
     class="absolute inset-0 w-full h-full select-none touch-none"
     bind:this={svgEl}
     viewBox={`0 0 ${w} ${h}`}
     tabindex="0"
+    role="application"
+    aria-label="Interactive surface canvas"
     onkeydown={keyActivate}
     onpointerdown={onSvgPointerDown}
     onpointermove={onSvgPointerMove}

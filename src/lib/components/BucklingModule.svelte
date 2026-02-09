@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
 
-  let { area, r_g } = $props<{ area: number; r_g: number }>();
+  let { area = 1, r_g = 1 } = $props<{ area?: number; r_g?: number }>();
 
   let L = $state(48);
   let K = $state(1.0);

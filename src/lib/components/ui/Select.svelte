@@ -3,7 +3,7 @@
   
   // FIX: Added 'items' prop to support dynamic options
   export let items: { value: string | number; label: string }[] = [];
-  export let value: string | number;
+  export let value: string | number | undefined;
   let className: string | undefined | null = undefined;
   export { className as class };
   export let disabled = false;

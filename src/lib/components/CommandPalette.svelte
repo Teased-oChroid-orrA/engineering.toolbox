@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { fly, fade, scale } from 'svelte/transition';
+  import { fly, fade } from 'svelte/transition';
   import { Input, Button } from '$lib/components/ui';
 
   export let open = false;
@@ -8,7 +8,7 @@
     = [];
 
   let query = '';
-  let inputEl: HTMLInputElement | null = null;
+  let inputEl: any = null;
   let active = 0;
 
   $: items = nav
@@ -50,7 +50,14 @@
 
 {#if open}
   <div class="fixed inset-0 z-[100]" aria-modal="true" role="dialog">
-    <div class="absolute inset-0 bg-black/50" in:fade={{ duration: 120 }} out:fade={{ duration: 100 }} on:click={() => (open = false)} />
+    <button
+      type="button"
+      class="absolute inset-0 bg-black/50 p-0 m-0 border-0"
+      aria-label="Close command palette"
+      in:fade={{ duration: 120 }}
+      out:fade={{ duration: 100 }}
+      on:click={() => (open = false)}
+    ></button>
 
     <div class="absolute inset-0 flex items-start justify-center p-4 pt-20">
       <div

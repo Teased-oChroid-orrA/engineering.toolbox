@@ -1,5 +1,5 @@
 <script lang="ts">
-  export type SelectionMode = 'none' | 'box' | 'lasso';
+  type SelectionMode = 'none' | 'box' | 'lasso';
 
   export let selectionMode: SelectionMode;
   export let curveMode: boolean;

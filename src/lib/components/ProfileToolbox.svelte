@@ -11,8 +11,8 @@
   }
 
   function dragAction(node: SVGCircleElement, i: number) {
-    const drag = d3.drag<SVGCircleElement, unknown>()
-      .on('drag', (ev) => handleDrag(ev, i));
+    const drag = d3.drag()
+      .on('drag', (ev: any) => handleDrag(ev, i));
     d3.select(node).call(drag);
     return {
       destroy() {

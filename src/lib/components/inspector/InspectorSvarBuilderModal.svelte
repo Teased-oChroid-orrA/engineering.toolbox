@@ -1,5 +1,6 @@
 <script lang="ts">
   import { FilterBuilder, WillowDark } from '@svar-ui/svelte-filter';
+  import { fade, scale } from 'svelte/transition';
 
   let {
     open = false,

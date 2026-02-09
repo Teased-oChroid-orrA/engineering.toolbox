@@ -469,8 +469,8 @@
   let zoomK = $state(1);
   let pan = $state({ x: 0, y: 0 });
   let rotateAnchor = $state<{ mx: number; my: number; pivot: Point3D } | null>(null);
-  let svgSelection: d3.Selection<SVGSVGElement, unknown, null, undefined> | null = null;
-  let zoomBehavior: d3.ZoomBehavior<SVGSVGElement, unknown> | null = null;
+  let svgSelection: any = null;
+  let zoomBehavior: any = null;
 
   function syncD3ZoomTransform(k: number, x: number, y: number) {
     if (!svgSelection || !zoomBehavior) return;
@@ -1829,7 +1829,7 @@
 
     // Zoom / pan: wheel+drag (hold Shift to pan-drag; drag otherwise rotates)
     const zoom = d3
-      .zoom<SVGSVGElement, unknown>()
+      .zoom()
       .scaleExtent([0.15, 12])
       .filter((event: any) => {
         if (selectionMode !== 'none') return false;
@@ -1838,7 +1838,7 @@
         if (event.type === 'mousedown') return !!event.shiftKey;
         return true;
       })
-      .on('zoom', (event) => {
+      .on('zoom', (event: any) => {
         const src = event.sourceEvent as WheelEvent | MouseEvent | null;
         // Use d3's transform for pan/zoom; keep rotation separate.
         zoomK = event.transform.k;
@@ -1852,13 +1852,13 @@
     syncD3ZoomTransform(zoomK, pan.x, pan.y);
 
     const drag = d3
-      .drag<SVGSVGElement, unknown>()
+      .drag()
       .filter((event: any) => {
         if (selectionMode !== 'none') return false;
         if (event.type === 'mousedown') return !event.shiftKey;
         return true;
       })
-      .on('start', (event) => {
+      .on('start', (event: any) => {
         const src = event.sourceEvent as MouseEvent | null;
         if (!src || !svgEl) return;
         const rect = svgEl.getBoundingClientRect();
@@ -1866,7 +1866,7 @@
         const my = src.clientY - rect.top;
         rotateAnchor = { mx, my, pivot: pickOrbitPivot(mx, my) };
       })
-      .on('drag', (event) => {
+      .on('drag', (event: any) => {
         const src = event.sourceEvent as MouseEvent | null;
         if (src?.shiftKey) return;
         rot = { alpha: rot.alpha + event.dx * 0.01, beta: rot.beta + event.dy * 0.01 };

@@ -1,7 +1,7 @@
 <script lang="ts">
-  export type Point3D = { x: number; y: number; z: number };
-  export type Edge = [number, number];
-  export type Curve = { name: string; pts: number[] };
+  type Point3D = { x: number; y: number; z: number };
+  type Edge = [number, number];
+  type Curve = { name: string; pts: number[] };
 
   export let edges: Edge[];
   export let activeEdgeIdx: number | null;

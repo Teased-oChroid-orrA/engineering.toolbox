@@ -7,8 +7,8 @@
   export let points: Point3D[] = [];
 
   // Bound state
-  export let selEdgeA: number;
-  export let selEdgeB: number;
+  export let selEdgeA: number | null;
+  export let selEdgeB: number | null;
   export let offsetDist: number;
   export let refPointIdx: number;
 

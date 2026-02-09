@@ -1,5 +1,6 @@
 <script lang="ts">
   import NumberFlow from '@number-flow/svelte';
+  import { fade, scale } from 'svelte/transition';
   import { safeAutoAnimate, isWebKitRuntime } from '$lib/utils/safeAutoAnimate';
   function aa(node: HTMLElement) {
     try {

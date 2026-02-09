@@ -9,9 +9,17 @@ export type RecipeState = {
   matchMode: 'fuzzy' | 'exact' | 'regex';
   targetColIdx: number | null;
   maxRowsScanText: string;
+  numericF?: { enabled: boolean; colIdx: number | null; minText: string; maxText: string };
+  dateF?: { enabled: boolean; colIdx: number | null; minIso: string; maxIso: string };
+  catF?: { enabled: boolean; colIdx: number | null; selected: string[] };
   sortColIdx: number | null;
   sortDir: 'asc' | 'desc';
+  sortSpecs?: { colIdx: number; dir: 'asc' | 'desc' }[];
   visibleColumns: number[];
+  pinnedLeft?: number[];
+  pinnedRight?: number[];
+  hiddenColumns?: number[];
+  columnWidths?: Record<number, number>;
   version?: 3;
   autoRestore?: boolean;
 };

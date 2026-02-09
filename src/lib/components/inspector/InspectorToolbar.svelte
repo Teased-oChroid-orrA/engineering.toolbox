@@ -93,10 +93,10 @@
         </div>
       {/if}
     </div>
-    <FlowBadge color="light">Rows: <NumberFlow value={totalRowCount} /></FlowBadge>
-    <FlowBadge color="light">Filtered: <NumberFlow value={totalFilteredCount} /></FlowBadge>
+    <FlowBadge color="gray">Rows: <NumberFlow value={totalRowCount} /></FlowBadge>
+    <FlowBadge color="gray">Filtered: <NumberFlow value={totalFilteredCount} /></FlowBadge>
     {#if sortColIdx != null}
-      <FlowBadge color="light">Sort: {headers?.[sortColIdx] ?? sortColIdx} ({sortDir})</FlowBadge>
+      <FlowBadge color="gray">Sort: {headers?.[sortColIdx] ?? sortColIdx} ({sortDir})</FlowBadge>
     {/if}
     {#if (query ?? '').trim().length > 0}
       <button class="btn btn-xs variant-soft" onclick={() => dispatch('clearQuery')}>
@@ -118,7 +118,7 @@
       <button class="btn btn-xs variant-soft" onclick={() => dispatch('clearCategory')}>Category <span class="text-white/40">×</span></button>
     {/if}
     {#if isMergedView}
-      <FlowBadge color="success">Merged view: all files</FlowBadge>
+      <FlowBadge color="emerald">Merged view: all files</FlowBadge>
     {/if}
     <span class="ml-auto flex items-center gap-2">
       <button class="btn btn-xs variant-soft" onclick={() => dispatch('clearAllFilters')} disabled={!hasLoaded}>Clear all filters</button>

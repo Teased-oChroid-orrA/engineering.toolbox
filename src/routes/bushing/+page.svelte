@@ -87,7 +87,7 @@
     const a: string[] = [];
     a.push('Interference fit pressure computed with Lamé thick-cylinder compatibility (finite plate equivalent OD).');
     a.push('Pressure-to-bearing uplift uses Fbru_eff = Fbru + k·p with k = 0.8.');
-    a.push(form.fit?.mode === 'thermal' ? 'Thermal interference enabled (ΔT contributes to δ).' : 'Thermal interference not applied.');
+    a.push((form.dT ?? 0) !== 0 ? 'Thermal interference enabled (ΔT contributes to δ).' : 'Thermal interference not applied.');
     a.push('Units are converted for display; internal base is imperial (in, lbf, psi).');
     return a;
   }
@@ -115,7 +115,7 @@
   function makeReportHtml(svgText: string, title: string) {
     const escHtml = (s: string) => String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] as string));
     const assumptions = buildAssumptions().map(x => `<li>${escHtml(x)}</li>`).join('');
-    const gov = results.governing?.mode ?? '—';
+    const gov = results.governing?.name ?? '—';
     const ms = Number.isFinite(results.governing?.margin) ? results.governing.margin.toFixed(3) : '—';
     const p = (results as any).lame?.pressureKsi;
     return `<!doctype html>

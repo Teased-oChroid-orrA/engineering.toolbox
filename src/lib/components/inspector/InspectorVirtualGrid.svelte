@@ -20,7 +20,7 @@
   export let totalFilteredCount = 0;
 
   export let rowHeight = INSPECTOR_THEME.grid.rowHeight;
-  export let overscan = INSPECTOR_THEME.grid.overscan;
+  export let overscan: number = INSPECTOR_THEME.grid.overscan;
   export let maxWindowAbs = INSPECTOR_THEME.grid.maxWindowAbs;
   export let initialHeight = 560;
 

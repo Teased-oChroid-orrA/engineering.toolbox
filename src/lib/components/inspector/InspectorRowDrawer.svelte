@@ -1,5 +1,6 @@
 <script lang="ts">
   import NumberFlow from '@number-flow/svelte';
+  import { fade, slide } from 'svelte/transition';
 
   type KeyValue = { key: string; value: string; idx: number | null; type: 'numeric' | 'date' | 'string' | null };
   type Explain = { passes: boolean; reasons: string[]; sourceRowIdx: number } | null;
