@@ -21,7 +21,7 @@
 {#if open}
   <div class="fixed inset-0 z-50 flex items-center justify-center p-6 relative" transition:fade={{ duration: uiAnimDur }}>
     <button type="button" class="absolute inset-0 modal-backdrop p-0 m-0 border-0" onclick={onClose} aria-label="Close advanced builder"></button>
-    <div class="relative z-10 glass-panel w-full max-w-5xl rounded-2xl border border-white/10 p-5" transition:scale={{ duration: uiAnimDur, start: 0.96 }} style={floatingStyle}>
+    <div class="relative z-10 glass-panel w-full max-w-5xl rounded-2xl border border-white/10 p-5 inspector-pop-layer" transition:scale={{ duration: uiAnimDur, start: 0.96 }} style={floatingStyle}>
       <div class="mb-2 flex items-center justify-between gap-2 border-b border-white/10 pb-2 cursor-move" role="button" tabindex="0" onmousedown={onBeginDrag}>
         <span class="text-[11px] uppercase tracking-widest text-white/50">Drag</span>
         <button class="btn btn-xs variant-soft" onclick={onReset}>Reset position</button>
@@ -35,7 +35,7 @@
           <button class="btn btn-sm variant-filled" onclick={onApply} disabled={!hasLoaded}>Apply to Inspector</button>
         </div>
       </div>
-      <div class="mt-4 rounded-2xl border border-white/10 bg-black/30 p-3">
+      <div class="mt-4 rounded-2xl border border-white/10 bg-black/30 p-3 inspector-pop-sub">
         <WillowDark fonts={false}>
           <FilterBuilder
             type="list"

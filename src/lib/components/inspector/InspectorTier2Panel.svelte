@@ -82,7 +82,7 @@
 </script>
 
 {#if tier2Open}
-  <div class="mt-4 border-t border-white/10 pt-4" transition:slide={{ duration: uiAnimDur }}>
+  <div class="mt-4 border-t border-white/10 pt-4 inspector-pop-layer rounded-xl px-2 pb-2" transition:slide={{ duration: uiAnimDur }}>
     <div class="flex flex-wrap items-center justify-between gap-2" use:aa>
       <div class="text-[10px] uppercase tracking-widest text-white/50">Tier-2 filters</div>
       <div class="flex flex-wrap gap-2">
@@ -106,7 +106,7 @@
     </div>
 
     {#if tier2Tab === 'numeric'}
-      <div class="mt-3 grid grid-cols-12 gap-3 items-end" transition:fade={{ duration: uiAnimDur }}>
+      <div class="mt-3 grid grid-cols-12 gap-3 items-end inspector-pop-sub rounded-xl px-2 py-2" transition:fade={{ duration: uiAnimDur }}>
         <div class="col-span-12 md:col-span-2">
           <label class="flex items-center gap-2 text-xs text-white/75">
             <input class="checkbox checkbox-sm" type="checkbox" bind:checked={numericF.enabled} onchange={() => void runFilterNow()} />
@@ -143,7 +143,7 @@
         {/if}
       </div>
     {:else if tier2Tab === 'date'}
-      <div class="mt-3 grid grid-cols-12 gap-3 items-end" transition:fade={{ duration: uiAnimDur }}>
+      <div class="mt-3 grid grid-cols-12 gap-3 items-end inspector-pop-sub rounded-xl px-2 py-2" transition:fade={{ duration: uiAnimDur }}>
         <div class="col-span-12 md:col-span-2">
           <label class="flex items-center gap-2 text-xs text-white/75">
             <input class="checkbox checkbox-sm" type="checkbox" bind:checked={dateF.enabled} onchange={() => void runFilterNow()} />
@@ -180,7 +180,7 @@
         {/if}
       </div>
     {:else}
-      <div class="mt-3 grid grid-cols-12 gap-3 items-end" transition:fade={{ duration: uiAnimDur }}>
+      <div class="mt-3 grid grid-cols-12 gap-3 items-end inspector-pop-sub rounded-xl px-2 py-2" transition:fade={{ duration: uiAnimDur }}>
         <div class="col-span-12 md:col-span-2">
           <label class="flex items-center gap-2 text-xs text-white/75">
             <input class="checkbox checkbox-sm" type="checkbox" bind:checked={catF.enabled} onchange={() => void runFilterNow()} />

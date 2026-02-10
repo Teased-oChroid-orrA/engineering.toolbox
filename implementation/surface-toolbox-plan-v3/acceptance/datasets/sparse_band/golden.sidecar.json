@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "export": {
+    "format": "csv+json-sidecar",
+    "requiredColumns": ["slice_id", "x", "y", "z"],
+    "optionalColumnsIncluded": true,
+    "optionalColumns": ["source_entity", "residual", "method", "warning_code"]
+  },
+  "stats": {
+    "pointsInputCount": 4,
+    "pointsExportedCount": 4,
+    "sliceCount": 7,
+    "warningCount": 8
+  },
+  "warnings": [
+    { "code": "SLICE_EMPTY", "severity": "warning" },
+    { "code": "SLICE_SPARSE", "severity": "info" },
+    { "code": "SLICE_EMPTY_MANY", "severity": "warning" }
+  ],
+  "expectations": {
+    "minSlices": 7,
+    "minWarnings": 5
+  }
+}

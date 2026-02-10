@@ -2,6 +2,13 @@
   type Point3D = { x: number; y: number; z: number };
   type Edge = [number, number];
   type IntersectionRes = { p: Point3D; skew: number };
+  type IntersectionDiag = {
+    severity: 'info' | 'warning' | 'error' | null;
+    message: string | null;
+    angleDeg: number | null;
+    skew: number | null;
+    recommendations: { label: string; confidence: number; rationale: string }[];
+  };
 
   export let edges: Edge[] = [];
   export let points: Point3D[] = [];
@@ -13,6 +20,14 @@
   export let refPointIdx: number;
 
   export let intersection: IntersectionRes | null = null;
+  export let intersectionBusy: boolean = false;
+  export let intersectionDiagnostics: IntersectionDiag = {
+    severity: null,
+    message: null,
+    angleDeg: null,
+    skew: null,
+    recommendations: []
+  };
   export let calcOffsetIntersection: () => void;
 </script>
 
@@ -70,8 +85,8 @@
     </label>
   </div>
 
-  <button class="btn variant-filled-primary w-full" onclick={calcOffsetIntersection}>
-    Compute intersection
+  <button class="btn variant-filled-primary w-full" onclick={calcOffsetIntersection} disabled={intersectionBusy}>
+    {intersectionBusy ? 'Computing...' : 'Compute intersection'}
   </button>
 
   {#if intersection}
@@ -83,6 +98,41 @@
       <div class="font-mono text-[11px] text-white/50">
         skew Δ {Number.isFinite(intersection.skew) ? intersection.skew.toExponential(2) : '—'}
       </div>
+    </div>
+  {/if}
+
+  {#if intersectionDiagnostics.message}
+    <div
+      class={`rounded-xl border p-3 space-y-2 ${
+        intersectionDiagnostics.severity === 'error'
+          ? 'border-rose-400/35 bg-rose-500/10 text-rose-200'
+          : intersectionDiagnostics.severity === 'warning'
+            ? 'border-amber-300/30 bg-amber-400/10 text-amber-100'
+            : 'border-cyan-300/25 bg-cyan-400/10 text-cyan-100'
+      }`}
+    >
+      <div class="text-[11px] font-semibold uppercase tracking-widest">{intersectionDiagnostics.severity ?? 'info'}</div>
+      <div class="text-[12px]">{intersectionDiagnostics.message}</div>
+      {#if intersectionDiagnostics.angleDeg != null}
+        <div class="text-[11px] font-mono opacity-90">Angle: {intersectionDiagnostics.angleDeg.toFixed(4)}°</div>
+      {/if}
+      {#if intersectionDiagnostics.recommendations.length > 0}
+        <div class="space-y-1">
+          <div class="text-[10px] uppercase tracking-widest opacity-80">Recommendations</div>
+          {#each intersectionDiagnostics.recommendations as rec (rec.label)}
+            <div class="rounded-lg border border-white/15 bg-black/20 p-2 space-y-1">
+              <div class="flex items-center justify-between text-[11px]">
+                <span>{rec.label}</span>
+                <span class="font-mono">{Math.round(rec.confidence * 100)}%</span>
+              </div>
+              <div class="h-1.5 rounded bg-white/10 overflow-hidden">
+                <div class="h-full bg-cyan-300/80" style={`width:${Math.max(0, Math.min(100, rec.confidence * 100))}%`}></div>
+              </div>
+              <div class="text-[10px] opacity-80">{rec.rationale}</div>
+            </div>
+          {/each}
+        </div>
+      {/if}
     </div>
   {/if}
 </div>

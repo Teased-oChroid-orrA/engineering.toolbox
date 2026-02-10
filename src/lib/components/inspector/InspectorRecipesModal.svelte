@@ -51,7 +51,7 @@
 {#if open}
   <div class="fixed inset-0 z-50 flex items-center justify-center p-6 relative" transition:fade={{ duration: uiAnimDur }}>
     <button type="button" class="absolute inset-0 modal-backdrop p-0 m-0 border-0" onclick={onClose} aria-label="Close recipes dialog"></button>
-    <div class="relative z-10 glass-panel w-full max-w-3xl rounded-2xl border border-white/10 p-5" transition:scale={{ duration: uiAnimDur, start: 0.96 }} style={floatingStyle}>
+    <div class="relative z-10 glass-panel w-full max-w-3xl rounded-2xl border border-white/10 p-5 inspector-pop-layer" transition:scale={{ duration: uiAnimDur, start: 0.96 }} style={floatingStyle}>
       <div class="mb-2 flex items-center justify-between gap-2 border-b border-white/10 pb-2 cursor-move" role="button" tabindex="0" onmousedown={onBeginDrag}>
         <span class="text-[11px] uppercase tracking-widest text-white/50">Drag</span>
         <button class="btn btn-xs variant-soft" onclick={onReset}>Reset position</button>
@@ -105,7 +105,7 @@
           <div class="text-sm text-white/55">No recipes saved yet.</div>
         {:else}
           {#each recipes as r (r.id)}
-            <div class="glass-panel rounded-xl border border-white/10 p-4">
+            <div class="glass-panel rounded-xl border border-white/10 p-4 inspector-pop-sub">
               <div class="flex items-start justify-between gap-2">
                 <div>
                   <div class="text-xs font-semibold text-white/85">{r.favorite ? '★ ' : ''}{r.name}</div>

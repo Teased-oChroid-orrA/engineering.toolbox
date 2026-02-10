@@ -247,7 +247,7 @@
 
 <div
   bind:this={containerEl}
-  class="glass-panel rounded-2xl border border-white/10 overflow-auto relative focus:outline-none"
+  class="glass-panel rounded-2xl border border-white/10 overflow-auto relative focus:outline-none inspector-panel-slide inspector-pop-card"
   style="height: 60vh;"
   onscroll={onScroll}
   onkeydown={onGridKeydown}
@@ -350,7 +350,7 @@
                   {#if (cell ?? '').trim().length === 0}
                     <span class="italic text-white/35">∅</span>
                   {:else}
-                    <span class="font-mono cell-smooth">{@html highlightCell(String(cell))}</span>
+                    <span class="font-mono cell-smooth inspector-pop-value">{@html highlightCell(String(cell))}</span>
                   {/if}
                 </td>
               {/each}
@@ -364,7 +364,7 @@
                   {#if (cell ?? '').trim().length === 0}
                     <span class="italic text-white/35">∅</span>
                   {:else}
-                    <span class="font-mono cell-smooth">{@html highlightCell(String(cell))}</span>
+                    <span class="font-mono cell-smooth inspector-pop-value">{@html highlightCell(String(cell))}</span>
                   {/if}
                 </td>
               {/each}
@@ -378,7 +378,7 @@
                   {#if (cell ?? '').trim().length === 0}
                     <span class="italic text-white/35">∅</span>
                   {:else}
-                    <span class="font-mono cell-smooth">{@html highlightCell(String(cell))}</span>
+                    <span class="font-mono cell-smooth inspector-pop-value">{@html highlightCell(String(cell))}</span>
                   {/if}
                 </td>
               {/each}
@@ -394,7 +394,7 @@
                   {#if (cell ?? '').trim().length === 0}
                     <span class="italic text-white/35">∅</span>
                   {:else}
-                    <span class="font-mono">{@html highlightCell(String(cell))}</span>
+                    <span class="font-mono inspector-pop-value">{@html highlightCell(String(cell))}</span>
                   {/if}
                 </td>
               {/each}
@@ -408,7 +408,7 @@
                   {#if (cell ?? '').trim().length === 0}
                     <span class="italic text-white/35">∅</span>
                   {:else}
-                    <span class="font-mono">{@html highlightCell(String(cell))}</span>
+                    <span class="font-mono inspector-pop-value">{@html highlightCell(String(cell))}</span>
                   {/if}
                 </td>
               {/each}
@@ -422,7 +422,7 @@
                   {#if (cell ?? '').trim().length === 0}
                     <span class="italic text-white/35">∅</span>
                   {:else}
-                    <span class="font-mono">{@html highlightCell(String(cell))}</span>
+                    <span class="font-mono inspector-pop-value">{@html highlightCell(String(cell))}</span>
                   {/if}
                 </td>
               {/each}

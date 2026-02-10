@@ -72,12 +72,12 @@
   }>();
 </script>
 
-<div class="glass-panel rounded-2xl p-3 border border-white/10 sticky top-2 z-30" data-testid="inspector-toolbar">
+<div class="glass-panel rounded-2xl p-3 border border-white/10 sticky top-2 z-30 inspector-panel-slide inspector-pop-card" data-testid="inspector-toolbar">
   <div class="flex flex-wrap items-center gap-2 text-xs text-white/70">
     <div class="relative" data-inspector-menu-root="true">
       <button class="btn btn-xs variant-soft" onclick={() => dispatch('toggleMenu')}>Menu ▾</button>
       {#if showInspectorMenu}
-        <div class="absolute left-0 top-full mt-2 z-[1400] w-64 rounded-xl border border-white/10 bg-surface-900/95 p-2 shadow-2xl">
+        <div class="absolute left-0 top-full mt-2 z-[1400] w-64 rounded-xl border border-white/10 bg-surface-900/95 p-2 shadow-2xl inspector-pop-sub inspector-pop-layer">
           <div class="px-2 py-1 text-[10px] uppercase tracking-widest text-white/45">Load</div>
           <button class="w-full text-left px-2 py-1 rounded hover:bg-white/10 text-xs" onclick={() => dispatch('openStream')} disabled={!canOpenPath}>Stream…</button>
           <button class="w-full text-left px-2 py-1 rounded hover:bg-white/10 text-xs" onclick={() => dispatch('openFallback')}>Fallback upload…</button>

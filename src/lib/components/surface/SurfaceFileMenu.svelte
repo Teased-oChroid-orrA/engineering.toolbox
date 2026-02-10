@@ -100,7 +100,7 @@
           fileSubOpen = null;
         }}
       >
-        Drafting
+        Create Geometry
       </button>
       <button
         class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-sm"

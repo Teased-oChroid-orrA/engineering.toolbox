@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "export": {
+    "format": "csv+json-sidecar",
+    "requiredColumns": ["slice_id", "x", "y", "z"],
+    "optionalColumnsIncluded": true,
+    "optionalColumns": ["source_entity", "residual", "method", "warning_code"]
+  },
+  "stats": {
+    "pointsInputCount": 9,
+    "pointsExportedCount": 9,
+    "sliceCount": 3,
+    "warningCount": 0
+  },
+  "warnings": [],
+  "expectations": {
+    "minSlices": 3,
+    "maxWarnings": 0
+  }
+}

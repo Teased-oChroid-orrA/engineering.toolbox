@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-02-10T12:19:10.382Z",
+  "source": {
+    "cases": "golden/bushing_cases.json",
+    "expected": "golden/bushing_expected.json"
+  },
+  "records": 3,
+  "columns": [
+    "case_name",
+    "units",
+    "bushing_type",
+    "id_type",
+    "bore_dia",
+    "id_bushing",
+    "interference",
+    "housing_len",
+    "housing_width",
+    "edge_dist",
+    "contact_pressure",
+    "governing_name",
+    "governing_margin",
+    "sleeve_wall",
+    "neck_wall",
+    "warning_count",
+    "warnings"
+  ]
+}

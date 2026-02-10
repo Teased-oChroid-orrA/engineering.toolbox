@@ -1,10 +1,10 @@
-export type UnitSystem = 'imperial' | 'metric';
+import type { UnitSystem } from '../units';
 
-export type CountersinkDefType = 'Dia+Angle' | 'Dia+Depth' | 'Depth+Angle';
+export type CSMode = 'depth_angle' | 'dia_angle' | 'dia_depth';
 
 export type CountersinkInput = {
-  enabled: boolean;
-  defType: CountersinkDefType;
+  enabled?: boolean;
+  defType?: string;
   dia?: number;
   depth?: number;
   angleDeg?: number;
@@ -25,47 +25,55 @@ export type MaterialProps = {
 
 export type BushingInputs = {
   units: UnitSystem;
-  // Basic geometry
-  t1: number;
-  t2: number;
-  housingLen: number; // contact length
   boreDia: number;
-  bushOD: number; // nominal
-  bushID: number;
-  edgeDist: number;
-
-  // Fit / load
+  idBushing: number;
   interference: number;
-  dT: number;
-  friction: number;
-  load: number;
-  thetaDeg: number;
-
-  // Types
-  idType: 'Straight' | 'Countersink';
-  bushingType: 'Straight' | 'Flanged' | 'CountersinkBushing';
-  // Flange geometry (used for drafting; solver currently ignores these)
+  housingLen: number;
+  housingWidth: number;
+  edgeDist: number;
+  bushingType: 'straight' | 'flanged' | 'countersink';
+  idType: 'straight' | 'countersink';
+  csMode: CSMode;
+  csDia: number;
+  csDepth: number;
+  csAngle: number;
+  extCsMode: CSMode;
+  extCsDia: number;
+  extCsDepth: number;
+  extCsAngle: number;
   flangeDia?: number;
+  flangeOd?: number;
   flangeThk?: number;
-
-
-  // Countersinks
-  idCS: CountersinkInput;
-  odCS: CountersinkInput;
-
-  // Min thickness constraints
+  matHousing: string;
+  matBushing: string;
+  friction: number;
+  dT: number;
   minWallStraight: number;
   minWallNeck: number;
-
-  // Materials
-  housingMat: string;
-  bushingMat: string;
+  load?: number;
+  thetaDeg?: number;
+  idCS?: CountersinkInput;
+  odCS?: CountersinkInput;
 };
 
 export type BushingCandidate = {
   name: string;
   /** Margin of safety (MS) for this check: + is pass, - is fail. */
   margin: number;
+};
+
+export type BushingWarningCode =
+  | 'INPUT_INVALID'
+  | 'STRAIGHT_WALL_BELOW_MIN'
+  | 'NECK_WALL_BELOW_MIN'
+  | 'NET_CLEARANCE_FIT'
+  | 'EDGE_DISTANCE_SEQUENCE_FAIL'
+  | 'EDGE_DISTANCE_STRENGTH_FAIL';
+
+export type BushingWarning = {
+  code: BushingWarningCode;
+  message: string;
+  severity: 'info' | 'warning' | 'error';
 };
 
 export type BushingOutput = {
@@ -79,6 +87,25 @@ export type BushingOutput = {
   };
 
   pressure: number;
+  lame: {
+    model: string;
+    unitsBase: { length: 'in'; stress: 'psi'; force: 'lbf' };
+    deltaTotal: number;
+    deltaThermal: number;
+    deltaUser: number;
+    boreDia: number;
+    idBushing: number;
+    effectiveODHousing: number;
+    D_equivalent: number;
+    psi: number;
+    lambda: number;
+    w_eff: number;
+    e_eff: number;
+    termB: number;
+    termH: number;
+    pressurePsi: number;
+    pressureKsi: number;
+  };
   hoop: {
     housingSigma: number;
     housingMS: number;
@@ -97,8 +124,54 @@ export type BushingOutput = {
   };
 
   governing: { name: string; margin: number };
-  /** Candidate checks with margins for traceability. */
+  physics: {
+    deltaEffective: number;
+    contactPressure: number;
+    installForce: number;
+    stressHoopHousing: number;
+    stressHoopBushing: number;
+    marginHousing: number;
+    marginBushing: number;
+    edMinCoupled: number;
+  };
+  geometry: {
+    odBushing: number;
+    wallStraight: number;
+    wallNeck: number;
+    csInternal: { dia: number; depth: number; angleDeg: number };
+    csExternal: { dia: number; depth: number; angleDeg: number };
+    isSaturationActive: boolean;
+  };
   candidates: BushingCandidate[];
+  warningCodes: BushingWarning[];
   warnings: string[];
-  debug: Record<string, unknown>;
+};
+
+export type BushingInputsRaw = Partial<BushingInputs> & {
+  bore_dia?: number;
+  bushOD?: number;
+  bushID?: number;
+  id_bushing?: number;
+  housing_len?: number;
+  housingWidth?: number;
+  housing_width?: number;
+  edge_dist?: number;
+  bushing_type?: string;
+  flange_od?: number;
+  flange_thk?: number;
+  id_type?: string;
+  cs_mode?: CSMode;
+  cs_dia?: number;
+  cs_depth?: number;
+  cs_angle?: number;
+  ext_cs_mode?: CSMode;
+  ext_cs_dia?: number;
+  ext_cs_depth?: number;
+  ext_cs_angle?: number;
+  mat_housing?: string;
+  mat_bushing?: string;
+  min_wall_straight?: number;
+  min_wall_neck?: number;
+  t1?: number;
+  t2?: number;
 };

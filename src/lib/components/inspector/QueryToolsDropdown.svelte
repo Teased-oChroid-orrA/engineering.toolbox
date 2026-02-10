@@ -99,7 +99,7 @@
   </button>
 
   {#if open}
-    <div bind:this={panelEl} class="z-[4000] min-w-[180px] rounded-xl border border-white/10 bg-surface-900/95 p-2 shadow-2xl pointer-events-auto" style={panelStyle}>
+    <div bind:this={panelEl} class="z-[4000] min-w-[180px] rounded-xl border border-white/10 bg-surface-900/95 p-2 shadow-2xl pointer-events-auto inspector-pop-layer" style={panelStyle}>
       <button class="w-full text-left px-2 py-1 rounded hover:bg-white/10 text-xs" onclick={() => run(onBuilder)}>Builder</button>
       <button class="w-full text-left px-2 py-1 rounded hover:bg-white/10 text-xs" onclick={() => run(onRegexMode)}>Regex mode</button>
       <button class="w-full text-left px-2 py-1 rounded hover:bg-white/10 text-xs" onclick={() => run(onHelp)}>Help</button>

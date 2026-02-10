@@ -16,6 +16,7 @@
   export let openViewportMenu: (e: MouseEvent) => void;
   export let closeViewportMenu: () => void;
   export let updateProbeFromEvent: (e: MouseEvent) => void;
+  export let onViewportMouseLeave: () => void = () => {};
   export let onSvgPointerDown: (e: PointerEvent) => void;
   export let onSvgPointerMove: (e: PointerEvent) => void;
   export let onSvgPointerUp: (e: PointerEvent) => void;
@@ -23,10 +24,12 @@
   export let sortedSurfaces: { i: number; pts: [number, number, number, number] | number[]; z: number; name: string }[] = [];
   export let sortedEdges: { i: number; a: number; b: number; z: number }[] = [];
   export let projected: { x: number; y: number; z: number }[] = [];
+  export let pointBaseRadius: number = 5;
+  export let edgeHitWidth: number = 10;
   export let activeEdgeIdx: number | null = null;
   export let setActiveEdgeIdx: (idx: number) => void;
   export let onEdgeClick: (idx: number, ev?: MouseEvent) => void = (idx) => setActiveEdgeIdx(idx);
-  export let onSurfaceClick: (idx: number) => void = () => {};
+  export let onSurfaceClick: (idx: number, ev?: MouseEvent) => void = () => {};
   export let onPlaneClick: (idx: number) => void = () => {};
   export let onCsysClick: (idx: number) => void = () => {};
   export let depthOpacity: (z: number) => number;
@@ -47,6 +50,8 @@
   export let cylAxisSeg: { a: any; b: any } | null = null;
   export let intersection: { p: any; skew: number } | null = null;
   export let interpPoint: any = null;
+  export let activeSnap: { kind: string; screen: { x: number; y: number } } | null = null;
+  export let hoverTooltip: { x: number; y: number; title: string; lines: string[] } | null = null;
 
   export let evalRes: any = null;
   export let heatmapOn: boolean = false;
@@ -93,7 +98,7 @@
 </script>
 
 <div
-  class="rounded-xl bg-black/20 border border-white/5 overflow-hidden relative"
+  class="rounded-xl bg-black/20 border border-white/5 overflow-hidden relative surface-panel-slide"
   bind:this={viewportEl}
   role="region"
   aria-label="Surface viewport container"
@@ -109,7 +114,7 @@
     oncontextmenu={openViewportMenu}
     onclick={closeViewportMenu}
     onmousemove={updateProbeFromEvent}
-    onmouseleave={() => (probe = null)}
+    onmouseleave={() => { probe = null; onViewportMouseLeave(); }}
     onpointerdown={onSvgPointerDown}
     onpointermove={onSvgPointerMove}
     onpointerup={onSvgPointerUp}
@@ -152,8 +157,8 @@
             tabindex="0"
             aria-label={`Select surface S${s.i + 1}`}
             onpointerdown={(ev) => ev.stopPropagation()}
-            onpointerup={(ev) => { ev.stopPropagation(); onSurfaceClick(s.i); }}
-            onclick={() => onSurfaceClick(s.i)}
+            onpointerup={(ev) => { ev.stopPropagation(); onSurfaceClick(s.i, ev as unknown as MouseEvent); }}
+            onclick={(ev) => onSurfaceClick(s.i, ev)}
             onkeydown={(ke) => keyActivate(ke, () => onSurfaceClick(s.i))}
           >
             <title>{s.name}</title>
@@ -234,7 +239,7 @@
             x2={p2.x}
             y2={p2.y}
             stroke="rgba(0,0,0,0)"
-            stroke-width="10"
+            stroke-width={edgeHitWidth}
             class="cursor-pointer"
             aria-hidden="true"
             onpointerdown={(ev) => ev.stopPropagation()}
@@ -289,6 +294,50 @@
       <circle cx={sp.x} cy={sp.y} r="5" fill="rgba(34,197,94,0.65)" stroke="rgba(34,197,94,1)" stroke-width="2" />
     {/if}
 
+    {#if activeSnap}
+      <g class="pointer-events-none">
+        <circle
+          cx={activeSnap.screen.x}
+          cy={activeSnap.screen.y}
+          r="7"
+          fill="rgba(6,182,212,0.12)"
+          stroke="rgba(34,211,238,0.95)"
+          stroke-width="1.6"
+          stroke-dasharray="3 2"
+        />
+        <line x1={activeSnap.screen.x - 9} y1={activeSnap.screen.y} x2={activeSnap.screen.x + 9} y2={activeSnap.screen.y} stroke="rgba(34,211,238,0.9)" stroke-width="1.2" />
+        <line x1={activeSnap.screen.x} y1={activeSnap.screen.y - 9} x2={activeSnap.screen.x} y2={activeSnap.screen.y + 9} stroke="rgba(34,211,238,0.9)" stroke-width="1.2" />
+      </g>
+    {/if}
+
+    {#if hoverTooltip}
+      <g class="pointer-events-none">
+        <rect
+          x={hoverTooltip.x + 12}
+          y={hoverTooltip.y - 58}
+          width="240"
+          height="54"
+          rx="9"
+          fill="rgba(2,6,23,0.82)"
+          stroke="rgba(125,211,252,0.35)"
+        />
+        <text x={hoverTooltip.x + 20} y={hoverTooltip.y - 42} fill="rgba(186,230,253,0.98)" font-size="10.5" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas">
+          {hoverTooltip.title}
+        </text>
+        {#each hoverTooltip.lines as line, li (li)}
+          <text
+            x={hoverTooltip.x + 20}
+            y={hoverTooltip.y - 29 + li * 12}
+            fill="rgba(241,245,249,0.86)"
+            font-size="10"
+            font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas"
+          >
+            {line}
+          </text>
+        {/each}
+      </g>
+    {/if}
+
     {#if showPoints}
       {#each projected as node, i (i)}
         {@const absd = evalRes ? Math.abs(evalRes.signedDistances[i] ?? 0) : 0}
@@ -298,7 +347,7 @@
           <circle
             cx={node.x}
             cy={node.y}
-            r={selectedSet.has(i) ? 7 : (pendingPointIdx === i ? 7 : 5)}
+            r={selectedSet.has(i) ? pointBaseRadius + 2 : (pendingPointIdx === i ? pointBaseRadius + 2 : pointBaseRadius)}
             fill={hmFill}
             fill-opacity={pointDepthOpacity(node.z)}
             stroke={selectedSet.has(i) ? 'rgba(56,189,248,0.95)' : (cylOutlierSet.has(i) ? 'rgba(251,191,36,0.95)' : (outlierSet.has(i) ? 'rgba(244,63,94,0.95)' : 'rgba(255,255,255,0.75)'))}

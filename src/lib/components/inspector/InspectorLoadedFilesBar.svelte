@@ -26,7 +26,7 @@
   }>();
 </script>
 
-<div class="glass-panel rounded-2xl p-3 border border-white/10" data-testid="inspector-loaded-files">
+<div class="glass-panel rounded-2xl p-3 border border-white/10 inspector-panel-slide inspector-pop-card" data-testid="inspector-loaded-files">
   <div class="flex items-center justify-between gap-2">
     <div class="text-[10px] uppercase tracking-widest text-white/50">Loaded files</div>
     <div></div>
@@ -36,7 +36,7 @@
       <span class="text-[11px] text-white/45">No file loaded yet.</span>
     {:else}
       {#each loadedDatasets as ds (ds.id)}
-        <div class={`inline-flex items-center rounded-lg border ${activeDatasetId === ds.id ? 'border-emerald-300/40 bg-emerald-500/15' : 'border-white/10 bg-white/5'}`}>
+        <div class={`inline-flex items-center rounded-lg border inspector-pop-sub ${activeDatasetId === ds.id ? 'border-emerald-300/40 bg-emerald-500/15' : 'border-white/10 bg-white/5'}`}>
           <button
             class={`btn btn-xs border-0 ${activeDatasetId === ds.id ? 'variant-filled' : 'variant-soft'}`}
             onclick={() => dispatch('activate', { id: ds.id })}

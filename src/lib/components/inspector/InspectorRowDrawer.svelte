@@ -47,7 +47,7 @@
 {#if open}
   <div class="fixed inset-0 z-40">
     <button class="absolute inset-0 modal-backdrop" transition:fade={{ duration: uiAnimDur }} onclick={onClose} aria-label="Close row details"></button>
-    <div class="absolute top-0 right-0 h-full w-full max-w-2xl glass-panel border-l border-white/10 p-5 overflow-auto" transition:slide={{ duration: uiAnimDur, axis: 'x' }}>
+    <div class="absolute top-0 right-0 h-full w-full max-w-2xl glass-panel border-l border-white/10 p-5 overflow-auto inspector-pop-layer" transition:slide={{ duration: uiAnimDur, axis: 'x' }}>
       <div class="flex items-start justify-between gap-3">
         <div>
           <div class="text-sm font-semibold text-white">Row details</div>
@@ -80,11 +80,11 @@
       {:else}
         <div class="mt-4 space-y-2">
           {#each drawerList as kv (kv.key)}
-            <div class="rounded-xl border border-white/10 bg-white/5 p-3">
+            <div class="rounded-xl border border-white/10 bg-white/5 p-3 inspector-pop-sub">
               <div class="flex items-start gap-2">
                 <div class="flex-1 min-w-0">
                   <div class="text-[10px] uppercase tracking-widest text-white/45 truncate">{kv.key}</div>
-                  <div class="mt-1 font-mono text-xs text-white/85 break-words">{kv.value || '—'}</div>
+                  <div class="mt-1 font-mono text-xs text-white/85 break-words inspector-pop-value">{kv.value || '—'}</div>
                 </div>
                 {#if kv.idx != null}
                   <div class="flex flex-wrap gap-1 justify-end">

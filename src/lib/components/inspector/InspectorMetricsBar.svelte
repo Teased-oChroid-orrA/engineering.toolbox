@@ -27,7 +27,7 @@
   }>();
 </script>
 
-<div class="glass-panel rounded-2xl p-4 border border-white/10" data-testid="inspector-metrics-bar">
+<div class="glass-panel rounded-2xl p-4 border border-white/10 inspector-panel-slide inspector-pop-card" data-testid="inspector-metrics-bar">
   <div class="flex flex-wrap gap-6 text-xs text-white/70">
     <div class="flex flex-col">
       <span class="text-[10px] uppercase tracking-widest text-white/40">Columns</span>
@@ -68,7 +68,7 @@
       <div class="font-semibold text-white/80 mb-1">Parser diagnostics (visible slice)</div>
       <div class="flex flex-wrap gap-2">
         {#each parseDiagnostics as d (`diag-${d.idx}`)}
-          <span class="px-2 py-1 rounded-lg border border-white/10 bg-white/5">
+          <span class="px-2 py-1 rounded-lg border border-white/10 bg-white/5 inspector-pop-sub">
             {d.name}: {#if d.numericFail > 0}num fail <NumberFlow value={d.numericFail} /> {/if}{#if d.dateFail > 0}date fail <NumberFlow value={d.dateFail} />{/if}
           </span>
         {/each}

@@ -1,79 +1,10 @@
 import { MATERIALS } from './materials';
-import { MM_TO_IN, type UnitSystem } from '../units';
 import { calculateUniversalBearing } from '../shared/bearing';
+import { normalizeBushingInputs } from './normalize';
+import { validateBushingInputs } from './schema';
+import type { BushingInputsRaw, BushingOutput, BushingWarning, CSMode } from './types';
 
-export type CSMode = 'depth_angle' | 'dia_angle' | 'dia_depth';
-
-export type BushingInputs = {
-  units: UnitSystem;
-  boreDia?: number;
-  bore_dia?: number;
-  bushOD?: number;
-  bushID?: number;
-  id_bushing?: number;
-  idBushing?: number;
-  interference: number;
-  housingLen?: number;
-  housing_len?: number;
-  housingWidth?: number;
-  housing_width?: number;
-  edgeDist?: number;
-  edge_dist?: number;
-  bushingType?: 'straight' | 'flanged' | 'countersink' | 'CountersinkBushing' | 'Straight' | 'Flanged';
-  bushing_type?: 'straight' | 'flanged' | 'countersink' | 'CountersinkBushing' | 'Straight' | 'Flanged';
-  flangeOd?: number;
-  flange_od?: number;
-  flangeThk?: number;
-  flange_thk?: number;
-  idType?: 'straight' | 'countersink' | 'Straight' | 'Countersink';
-  id_type?: 'straight' | 'countersink' | 'Straight' | 'Countersink';
-  csMode?: CSMode;
-  cs_mode?: CSMode;
-  csDia?: number;
-  cs_dia?: number;
-  csDepth?: number;
-  cs_depth?: number;
-  csAngle?: number;
-  cs_angle?: number;
-  extCsMode?: CSMode;
-  ext_cs_mode?: CSMode;
-  extCsDia?: number;
-  ext_cs_dia?: number;
-  extCsDepth?: number;
-  ext_cs_depth?: number;
-  extCsAngle?: number;
-  ext_cs_angle?: number;
-  matHousing?: string;
-  mat_housing?: string;
-  matBushing?: string;
-  mat_bushing?: string;
-  friction: number;
-  dT: number;
-  minWallStraight?: number;
-  min_wall_straight?: number;
-  minWallNeck?: number;
-  min_wall_neck?: number;
-  // legacy/extended fields
-  t1?: number;
-  t2?: number;
-  housing_surf_len?: number;
-  load?: number;
-  thetaDeg?: number;
-  idCS?: {
-    enabled?: boolean;
-    defType?: string;
-    dia?: number;
-    depth?: number;
-    angleDeg?: number;
-  };
-  odCS?: {
-    enabled?: boolean;
-    defType?: string;
-    dia?: number;
-    depth?: number;
-    angleDeg?: number;
-  };
-};
+export type { BushingInputs, BushingInputsRaw, BushingOutput, BushingWarning, CSMode } from './types';
 
 const getMat = (id: string | undefined) => MATERIALS.find((m) => m.id === id) || MATERIALS[0];
 
@@ -90,64 +21,41 @@ export function solveCountersink(mode: CSMode, dia: number, depth: number, angle
   return res;
 }
 
-function toInches(v: number, units: UnitSystem) {
-  return units === 'metric' ? v * MM_TO_IN : v;
-}
-
 function toPsiFromKsi(v: number) {
   return v * 1000;
 }
 
-export function computeBushing(raw: BushingInputs) {
-  const units = raw.units ?? 'imperial';
+export function computeBushing(raw: BushingInputsRaw): BushingOutput {
+  const input = normalizeBushingInputs(raw);
+  const validationWarnings = validateBushingInputs(input);
+  const units = input.units;
+  const boreDia = input.boreDia;
+  const idBushing = input.idBushing;
+  const housingLen = input.housingLen;
+  const edgeDist = input.edgeDist;
+  const housingWidth = input.housingWidth;
+  const flangeOd = input.flangeOd ?? 0;
+  const flangeThk = input.flangeThk ?? 0;
+  const minWallStraight = input.minWallStraight;
+  const minWallNeck = input.minWallNeck;
+  const csMode = input.csMode;
+  const csEnabled = input.idCS?.enabled ?? input.idType === 'countersink';
+  const csDia = input.csDia;
+  const csDepth = input.csDepth;
+  const csAngle = input.csAngle;
+  const extCsMode = input.extCsMode;
+  const extCsEnabled = input.odCS?.enabled ?? input.bushingType === 'countersink';
+  const extCsDia = input.extCsDia;
+  const extCsDepth = input.extCsDepth;
+  const extCsAngle = input.extCsAngle;
+  const bushingType = input.bushingType;
+  const idType = input.idType;
 
-  // Normalize the mixed legacy/current field names and convert geometry to inches so that
-  // the solver can stay in psi/inch space (matches the legacy golden baselines).
-  const boreDia = toInches(raw.boreDia ?? raw.bore_dia ?? raw.bushOD ?? 0, units);
-  const idBushing = toInches(raw.idBushing ?? raw.bushID ?? raw.id_bushing ?? 0, units);
-  const housingLen = toInches(
-    (raw.housingLen ?? raw.housing_len ?? (raw.t1 ?? 0) + (raw.t2 ?? 0)) || boreDia * 2,
-    units
-  );
-  const edgeDist = toInches(raw.edgeDist ?? raw.edge_dist ?? Math.max(boreDia * 2, 0), units);
-  const housingWidth = toInches(
-    raw.housingWidth ?? raw.housing_width ?? Math.max(edgeDist * 2, boreDia * 4),
-    units
-  );
-  const flangeOd = toInches(raw.flangeOd ?? raw.flange_od ?? 0, units);
-  const flangeThk = toInches(raw.flangeThk ?? raw.flange_thk ?? 0, units);
+  const matHousing = getMat(input.matHousing);
+  const matBushing = getMat(input.matBushing);
 
-  const minWallStraight = toInches(raw.minWallStraight ?? raw.min_wall_straight ?? 0.02, units);
-  const minWallNeck = toInches(raw.minWallNeck ?? raw.min_wall_neck ?? 0.02, units);
-
-  // Internal countersink (ID)
-  const csMode = ((raw.csMode ?? raw.cs_mode ?? raw.idCS?.defType)?.toString().toLowerCase().replace('+', '_') as CSMode) || 'depth_angle';
-  const csEnabled = raw.idCS?.enabled ?? (raw.idType ?? raw.id_type)?.toString().toLowerCase() === 'countersink';
-  const csDia = toInches(
-    raw.csDia ?? raw.cs_dia ?? raw.idCS?.dia ?? raw.boreDia ?? raw.bore_dia ?? idBushing,
-    units
-  );
-  const csDepth = toInches(raw.csDepth ?? raw.cs_depth ?? raw.idCS?.depth ?? 0, units);
-  const csAngle = raw.csAngle ?? raw.cs_angle ?? raw.idCS?.angleDeg ?? 100;
-
-  // External countersink (OD / head)
-  const extCsMode = ((raw.extCsMode ?? raw.ext_cs_mode ?? raw.odCS?.defType)?.toString().toLowerCase().replace('+', '_') as CSMode) || 'depth_angle';
-  const extCsEnabled = raw.odCS?.enabled ?? (raw.bushingType ?? raw.bushing_type)?.toString().toLowerCase() === 'countersink';
-  const extCsDia = toInches(
-    raw.extCsDia ?? raw.ext_cs_dia ?? raw.odCS?.dia ?? raw.boreDia ?? raw.bore_dia ?? boreDia,
-    units
-  );
-  const extCsDepth = toInches(raw.extCsDepth ?? raw.ext_cs_depth ?? raw.odCS?.depth ?? 0, units);
-  const extCsAngle = raw.extCsAngle ?? raw.ext_cs_angle ?? raw.odCS?.angleDeg ?? 100;
-
-  const bushingType = (raw.bushingType ?? raw.bushing_type ?? 'straight').toString().toLowerCase() as BushingInputs['bushingType'];
-  const idType = (raw.idType ?? raw.id_type ?? 'straight').toString().toLowerCase() as BushingInputs['idType'];
-
-  const matHousing = getMat(raw.matHousing ?? raw.mat_housing);
-  const matBushing = getMat(raw.matBushing ?? raw.mat_bushing);
-
-  const friction = Number.isFinite(raw.friction) ? raw.friction : 0.15;
-  const dT = Number.isFinite(raw.dT) ? raw.dT : 0;
+  const friction = Number.isFinite(input.friction) ? input.friction : 0.15;
+  const dT = Number.isFinite(input.dT) ? input.dT : 0;
 
   // Thermal delta: use per-°F coefficients and convert °C delta when metric.
   const dT_F = units === 'metric' ? dT * 1.8 : dT;
@@ -155,7 +63,7 @@ export function computeBushing(raw: BushingInputs) {
   const alpha_b = (matBushing.alpha_uF ?? 0) * 1e-6;
 
   const deltaThermal = (alpha_b - alpha_h) * boreDia * dT_F;
-  const delta = (raw.interference ?? 0) + deltaThermal;
+  const delta = input.interference + deltaThermal;
   const odInstalled = boreDia + delta;
 
   // Countersink resolution (ID and OD).
@@ -230,7 +138,7 @@ export function computeBushing(raw: BushingInputs) {
   const bearingProfile = calculateUniversalBearing(profile);
   const t_eff_seq = bearingProfile.t_eff_sequence || housingLen;
 
-  const thetaDeg = raw.thetaDeg ?? 40;
+  const thetaDeg = input.thetaDeg ?? 40;
   const th = Math.max(1e-6, Math.abs(thetaDeg)) * (Math.PI / 180);
   const sinTheta = Math.max(1e-6, Math.sin(th));
 
@@ -239,7 +147,7 @@ export function computeBushing(raw: BushingInputs) {
 
   const Fbru_eff = Fbru + 0.8 * pressure; // interaction uplift from legacy
   const e_required_seq = tau > 0 ? (boreDia * Fbru_eff) / (2 * tau * sinTheta) : Infinity;
-  const loadForEdge = Number.isFinite(raw.load) ? Number(raw.load) : 1000;
+  const loadForEdge = Number.isFinite(input.load) ? Number(input.load) : 1000;
   const e_required_strength = (2 * t_eff_seq * tau * sinTheta) > 1e-9 ? (loadForEdge) / (2 * t_eff_seq * tau * sinTheta) : Infinity;
 
   const edMinSequence = e_required_seq > 0 ? e_required_seq / boreDia : Infinity;
@@ -261,10 +169,48 @@ export function computeBushing(raw: BushingInputs) {
 
   const governing = candidates.reduce((best, cur) => (cur.margin < best.margin ? cur : best), candidates[0]);
 
-  const warnings: string[] = [];
-  if (failStraight) warnings.push('Straight wall thickness below minimum.');
-  if (failNeck) warnings.push('Neck wall thickness below minimum.');
-  if (delta <= 0) warnings.push('Net interference is negative (clearance fit after thermal).');
+  const warningCodes: BushingWarning[] = [...validationWarnings];
+  const warnings: string[] = validationWarnings.map((w) => w.message);
+  if (failStraight) {
+    warningCodes.push({
+      code: 'STRAIGHT_WALL_BELOW_MIN',
+      message: 'Straight wall thickness below minimum.',
+      severity: 'error'
+    });
+    warnings.push('Straight wall thickness below minimum.');
+  }
+  if (failNeck) {
+    warningCodes.push({
+      code: 'NECK_WALL_BELOW_MIN',
+      message: 'Neck wall thickness below minimum.',
+      severity: 'error'
+    });
+    warnings.push('Neck wall thickness below minimum.');
+  }
+  if (delta <= 0) {
+    warningCodes.push({
+      code: 'NET_CLEARANCE_FIT',
+      message: 'Net interference is negative (clearance fit after thermal).',
+      severity: 'warning'
+    });
+    warnings.push('Net interference is negative (clearance fit after thermal).');
+  }
+  if (marginSeq < 0) {
+    warningCodes.push({
+      code: 'EDGE_DISTANCE_SEQUENCE_FAIL',
+      message: 'Edge distance sequencing margin is below zero.',
+      severity: 'error'
+    });
+    warnings.push('Edge distance sequencing margin is below zero.');
+  }
+  if (marginStrength < 0) {
+    warningCodes.push({
+      code: 'EDGE_DISTANCE_STRENGTH_FAIL',
+      message: 'Edge distance strength margin is below zero.',
+      severity: 'error'
+    });
+    warnings.push('Edge distance strength margin is below zero.');
+  }
 
   return {
     sleeveWall: wallStraight,
@@ -280,7 +226,7 @@ export function computeBushing(raw: BushingInputs) {
       unitsBase: { length: 'in', stress: 'psi', force: 'lbf' },
       deltaTotal: delta,
       deltaThermal,
-      deltaUser: (raw.interference ?? 0),
+      deltaUser: input.interference,
       boreDia,
       idBushing,
       effectiveODHousing,
@@ -328,6 +274,8 @@ export function computeBushing(raw: BushingInputs) {
       isSaturationActive: housingWidth > w_eff || edgeDist > e_eff
     },
     governing,
+    candidates,
+    warningCodes,
     warnings
   };
 }

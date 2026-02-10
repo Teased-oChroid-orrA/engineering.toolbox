@@ -74,8 +74,28 @@
     const el = e.currentTarget as HTMLInputElement;
     if (type === 'number') {
       raw = el.value;
-      // While typing we emit the raw value for consumers that care,
-      // but we intentionally do NOT update the bound numeric value.
+      const trimmed = raw.trim();
+
+      // Live-commit valid numeric states so bound values update immediately.
+      if (trimmed === '') {
+        value = null;
+        isInvalid = false;
+        dispatch('input', value);
+        return;
+      }
+
+      if (VALID_NUMBER_RE.test(trimmed)) {
+        const n = Number.parseFloat(trimmed);
+        if (Number.isFinite(n)) {
+          value = n;
+          isInvalid = false;
+          dispatch('input', value);
+          return;
+        }
+      }
+
+      // Keep typing state for intermediate/invalid strings without clobbering value.
+      isInvalid = true;
       dispatch('input', raw);
       return;
     }

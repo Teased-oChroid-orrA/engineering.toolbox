@@ -1,6 +1,7 @@
 export type QueryScope = 'current' | 'all' | 'ask';
 export type MatchMode = 'fuzzy' | 'exact' | 'regex';
 import type { CategoryFilterState, DateFilterState, NumericFilterState } from '$lib/components/inspector/InspectorTier2Controller';
+import { toCombinedRegexQuery, type MultiQueryClause } from '$lib/components/inspector/InspectorMultiQueryController';
 
 export const shouldRunCrossFileQuery = (scope: QueryScope, loadedDatasetsLength: number) =>
   scope === 'all' && loadedDatasetsLength > 1;
@@ -35,16 +36,41 @@ export function buildFilterSpec(args: {
   query: string;
   targetColIdx: number | null;
   matchMode: MatchMode;
+  multiQueryEnabled?: boolean;
+  multiQueryClauses?: MultiQueryClause[];
+  escapeRegExp?: (v: string) => string;
   numericF: NumericFilterState;
   dateF: DateFilterState;
   catF: CategoryFilterState;
   maxRowsScanText: string;
 }): { spec: any | null; queryError?: string | null; numericError?: string | null; dateError?: string | null } {
-  const { query, targetColIdx, matchMode, numericF, dateF, catF, maxRowsScanText } = args;
+  const {
+    query,
+    targetColIdx,
+    matchMode,
+    multiQueryEnabled = false,
+    multiQueryClauses = [],
+    escapeRegExp = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+    numericF,
+    dateF,
+    catF,
+    maxRowsScanText
+  } = args;
 
-  if (matchMode === 'regex' && query.trim().length > 0) {
+  let effectiveQuery = query ?? '';
+  let effectiveMode = matchMode;
+  if (multiQueryEnabled) {
+    const combined = toCombinedRegexQuery(multiQueryClauses, escapeRegExp);
+    if (combined.error) return { spec: null, queryError: combined.error };
+    if ((combined.query ?? '').trim().length > 0) {
+      effectiveQuery = combined.query;
+      effectiveMode = 'regex';
+    }
+  }
+
+  if (effectiveMode === 'regex' && effectiveQuery.trim().length > 0) {
     try {
-      new RegExp(query, 'i');
+      new RegExp(effectiveQuery, 'i');
     } catch (e: any) {
       return { spec: null, queryError: e?.message ?? 'Invalid regex' };
     }
@@ -89,9 +115,9 @@ export function buildFilterSpec(args: {
 
   return {
     spec: {
-      query: query ?? '',
+      query: effectiveQuery,
       columnIdx: targetColIdx,
-      matchMode,
+      matchMode: effectiveMode,
       numericFilter,
       dateFilter,
       categoryFilter,

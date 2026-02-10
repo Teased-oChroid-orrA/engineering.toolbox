@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { slide } from 'svelte/transition';
   import { safeAutoAnimate, isWebKitRuntime } from '$lib/utils/safeAutoAnimate';
   import { invoke } from '@tauri-apps/api/core';
   import NumberFlow from '@number-flow/svelte';
@@ -19,6 +18,7 @@
   import InspectorSchemaModal from '$lib/components/inspector/InspectorSchemaModal.svelte';
   import InspectorSvarBuilderModal from '$lib/components/inspector/InspectorSvarBuilderModal.svelte';
   import InspectorRegexGeneratorModal from '$lib/components/inspector/InspectorRegexGeneratorModal.svelte';
+  import InspectorRegexHelpPanel from '$lib/components/inspector/InspectorRegexHelpPanel.svelte';
   import InspectorMergedGrid from '$lib/components/inspector/InspectorMergedGrid.svelte';
   import { INSPECTOR_THEME } from '$lib/components/inspector/InspectorThemeTokens';
   import {
@@ -121,6 +121,16 @@
     setSchemaDriftBaseline as setSchemaDriftBaselineController2
   } from '$lib/components/inspector/InspectorOrchestratorSchemaController';
   import {
+    computeSchemaDrift,
+    computeSchemaOutliers,
+    computeSchemaRelationshipHints,
+    computeSchemaSuggested,
+    schemaActionCategory as schemaActionCategoryController,
+    schemaActionDateRange as schemaActionDateRangeController,
+    schemaActionNumericRange as schemaActionNumericRangeController,
+    schemaActionTarget as schemaActionTargetController
+  } from '$lib/components/inspector/InspectorOrchestratorSchemaInsightsController';
+  import {
     applyState as applyStateController2,
     captureState as captureStateController2
   } from '$lib/components/inspector/InspectorOrchestratorStateController';
@@ -154,6 +164,11 @@
     escapeRegExp,
     fnv1a32
   } from '$lib/components/inspector/InspectorUtilsController';
+  import {
+    multiQueryHighlightRegexes,
+    newMultiQueryClause,
+    type MultiQueryClause
+  } from '$lib/components/inspector/InspectorMultiQueryController';
   // AutoAnimate Svelte action (used as: use:aa)
   function aa(node: HTMLElement, opts?: { duration?: number }) {
     try {
@@ -190,7 +205,6 @@
   const OVERSCAN = INSPECTOR_THEME.grid.overscan;
   const MAX_WINDOW_ABS = INSPECTOR_THEME.grid.maxWindowAbs; // DOM cap
   let uiAnimDur = $state(160);
-  const UI_ANIM_EASE = (t: number) => 1 - Math.pow(1 - t, 3);
   const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
   const perf = new PerfRecorder();
   const SLO_P95_MS = {
@@ -302,200 +316,12 @@
     return base.filter((s) => (`${s.idx} ${s.name} ${s.type}`).toLowerCase().includes(q));
   });
 
-  // Suggested “good filter” columns (entropy/distinctness-based)
-  type SuggestedCol = { idx: number; name: string; kind: 'categorical'|'numeric'|'date'|'identifier'; score: number; reason: string };
-
-  function scoreMid(x: number, mid: number, width: number): number {
-    // 1 at mid, falls linearly to 0 at +/- width
-    const d = Math.abs(x - mid);
-    return clamp(1 - d / Math.max(1e-6, width), 0, 1);
-  }
-
-  let schemaSuggested = $derived.by(() => {
-    const base = schemaStats ?? [];
-    const out: SuggestedCol[] = [];
-
-    for (const s of base) {
-      if ((s.nonEmpty ?? 0) < 25) continue;
-      if ((s.emptyPct ?? 100) > 60) continue;
-
-      // Identifier: almost all values unique
-      if (s.distinctRatio >= 0.9 && s.entropyNorm >= 0.9) {
-        out.push({
-          idx: s.idx,
-          name: s.name,
-          kind: 'identifier',
-          score: (1 - s.emptyPct / 100) * s.distinctRatio,
-          reason: `High uniqueness (${(s.distinctRatio * 100).toFixed(0)}% distinct)`
-        });
-        continue;
-      }
-
-      // Categorical: low-ish cardinality, not too skewed, not too unique
-      const isCat = s.distinctSample >= 2 && s.distinctSample <= 30 && s.distinctRatio <= 0.35;
-      if (isCat) {
-        const skewOk = scoreMid(s.entropyNorm, 0.7, 0.5);
-        const score = (1 - s.emptyPct / 100) * (1 - s.distinctRatio) * skewOk * Math.log(1 + s.distinctSample);
-        out.push({
-          idx: s.idx,
-          name: s.name,
-          kind: 'categorical',
-          score,
-          reason: `Low card (${s.distinctSample}) • entropy ${(s.entropyNorm * 100).toFixed(0)}%`
-        });
-      }
-
-      // Numeric/date: good parse rate even if backend typed string
-      if (s.numericParseRate >= 0.95) {
-        out.push({
-          idx: s.idx,
-          name: s.name,
-          kind: 'numeric',
-          score: (1 - s.emptyPct / 100) * s.numericParseRate * scoreMid(s.distinctRatio, 0.6, 0.5),
-          reason: `Numeric parse ${(s.numericParseRate * 100).toFixed(0)}%`
-        });
-      }
-      if (s.dateParseRate >= 0.9) {
-        out.push({
-          idx: s.idx,
-          name: s.name,
-          kind: 'date',
-          score: (1 - s.emptyPct / 100) * s.dateParseRate,
-          reason: `Date parse ${(s.dateParseRate * 100).toFixed(0)}%`
-        });
-      }
-    }
-
-    // Keep best per kind
-    const pick = (kind: SuggestedCol['kind'], n: number) =>
-      out.filter((x) => x.kind === kind).sort((a, b) => b.score - a.score).slice(0, n);
-
-    return {
-      categorical: pick('categorical', 8),
-      numeric: pick('numeric', 6),
-      date: pick('date', 6),
-      identifier: pick('identifier', 6),
-    };
-  });
-
-  type OutlierHint = { idx: number; name: string; zHint: number; reason: string };
-  let schemaOutliers = $derived.by(() => {
-    const out: OutlierHint[] = [];
-    for (const s of schemaStats ?? []) {
-      if (s.type !== 'numeric') continue;
-      const ratio = s.distinctRatio ?? 0;
-      const entropy = s.entropyNorm ?? 0;
-      const parse = s.numericParseRate ?? 0;
-      // Proxy score for outlier-prone numeric columns.
-      const zHint = clamp((ratio * 0.8 + entropy * 0.4 + parse * 0.3) * 3.2, 0, 5);
-      if (zHint < 2.2) continue;
-      out.push({
-        idx: s.idx,
-        name: s.name,
-        zHint: Number(zHint.toFixed(2)),
-        reason: `High spread signature (distinct ${(ratio * 100).toFixed(0)}%, entropy ${(entropy * 100).toFixed(0)}%).`
-      });
-    }
-    return out.sort((a, b) => b.zHint - a.zHint).slice(0, 8);
-  });
-
-  type RelHint = { a: number; b: number; score: number; reason: string };
-  let schemaRelationshipHints = $derived.by(() => {
-    const hs = schemaStats ?? [];
-    const out: RelHint[] = [];
-    for (let i = 0; i < hs.length; i++) {
-      for (let j = i + 1; j < hs.length; j++) {
-        const a = hs[i];
-        const b = hs[j];
-        if (!a || !b) continue;
-        if (a.type !== b.type) continue;
-        const cardProx = 1 - Math.abs((a.distinctRatio ?? 0) - (b.distinctRatio ?? 0));
-        const emptyProx = 1 - Math.abs((a.emptyPct ?? 0) - (b.emptyPct ?? 0)) / 100;
-        const score = clamp(cardProx * 0.7 + emptyProx * 0.3, 0, 1);
-        if (score < 0.86) continue;
-        out.push({
-          a: a.idx,
-          b: b.idx,
-          score: Number(score.toFixed(2)),
-          reason: `${a.name} ↔ ${b.name} show similar cardinality/completeness.`
-        });
-      }
-    }
-    return out.sort((x, y) => y.score - x.score).slice(0, 8);
-  });
+  let schemaSuggested = $derived.by(() => computeSchemaSuggested(schemaStats ?? []));
+  let schemaOutliers = $derived.by(() => computeSchemaOutliers(schemaStats ?? []));
+  let schemaRelationshipHints = $derived.by(() => computeSchemaRelationshipHints(schemaStats ?? []));
 
   let schemaDriftBaseline = $state<SchemaColStat[] | null>(null);
-  let schemaDrift = $derived.by(() => {
-    if (!schemaDriftBaseline?.length || !(schemaStats?.length ?? 0)) return [];
-    const base = new Map<number, SchemaColStat>();
-    for (const s of schemaDriftBaseline) base.set(s.idx, s);
-    const out: { idx: number; name: string; drift: number; reason: string }[] = [];
-    for (const s of schemaStats ?? []) {
-      const b = base.get(s.idx);
-      if (!b) continue;
-      const dEmpty = Math.abs((s.emptyPct ?? 0) - (b.emptyPct ?? 0)) / 100;
-      const dDistinct = Math.abs((s.distinctRatio ?? 0) - (b.distinctRatio ?? 0));
-      const dType = s.type === b.type ? 0 : 0.5;
-      const drift = clamp(dEmpty * 0.35 + dDistinct * 0.45 + dType * 0.2, 0, 1);
-      if (drift < 0.15) continue;
-      out.push({
-        idx: s.idx,
-        name: s.name,
-        drift: Number(drift.toFixed(2)),
-        reason: `empty ${(b.emptyPct ?? 0).toFixed(1)}%→${(s.emptyPct ?? 0).toFixed(1)}%, distinct ${(b.distinctRatio ?? 0).toFixed(2)}→${(s.distinctRatio ?? 0).toFixed(2)}`
-      });
-    }
-    return out.sort((a, b) => b.drift - a.drift).slice(0, 10);
-  });
-
-  function applySuggestedColumn(idx: number) {
-    // Set target column and focus search; keep schema modal open
-    targetColIdx = idx;
-  }
-
-  function schemaActionTarget(idx: number) {
-    targetColIdx = idx;
-  }
-
-  function schemaActionCategory(idx: number, autoSelectTop = true) {
-    tier2Open = true;
-    tier2Tab = 'category';
-    catF.enabled = true;
-    catF.colIdx = idx;
-    // Auto-select top values when we have them (best for quick filtering)
-    if (autoSelectTop) {
-      const st = (schemaStats ?? []).find((s) => s.idx === idx);
-      const top = (st?.topSample ?? []).slice(0, 6).map((x) => x.v).filter((v) => (v ?? '').trim().length > 0);
-      catF.selected = new Set<string>(top);
-    }
-    void runFilterNow();
-  }
-
-  function schemaActionNumericRange(idx: number, useMinMax = true) {
-    tier2Open = true;
-    tier2Tab = 'numeric';
-    numericF.enabled = true;
-    numericF.colIdx = idx;
-    const st = (schemaStats ?? []).find((s) => s.idx === idx);
-    if (useMinMax && st?.min != null && st?.max != null) {
-      numericF.minText = st.min;
-      numericF.maxText = st.max;
-    }
-    void runFilterNow();
-  }
-
-  function schemaActionDateRange(idx: number, useMinMax = true) {
-    tier2Open = true;
-    tier2Tab = 'date';
-    dateF.enabled = true;
-    dateF.colIdx = idx;
-    const st = (schemaStats ?? []).find((s) => s.idx === idx);
-    if (useMinMax && st?.min != null && st?.max != null) {
-      dateF.minIso = st.min;
-      dateF.maxIso = st.max;
-    }
-    void runFilterNow();
-  }
+  let schemaDrift = $derived.by(() => computeSchemaDrift(schemaStats ?? [], schemaDriftBaseline ?? null));
 
 
   // -------------------- Sort state (server-side) --------------------
@@ -530,6 +356,8 @@
   type MatchMode = 'fuzzy' | 'exact' | 'regex';
   let query = $state('');
   let matchMode = $state<MatchMode>('fuzzy');
+  let multiQueryEnabled = $state(false);
+  let multiQueryClauses = $state<MultiQueryClause[]>([newMultiQueryClause(0)]);
   // null => all columns
   let targetColIdx = $state<number | null>(null);
   // string input; blank => backend default
@@ -889,6 +717,8 @@
       set crossQueryTimer(v: ReturnType<typeof setTimeout> | null) { crossQueryTimer = v; },
       get query() { return query; },
       set query(v: string) { query = v; },
+      get multiQueryEnabled() { return multiQueryEnabled; },
+      get multiQueryClauses() { return multiQueryClauses; },
       get targetColIdx() { return targetColIdx; },
       set targetColIdx(v: number | null) { targetColIdx = v; },
       get matchMode() { return matchMode; },
@@ -1382,22 +1212,50 @@
   function highlightCell(cell: string) {
     const raw = cell ?? '';
     const q = (query ?? '').trim();
-    if (!q) return escapeHtml(raw);
-
-    // Only highlight for fuzzy/exact, and best-effort for regex
+    const regexes: RegExp[] = [];
     try {
-      let re: RegExp | null = null;
-      if (matchMode === 'regex') {
-        re = new RegExp(q, 'gi');
-      } else {
-        re = new RegExp(escapeRegExp(q), 'gi');
+      if (q) {
+        if (matchMode === 'regex') regexes.push(new RegExp(q, 'gi'));
+        else regexes.push(new RegExp(escapeRegExp(q), 'gi'));
       }
-
-      const html = escapeHtml(raw).replace(re, (m) => `<mark class="ins-mark">${escapeHtml(m)}</mark>`);
-      return html;
     } catch {
-      return escapeHtml(raw);
+      // ignore invalid base regex for highlighting; query error is surfaced elsewhere
     }
+    if (multiQueryEnabled) regexes.push(...multiQueryHighlightRegexes(multiQueryClauses, escapeRegExp));
+    if (!regexes.length) return escapeHtml(raw);
+
+    const ranges: Array<{ start: number; end: number }> = [];
+    for (const re of regexes) {
+      re.lastIndex = 0;
+      let m: RegExpExecArray | null = null;
+      while ((m = re.exec(raw)) !== null) {
+        const text = m[0] ?? '';
+        if (!text.length) {
+          re.lastIndex += 1;
+          continue;
+        }
+        ranges.push({ start: m.index, end: m.index + text.length });
+      }
+    }
+    if (!ranges.length) return escapeHtml(raw);
+
+    ranges.sort((a, b) => a.start - b.start || a.end - b.end);
+    const merged: Array<{ start: number; end: number }> = [];
+    for (const r of ranges) {
+      const last = merged[merged.length - 1];
+      if (!last || r.start > last.end) merged.push({ ...r });
+      else if (r.end > last.end) last.end = r.end;
+    }
+
+    let out = '';
+    let cursor = 0;
+    for (const r of merged) {
+      if (r.start > cursor) out += escapeHtml(raw.slice(cursor, r.start));
+      out += `<span class="ins-query-hit">${escapeHtml(raw.slice(r.start, r.end))}</span>`;
+      cursor = r.end;
+    }
+    if (cursor < raw.length) out += escapeHtml(raw.slice(cursor));
+    return out;
   }
 
   // -------------------- Row drawer --------------------
@@ -1608,6 +1466,41 @@
 
   function setSchemaDriftBaseline() {
     setSchemaDriftBaselineController2(schemaControllerCtx());
+  }
+
+  function schemaInsightsCtx() {
+    return {
+      get targetColIdx() { return targetColIdx; },
+      set targetColIdx(v: number | null) { targetColIdx = v; },
+      get tier2Open() { return tier2Open; },
+      set tier2Open(v: boolean) { tier2Open = v; },
+      get tier2Tab() { return tier2Tab; },
+      set tier2Tab(v: 'numeric' | 'date' | 'category') { tier2Tab = v; },
+      get catF() { return catF; },
+      set catF(v: typeof catF) { catF = v; },
+      get numericF() { return numericF; },
+      set numericF(v: typeof numericF) { numericF = v; },
+      get dateF() { return dateF; },
+      set dateF(v: typeof dateF) { dateF = v; },
+      get schemaStats() { return schemaStats; },
+      runFilterNow
+    };
+  }
+
+  function schemaActionTarget(idx: number) {
+    schemaActionTargetController(schemaInsightsCtx(), idx);
+  }
+
+  function schemaActionCategory(idx: number, autoSelectTop = true) {
+    schemaActionCategoryController(schemaInsightsCtx(), idx, autoSelectTop);
+  }
+
+  function schemaActionNumericRange(idx: number, useMinMax = true) {
+    schemaActionNumericRangeController(schemaInsightsCtx(), idx, useMinMax);
+  }
+
+  function schemaActionDateRange(idx: number, useMinMax = true) {
+    schemaActionDateRangeController(schemaInsightsCtx(), idx, useMinMax);
   }
 
   const debugLogger = createInspectorDebugLogger({
@@ -1912,9 +1805,28 @@
     showRegexGenerator = false;
     showRegexHelp = false;
   }
+
+  function onAddMultiQueryClause() {
+    multiQueryClauses = [...multiQueryClauses, newMultiQueryClause(multiQueryClauses.length)];
+  }
+
+  function onRemoveMultiQueryClause(id: string) {
+    const next = multiQueryClauses.filter((c) => c.id !== id);
+    multiQueryClauses = next.length ? next : [newMultiQueryClause(0)];
+  }
+
+  function onUpdateMultiQueryClause(id: string, patch: Partial<MultiQueryClause>) {
+    multiQueryClauses = multiQueryClauses.map((c) => (c.id === id ? { ...c, ...patch } : c));
+    scheduleFilter('multi-query-update');
+  }
+
+  function onMultiQueryEnabledChange(enabled: boolean) {
+    multiQueryEnabled = enabled;
+    scheduleFilter('multi-query-toggle');
+  }
 </script>
 
-<div class="flex flex-col gap-3">
+<div class="flex flex-col gap-3 inspector-lab inspector-reveal">
   <input
     class="hidden"
     type="file"
@@ -1943,6 +1855,8 @@
     {matchMode}
     {queryScope}
     {query}
+    {multiQueryEnabled}
+    multiQueryCount={multiQueryClauses.filter((c) => (c.query ?? '').trim().length > 0).length}
     {maxRowsScanText}
     {tier2Open}
     visibleColCount={visibleColIdxs.length}
@@ -1966,31 +1880,14 @@
     onOpenHelp={() => { showRegexHelp = true; }}
     onOpenGenerator={() => { showRegexGenerator = true; genTab = 'builder'; }}
     onOpenRecipes={openRecipes}
+    {multiQueryClauses}
+    onMultiQueryEnabledChange={onMultiQueryEnabledChange}
+    onAddMultiQueryClause={onAddMultiQueryClause}
+    onRemoveMultiQueryClause={onRemoveMultiQueryClause}
+    onUpdateMultiQueryClause={onUpdateMultiQueryClause}
   >
 
-    {#if showRegexHelp}
-      <div class="mt-4 border-t border-white/10 pt-4 text-xs text-white/70" transition:slide={{ duration: uiAnimDur, easing: UI_ANIM_EASE }}>
-        <div class="font-semibold text-white/85 mb-1">Regex quick help</div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div class="glass-panel rounded-xl border border-white/10 p-3">
-            <div class="text-white/80 font-semibold">Common patterns</div>
-            <ul class="mt-2 space-y-1 text-white/65">
-              <li><span class="font-mono text-white/85">^AN\\d+-.*</span> — starts with AN + digits</li>
-              <li><span class="font-mono text-white/85">^(NAS|MS)\\d+.*</span> — NAS or MS family</li>
-              <li><span class="font-mono text-white/85">.*-\\d+$</span> — ends with dash number</li>
-            </ul>
-          </div>
-          <div class="glass-panel rounded-xl border border-white/10 p-3">
-            <div class="text-white/80 font-semibold">Safety defaults</div>
-            <ul class="mt-2 space-y-1 text-white/65">
-              <li>Pattern length capped (UI warns at 256 chars).</li>
-              <li>Blank Max scan uses backend default cap.</li>
-              <li>Invalid regex will not execute; you’ll see an inline error.</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    {/if}
+    <InspectorRegexHelpPanel open={showRegexHelp} {uiAnimDur} />
 
     <InspectorTier2Panel
       {tier2Open}

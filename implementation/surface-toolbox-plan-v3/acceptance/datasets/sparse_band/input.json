@@ -1,0 +1,19 @@
+{
+  "name": "sparse_band",
+  "points": [
+    { "x": 0, "y": 0, "z": 0 },
+    { "x": 1, "y": 0, "z": 0 },
+    { "x": 2, "y": 0, "z": 0 },
+    { "x": 3, "y": 0, "z": 0 }
+  ],
+  "plane": {
+    "name": "Plane X",
+    "origin": { "x": 0, "y": 0, "z": 0 },
+    "normal": { "x": 1, "y": 0, "z": 0 }
+  },
+  "mode": "fixed_spacing",
+  "spacing": 0.5,
+  "count": 24,
+  "thickness": 0.1,
+  "includeOptionalColumns": true
+}

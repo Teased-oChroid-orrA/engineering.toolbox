@@ -1,3 +1,16 @@
 export { computeBushing, solveCountersink } from './solve';
+export { normalizeBushingInputs } from './normalize';
+export { buildBushingViewModel } from './viewModel';
+export { validateBushingInputs } from './schema';
 export { MATERIALS, getMaterial } from './materials';
-export type { BushingInputs, BushingOutput, MaterialProps, CountersinkInput, UnitSystem } from './types';
+export { BUSHING_FORMULA_INVENTORY } from './formulaInventory';
+export type {
+  BushingInputs,
+  BushingInputsRaw,
+  BushingOutput,
+  BushingWarning,
+  BushingWarningCode,
+  CSMode,
+  MaterialProps,
+  CountersinkInput
+} from './types';

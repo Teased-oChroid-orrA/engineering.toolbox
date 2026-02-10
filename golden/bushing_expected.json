@@ -1,0 +1,100 @@
+{
+  "straight_imperial_baseline": {
+    "csSolved": {},
+    "edgeDistance": {
+      "edActual": 1.5,
+      "edMinSequence": 2.0748707835,
+      "edMinStrength": 0.0648218261,
+      "governing": "sequencing"
+    },
+    "governing": {
+      "margin": -0.2770634143,
+      "name": "Edge distance (sequencing)"
+    },
+    "hoop": {
+      "bushingMS": 0.5919677924,
+      "bushingSigma": -31407.6705807241,
+      "edRequiredLigament": 1.0374353918,
+      "housingMS": 5.6820896468,
+      "housingSigma": 10475.7648729095,
+      "ligamentMS": 5.6820896468,
+      "ligamentSigma": 10475.7648729095
+    },
+    "neckWall": 0.06325,
+    "odInstalled": 0.5015,
+    "pressure": 8794.1477626028,
+    "sleeveWall": 0.06325,
+    "warnings": [
+      "Edge distance sequencing margin is below zero."
+    ]
+  },
+  "flanged_metric": {
+    "csSolved": {},
+    "edgeDistance": {
+      "edActual": 1.5,
+      "edMinSequence": 2.0748707835,
+      "edMinStrength": 0.0648218261,
+      "governing": "sequencing"
+    },
+    "governing": {
+      "margin": -0.2770634143,
+      "name": "Edge distance (sequencing)"
+    },
+    "hoop": {
+      "bushingMS": 0.5919677924,
+      "bushingSigma": -31407.6705807241,
+      "edRequiredLigament": 1.0374353918,
+      "housingMS": 5.6820896468,
+      "housingSigma": 10475.7648729095,
+      "ligamentMS": 5.6820896468,
+      "ligamentSigma": 10475.7648729095
+    },
+    "neckWall": 0.06325,
+    "odInstalled": 0.5015,
+    "pressure": 8794.1477626028,
+    "sleeveWall": 0.06325,
+    "warnings": [
+      "Edge distance sequencing margin is below zero."
+    ]
+  },
+  "countersink_imperial": {
+    "csSolved": {
+      "id": {
+        "angleDeg": 100,
+        "depth": 0.1,
+        "dia": 0.6133507185
+      },
+      "od": {
+        "angleDeg": 101.036700071,
+        "depth": 0.09,
+        "dia": 0.72
+      }
+    },
+    "edgeDistance": {
+      "edActual": 1.5,
+      "edMinSequence": 2.0748707835,
+      "edMinStrength": 0.0734109016,
+      "governing": "sequencing"
+    },
+    "governing": {
+      "margin": -0.2770634143,
+      "name": "Edge distance (sequencing)"
+    },
+    "hoop": {
+      "bushingMS": 0.5919677924,
+      "bushingSigma": -31407.6705807241,
+      "edRequiredLigament": 1.0374353918,
+      "housingMS": 5.6820896468,
+      "housingSigma": 10475.7648729095,
+      "ligamentMS": 5.6820896468,
+      "ligamentSigma": 10475.7648729095
+    },
+    "neckWall": 0.0533246407,
+    "odInstalled": 0.5015,
+    "pressure": 8794.1477626028,
+    "sleeveWall": 0.06325,
+    "warnings": [
+      "Edge distance sequencing margin is below zero."
+    ]
+  }
+}

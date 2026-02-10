@@ -14,7 +14,7 @@
   }>();
 </script>
 
-<div class="glass-panel rounded-2xl border border-white/10 overflow-auto relative" style="height: 60vh;">
+<div class="glass-panel rounded-2xl border border-white/10 overflow-auto relative inspector-panel-slide inspector-pop-card" style="height: 60vh;">
   <table class="min-w-full text-xs whitespace-nowrap">
     <thead class="sticky top-0 z-20 bg-surface-900/80 backdrop-blur border-b border-white/10">
       <tr>
@@ -41,7 +41,7 @@
                   {#if (cell ?? '').trim().length === 0}
                     <span class="italic text-white/35">∅</span>
                   {:else}
-                    <span class="font-mono">{cell}</span>
+                    <span class="font-mono inspector-pop-value">{cell}</span>
                   {/if}
                 </td>
               {/each}
@@ -54,7 +54,7 @@
                   {#if (cell ?? '').trim().length === 0}
                     <span class="italic text-white/35">∅</span>
                   {:else}
-                    <span class="font-mono">{cell}</span>
+                    <span class="font-mono inspector-pop-value">{cell}</span>
                   {/if}
                 </td>
               {/each}

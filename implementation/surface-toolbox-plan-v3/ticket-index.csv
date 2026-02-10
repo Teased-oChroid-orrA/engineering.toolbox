@@ -1,0 +1,47 @@
+id,title,epic,points,depends_on
+STB-001,Create Surface Architecture Manifest,Governance,5,
+STB-002,Enforce module size and dependency rules,Governance,3,STB-001
+STB-003,Add Surface verification gate v2,Governance,3,STB-001|STB-002
+STB-010,Create Surface orchestrator shell,Refactor,5,STB-001
+STB-011,Extract state/history controller,Refactor,5,STB-010
+STB-012,Extract eval/io/tools controllers,Refactor,8,STB-010
+STB-013,Add Advanced accordion policy and Core Mode default,Refactor,5,STB-010
+STB-020,Implement unified tool-cursor interaction model,ToolCursor,8,STB-011|STB-012
+STB-021,Selection priority and switchable selection profile,ToolCursor,3,STB-020
+STB-022,Snapping engine expansion,ToolCursor,5,STB-020
+STB-023,Hover metric preview and contextual tooltip,ToolCursor,3,STB-022
+STB-030,Define geometry contracts package,Geometry,5,STB-001
+STB-031,Geodesic offset primary solver,Geometry,8,STB-030
+STB-032,Best-effort fallback chain implementation,Geometry,5,STB-031
+STB-033,Offset intersection robustness,Geometry,5,STB-032
+STB-034,Ranked recommendation engine with confidence,Geometry,3,STB-032|STB-033
+STB-040,Datum-plane slicing pipeline hardening,SlicingExport,5,STB-030
+STB-041,Combined CSV export canonical,SlicingExport,3,STB-040
+STB-042,JSON sidecar metadata export,SlicingExport,3,STB-041
+STB-043,Optional extra columns toggle,SlicingExport,2,STB-041
+STB-044,Warning reporting dual channel,SlicingExport,3,STB-042
+STB-050,Workspace-scoped recipe store,Recipes,5,STB-011
+STB-051,Step-confirmed recipe runner,Recipes,5,STB-050|STB-012
+STB-052,Recipe versioning and migration,Recipes,3,STB-050
+STB-053,Recipe plus undo-redo hybrid transactions,Recipes,3,STB-051|STB-011
+STB-060,Technical-lab design tokens,UXPass,3,STB-013
+STB-061,Dual typography system,UXPass,2,STB-060
+STB-062,Motion spec and implementation,UXPass,3,STB-060
+STB-063,Warning UX stack,UXPass,3,STB-034|STB-044
+STB-064,Synced slicing visualization and recommendation rail,UXPass,5,STB-040|STB-034
+STB-065,Guided empty-loading microcopy,UXPass,2,STB-013
+STB-070,Build acceptance dataset pack and golden outputs,QARelease,5,STB-030
+STB-071,Geometry regression suite 1e-4,QARelease,5,STB-070|STB-031|STB-033|STB-040
+STB-072,End-to-end workflow smoke tests,QARelease,3,STB-023|STB-051|STB-042
+STB-073,Release readiness and deferred OBJ-STL backlog,QARelease,2,STB-071|STB-072
+STB-074,Orchestrator decomposition and module extraction,Refactor,8,STB-073|STB-053
+STB-080,Feature-flag non-core analytics UI,RefocusUX,2,STB-074
+STB-081,Core-only default and advanced policy tightening,RefocusUX,2,STB-080
+STB-082,Simplified create toolbar mouse-first,RefocusUX,3,STB-081
+STB-083,Enforce explicit point-first entity creation,RefocusUX,3,STB-082
+STB-084,Guided triangle quad contour surface flow,RefocusUX,5,STB-083
+STB-085,Inline helper guidance system,RefocusUX,3,STB-082
+STB-086,Viewport vertical expansion,RefocusUX,2,STB-081
+STB-087,Collapsible right panel to icon-only rail,RefocusUX,5,STB-086
+STB-088,Persist right-rail state globally and by workspace,RefocusUX,3,STB-087
+STB-089,Right-panel information architecture cleanup,RefocusUX,3,STB-082|STB-087

@@ -43,7 +43,7 @@
 {#if open}
   <div class="fixed inset-0 z-50 flex items-center justify-center p-6 relative" transition:fade={{ duration: uiAnimDur }}>
     <button type="button" class="absolute inset-0 modal-backdrop p-0 m-0 border-0" onclick={onClose} aria-label="Close schema dialog"></button>
-    <div class="relative z-10 glass-panel w-full max-w-6xl rounded-2xl border border-white/10 p-5" transition:scale={{ duration: uiAnimDur, start: 0.96 }} style={floatingStyle}>
+    <div class="relative z-10 glass-panel w-full max-w-6xl rounded-2xl border border-white/10 p-5 inspector-pop-layer" transition:scale={{ duration: uiAnimDur, start: 0.96 }} style={floatingStyle}>
       <div class="mb-2 flex items-center justify-between gap-2 border-b border-white/10 pb-2 cursor-move" role="button" tabindex="0" onmousedown={onBeginDrag}>
         <span class="text-[11px] uppercase tracking-widest text-white/50">Drag</span>
         <button class="btn btn-xs variant-soft" onclick={onReset}>Reset position</button>
@@ -80,7 +80,7 @@
       <div class="mt-3 flex flex-wrap gap-2">
         <button class="btn btn-xs variant-soft" onclick={onSetDriftBaseline}>Set drift baseline</button>
       </div>
-      <div class="mt-4 max-h-[60vh] overflow-auto rounded-xl border border-white/10">
+      <div class="mt-4 max-h-[60vh] overflow-auto rounded-xl border border-white/10 inspector-pop-sub">
         <table class="min-w-full text-xs">
           <thead class="sticky top-0 z-10 bg-surface-900/80 backdrop-blur border-b border-white/10">
             <tr>

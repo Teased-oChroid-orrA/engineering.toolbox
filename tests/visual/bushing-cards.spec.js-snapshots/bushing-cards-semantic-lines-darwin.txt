@@ -1,0 +1,23 @@
+<Card class="bushing-results-card border-l-4 border-emerald-500 bushing-pop-card">
+<div class="text-[10px] mb-2 uppercase tracking-wide text-indigo-200/95 font-bold">Safety Margins (Yield)</div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Housing</span><span class="font-mono text-emerald-300 font-semibold">{fmt(results.physics.marginHousing)}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Bushing</span><span class="font-mono text-emerald-300 font-semibold">{fmt(results.physics.marginBushing)}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Governing</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.governing.margin)}</span></div>
+<Card class="bushing-results-card bushing-pop-card">
+<div class="text-[10px] mb-2 uppercase tracking-wide text-indigo-200/95 font-bold">Fit Physics</div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Contact Pressure</span><span class="font-mono text-slate-100 font-semibold">{fmtStress(results.physics.contactPressure)} {stressUnit()}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Install Force</span><span class="font-mono text-slate-100 font-semibold">{fmtForce(results.physics.installForce)} {forceUnit()}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Interference (eff.)</span><span class="font-mono text-amber-200 font-semibold">{fmt(results.physics.deltaEffective, 4)}</span></div>
+<details class="glass-card rounded-xl border border-white/10 p-3 bushing-pop-card bushing-results-card" open>
+<summary class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-indigo-200/95">Detailed Diagnostics</summary>
+<Card class="bushing-results-card bushing-pop-card">
+<div class="text-[10px] uppercase tracking-wide text-indigo-200/95 font-bold">Edge Distance</div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Actual e/D</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.edgeDistance.edActual)}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Min (Seq)</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.edgeDistance.edMinSequence)}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Min (Strength)</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.edgeDistance.edMinStrength)}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Mode</span><span class="font-mono text-slate-100 font-semibold">{results.edgeDistance.governing}</span></div>
+<Card class="bushing-results-card bushing-pop-card">
+<div class="text-[10px] uppercase tracking-wide text-indigo-200/95 font-bold">Wall Thickness</div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Straight</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.sleeveWall)}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Neck</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.neckWall)}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Governing</span><span class="font-mono text-slate-100 font-semibold">{results.governing.name}</span></div>
