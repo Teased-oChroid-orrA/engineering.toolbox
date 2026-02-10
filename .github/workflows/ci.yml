@@ -26,5 +26,5 @@ jobs:
       - name: Type and feature checks
         run: npm run check
 
-      - name: Frontend build verification
-        run: npm run verify-build
+      - name: Build frontend (includes build verification)
+        run: npm run build
