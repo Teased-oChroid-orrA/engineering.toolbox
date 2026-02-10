@@ -31,8 +31,23 @@ jobs:
         run: npm run tauri:build
 
       - name: Upload Tauri bundles
+        if: ${{ hashFiles('src-tauri/target/release/bundle/**') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: tauri-windows-bundles
           path: src-tauri/target/release/bundle/**
           if-no-files-found: error
+
+      - name: Upload fallback executable
+        if: ${{ hashFiles('src-tauri/target/release/bundle/**') == '' && hashFiles('src-tauri/target/release/*.exe') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-windows-exe
+          path: src-tauri/target/release/*.exe
+          if-no-files-found: error
+
+      - name: Verify artifact output exists
+        if: ${{ hashFiles('src-tauri/target/release/bundle/**') == '' && hashFiles('src-tauri/target/release/*.exe') == '' }}
+        run: |
+          echo "No bundle or executable was produced by the build."
+          exit 1
