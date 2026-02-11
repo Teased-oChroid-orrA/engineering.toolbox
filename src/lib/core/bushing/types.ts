@@ -1,6 +1,16 @@
 import type { UnitSystem } from '../units';
 
 export type CSMode = 'depth_angle' | 'dia_angle' | 'dia_depth';
+export type ToleranceMode = 'nominal_tol' | 'limits';
+
+export type ToleranceRange = {
+  mode: ToleranceMode;
+  lower: number;
+  upper: number;
+  nominal: number;
+  tolPlus: number;
+  tolMinus: number;
+};
 
 export type CountersinkInput = {
   enabled?: boolean;
@@ -28,6 +38,18 @@ export type BushingInputs = {
   boreDia: number;
   idBushing: number;
   interference: number;
+  boreTolMode?: ToleranceMode;
+  boreNominal?: number;
+  boreTolPlus?: number;
+  boreTolMinus?: number;
+  boreLower?: number;
+  boreUpper?: number;
+  interferenceTolMode?: ToleranceMode;
+  interferenceNominal?: number;
+  interferenceTolPlus?: number;
+  interferenceTolMinus?: number;
+  interferenceLower?: number;
+  interferenceUpper?: number;
   housingLen: number;
   housingWidth: number;
   edgeDist: number;
@@ -50,6 +72,7 @@ export type BushingInputs = {
   dT: number;
   minWallStraight: number;
   minWallNeck: number;
+  endConstraint?: 'free' | 'one_end' | 'both_ends';
   load?: number;
   thetaDeg?: number;
   idCS?: CountersinkInput;
@@ -64,6 +87,7 @@ export type BushingCandidate = {
 
 export type BushingWarningCode =
   | 'INPUT_INVALID'
+  | 'TOLERANCE_INFEASIBLE'
   | 'STRAIGHT_WALL_BELOW_MIN'
   | 'NECK_WALL_BELOW_MIN'
   | 'NET_CLEARANCE_FIT'
@@ -105,6 +129,44 @@ export type BushingOutput = {
     termH: number;
     pressurePsi: number;
     pressureKsi: number;
+    field: {
+      signConvention: string;
+      axialModel: string;
+      bushing: {
+        innerRadius: number;
+        outerRadius: number;
+        samples: Array<{ r: number; sigmaR: number; sigmaTheta: number; sigmaAxial: number }>;
+        boundary: {
+          sigmaRInner: number;
+          sigmaROuter: number;
+          sigmaThetaInner: number;
+          sigmaThetaOuter: number;
+          sigmaAxialInner: number;
+          sigmaAxialOuter: number;
+          maxAbsHoop: number;
+          maxAbsHoopAt: number;
+          maxAbsAxial: number;
+          maxAbsAxialAt: number;
+        };
+      };
+      housing: {
+        innerRadius: number;
+        outerRadius: number;
+        samples: Array<{ r: number; sigmaR: number; sigmaTheta: number; sigmaAxial: number }>;
+        boundary: {
+          sigmaRInner: number;
+          sigmaROuter: number;
+          sigmaThetaInner: number;
+          sigmaThetaOuter: number;
+          sigmaAxialInner: number;
+          sigmaAxialOuter: number;
+          maxAbsHoop: number;
+          maxAbsHoopAt: number;
+          maxAbsAxial: number;
+          maxAbsAxialAt: number;
+        };
+      };
+    };
   };
   hoop: {
     housingSigma: number;
@@ -132,6 +194,10 @@ export type BushingOutput = {
     stressHoopBushing: number;
     marginHousing: number;
     marginBushing: number;
+    stressAxialHousing: number;
+    stressAxialBushing: number;
+    axialConstraintFactor: number;
+    axialLengthFactor: number;
     edMinCoupled: number;
   };
   geometry: {
@@ -141,6 +207,16 @@ export type BushingOutput = {
     csInternal: { dia: number; depth: number; angleDeg: number };
     csExternal: { dia: number; depth: number; angleDeg: number };
     isSaturationActive: boolean;
+  };
+  tolerance: {
+    status: 'ok' | 'clamped' | 'infeasible';
+    notes: string[];
+    bore: ToleranceRange;
+    interferenceTarget: ToleranceRange;
+    odBushing: ToleranceRange;
+    achievedInterference: ToleranceRange;
+    csInternalDia?: ToleranceRange;
+    csExternalDia?: ToleranceRange;
   };
   candidates: BushingCandidate[];
   warningCodes: BushingWarning[];
@@ -168,10 +244,23 @@ export type BushingInputsRaw = Partial<BushingInputs> & {
   ext_cs_dia?: number;
   ext_cs_depth?: number;
   ext_cs_angle?: number;
+  bore_tol_mode?: ToleranceMode;
+  bore_nominal?: number;
+  bore_tol_plus?: number;
+  bore_tol_minus?: number;
+  bore_lower?: number;
+  bore_upper?: number;
+  interference_tol_mode?: ToleranceMode;
+  interference_nominal?: number;
+  interference_tol_plus?: number;
+  interference_tol_minus?: number;
+  interference_lower?: number;
+  interference_upper?: number;
   mat_housing?: string;
   mat_bushing?: string;
   min_wall_straight?: number;
   min_wall_neck?: number;
+  end_constraint?: 'free' | 'one_end' | 'both_ends';
   t1?: number;
   t2?: number;
 };

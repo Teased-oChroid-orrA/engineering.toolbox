@@ -2,280 +2,646 @@ import { MATERIALS } from './materials';
 import { calculateUniversalBearing } from '../shared/bearing';
 import { normalizeBushingInputs } from './normalize';
 import { validateBushingInputs } from './schema';
-import type { BushingInputsRaw, BushingOutput, BushingWarning, CSMode } from './types';
+import type {
+  BushingInputsRaw,
+  BushingOutput,
+  BushingWarning,
+  CSMode,
+  ToleranceMode,
+  ToleranceRange
+} from './types';
 
 export type { BushingInputs, BushingInputsRaw, BushingOutput, BushingWarning, CSMode } from './types';
 
 const getMat = (id: string | undefined) => MATERIALS.find((m) => m.id === id) || MATERIALS[0];
+const EPS = 1e-9;
 
-export function solveCountersink(mode: CSMode, dia: number, depth: number, angle: number, baseDia: number) {
-  const r_rad = (angle / 2) * (Math.PI / 180);
-  const tan_r = Math.tan(r_rad);
-  const res = { dia, depth, angleDeg: angle };
-  if (mode === 'depth_angle') res.dia = baseDia + 2 * depth * tan_r;
-  else if (mode === 'dia_angle') res.depth = tan_r > 1e-9 ? (dia - baseDia) / (2 * tan_r) : 0;
-  else if (mode === 'dia_depth') {
-    const angle_rad = depth > 1e-9 ? 2 * Math.atan((dia - baseDia) / (2 * depth)) : 0;
-    res.angleDeg = angle_rad * (180 / Math.PI);
-  }
-  return res;
+function clamp(value: number, lower: number, upper: number): number {
+  return Math.min(upper, Math.max(lower, value));
 }
 
 function toPsiFromKsi(v: number) {
   return v * 1000;
 }
 
-export function computeBushing(raw: BushingInputsRaw): BushingOutput {
-  const input = normalizeBushingInputs(raw);
-  const validationWarnings = validateBushingInputs(input);
-  const units = input.units;
-  const boreDia = input.boreDia;
-  const idBushing = input.idBushing;
-  const housingLen = input.housingLen;
-  const edgeDist = input.edgeDist;
-  const housingWidth = input.housingWidth;
-  const flangeOd = input.flangeOd ?? 0;
-  const flangeThk = input.flangeThk ?? 0;
-  const minWallStraight = input.minWallStraight;
-  const minWallNeck = input.minWallNeck;
-  const csMode = input.csMode;
-  const csEnabled = input.idCS?.enabled ?? input.idType === 'countersink';
-  const csDia = input.csDia;
-  const csDepth = input.csDepth;
-  const csAngle = input.csAngle;
-  const extCsMode = input.extCsMode;
-  const extCsEnabled = input.odCS?.enabled ?? input.bushingType === 'countersink';
-  const extCsDia = input.extCsDia;
-  const extCsDepth = input.extCsDepth;
-  const extCsAngle = input.extCsAngle;
-  const bushingType = input.bushingType;
-  const idType = input.idType;
+function roundTol(value: number): number {
+  return Number.isFinite(value) ? value : 0;
+}
 
-  const matHousing = getMat(input.matHousing);
-  const matBushing = getMat(input.matBushing);
+function makeRange(mode: ToleranceMode, lower: number, upper: number, nominal?: number): ToleranceRange {
+  const lo = Math.min(lower, upper);
+  const hi = Math.max(lower, upper);
+  const nom = clamp(Number.isFinite(nominal as number) ? Number(nominal) : (lo + hi) / 2, lo, hi);
+  return {
+    mode,
+    lower: roundTol(lo),
+    upper: roundTol(hi),
+    nominal: roundTol(nom),
+    tolPlus: roundTol(hi - nom),
+    tolMinus: roundTol(nom - lo)
+  };
+}
 
-  const friction = Number.isFinite(input.friction) ? input.friction : 0.15;
-  const dT = Number.isFinite(input.dT) ? input.dT : 0;
+function resolveTolerance(input: {
+  mode?: ToleranceMode;
+  nominal?: number;
+  plus?: number;
+  minus?: number;
+  lower?: number;
+  upper?: number;
+  minFloor?: number;
+}): ToleranceRange {
+  const mode = input.mode === 'limits' ? 'limits' : 'nominal_tol';
+  const minFloor = Number.isFinite(input.minFloor) ? Math.max(0, Number(input.minFloor)) : -Infinity;
 
-  // Thermal delta: use per-°F coefficients and convert °C delta when metric.
-  const dT_F = units === 'metric' ? dT * 1.8 : dT;
-  const alpha_h = (matHousing.alpha_uF ?? 0) * 1e-6;
-  const alpha_b = (matBushing.alpha_uF ?? 0) * 1e-6;
+  if (mode === 'limits') {
+    const lower = Number.isFinite(input.lower) ? Number(input.lower) : Number(input.nominal ?? 0);
+    const upper = Number.isFinite(input.upper) ? Number(input.upper) : Number(input.nominal ?? lower);
+    const lo = Math.max(minFloor, Math.min(lower, upper));
+    const hi = Math.max(lo, Math.max(lower, upper));
+    return makeRange(mode, lo, hi, input.nominal);
+  }
 
-  const deltaThermal = (alpha_b - alpha_h) * boreDia * dT_F;
-  const delta = input.interference + deltaThermal;
-  const odInstalled = boreDia + delta;
+  const nominal = Number(input.nominal ?? 0);
+  const plus = Math.max(0, Number(input.plus ?? 0));
+  const minus = Math.max(0, Number(input.minus ?? 0));
+  const lo = Math.max(minFloor, nominal - minus);
+  const hi = Math.max(lo, nominal + plus);
+  return makeRange(mode, lo, hi, nominal);
+}
 
-  // Countersink resolution (ID and OD).
-  const csSolvedId = csEnabled || idType === 'countersink'
-    ? solveCountersink(csMode, csDia, csDepth, csAngle, idBushing)
-    : { dia: csDia, depth: csDepth, angleDeg: csAngle };
+function buildOdTolerance(bore: ToleranceRange, targetInterference: ToleranceRange): {
+  status: 'ok' | 'clamped' | 'infeasible';
+  notes: string[];
+  od: ToleranceRange;
+  achievedInterference: ToleranceRange;
+} {
+  const notes: string[] = [];
+  const requiredLower = bore.upper + targetInterference.lower;
+  const requiredUpper = bore.lower + targetInterference.upper;
+  const desiredNominal = bore.nominal + targetInterference.nominal;
 
-  const csSolvedOd = extCsEnabled || bushingType === 'countersink'
-    ? solveCountersink(extCsMode, extCsDia, extCsDepth, extCsAngle, odInstalled)
-    : { dia: extCsDia, depth: extCsDepth, angleDeg: extCsAngle };
+  if (requiredLower <= requiredUpper + EPS) {
+    const nominal = clamp(desiredNominal, requiredLower, requiredUpper);
+    const halfSpan = Math.max(0, Math.min(nominal - requiredLower, requiredUpper - nominal));
+    const od = makeRange('limits', nominal - halfSpan, nominal + halfSpan, nominal);
+    const achieved = makeRange('limits', od.lower - bore.upper, od.upper - bore.lower, od.nominal - bore.nominal);
+    const status = Math.abs(nominal - desiredNominal) > EPS ? 'clamped' : 'ok';
+    if (status === 'clamped') {
+      notes.push('OD nominal was clamped to keep fit inside the requested interference tolerance window.');
+    }
+    return {
+      status,
+      notes,
+      od,
+      achievedInterference: achieved
+    };
+  }
 
-  // Wall calculations
-  const wallStraight = Math.max((odInstalled - idBushing) / 2, 0);
-  let wallNeck = wallStraight;
+  const odCollapsed = makeRange('limits', desiredNominal, desiredNominal, desiredNominal);
+  const achievedCollapsed = makeRange(
+    'limits',
+    odCollapsed.nominal - bore.upper,
+    odCollapsed.nominal - bore.lower,
+    odCollapsed.nominal - bore.nominal
+  );
+  notes.push('Bore tolerance width exceeds interference tolerance width; full-range containment is infeasible.');
+  return {
+    status: 'infeasible',
+    notes,
+    od: odCollapsed,
+    achievedInterference: achievedCollapsed
+  };
+}
 
-  if (idType === 'countersink') {
-    const A_rad = (csSolvedId.angleDeg / 2) * (Math.PI / 180);
-    const outerBoundary = bushingType === 'flanged' ? flangeOd : (bushingType === 'countersink' ? csSolvedOd.dia : odInstalled);
+function csDiaToleranceFromBase(
+  mode: CSMode,
+  solvedDia: number,
+  solvedDepth: number,
+  solvedAngleDeg: number,
+  base: ToleranceRange
+): ToleranceRange {
+  if (mode !== 'depth_angle') return makeRange('nominal_tol', solvedDia, solvedDia, solvedDia);
+  const angleRad = (solvedAngleDeg / 2) * (Math.PI / 180);
+  const offset = 2 * Math.max(0, solvedDepth) * Math.tan(angleRad);
+  return makeRange(base.mode, base.lower + offset, base.upper + offset, base.nominal + offset);
+}
 
-    if (bushingType === 'countersink') {
-      wallNeck = Math.min((csSolvedOd.dia - csSolvedId.dia) / 2, wallStraight);
-    } else {
-      const t_top = (outerBoundary - csSolvedId.dia) / (2 * Math.cos(A_rad));
-      wallNeck = t_top;
-      if (bushingType === 'flanged') {
-        const d_corner = ((odInstalled - csSolvedId.dia) / 2) * Math.cos(A_rad) + flangeThk * Math.sin(A_rad);
-        wallNeck = Math.min(t_top, d_corner);
-      }
+export function solveCountersink(mode: CSMode, dia: number, depth: number, angle: number, baseDia: number) {
+  const safeBaseDia = Number.isFinite(baseDia) ? Math.max(baseDia, 0) : 0;
+  const safeDia = Number.isFinite(dia) ? Math.max(dia, 0) : 0;
+  const safeDepth = Number.isFinite(depth) ? Math.max(depth, 0) : 0;
+  const safeAngle = Number.isFinite(angle) ? Math.min(Math.max(angle, 1e-3), 179.999) : 100;
+  const r_rad = (safeAngle / 2) * (Math.PI / 180);
+  const tan_r = Math.tan(r_rad);
+  const res = { dia: safeDia, depth: safeDepth, angleDeg: safeAngle };
+  if (mode === 'depth_angle') res.dia = Math.max(safeBaseDia + 2 * safeDepth * tan_r, safeBaseDia);
+  else if (mode === 'dia_angle') res.depth = tan_r > 1e-9 ? Math.max((safeDia - safeBaseDia) / (2 * tan_r), 0) : 0;
+  else if (mode === 'dia_depth') {
+    const angle_rad = safeDepth > 1e-9 ? 2 * Math.atan(Math.max(safeDia - safeBaseDia, 0) / (2 * safeDepth)) : 0;
+    res.angleDeg = Math.min(Math.max(angle_rad * (180 / Math.PI), 0), 179.999);
+  }
+  return res;
+}
+
+type CalcState = {
+  input: ReturnType<typeof normalizeBushingInputs>;
+  matHousing: ReturnType<typeof getMat>;
+  matBushing: ReturnType<typeof getMat>;
+  boreTol: ToleranceRange;
+  interferenceTol: ToleranceRange;
+  odTol: ToleranceRange;
+  achievedInterferenceTol: ToleranceRange;
+  toleranceStatus: 'ok' | 'clamped' | 'infeasible';
+  toleranceNotes: string[];
+  odInstalled: number;
+  delta: number;
+  deltaUser: number;
+  deltaThermal: number;
+  csSolvedId: { dia: number; depth: number; angleDeg: number };
+  csSolvedOd: { dia: number; depth: number; angleDeg: number };
+  csInternalDiaTol: ToleranceRange;
+  csExternalDiaTol: ToleranceRange;
+  internalCsInvalid: boolean;
+  externalCsInvalid: boolean;
+  wallStraight: number;
+  wallNeck: number;
+  failStraight: boolean;
+  failNeck: boolean;
+  effectiveODHousing: number;
+  D_equivalent: number;
+  psi: number;
+  lambda: number;
+  w_eff: number;
+  e_eff: number;
+  termB: number;
+  termH: number;
+  pressure: number;
+  stressHoopHousing: number;
+  stressHoopBushing: number;
+  stressAxialHousing: number;
+  stressAxialBushing: number;
+  axialConstraintFactor: number;
+  axialLengthFactor: number;
+  installForce: number;
+  e_required_seq: number;
+  edActual: number;
+  edMinSequence: number;
+  edMinStrength: number;
+  candidates: Array<{ name: string; margin: number }>;
+  governing: { name: string; margin: number };
+};
+
+type LameSample = { r: number; sigmaR: number; sigmaTheta: number; sigmaAxial: number };
+
+type LameRegionField = {
+  innerRadius: number;
+  outerRadius: number;
+  samples: LameSample[];
+  boundary: {
+    sigmaRInner: number;
+    sigmaROuter: number;
+    sigmaThetaInner: number;
+    sigmaThetaOuter: number;
+    sigmaAxialInner: number;
+    sigmaAxialOuter: number;
+    maxAbsHoop: number;
+    maxAbsHoopAt: number;
+    maxAbsAxial: number;
+    maxAbsAxialAt: number;
+  };
+};
+
+function lameStressAtRadius(
+  r: number,
+  innerRadius: number,
+  outerRadius: number,
+  pInner: number,
+  pOuter: number
+): { sigmaR: number; sigmaTheta: number } {
+  const a2 = innerRadius ** 2;
+  const b2 = outerRadius ** 2;
+  const denom = Math.max(b2 - a2, 1e-12);
+  const A = (a2 * pInner - b2 * pOuter) / denom;
+  const B = (a2 * b2 * (pInner - pOuter)) / denom;
+  const rr = Math.max(r ** 2, 1e-12);
+  const sigmaR = A - B / rr;
+  const sigmaTheta = A + B / rr;
+  return { sigmaR, sigmaTheta };
+}
+
+function buildLameRegionField(
+  innerRadius: number,
+  outerRadius: number,
+  pInner: number,
+  pOuter: number,
+  nu: number,
+  axialScale: number,
+  sampleCount = 41
+): LameRegionField {
+  const n = Math.max(3, sampleCount);
+  const samples: LameSample[] = [];
+  let maxAbsHoop = -Infinity;
+  let maxAbsHoopAt = innerRadius;
+  let maxAbsAxial = -Infinity;
+  let maxAbsAxialAt = innerRadius;
+
+  for (let i = 0; i < n; i += 1) {
+    const t = i / (n - 1);
+    const r = innerRadius + (outerRadius - innerRadius) * t;
+    const { sigmaR, sigmaTheta } = lameStressAtRadius(r, innerRadius, outerRadius, pInner, pOuter);
+    const sigmaAxial = axialScale * nu * (sigmaR + sigmaTheta);
+    samples.push({ r, sigmaR, sigmaTheta, sigmaAxial });
+    const hoopAbs = Math.abs(sigmaTheta);
+    if (hoopAbs > maxAbsHoop) {
+      maxAbsHoop = hoopAbs;
+      maxAbsHoopAt = r;
+    }
+    const axialAbs = Math.abs(sigmaAxial);
+    if (axialAbs > maxAbsAxial) {
+      maxAbsAxial = axialAbs;
+      maxAbsAxialAt = r;
     }
   }
 
-  const failStraight = wallStraight < minWallStraight;
-  const failNeck = wallNeck < minWallNeck;
+  const atInner = lameStressAtRadius(innerRadius, innerRadius, outerRadius, pInner, pOuter);
+  const atOuter = lameStressAtRadius(outerRadius, innerRadius, outerRadius, pInner, pOuter);
+  const sigmaAxialInner = axialScale * nu * (atInner.sigmaR + atInner.sigmaTheta);
+  const sigmaAxialOuter = axialScale * nu * (atOuter.sigmaR + atOuter.sigmaTheta);
+  return {
+    innerRadius,
+    outerRadius,
+    samples,
+    boundary: {
+      sigmaRInner: atInner.sigmaR,
+      sigmaROuter: atOuter.sigmaR,
+      sigmaThetaInner: atInner.sigmaTheta,
+      sigmaThetaOuter: atOuter.sigmaTheta,
+      maxAbsHoop,
+      maxAbsHoopAt,
+      sigmaAxialInner,
+      sigmaAxialOuter,
+      maxAbsAxial,
+      maxAbsAxialAt
+    }
+  };
+}
 
-  // Pressure and hoop stresses (Lamé).
+function computeState(input: ReturnType<typeof normalizeBushingInputs>): CalcState {
+  const matHousing = getMat(input.matHousing);
+  const matBushing = getMat(input.matBushing);
+
+  const boreTol = resolveTolerance({
+    mode: input.boreTolMode,
+    nominal: input.boreNominal ?? input.boreDia,
+    plus: input.boreTolPlus,
+    minus: input.boreTolMinus,
+    lower: input.boreLower,
+    upper: input.boreUpper,
+    minFloor: 1e-6
+  });
+
+  const interferenceTol = resolveTolerance({
+    mode: input.interferenceTolMode,
+    nominal: input.interferenceNominal ?? input.interference,
+    plus: input.interferenceTolPlus,
+    minus: input.interferenceTolMinus,
+    lower: input.interferenceLower,
+    upper: input.interferenceUpper
+  });
+
+  const odFit = buildOdTolerance(boreTol, interferenceTol);
+  const odInstalled = odFit.od.nominal;
+
+  const dT = Number.isFinite(input.dT) ? input.dT : 0;
+  const dT_F = input.units === 'metric' ? dT * 1.8 : dT;
+  const deltaThermal = ((matBushing.alpha_uF ?? 0) - (matHousing.alpha_uF ?? 0)) * 1e-6 * boreTol.nominal * dT_F;
+  const deltaUser = odFit.achievedInterference.nominal;
+  const delta = deltaUser + deltaThermal;
+
+  const csSolvedId = (input.idCS?.enabled ?? input.idType === 'countersink')
+    ? solveCountersink(input.csMode, input.csDia, input.csDepth, input.csAngle, input.idBushing)
+    : { dia: input.csDia, depth: input.csDepth, angleDeg: input.csAngle };
+  const csSolvedOd = (input.odCS?.enabled ?? input.bushingType === 'countersink')
+    ? solveCountersink(input.extCsMode, input.extCsDia, input.extCsDepth, input.extCsAngle, odInstalled)
+    : { dia: input.extCsDia, depth: input.extCsDepth, angleDeg: input.extCsAngle };
+
+  const csInternalDiaTol = csDiaToleranceFromBase(
+    input.csMode,
+    csSolvedId.dia,
+    csSolvedId.depth,
+    csSolvedId.angleDeg,
+    makeRange('nominal_tol', input.idBushing, input.idBushing, input.idBushing)
+  );
+  const csExternalDiaTol = csDiaToleranceFromBase(
+    input.extCsMode,
+    csSolvedOd.dia,
+    csSolvedOd.depth,
+    csSolvedOd.angleDeg,
+    odFit.od
+  );
+
+  const internalCsInvalid =
+    input.idType === 'countersink' &&
+    (!Number.isFinite(csSolvedId.dia) ||
+      !Number.isFinite(csSolvedId.depth) ||
+      !Number.isFinite(csSolvedId.angleDeg) ||
+      csSolvedId.dia < input.idBushing ||
+      csSolvedId.depth < 0 ||
+      csSolvedId.angleDeg <= 0 ||
+      csSolvedId.angleDeg >= 180);
+  const externalCsInvalid =
+    input.bushingType === 'countersink' &&
+    (!Number.isFinite(csSolvedOd.dia) ||
+      !Number.isFinite(csSolvedOd.depth) ||
+      !Number.isFinite(csSolvedOd.angleDeg) ||
+      csSolvedOd.dia < odInstalled ||
+      csSolvedOd.depth < 0 ||
+      csSolvedOd.angleDeg <= 0 ||
+      csSolvedOd.angleDeg >= 180);
+
+  const wallStraight = Math.max((odInstalled - input.idBushing) / 2, 0);
+  const A_rad = (csSolvedId.angleDeg / 2) * (Math.PI / 180);
+  const outerBoundary =
+    input.bushingType === 'flanged'
+      ? (input.flangeOd ?? 0)
+      : input.bushingType === 'countersink'
+        ? csSolvedOd.dia
+        : odInstalled;
+  const t_top = (outerBoundary - csSolvedId.dia) / (2 * Math.cos(A_rad));
+  const d_corner =
+    ((odInstalled - csSolvedId.dia) / 2) * Math.cos(A_rad) + (input.flangeThk ?? 0) * Math.sin(A_rad);
+  const wallNeck =
+    input.idType !== 'countersink'
+      ? wallStraight
+      : input.bushingType === 'countersink'
+        ? Math.min((csSolvedOd.dia - csSolvedId.dia) / 2, wallStraight)
+        : input.bushingType === 'flanged'
+          ? Math.min(t_top, d_corner)
+          : t_top;
+  const failStraight = wallStraight < input.minWallStraight;
+  const failNeck = wallNeck < input.minWallNeck;
+
   const Eh = toPsiFromKsi(matHousing.E_ksi || 0);
   const Eb = toPsiFromKsi(matBushing.E_ksi || 0);
-  const nuh = matHousing.nu ?? 0.33;
-  const nub = matBushing.nu ?? 0.33;
-
-  // Saturation clamp for very wide plates (legacy used 2D span)
-  const R_sat = boreDia * 2;
-  const w_eff = Math.min(housingWidth, R_sat * 2);
-  const e_eff = Math.min(edgeDist, R_sat);
-  const area_rect = w_eff * (e_eff * 2.0);
-  const area_bore = (Math.PI * boreDia ** 2) / 4;
-  const area_housing = Math.max(area_rect - area_bore, 1e-6);
-  const D_equivalent = Math.sqrt((4 * area_housing) / Math.PI + boreDia ** 2);
-
+  const R_sat = boreTol.nominal * 2;
+  const w_eff = Math.min(input.housingWidth, R_sat * 2);
+  const e_eff = Math.min(input.edgeDist, R_sat);
+  const area_housing = Math.max(w_eff * (e_eff * 2.0) - (Math.PI * boreTol.nominal ** 2) / 4, 1e-6);
+  const D_equivalent = Math.sqrt((4 * area_housing) / Math.PI + boreTol.nominal ** 2);
   const lambda = Math.min(e_eff / (D_equivalent / 2), 1.0);
   const psi = 1.0 + 0.2 * (1.0 - lambda);
-
   const effectiveODHousing = D_equivalent;
-  const termB = (boreDia / Eb) * (((boreDia ** 2 + idBushing ** 2) / (boreDia ** 2 - idBushing ** 2)) - nub);
-  const termH = psi * (boreDia / Eh) * (((effectiveODHousing ** 2 + boreDia ** 2) / (effectiveODHousing ** 2 - boreDia ** 2)) + nuh);
-
+  const termB =
+    (boreTol.nominal / Eb) *
+    (((boreTol.nominal ** 2 + input.idBushing ** 2) / (boreTol.nominal ** 2 - input.idBushing ** 2)) -
+      (matBushing.nu ?? 0.33));
+  const termH =
+    psi *
+    (boreTol.nominal / Eh) *
+    (((effectiveODHousing ** 2 + boreTol.nominal ** 2) / (effectiveODHousing ** 2 - boreTol.nominal ** 2)) +
+      (matHousing.nu ?? 0.33));
   const pressure = delta > 0 ? delta / (termB + termH) : 0;
-  const stressHoopHousing = pressure * ((effectiveODHousing ** 2 + boreDia ** 2) / (effectiveODHousing ** 2 - boreDia ** 2));
-  const stressHoopBushing = -pressure * ((boreDia ** 2 + idBushing ** 2) / (boreDia ** 2 - idBushing ** 2));
-  const installForce = friction * pressure * (Math.PI * boreDia * housingLen);
+  const stressHoopHousing =
+    pressure * ((effectiveODHousing ** 2 + boreTol.nominal ** 2) / (effectiveODHousing ** 2 - boreTol.nominal ** 2));
+  const stressHoopBushing =
+    -pressure * ((boreTol.nominal ** 2 + input.idBushing ** 2) / (boreTol.nominal ** 2 - input.idBushing ** 2));
+  const endConstraint = input.endConstraint ?? 'free';
+  const axialConstraintFactor = endConstraint === 'both_ends' ? 1 : endConstraint === 'one_end' ? 0.5 : 0;
+  const axialLengthFactor = clamp(input.housingLen / Math.max(4 * wallStraight, 1e-6), 0, 1);
+  const axialScale = axialConstraintFactor * axialLengthFactor;
+  const stressAxialHousing = axialScale * (matHousing.nu ?? 0.33) * stressHoopHousing;
+  const stressAxialBushing = axialScale * (matBushing.nu ?? 0.33) * stressHoopBushing;
+  const installForce =
+    (Number.isFinite(input.friction) ? input.friction : 0.15) * pressure * (Math.PI * boreTol.nominal * input.housingLen);
 
-  // Edge distance using legacy interaction approach.
-  const profile = (bushingType === 'countersink')
-    ? [
-        { d_top: csSolvedOd.dia, d_bottom: odInstalled, height: Math.min(csSolvedOd.depth, housingLen), role: 'parent' },
-        ...(csSolvedOd.depth < housingLen
-          ? [{ d_top: odInstalled, d_bottom: odInstalled, height: Math.max(0, housingLen - csSolvedOd.depth), role: 'parent' }]
-          : [])
-      ]
-    : [{ d_top: odInstalled, d_bottom: odInstalled, height: housingLen, role: 'parent' }];
-
-  const bearingProfile = calculateUniversalBearing(profile);
-  const t_eff_seq = bearingProfile.t_eff_sequence || housingLen;
-
-  const thetaDeg = input.thetaDeg ?? 40;
-  const th = Math.max(1e-6, Math.abs(thetaDeg)) * (Math.PI / 180);
-  const sinTheta = Math.max(1e-6, Math.sin(th));
-
-  const Fbru = toPsiFromKsi(matHousing.Fbru_ksi || matHousing.Sy_ksi || 0);
+  const profile =
+    input.bushingType === 'countersink'
+      ? [
+          {
+            d_top: csSolvedOd.dia,
+            d_bottom: odInstalled,
+            height: Math.min(csSolvedOd.depth, input.housingLen),
+            role: 'parent'
+          },
+          ...(csSolvedOd.depth < input.housingLen
+            ? [{ d_top: odInstalled, d_bottom: odInstalled, height: Math.max(0, input.housingLen - csSolvedOd.depth), role: 'parent' }]
+            : [])
+        ]
+      : [{ d_top: odInstalled, d_bottom: odInstalled, height: input.housingLen, role: 'parent' }];
+  const t_eff_seq = calculateUniversalBearing(profile).t_eff_sequence || input.housingLen;
+  const sinTheta = Math.max(1e-6, Math.sin(Math.max(1e-6, Math.abs(input.thetaDeg ?? 40)) * (Math.PI / 180)));
+  const Fbru_eff = toPsiFromKsi(matHousing.Fbru_ksi || matHousing.Sy_ksi || 0) + 0.8 * pressure;
   const tau = toPsiFromKsi(matHousing.Fsu_ksi || matHousing.Sy_ksi || 0);
-
-  const Fbru_eff = Fbru + 0.8 * pressure; // interaction uplift from legacy
-  const e_required_seq = tau > 0 ? (boreDia * Fbru_eff) / (2 * tau * sinTheta) : Infinity;
-  const loadForEdge = Number.isFinite(input.load) ? Number(input.load) : 1000;
-  const e_required_strength = (2 * t_eff_seq * tau * sinTheta) > 1e-9 ? (loadForEdge) / (2 * t_eff_seq * tau * sinTheta) : Infinity;
-
-  const edMinSequence = e_required_seq > 0 ? e_required_seq / boreDia : Infinity;
-  const edMinStrength = e_required_strength > 0 ? e_required_strength / boreDia : Infinity;
-  const edActual = boreDia > 0 ? edgeDist / boreDia : Infinity;
-
-  // Governing margin selection.
-  const marginSeq = edActual / edMinSequence - 1;
-  const marginStrength = edActual / edMinStrength - 1;
-  const marginWallStraight = wallStraight / minWallStraight - 1;
-  const marginWallNeck = wallNeck / minWallNeck - 1;
+  const e_required_seq = tau > 0 ? (boreTol.nominal * Fbru_eff) / (2 * tau * sinTheta) : Infinity;
+  const e_required_strength =
+    2 * t_eff_seq * tau * sinTheta > 1e-9
+      ? (Number.isFinite(input.load) ? Number(input.load) : 1000) / (2 * t_eff_seq * tau * sinTheta)
+      : Infinity;
+  const edMinSequence = e_required_seq > 0 ? e_required_seq / boreTol.nominal : Infinity;
+  const edMinStrength = e_required_strength > 0 ? e_required_strength / boreTol.nominal : Infinity;
+  const edActual = boreTol.nominal > 0 ? input.edgeDist / boreTol.nominal : Infinity;
 
   const candidates = [
-    { name: 'Edge distance (sequencing)', margin: marginSeq },
-    { name: 'Edge distance (strength)', margin: marginStrength },
-    { name: 'Straight wall thickness', margin: marginWallStraight },
-    { name: 'Neck wall thickness', margin: marginWallNeck }
+    { name: 'Edge distance (sequencing)', margin: edActual / edMinSequence - 1 },
+    { name: 'Edge distance (strength)', margin: edActual / edMinStrength - 1 },
+    { name: 'Straight wall thickness', margin: wallStraight / input.minWallStraight - 1 },
+    { name: 'Neck wall thickness', margin: wallNeck / input.minWallNeck - 1 }
   ];
-
   const governing = candidates.reduce((best, cur) => (cur.margin < best.margin ? cur : best), candidates[0]);
 
+  return {
+    input,
+    matHousing,
+    matBushing,
+    boreTol,
+    interferenceTol,
+    odTol: odFit.od,
+    achievedInterferenceTol: odFit.achievedInterference,
+    toleranceStatus: odFit.status,
+    toleranceNotes: odFit.notes,
+    odInstalled,
+    delta,
+    deltaUser,
+    deltaThermal,
+    csSolvedId,
+    csSolvedOd,
+    csInternalDiaTol,
+    csExternalDiaTol,
+    internalCsInvalid,
+    externalCsInvalid,
+    wallStraight,
+    wallNeck,
+    failStraight,
+    failNeck,
+    effectiveODHousing,
+    D_equivalent,
+    psi,
+    lambda,
+    w_eff,
+    e_eff,
+    termB,
+    termH,
+    pressure,
+    stressHoopHousing,
+    stressHoopBushing,
+    stressAxialHousing,
+    stressAxialBushing,
+    axialConstraintFactor,
+    axialLengthFactor,
+    installForce,
+    e_required_seq,
+    edActual,
+    edMinSequence,
+    edMinStrength,
+    candidates,
+    governing
+  };
+}
+
+function buildWarnings(validationWarnings: BushingWarning[], s: CalcState): { warningCodes: BushingWarning[]; warnings: string[] } {
   const warningCodes: BushingWarning[] = [...validationWarnings];
-  const warnings: string[] = validationWarnings.map((w) => w.message);
-  if (failStraight) {
-    warningCodes.push({
-      code: 'STRAIGHT_WALL_BELOW_MIN',
-      message: 'Straight wall thickness below minimum.',
-      severity: 'error'
-    });
-    warnings.push('Straight wall thickness below minimum.');
+  const warnings = validationWarnings.map((w) => w.message);
+  const push = (code: BushingWarning['code'], message: string, severity: BushingWarning['severity']) => {
+    warningCodes.push({ code, message, severity });
+    warnings.push(message);
+  };
+  if (s.failStraight) push('STRAIGHT_WALL_BELOW_MIN', 'Straight wall thickness below minimum.', 'error');
+  if (s.failNeck) push('NECK_WALL_BELOW_MIN', 'Neck wall thickness below minimum.', 'error');
+  if (s.delta <= 0) push('NET_CLEARANCE_FIT', 'Net interference is negative (clearance fit after thermal).', 'warning');
+  if (s.edActual / s.edMinSequence - 1 < 0) push('EDGE_DISTANCE_SEQUENCE_FAIL', 'Edge distance sequencing margin is below zero.', 'error');
+  if (s.edActual / s.edMinStrength - 1 < 0) push('EDGE_DISTANCE_STRENGTH_FAIL', 'Edge distance strength margin is below zero.', 'error');
+  if (s.internalCsInvalid) push('INPUT_INVALID', 'Internal countersink geometry is invalid for the selected mode.', 'warning');
+  if (s.externalCsInvalid) push('INPUT_INVALID', 'External countersink geometry is invalid for the selected mode.', 'warning');
+  if (s.toleranceStatus === 'infeasible') {
+    push('TOLERANCE_INFEASIBLE', 'Bore/interference tolerance bands are incompatible for full-range containment.', 'warning');
   }
-  if (failNeck) {
-    warningCodes.push({
-      code: 'NECK_WALL_BELOW_MIN',
-      message: 'Neck wall thickness below minimum.',
-      severity: 'error'
-    });
-    warnings.push('Neck wall thickness below minimum.');
-  }
-  if (delta <= 0) {
-    warningCodes.push({
-      code: 'NET_CLEARANCE_FIT',
-      message: 'Net interference is negative (clearance fit after thermal).',
-      severity: 'warning'
-    });
-    warnings.push('Net interference is negative (clearance fit after thermal).');
-  }
-  if (marginSeq < 0) {
-    warningCodes.push({
-      code: 'EDGE_DISTANCE_SEQUENCE_FAIL',
-      message: 'Edge distance sequencing margin is below zero.',
-      severity: 'error'
-    });
-    warnings.push('Edge distance sequencing margin is below zero.');
-  }
-  if (marginStrength < 0) {
-    warningCodes.push({
-      code: 'EDGE_DISTANCE_STRENGTH_FAIL',
-      message: 'Edge distance strength margin is below zero.',
-      severity: 'error'
-    });
-    warnings.push('Edge distance strength margin is below zero.');
-  }
+  return { warningCodes, warnings };
+}
+
+function toOutput(s: CalcState, warningCodes: BushingWarning[], warnings: string[]): BushingOutput {
+  const bushingField = buildLameRegionField(
+    s.input.idBushing / 2,
+    s.boreTol.nominal / 2,
+    0,
+    s.pressure,
+    s.matBushing.nu ?? 0.33,
+    s.axialConstraintFactor * s.axialLengthFactor
+  );
+  const housingField = buildLameRegionField(
+    s.boreTol.nominal / 2,
+    s.effectiveODHousing / 2,
+    s.pressure,
+    0,
+    s.matHousing.nu ?? 0.33,
+    s.axialConstraintFactor * s.axialLengthFactor
+  );
 
   return {
-    sleeveWall: wallStraight,
-    neckWall: wallNeck,
-    odInstalled,
+    sleeveWall: s.wallStraight,
+    neckWall: s.wallNeck,
+    odInstalled: s.odInstalled,
     csSolved: {
-      ...(idType === 'countersink' ? { id: { dia: csSolvedId.dia, depth: csSolvedId.depth, angleDeg: csSolvedId.angleDeg } } : {}),
-      ...(bushingType === 'countersink' ? { od: { dia: csSolvedOd.dia, depth: csSolvedOd.depth, angleDeg: csSolvedOd.angleDeg } } : {})
+      ...(s.input.idType === 'countersink'
+        ? { id: { dia: s.csSolvedId.dia, depth: s.csSolvedId.depth, angleDeg: s.csSolvedId.angleDeg } }
+        : {}),
+      ...(s.input.bushingType === 'countersink'
+        ? { od: { dia: s.csSolvedOd.dia, depth: s.csSolvedOd.depth, angleDeg: s.csSolvedOd.angleDeg } }
+        : {})
     },
-    pressure,
+    pressure: s.pressure,
     lame: {
       model: 'lame_thick_cylinder',
       unitsBase: { length: 'in', stress: 'psi', force: 'lbf' },
-      deltaTotal: delta,
-      deltaThermal,
-      deltaUser: input.interference,
-      boreDia,
-      idBushing,
-      effectiveODHousing,
-      D_equivalent,
-      psi,
-      lambda,
-      w_eff,
-      e_eff,
-      termB,
-      termH,
-      pressurePsi: pressure,
-      pressureKsi: pressure / 1000,
+      deltaTotal: s.delta,
+      deltaThermal: s.deltaThermal,
+      deltaUser: s.deltaUser,
+      boreDia: s.boreTol.nominal,
+      idBushing: s.input.idBushing,
+      effectiveODHousing: s.effectiveODHousing,
+      D_equivalent: s.D_equivalent,
+      psi: s.psi,
+      lambda: s.lambda,
+      w_eff: s.w_eff,
+      e_eff: s.e_eff,
+      termB: s.termB,
+      termH: s.termH,
+      pressurePsi: s.pressure,
+      pressureKsi: s.pressure / 1000,
+      field: {
+        signConvention: 'Tension positive; compressive pressure appears as negative radial stress.',
+        axialModel: `sigma_z(r) = k_constraint*k_length*nu*(sigma_r(r)+sigma_theta(r)), with k_constraint=${s.axialConstraintFactor.toFixed(2)} and k_length=${s.axialLengthFactor.toFixed(2)}.`,
+        bushing: bushingField,
+        housing: housingField
+      }
     },
     hoop: {
-      housingSigma: stressHoopHousing,
-      housingMS: stressHoopHousing !== 0 ? (toPsiFromKsi(matHousing.Sy_ksi || 0) / stressHoopHousing) - 1 : Infinity,
-      bushingSigma: stressHoopBushing,
-      bushingMS: stressHoopBushing !== 0 ? (toPsiFromKsi(matBushing.Sy_ksi || 0) / Math.abs(stressHoopBushing)) - 1 : Infinity,
-      ligamentSigma: stressHoopHousing,
-      ligamentMS: stressHoopHousing !== 0 ? (toPsiFromKsi(matHousing.Sy_ksi || 0) / stressHoopHousing) - 1 : Infinity,
-      edRequiredLigament: e_required_seq
+      housingSigma: s.stressHoopHousing,
+      housingMS:
+        s.stressHoopHousing !== 0 ? toPsiFromKsi(s.matHousing.Sy_ksi || 0) / s.stressHoopHousing - 1 : Infinity,
+      bushingSigma: s.stressHoopBushing,
+      bushingMS:
+        s.stressHoopBushing !== 0
+          ? toPsiFromKsi(s.matBushing.Sy_ksi || 0) / Math.abs(s.stressHoopBushing) - 1
+          : Infinity,
+      ligamentSigma: s.stressHoopHousing,
+      ligamentMS:
+        s.stressHoopHousing !== 0 ? toPsiFromKsi(s.matHousing.Sy_ksi || 0) / s.stressHoopHousing - 1 : Infinity,
+      edRequiredLigament: s.e_required_seq
     },
     edgeDistance: {
-      edActual,
-      edMinSequence,
-      edMinStrength,
-      governing: edMinSequence >= edMinStrength ? 'sequencing' : 'strength'
+      edActual: s.edActual,
+      edMinSequence: s.edMinSequence,
+      edMinStrength: s.edMinStrength,
+      governing: s.edMinSequence >= s.edMinStrength ? 'sequencing' : 'strength'
     },
     physics: {
-      deltaEffective: delta,
-      contactPressure: pressure,
-      installForce,
-      stressHoopHousing: stressHoopHousing,
-      stressHoopBushing: stressHoopBushing,
-      marginHousing: stressHoopHousing !== 0 ? (toPsiFromKsi(matHousing.Sy_ksi || 0) / stressHoopHousing) - 1 : Infinity,
-      marginBushing: stressHoopBushing !== 0 ? (toPsiFromKsi(matBushing.Sy_ksi || 0) / Math.abs(stressHoopBushing)) - 1 : Infinity,
-      edMinCoupled: edMinSequence
+      deltaEffective: s.delta,
+      contactPressure: s.pressure,
+      installForce: s.installForce,
+      stressHoopHousing: s.stressHoopHousing,
+      stressHoopBushing: s.stressHoopBushing,
+      stressAxialHousing: s.stressAxialHousing,
+      stressAxialBushing: s.stressAxialBushing,
+      marginHousing:
+        s.stressHoopHousing !== 0 ? toPsiFromKsi(s.matHousing.Sy_ksi || 0) / s.stressHoopHousing - 1 : Infinity,
+      marginBushing:
+        s.stressHoopBushing !== 0
+          ? toPsiFromKsi(s.matBushing.Sy_ksi || 0) / Math.abs(s.stressHoopBushing) - 1
+          : Infinity,
+      axialConstraintFactor: s.axialConstraintFactor,
+      axialLengthFactor: s.axialLengthFactor,
+      edMinCoupled: s.edMinSequence
     },
     geometry: {
-      odBushing: odInstalled,
-      wallStraight,
-      wallNeck,
-      csInternal: csSolvedId,
-      csExternal: csSolvedOd,
-      isSaturationActive: housingWidth > w_eff || edgeDist > e_eff
+      odBushing: s.odInstalled,
+      wallStraight: s.wallStraight,
+      wallNeck: s.wallNeck,
+      csInternal: s.csSolvedId,
+      csExternal: s.csSolvedOd,
+      isSaturationActive: s.input.housingWidth > s.w_eff || s.input.edgeDist > s.e_eff
     },
-    governing,
-    candidates,
+    tolerance: {
+      status: s.toleranceStatus,
+      notes: s.toleranceNotes,
+      bore: s.boreTol,
+      interferenceTarget: s.interferenceTol,
+      odBushing: s.odTol,
+      achievedInterference: s.achievedInterferenceTol,
+      ...(s.input.idType === 'countersink' ? { csInternalDia: s.csInternalDiaTol } : {}),
+      ...(s.input.bushingType === 'countersink' ? { csExternalDia: s.csExternalDiaTol } : {})
+    },
+    governing: s.governing,
+    candidates: s.candidates,
     warningCodes,
     warnings
   };
+}
+
+export function computeBushing(raw: BushingInputsRaw): BushingOutput {
+  const input = normalizeBushingInputs(raw);
+  const validationWarnings = validateBushingInputs(input);
+  const state = computeState(input);
+  const { warningCodes, warnings } = buildWarnings(validationWarnings, state);
+  return toOutput(state, warningCodes, warnings);
 }

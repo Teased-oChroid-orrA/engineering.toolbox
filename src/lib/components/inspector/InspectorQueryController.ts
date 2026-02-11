@@ -1,7 +1,7 @@
 export type QueryScope = 'current' | 'all' | 'ask';
 export type MatchMode = 'fuzzy' | 'exact' | 'regex';
 import type { CategoryFilterState, DateFilterState, NumericFilterState } from '$lib/components/inspector/InspectorTier2Controller';
-import { toCombinedRegexQuery, type MultiQueryClause } from '$lib/components/inspector/InspectorMultiQueryController';
+import { type MultiQueryClause } from '$lib/components/inspector/InspectorMultiQueryController';
 
 export const shouldRunCrossFileQuery = (scope: QueryScope, loadedDatasetsLength: number) =>
   scope === 'all' && loadedDatasetsLength > 1;
@@ -57,14 +57,21 @@ export function buildFilterSpec(args: {
     maxRowsScanText
   } = args;
 
-  let effectiveQuery = query ?? '';
-  let effectiveMode = matchMode;
-  if (multiQueryEnabled) {
-    const combined = toCombinedRegexQuery(multiQueryClauses, escapeRegExp);
-    if (combined.error) return { spec: null, queryError: combined.error };
-    if ((combined.query ?? '').trim().length > 0) {
-      effectiveQuery = combined.query;
-      effectiveMode = 'regex';
+  const effectiveQuery = query ?? '';
+  const effectiveMode = matchMode;
+  const activeMultiQueryClauses = multiQueryEnabled
+    ? (multiQueryClauses ?? [])
+        .map((c) => ({ ...c, query: (c.query ?? '').trim() }))
+        .filter((c) => c.query.length > 0)
+    : [];
+  if (activeMultiQueryClauses.length > 0) {
+    for (const c of activeMultiQueryClauses) {
+      if (c.mode !== 'regex') continue;
+      try {
+        new RegExp(c.query, 'i');
+      } catch (e: any) {
+        return { spec: null, queryError: `Multi-query regex invalid: ${e?.message ?? 'Invalid regex'}` };
+      }
     }
   }
 
@@ -118,6 +125,8 @@ export function buildFilterSpec(args: {
       query: effectiveQuery,
       columnIdx: targetColIdx,
       matchMode: effectiveMode,
+      multiQueryEnabled,
+      multiQueryClauses: activeMultiQueryClauses,
       numericFilter,
       dateFilter,
       categoryFilter,

@@ -138,6 +138,9 @@ body {
   }
 
   .surface-pop-card {
+    --surface-tilt-x: 2deg;
+    --surface-tilt-y: -2.2deg;
+    --surface-lift-y: -4px;
     position: relative;
     transform-style: preserve-3d;
     transition:
@@ -161,7 +164,7 @@ body {
   }
 
   .surface-pop-card:hover {
-    transform: perspective(960px) translateY(-4px) rotateX(2deg) rotateY(-2.2deg);
+    transform: perspective(960px) translateY(var(--surface-lift-y, -4px)) rotateX(var(--surface-tilt-x, 2deg)) rotateY(var(--surface-tilt-y, -2.2deg));
     border-color: rgba(125, 211, 252, 0.5);
     box-shadow: 0 20px 36px rgba(3, 12, 23, 0.56), 0 0 0 1px rgba(125, 211, 252, 0.18) inset;
   }
@@ -186,6 +189,9 @@ body {
   }
 
   .bushing-pop-card {
+    --bushing-tilt-x: 2.2deg;
+    --bushing-tilt-y: -2deg;
+    --bushing-lift-y: -6px;
     position: relative;
     transform-style: preserve-3d;
     transform-origin: center center;
@@ -210,7 +216,7 @@ body {
   }
 
   .bushing-pop-card:hover {
-    transform: perspective(980px) translateY(-6px) rotateX(2.2deg) rotateY(-2deg);
+    transform: perspective(980px) translateY(var(--bushing-lift-y, -6px)) rotateX(var(--bushing-tilt-x, 2.2deg)) rotateY(var(--bushing-tilt-y, -2deg));
     border-color: rgba(45, 212, 191, 0.46);
     box-shadow:
       0 22px 36px rgba(2, 8, 18, 0.58),
@@ -222,7 +228,14 @@ body {
     opacity: 1;
   }
 
+  .bushing-no-tilt:hover {
+    transform: none;
+  }
+
   .bushing-pop-sub {
+    --bushing-sub-tilt-x: 0.35deg;
+    --bushing-sub-tilt-y: -0.25deg;
+    --bushing-sub-lift-y: -1.5px;
     transition:
       transform var(--bushing-motion-standard) var(--bushing-motion-ease),
       border-color var(--bushing-motion-fast) var(--bushing-motion-ease),
@@ -231,11 +244,29 @@ body {
   }
 
   .bushing-pop-sub:hover {
-    transform: perspective(900px) translateY(-3px) rotateX(1.2deg);
+    transform: perspective(900px) translateY(var(--bushing-sub-lift-y, -1.5px)) rotateX(var(--bushing-sub-tilt-x, 0.35deg)) rotateY(var(--bushing-sub-tilt-y, -0.25deg));
     border-color: rgba(45, 212, 191, 0.4);
     box-shadow:
-      0 14px 24px rgba(2, 8, 18, 0.46),
+      0 10px 16px rgba(2, 8, 18, 0.42),
       0 0 0 1px rgba(94, 234, 212, 0.16) inset;
+  }
+
+  .bushing-depth-0 {
+    --bushing-tilt-x: 0deg;
+    --bushing-tilt-y: 0deg;
+    --bushing-lift-y: -1px;
+  }
+
+  .bushing-depth-1 {
+    --bushing-tilt-x: 0.75deg;
+    --bushing-tilt-y: -0.65deg;
+    --bushing-lift-y: -3px;
+  }
+
+  .bushing-depth-2 {
+    --bushing-tilt-x: 2.2deg;
+    --bushing-tilt-y: -2deg;
+    --bushing-lift-y: -6px;
   }
 
   .bush-card-title {
@@ -297,6 +328,24 @@ body {
       box-shadow 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
   }
 
+  .inspector-depth-0 {
+    --ins-tilt-x: 0deg;
+    --ins-tilt-y: 0deg;
+    --ins-lift-y: -1px;
+  }
+
+  .inspector-depth-1 {
+    --ins-tilt-x: 0.45deg;
+    --ins-tilt-y: -0.35deg;
+    --ins-lift-y: -2px;
+  }
+
+  .inspector-depth-2 {
+    --ins-tilt-x: 2.7deg;
+    --ins-tilt-y: -2.4deg;
+    --ins-lift-y: -7px;
+  }
+
   .inspector-pop-card {
     position: relative;
     transform-style: preserve-3d;
@@ -316,7 +365,7 @@ body {
   }
 
   .inspector-pop-card:hover {
-    transform: perspective(1020px) translateY(-7px) rotateX(2.7deg) rotateY(-2.4deg);
+    transform: perspective(1020px) translateY(var(--ins-lift-y, -7px)) rotateX(var(--ins-tilt-x, 2.7deg)) rotateY(var(--ins-tilt-y, -2.4deg));
     border-color: rgba(110, 231, 183, 0.55);
     box-shadow:
       0 24px 40px rgba(2, 8, 18, 0.6),
@@ -329,6 +378,9 @@ body {
   }
 
   .inspector-pop-sub {
+    --ins-tilt-x: 0.3deg;
+    --ins-tilt-y: -0.2deg;
+    --ins-lift-y: -1.5px;
     transition:
       transform 200ms cubic-bezier(0.22, 0.61, 0.36, 1),
       border-color 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
@@ -336,9 +388,9 @@ body {
   }
 
   .inspector-pop-sub:hover {
-    transform: perspective(900px) translateY(-4px) rotateX(1.1deg);
+    transform: perspective(900px) translateY(var(--ins-lift-y, -1.5px)) rotateX(var(--ins-tilt-x, 0.3deg)) rotateY(var(--ins-tilt-y, -0.2deg));
     border-color: rgba(125, 211, 252, 0.5);
-    box-shadow: 0 16px 26px rgba(2, 8, 18, 0.5), 0 0 0 1px rgba(125, 211, 252, 0.18) inset;
+    box-shadow: 0 10px 18px rgba(2, 8, 18, 0.42), 0 0 0 1px rgba(125, 211, 252, 0.16) inset;
   }
 
   .inspector-pop-layer {
@@ -365,9 +417,9 @@ body {
   }
 
   .inspector-pop-layer:hover {
-    transform: perspective(960px) translateY(-6px) rotateX(1.8deg) rotateY(-1.5deg);
+    transform: perspective(960px) translateY(-4px) rotateX(1.15deg) rotateY(-0.9deg);
     border-color: rgba(125, 211, 252, 0.58);
-    box-shadow: 0 20px 30px rgba(2, 8, 18, 0.54), 0 0 0 1px rgba(167, 243, 208, 0.2) inset, 0 0 18px rgba(56, 189, 248, 0.16);
+    box-shadow: 0 16px 24px rgba(2, 8, 18, 0.5), 0 0 0 1px rgba(167, 243, 208, 0.18) inset, 0 0 16px rgba(56, 189, 248, 0.14);
   }
 
   .inspector-pop-layer:hover::after {
@@ -469,3 +521,20 @@ body {
     transform: translateY(0) scale(1);
   }
 }
+  .surface-depth-0 {
+    --surface-tilt-x: 0deg;
+    --surface-tilt-y: 0deg;
+    --surface-lift-y: -1px;
+  }
+
+  .surface-depth-1 {
+    --surface-tilt-x: 0.6deg;
+    --surface-tilt-y: -0.55deg;
+    --surface-lift-y: -2px;
+  }
+
+  .surface-depth-2 {
+    --surface-tilt-x: 2deg;
+    --surface-tilt-y: -2.2deg;
+    --surface-lift-y: -4px;
+  }

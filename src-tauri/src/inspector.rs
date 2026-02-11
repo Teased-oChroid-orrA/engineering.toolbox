@@ -119,11 +119,22 @@ pub struct FilterSpec {
     pub query: String,
     pub column_idx: Option<usize>,
     pub match_mode: MatchMode,
+    #[serde(default)]
+    pub multi_query_enabled: bool,
+    #[serde(default)]
+    pub multi_query_clauses: Vec<MultiQueryClause>,
     pub numeric_filter: Option<NumericFilter>,
     pub date_filter: Option<DateFilter>,
     pub category_filter: Option<CategoryFilter>,
     // throttle: stop scanning after N rows (None = scan all)
     pub max_rows_scan: Option<usize>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MultiQueryClause {
+    pub query: String,
+    pub mode: MatchMode,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -653,6 +664,50 @@ fn passes_date(col: &[String], row: usize, f: &DateFilter) -> bool {
     d >= min_d && d <= max_d
 }
 
+fn text_query_matches(
+    columns: &[Vec<String>],
+    row: usize,
+    column_idx: Option<usize>,
+    mode: MatchMode,
+    query: &str,
+    q_lower: &str,
+    compiled: Option<&Regex>,
+) -> Result<bool, String> {
+    if query.trim().is_empty() {
+        return Ok(true);
+    }
+
+    if let Some(ci) = column_idx {
+        if ci >= columns.len() {
+            return Ok(false);
+        }
+        let cell = columns[ci].get(row).map(|s| s.as_str()).unwrap_or("");
+        let hit = match mode {
+            MatchMode::Exact => cell.eq_ignore_ascii_case(query),
+            MatchMode::Fuzzy => cell.to_lowercase().contains(q_lower),
+            MatchMode::Regex => compiled
+                .ok_or_else(|| "regex not compiled".to_string())?
+                .is_match(cell),
+        };
+        return Ok(hit);
+    }
+
+    for c in columns.iter() {
+        let cell = c.get(row).map(|s| s.as_str()).unwrap_or("");
+        let matched = match mode {
+            MatchMode::Exact => cell.eq_ignore_ascii_case(query),
+            MatchMode::Fuzzy => cell.to_lowercase().contains(q_lower),
+            MatchMode::Regex => compiled
+                .ok_or_else(|| "regex not compiled".to_string())?
+                .is_match(cell),
+        };
+        if matched {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 fn filter_indices(columns: &[Vec<String>], row_count: usize, spec: &FilterSpec) -> Result<Vec<usize>, String> {
     if spec.match_mode == MatchMode::Regex && spec.query.len() > 256 {
         return Err("Regex pattern too long (max 256 chars)".to_string());
@@ -661,11 +716,25 @@ fn filter_indices(columns: &[Vec<String>], row_count: usize, spec: &FilterSpec) 
     if spec.match_mode == MatchMode::Regex && !spec.query.trim().is_empty() {
         compiled = Some(Regex::new(&spec.query).map_err(|e| format!("Invalid regex: {e}"))?);
     }
+    let mut mq_compiled: Vec<Regex> = Vec::new();
+    let mut mq_active: Vec<&MultiQueryClause> = Vec::new();
+    if spec.multi_query_enabled {
+        for clause in spec.multi_query_clauses.iter() {
+            let cq = clause.query.trim();
+            if cq.is_empty() {
+                continue;
+            }
+            if clause.mode == MatchMode::Regex {
+                mq_compiled.push(Regex::new(cq).map_err(|e| format!("Invalid multi-query regex: {e}"))?);
+            }
+            mq_active.push(clause);
+        }
+    }
 
     let max_scan = spec.max_rows_scan.unwrap_or(row_count);
     let scan_n = row_count.min(max_scan);
     let no_tier2 = spec.numeric_filter.is_none() && spec.date_filter.is_none() && spec.category_filter.is_none();
-    if spec.query.trim().is_empty() && no_tier2 {
+    if spec.query.trim().is_empty() && mq_active.is_empty() && no_tier2 {
         return Ok((0..scan_n).collect());
     }
 
@@ -689,45 +758,38 @@ fn filter_indices(columns: &[Vec<String>], row_count: usize, spec: &FilterSpec) 
                 continue;
             }
         }
-        if q.is_empty() {
-            if let (Some(f), Some(set)) = (&spec.category_filter, &cat_set) {
-                if f.enabled && f.col_idx < columns.len() {
-                    let v = columns[f.col_idx].get(r).map(|s| s.trim()).unwrap_or("");
-                    if !set.contains(v) {
-                        continue;
-                    }
-                }
-            }
-            out.push(r);
-            continue;
-        }
-
-        let mut hit = false;
-        if let Some(ci) = spec.column_idx {
-            if ci < columns.len() {
-                let cell = columns[ci].get(r).map(|s| s.as_str()).unwrap_or("");
-                hit = match spec.match_mode {
-                    MatchMode::Exact => cell.eq_ignore_ascii_case(&q),
-                    MatchMode::Fuzzy => cell.to_lowercase().contains(&q_lower),
-                    MatchMode::Regex => {
-                        let re = compiled.as_ref().ok_or_else(|| "regex not compiled".to_string())?;
-                        re.is_match(cell)
-                    }
+        let mut hit = text_query_matches(
+            columns,
+            r,
+            spec.column_idx,
+            spec.match_mode,
+            &q,
+            &q_lower,
+            compiled.as_ref(),
+        )?;
+        if hit && !mq_active.is_empty() {
+            let mut regex_i = 0usize;
+            for clause in mq_active.iter() {
+                let cq = clause.query.trim().to_string();
+                let cq_lower = cq.to_lowercase();
+                let cre = if clause.mode == MatchMode::Regex {
+                    let re = mq_compiled.get(regex_i);
+                    regex_i += 1;
+                    re
+                } else {
+                    None
                 };
-            }
-        } else {
-            for c in columns.iter() {
-                let cell = c.get(r).map(|s| s.as_str()).unwrap_or("");
-                let matched = match spec.match_mode {
-                    MatchMode::Exact => cell.eq_ignore_ascii_case(&q),
-                    MatchMode::Fuzzy => cell.to_lowercase().contains(&q_lower),
-                    MatchMode::Regex => {
-                        let re = compiled.as_ref().ok_or_else(|| "regex not compiled".to_string())?;
-                        re.is_match(cell)
-                    }
-                };
-                if matched {
-                    hit = true;
+                let clause_hit = text_query_matches(
+                    columns,
+                    r,
+                    spec.column_idx,
+                    clause.mode,
+                    &cq,
+                    &cq_lower,
+                    cre,
+                )?;
+                if !clause_hit {
+                    hit = false;
                     break;
                 }
             }
@@ -1154,7 +1216,6 @@ pub fn inspector_explain_row(
     }
 
     if !spec.query.trim().is_empty() {
-        let mut matched = false;
         let q = spec.query.trim().to_string();
         let q_lower = q.to_lowercase();
         let compiled = if spec.match_mode == MatchMode::Regex {
@@ -1162,38 +1223,15 @@ pub fn inspector_explain_row(
         } else {
             None
         };
-        if let Some(ci) = spec.column_idx {
-            if ci >= columns.len() {
-                passes = false;
-                reasons.push("Query filter target is out of range.".to_string());
-            } else {
-                let cell = columns[ci].get(row_idx).map(|s| s.as_str()).unwrap_or("");
-                matched = match spec.match_mode {
-                    MatchMode::Exact => cell.eq_ignore_ascii_case(&q),
-                    MatchMode::Fuzzy => cell.to_lowercase().contains(&q_lower),
-                    MatchMode::Regex => compiled
-                        .as_ref()
-                        .ok_or_else(|| "regex not compiled".to_string())?
-                        .is_match(cell),
-                };
-            }
-        } else {
-            for c in columns.iter() {
-                let cell = c.get(row_idx).map(|s| s.as_str()).unwrap_or("");
-                let hit = match spec.match_mode {
-                    MatchMode::Exact => cell.eq_ignore_ascii_case(&q),
-                    MatchMode::Fuzzy => cell.to_lowercase().contains(&q_lower),
-                    MatchMode::Regex => compiled
-                        .as_ref()
-                        .ok_or_else(|| "regex not compiled".to_string())?
-                        .is_match(cell),
-                };
-                if hit {
-                    matched = true;
-                    break;
-                }
-            }
-        }
+        let matched = text_query_matches(
+            &columns,
+            row_idx,
+            spec.column_idx,
+            spec.match_mode,
+            &q,
+            &q_lower,
+            compiled.as_ref(),
+        )?;
         if matched {
             reasons.push("Query pass.".to_string());
         } else {
@@ -1202,6 +1240,49 @@ pub fn inspector_explain_row(
         }
     } else {
         reasons.push("Query skipped: empty query.".to_string());
+    }
+
+    if spec.multi_query_enabled {
+        let mut regexes: Vec<Regex> = Vec::new();
+        for c in spec.multi_query_clauses.iter() {
+            let cq = c.query.trim();
+            if cq.is_empty() {
+                continue;
+            }
+            if c.mode == MatchMode::Regex {
+                regexes.push(Regex::new(cq).map_err(|e| format!("Invalid multi-query regex: {e}"))?);
+            }
+        }
+        let mut regex_i = 0usize;
+        for c in spec.multi_query_clauses.iter() {
+            let cq = c.query.trim().to_string();
+            if cq.is_empty() {
+                continue;
+            }
+            let cq_lower = cq.to_lowercase();
+            let cre = if c.mode == MatchMode::Regex {
+                let re = regexes.get(regex_i);
+                regex_i += 1;
+                re
+            } else {
+                None
+            };
+            let matched = text_query_matches(
+                &columns,
+                row_idx,
+                spec.column_idx,
+                c.mode,
+                &cq,
+                &cq_lower,
+                cre,
+            )?;
+            if matched {
+                reasons.push(format!("Multi-query clause pass ({:?}).", c.mode));
+            } else {
+                passes = false;
+                reasons.push(format!("Multi-query clause fail ({:?}).", c.mode));
+            }
+        }
     }
 
     Ok(ExplainRowResponse {

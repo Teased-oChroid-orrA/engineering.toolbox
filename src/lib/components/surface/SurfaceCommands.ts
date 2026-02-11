@@ -6,21 +6,15 @@ export type StepImportResult = {
   warnings?: string[];
 };
 
-// Minimal STEP geometry extraction (points + polyline/line edges).
-// Supports the common subset used for point clouds and wire polyline exports.
-// NOTE: For full CAD topology (EDGE_CURVE/ADVANCED_FACE), we will add a Rust-side triangulation path later.
-export function parseStepPointsAndEdges(stepText: string, maxPoints = 200_000): StepImportResult {
-  const warningSet = new Set<string>();
-  const warnings: string[] = [];
-  const points: { x: number; y: number; z: number }[] = [];
-  const idToIdx = new Map<number, number>();
-  const addWarning = (w: string) => {
-    if (warningSet.has(w)) return;
-    warningSet.add(w);
-    warnings.push(w);
-  };
+type Point3 = { x: number; y: number; z: number };
 
-  // CARTESIAN_POINT('',(x,y,z));
+function parseCartesianPoints(
+  stepText: string,
+  maxPoints: number,
+  addWarning: (msg: string) => void
+): { points: Point3[]; idToIdx: Map<number, number> } {
+  const points: Point3[] = [];
+  const idToIdx = new Map<number, number>();
   const rePt = /#(\d+)\s*=\s*CARTESIAN_POINT\s*\([^,]*,\s*\(\s*([-+0-9.Ee]+)\s*,\s*([-+0-9.Ee]+)\s*,\s*([-+0-9.Ee]+)\s*\)\s*\)\s*;/gi;
   let m: RegExpExecArray | null;
   while ((m = rePt.exec(stepText))) {
@@ -37,10 +31,13 @@ export function parseStepPointsAndEdges(stepText: string, maxPoints = 200_000): 
     idToIdx.set(id, points.length);
     points.push({ x, y, z });
   }
+  return { points, idToIdx };
+}
 
-  // DIRECTION('',(dx,dy,dz));
-  const directionById = new Map<number, { x: number; y: number; z: number }>();
+function parseDirections(stepText: string): Map<number, Point3> {
+  const directionById = new Map<number, Point3>();
   const reDir = /#(\d+)\s*=\s*DIRECTION\s*\([^,]*,\s*\(\s*([-+0-9.Ee]+)\s*,\s*([-+0-9.Ee]+)\s*,\s*([-+0-9.Ee]+)\s*\)\s*\)\s*;/gi;
+  let m: RegExpExecArray | null;
   while ((m = reDir.exec(stepText))) {
     const id = Number(m[1]);
     const x = Number(m[2]);
@@ -49,10 +46,13 @@ export function parseStepPointsAndEdges(stepText: string, maxPoints = 200_000): 
     if (!Number.isFinite(id) || !Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
     directionById.set(id, { x, y, z });
   }
+  return directionById;
+}
 
-  // VECTOR('',#dir,magnitude);
+function parseVectors(stepText: string): Map<number, { dirId: number; magnitude: number }> {
   const vectorById = new Map<number, { dirId: number; magnitude: number }>();
   const reVec = /#(\d+)\s*=\s*VECTOR\s*\([^,]*,\s*#(\d+)\s*,\s*([-+0-9.Ee]+)\s*\)\s*;/gi;
+  let m: RegExpExecArray | null;
   while ((m = reVec.exec(stepText))) {
     const id = Number(m[1]);
     const dirId = Number(m[2]);
@@ -60,7 +60,18 @@ export function parseStepPointsAndEdges(stepText: string, maxPoints = 200_000): 
     if (!Number.isFinite(id) || !Number.isFinite(dirId) || !Number.isFinite(magnitude)) continue;
     vectorById.set(id, { dirId, magnitude });
   }
+  return vectorById;
+}
 
+function createEdgeBuilders(
+  points: Point3[],
+  maxPoints: number,
+  addWarning: (msg: string) => void
+): {
+  edges: [number, number][];
+  addEdge: (a: number, b: number) => void;
+  addOrGetPoint: (p: Point3) => number | null;
+} {
   const edges: [number, number][] = [];
   const edgeSet = new Set<string>();
   const pointKeyToIdx = new Map<string, number>();
@@ -78,7 +89,7 @@ export function parseStepPointsAndEdges(stepText: string, maxPoints = 200_000): 
     edges.push([a, b]);
   };
 
-  const addOrGetPoint = (p: { x: number; y: number; z: number }) => {
+  const addOrGetPoint = (p: Point3) => {
     const key = `${p.x.toFixed(8)},${p.y.toFixed(8)},${p.z.toFixed(8)}`;
     const existing = pointKeyToIdx.get(key);
     if (existing != null) return existing;
@@ -92,11 +103,14 @@ export function parseStepPointsAndEdges(stepText: string, maxPoints = 200_000): 
     return idx;
   };
 
-  // POLYLINE((#12,#13,#14)); and POLYLINE('',(#12,#13,#14));
+  return { edges, addEdge, addOrGetPoint };
+}
+
+function extractPolylineEdges(stepText: string, idToIdx: Map<number, number>, addEdge: (a: number, b: number) => void) {
   const rePoly = /POLYLINE\s*\(\s*(?:[^,]*,\s*)?\(\s*([^)]+?)\s*\)\s*\)\s*;/gi;
+  let m: RegExpExecArray | null;
   while ((m = rePoly.exec(stepText))) {
-    const list = m[1];
-    const refs = list
+    const refs = m[1]
       .split(',')
       .map((s) => s.trim())
       .map((s) => (s.startsWith('#') ? Number(s.slice(1)) : NaN))
@@ -109,11 +123,20 @@ export function parseStepPointsAndEdges(stepText: string, maxPoints = 200_000): 
     }
     for (let i = 0; i + 1 < idxs.length; i++) addEdge(idxs[i], idxs[i + 1]);
   }
+}
 
-  // LINE('',#start,#otherRef) where otherRef is either:
-  // - #point (non-standard but common in some exporters), or
-  // - #vector (standard STEP). For vector lines we derive an endpoint and render a finite segment.
+function extractLineEdges(
+  stepText: string,
+  points: Point3[],
+  idToIdx: Map<number, number>,
+  directionById: Map<number, Point3>,
+  vectorById: Map<number, { dirId: number; magnitude: number }>,
+  addEdge: (a: number, b: number) => void,
+  addOrGetPoint: (p: Point3) => number | null,
+  addWarning: (msg: string) => void
+) {
   const reLine = /LINE\s*\(\s*[^,]*,\s*#(\d+)\s*,\s*#(\d+)\s*\)\s*;/gi;
+  let m: RegExpExecArray | null;
   while ((m = reLine.exec(stepText))) {
     const startId = Number(m[1]);
     const otherId = Number(m[2]);
@@ -133,7 +156,6 @@ export function parseStepPointsAndEdges(stepText: string, maxPoints = 200_000): 
       addWarning(`LINE references VECTOR #${otherId} with missing DIRECTION #${vec.dirId}.`);
       continue;
     }
-
     const dLen = Math.hypot(dir.x, dir.y, dir.z);
     if (dLen < 1e-12) {
       addWarning(`VECTOR #${otherId} has near-zero direction; skipped LINE segment.`);
@@ -141,15 +163,30 @@ export function parseStepPointsAndEdges(stepText: string, maxPoints = 200_000): 
     }
     const d = { x: dir.x / dLen, y: dir.y / dLen, z: dir.z / dLen };
     const p0 = points[startIdx];
-    const p1 = {
-      x: p0.x + d.x * vec.magnitude,
-      y: p0.y + d.y * vec.magnitude,
-      z: p0.z + d.z * vec.magnitude
-    };
+    const p1 = { x: p0.x + d.x * vec.magnitude, y: p0.y + d.y * vec.magnitude, z: p0.z + d.z * vec.magnitude };
     const endIdx = addOrGetPoint(p1);
     if (endIdx == null) continue;
     addEdge(startIdx, endIdx);
   }
+}
+
+// Minimal STEP geometry extraction (points + polyline/line edges).
+// Supports the common subset used for point clouds and wire polyline exports.
+// NOTE: For full CAD topology (EDGE_CURVE/ADVANCED_FACE), we will add a Rust-side triangulation path later.
+export function parseStepPointsAndEdges(stepText: string, maxPoints = 200_000): StepImportResult {
+  const warningSet = new Set<string>();
+  const warnings: string[] = [];
+  const addWarning = (w: string) => {
+    if (warningSet.has(w)) return;
+    warningSet.add(w);
+    warnings.push(w);
+  };
+  const { points, idToIdx } = parseCartesianPoints(stepText, maxPoints, addWarning);
+  const directionById = parseDirections(stepText);
+  const vectorById = parseVectors(stepText);
+  const { edges, addEdge, addOrGetPoint } = createEdgeBuilders(points, maxPoints, addWarning);
+  extractPolylineEdges(stepText, idToIdx, addEdge);
+  extractLineEdges(stepText, points, idToIdx, directionById, vectorById, addEdge, addOrGetPoint, addWarning);
 
   return { points, edges, warnings: warnings.length ? warnings : undefined };
 }

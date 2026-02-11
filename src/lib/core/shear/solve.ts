@@ -43,6 +43,145 @@ function memberIsCountersunk(idx: number, n: number, isCountersunk: boolean) {
   return idx === 0 || idx === n - 1;
 }
 
+function resolveInteractionExponent(inputs: ShearInputs): number {
+  const mFromToughness = (t: number) => {
+    if (t <= 0.25 + 1e-9) return 1.0;
+    if (t <= 0.5 + 1e-9) return 1.5;
+    return 2.0;
+  };
+  return clamp(
+    isNum(inputs.interactionExponent) ? Number(inputs.interactionExponent) : mFromToughness(Number(inputs.toughness ?? 0.75)),
+    1.0,
+    4.0
+  );
+}
+
+function buildMemberResults(args: {
+  memberThicknesses: number[];
+  isCountersunk: boolean;
+  d: number;
+  e: number;
+  w: number;
+  safetyFactor: number;
+  Fbru: number;
+  Fsu: number;
+  Ftu: number;
+  csAngleDeg: number;
+  mInteraction: number;
+  sinTh: number;
+  cosTh: number;
+}): { members: ShearMemberOutput[]; memberCapacities: { id: number; bearing: number; tearOut: number; }[] } {
+  const { memberThicknesses, isCountersunk, d, e, w, safetyFactor, Fbru, Fsu, Ftu, csAngleDeg, mInteraction, sinTh, cosTh } = args;
+  const nMembers = memberThicknesses.length;
+  const members: ShearMemberOutput[] = [];
+  const memberCapacities: { id: number; bearing: number; tearOut: number; }[] = [];
+  for (let i = 0; i < nMembers; i++) {
+    const t = memberThicknesses[i];
+    const cs = memberIsCountersunk(i, nMembers, isCountersunk);
+    const profile = cs ? buildBearingProfileCountersunk(d, t) : buildBearingProfileStraight(d, t);
+    const ub = calculateUniversalBearing(profile);
+    const fbru_eff = cs ? (Fbru * Math.sin((csAngleDeg * Math.PI) / 360)) : Fbru;
+    const load_br_raw = d * ub.t_eff_bearing * fbru_eff;
+    const load_so_raw = 2 * e * ub.t_eff_sequence * Fsu * sinTh;
+    const netWidth = Math.max(1e-9, w - d);
+    const load_nt_raw = netWidth * t * Ftu * cosTh;
+    const int_bn_raw = solveInteraction(load_nt_raw, load_br_raw, mInteraction);
+    const int_bs_raw = solveInteraction(load_so_raw, load_br_raw, mInteraction);
+    const int_pair: InteractionPair = (isNum(int_bn_raw) && isNum(int_bs_raw) && int_bs_raw < int_bn_raw) ? 'Br+So' : 'Br+Nt';
+    const int_raw = int_pair === 'Br+So' ? int_bs_raw : int_bn_raw;
+    members.push({
+      index: i + 1,
+      thickness: t,
+      isCountersunk: cs,
+      t_eff_bearing: ub.t_eff_bearing,
+      t_eff_sequence: ub.t_eff_sequence,
+      loads: { bearing: load_br_raw / safetyFactor, shearOut: load_so_raw / safetyFactor, netSection: load_nt_raw / safetyFactor, interaction_BrNt: int_bn_raw / safetyFactor, interaction_BrSo: int_bs_raw / safetyFactor, interaction: int_raw / safetyFactor, interactionPair: int_pair },
+      edgeDistance: { actual_e_over_d: NaN, min_e_over_d_sequence: NaN, min_e_over_d_strength: NaN, governing: 'unknown' },
+      warnings: []
+    });
+    memberCapacities.push({ id: i + 1, bearing: load_br_raw / safetyFactor, tearOut: load_so_raw / safetyFactor });
+  }
+  return { members, memberCapacities };
+}
+
+function applyEdgeDistanceWarnings(args: {
+  members: ShearMemberOutput[];
+  d: number;
+  e: number;
+  Fbru: number;
+  Fsu: number;
+  thetaDeg: number;
+  candidateFailure: number;
+  safetyFactor: number;
+}): boolean {
+  const { members, d, e, Fbru, Fsu, thetaDeg, candidateFailure, safetyFactor } = args;
+  let sequencingSuppressedShearOut = false;
+  if (thetaDeg <= 5) return false;
+  for (const m of members) {
+    const ed = evaluateEdgeDistance({ d, t: m.t_eff_sequence, e, P: candidateFailure * safetyFactor, thetaDeg, Fbru, Fsu });
+    m.edgeDistance = { actual_e_over_d: ed.edgeDistance.actual_e_over_d, min_e_over_d_sequence: ed.edgeDistance.min_e_over_d_sequence, min_e_over_d_strength: ed.edgeDistance.min_e_over_d_strength, governing: ed.edgeDistance.governing };
+    const cap_bearing = m.loads.bearing * safetyFactor;
+    const cap_tearout = m.loads.shearOut * safetyFactor;
+    if (isNum(ed.edgeDistance.actual_e_over_d) && isNum(ed.edgeDistance.min_e_over_d_sequence) && ed.edgeDistance.actual_e_over_d < ed.edgeDistance.min_e_over_d_sequence) {
+      m.warnings.push({ message: `Member ${m.index}: Sequencing Not Met`, type: 'warning', subItems: [`e/D Check: ${ed.edgeDistance.actual_e_over_d.toFixed(2)} < ${ed.edgeDistance.min_e_over_d_sequence.toFixed(2)} (Req)`, `Tear-out: ${cap_tearout.toFixed(0)} lbs`, `Bearing: ${cap_bearing.toFixed(0)} lbs`, 'Mode: Brittle edge failure.'] });
+      sequencingSuppressedShearOut = true;
+    }
+    if (isNum(ed.edgeDistance.actual_e_over_d) && isNum(ed.edgeDistance.min_e_over_d_strength) && ed.edgeDistance.actual_e_over_d < ed.edgeDistance.min_e_over_d_strength) {
+      m.warnings.push({ message: `Member ${m.index}: Strength Check Failed`, type: 'danger', subItems: [`e/D Check: ${ed.edgeDistance.actual_e_over_d.toFixed(2)} < ${ed.edgeDistance.min_e_over_d_strength.toFixed(2)} (Req)`, `Cap (Tear-out): ${cap_tearout.toFixed(0)} lbs`, `Load (Ult): ${(candidateFailure * safetyFactor).toFixed(0)} lbs`, 'Result: Rupture predicted.'] });
+    }
+  }
+  return sequencingSuppressedShearOut;
+}
+
+function finalizeShearResult(args: {
+  inputs: ShearInputs;
+  members: ShearMemberOutput[];
+  memberCapacities: { id: number; bearing: number; tearOut: number; }[];
+  warnings: AnalysisWarning[];
+  errors: string[];
+  P_applied: number;
+  d: number;
+  load_pin_allowable: number;
+  minBearing: ReturnType<typeof pickMinBy<ShearMemberOutput>>;
+  minShearOut: ReturnType<typeof pickMinBy<ShearMemberOutput>>;
+  minNet: ReturnType<typeof pickMinBy<ShearMemberOutput>>;
+  minInteraction: ReturnType<typeof pickMinBy<ShearMemberOutput>>;
+  m_interaction: number;
+  sequencingSuppressedShearOut: boolean;
+}): ShearOutput {
+  const { inputs, members, memberCapacities, warnings, errors, P_applied, d, load_pin_allowable, minBearing, minShearOut, minNet, minInteraction, m_interaction, sequencingSuppressedShearOut } = args;
+  const interactionPair = minInteraction.best?.loads.interactionPair ?? 'Br+Nt';
+  const governingCandidates: { mode: HighlightMode; report: string; load: number }[] = [
+    { mode: 'pinShear', report: 'Pin shear', load: load_pin_allowable },
+    { mode: 'interaction', report: `Interaction (${interactionPair})`, load: minInteraction.bestV },
+    { mode: 'netSection', report: 'Net-section', load: minNet.bestV },
+    { mode: 'bearing', report: 'Bearing', load: minBearing.bestV }
+  ];
+  if (!sequencingSuppressedShearOut) governingCandidates.push({ mode: 'shearOut', report: 'Edge shear-out', load: minShearOut.bestV });
+  const governing = pickMinBy(governingCandidates, (c) => c.load).best ?? governingCandidates[0];
+  const margin = (isNum(P_applied) && P_applied > 0 && isNum(governing.load)) ? (governing.load / P_applied) - 1 : -1.0;
+  for (const m of members) for (const w of m.warnings) warnings.push(w);
+  if (!isNum(d) || d <= 0) errors.push('Invalid diameter.');
+  return {
+    inputs,
+    members,
+    memberCapacities,
+    loads: { pinShear: load_pin_allowable, bearing: minBearing.bestV, shearOut: minShearOut.bestV, netSection: minNet.bestV, interaction: minInteraction.bestV, interactionPair, interactionExponent: m_interaction },
+    sequencingSuppressedShearOut,
+    governing: { reportMode: governing.report, highlightMode: governing.mode, failureLoad: governing.load, margin },
+    warnings,
+    errors
+  };
+}
+
+function pushSequencingInfoWarning(warnings: AnalysisWarning[]) {
+  warnings.push({
+    message: 'Sequencing Suppression Active',
+    type: 'info',
+    subItems: ['Shear-out ignored in governing mode.', 'Design forced to Bearing/Interaction to ensure safety.']
+  });
+}
+
 // Robust minimum picker
 function pickMinBy<T>(items: T[], get: (t: T) => number) {
   let best: T | null = null;
@@ -78,22 +217,7 @@ export function computeShear(inputs: ShearInputs): ShearOutput {
 
   const safetyFactor = Math.max(1e-6, Number(inputs.safetyFactor ?? 1));
   
-  // Interaction exponent (m) for bearing-vs-(net/shear-out) interaction.
-  // Default mapping from legacy "toughness" slider:
-  //   0.25 -> 1.0 (linear / brittle)
-  //   0.5  -> 1.5 (intermediate)
-  //   0.75 -> 2.0 (elliptical / ductile)
-  // A new explicit override is supported via inputs.interactionExponent.
-  const m_from_toughness = (t: number) => {
-    if (t <= 0.25 + 1e-9) return 1.0;
-    if (t <= 0.5 + 1e-9) return 1.5;
-    return 2.0;
-  };
-  const m_interaction = clamp(
-    isNum(inputs.interactionExponent) ? Number(inputs.interactionExponent) : m_from_toughness(Number(inputs.toughness ?? 0.75)),
-    1.0,
-    4.0
-  );
+  const m_interaction = resolveInteractionExponent(inputs);
 
   const plate = getMaterial(inputs.plateMat);
   const Fbru = plate.Fbru_ksi * KSI_TO_PSI;
@@ -116,59 +240,21 @@ export function computeShear(inputs: ShearInputs): ShearOutput {
   const load_pin_ultimate = planes * area * fastenerFsu_psi; 
   const load_pin_allowable = load_pin_ultimate / safetyFactor;
 
-  const members: ShearMemberOutput[] = [];
-  const memberCapacities: { id: number; bearing: number; tearOut: number; }[] = [];
-
-  for (let i = 0; i < nMembers; i++) {
-    const t = memberThicknesses[i];
-    const cs = memberIsCountersunk(i, nMembers, !!inputs.isCountersunk);
-    const profile = cs ? buildBearingProfileCountersunk(d, t) : buildBearingProfileStraight(d, t);
-    const ub = calculateUniversalBearing(profile);
-
-    const csAng = (Number(inputs.csAngleDeg ?? 100) * Math.PI) / 180;
-    const fbru_eff = cs ? (Fbru * Math.sin(csAng / 2)) : Fbru;
-
-    const load_br_raw = d * ub.t_eff_bearing * fbru_eff;
-    const load_so_raw = 2 * e * ub.t_eff_sequence * Fsu * sinTh;
-    const netWidth = Math.max(1e-9, w - d);
-    const load_nt_raw = netWidth * t * Ftu * cosTh;
-
-    const int_bn_raw = solveInteraction(load_nt_raw, load_br_raw, m_interaction);
-    const int_bs_raw = solveInteraction(load_so_raw, load_br_raw, m_interaction);
-
-    const int_pair: InteractionPair = (isNum(int_bn_raw) && isNum(int_bs_raw) && int_bs_raw < int_bn_raw) ? 'Br+So' : 'Br+Nt';
-    const int_raw = int_pair === 'Br+So' ? int_bs_raw : int_bn_raw;
-
-    members.push({
-      index: i + 1,
-      thickness: t,
-      isCountersunk: cs,
-      t_eff_bearing: ub.t_eff_bearing,
-      t_eff_sequence: ub.t_eff_sequence,
-      loads: {
-        bearing: load_br_raw / safetyFactor,
-        shearOut: load_so_raw / safetyFactor,
-        netSection: load_nt_raw / safetyFactor,
-        interaction_BrNt: int_bn_raw / safetyFactor,
-        interaction_BrSo: int_bs_raw / safetyFactor,
-        interaction: int_raw / safetyFactor,
-        interactionPair: int_pair
-      },
-      edgeDistance: {
-        actual_e_over_d: NaN,
-        min_e_over_d_sequence: NaN,
-        min_e_over_d_strength: NaN,
-        governing: 'unknown'
-      },
-      warnings: []
-    });
-
-    memberCapacities.push({
-      id: i + 1,
-      bearing: load_br_raw / safetyFactor,
-      tearOut: load_so_raw / safetyFactor
-    });
-  }
+  const { members, memberCapacities } = buildMemberResults({
+    memberThicknesses,
+    isCountersunk: !!inputs.isCountersunk,
+    d,
+    e,
+    w,
+    safetyFactor,
+    Fbru,
+    Fsu,
+    Ftu,
+    csAngleDeg: Number(inputs.csAngleDeg ?? 100),
+    mInteraction: m_interaction,
+    sinTh,
+    cosTh
+  });
 
   const minBearing = pickMinBy(members, (m) => m.loads.bearing);
   const minShearOut = pickMinBy(members, (m) => m.loads.shearOut);
@@ -177,124 +263,33 @@ export function computeShear(inputs: ShearInputs): ShearOutput {
 
   const candidateFailure = Math.min(load_pin_allowable, minInteraction.bestV);
 
-  let sequencingSuppressedShearOut = false;
-  
-  if (thetaDeg > 5) {
-    for (const m of members) {
-      const ed = evaluateEdgeDistance({
-        d,
-        t: m.t_eff_sequence,
-        e,
-        P: candidateFailure * safetyFactor, 
-        thetaDeg,
-        Fbru: Fbru,
-        Fsu: Fsu
-      });
+  const sequencingSuppressedShearOut = applyEdgeDistanceWarnings({
+    members,
+    d,
+    e,
+    Fbru,
+    Fsu,
+    thetaDeg,
+    candidateFailure,
+    safetyFactor
+  });
 
-      m.edgeDistance = {
-        actual_e_over_d: ed.edgeDistance.actual_e_over_d,
-        min_e_over_d_sequence: ed.edgeDistance.min_e_over_d_sequence,
-        min_e_over_d_strength: ed.edgeDistance.min_e_over_d_strength,
-        governing: ed.edgeDistance.governing
-      };
+  if (sequencingSuppressedShearOut) pushSequencingInfoWarning(warnings);
 
-      const edActual = ed.edgeDistance.actual_e_over_d;
-      const edSeq = ed.edgeDistance.min_e_over_d_sequence;
-      const edStr = ed.edgeDistance.min_e_over_d_strength;
-
-      const cap_bearing = m.loads.bearing * safetyFactor;
-      const cap_tearout = m.loads.shearOut * safetyFactor;
-      
-      if (isNum(edActual) && isNum(edSeq) && edActual < edSeq) {
-        m.warnings.push({
-          message: `Member ${m.index}: Sequencing Not Met`,
-          type: 'warning',
-          subItems: [
-            `e/D Check: ${edActual.toFixed(2)} < ${edSeq.toFixed(2)} (Req)`,
-            `Tear-out: ${cap_tearout.toFixed(0)} lbs`,
-            `Bearing: ${cap_bearing.toFixed(0)} lbs`,
-            `Mode: Brittle edge failure.`
-          ]
-        });
-        sequencingSuppressedShearOut = true;
-      }
-      
-      if (isNum(edActual) && isNum(edStr) && edActual < edStr) {
-        m.warnings.push({
-            message: `Member ${m.index}: Strength Check Failed`,
-            type: 'danger',
-            subItems: [
-                `e/D Check: ${edActual.toFixed(2)} < ${edStr.toFixed(2)} (Req)`,
-                `Cap (Tear-out): ${cap_tearout.toFixed(0)} lbs`,
-                `Load (Ult): ${(candidateFailure*safetyFactor).toFixed(0)} lbs`,
-                `Result: Rupture predicted.`
-            ]
-        });
-      }
-    }
-  }
-
-  if (sequencingSuppressedShearOut) {
-    warnings.push({ 
-        message: 'Sequencing Suppression Active', 
-        type: 'info',
-        subItems: ['Shear-out ignored in governing mode.', 'Design forced to Bearing/Interaction to ensure safety.']
-    });
-  }
-
-  const { best: minIntMember } = minInteraction;
-  const interactionPair = minIntMember?.loads.interactionPair ?? 'Br+Nt';
-
-  let load_bearing = minBearing.bestV;
-  let load_shearOut = minShearOut.bestV;
-  let load_net = minNet.bestV;
-  let load_interaction = minInteraction.bestV;
-
-  const governingCandidates: { mode: HighlightMode; report: string; load: number }[] = [
-    { mode: 'pinShear', report: 'Pin shear', load: load_pin_allowable },
-    { mode: 'interaction', report: `Interaction (${interactionPair})`, load: load_interaction },
-    { mode: 'netSection', report: 'Net-section', load: load_net },
-    { mode: 'bearing', report: 'Bearing', load: load_bearing }
-  ];
-  
-  if (!sequencingSuppressedShearOut) {
-    governingCandidates.push({ mode: 'shearOut', report: 'Edge shear-out', load: load_shearOut });
-  }
-
-  const gov = pickMinBy(governingCandidates, (c) => c.load);
-  const governing = gov.best ?? governingCandidates[0];
-
-  const margin = (isNum(P_applied) && P_applied > 0 && isNum(governing.load)) 
-    ? (governing.load / P_applied) - 1 
-    : -1.0;
-
-  for (const m of members) {
-    for (const w of m.warnings) warnings.push(w);
-  }
-
-  if (!isNum(d) || d <= 0) errors.push('Invalid diameter.');
-  
-  return {
+  return finalizeShearResult({
     inputs,
     members,
     memberCapacities,
-    loads: {
-      pinShear: load_pin_allowable,
-      bearing: load_bearing,
-      shearOut: load_shearOut,
-      netSection: load_net,
-      interaction: load_interaction,
-      interactionPair,
-      interactionExponent: m_interaction
-    },
-    sequencingSuppressedShearOut,
-    governing: {
-      reportMode: governing.report,
-      highlightMode: governing.mode,
-      failureLoad: governing.load,
-      margin
-    },
     warnings,
-    errors
-  };
+    errors,
+    P_applied,
+    d,
+    load_pin_allowable,
+    minBearing,
+    minShearOut,
+    minNet,
+    minInteraction,
+    m_interaction,
+    sequencingSuppressedShearOut
+  });
 }

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-02-10T12:19:10.382Z",
+  "generatedAt": "2026-02-11T04:32:09.095Z",
   "source": {
     "cases": "golden/bushing_cases.json",
     "expected": "golden/bushing_expected.json"

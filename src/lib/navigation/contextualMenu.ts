@@ -1,0 +1,65 @@
+export type ContextMenuScope = 'inspector' | 'surface' | 'bushing';
+
+export type ContextMenuAction = {
+  id: string;
+  label: string;
+  disabled?: boolean;
+  checked?: boolean;
+};
+
+export type ContextMenuSection = {
+  title: string;
+  actions: ContextMenuAction[];
+};
+
+export type ContextMenuRegistration = {
+  scope: ContextMenuScope;
+  label?: string;
+  sections: ContextMenuSection[];
+};
+
+export const CONTEXT_MENU_REGISTER_EVENT = 'sc:context-menu-register';
+export const CONTEXT_MENU_CLEAR_EVENT = 'sc:context-menu-clear';
+export const CONTEXT_MENU_COMMAND_EVENT = 'sc:context-menu-command';
+
+type MenuRegistry = Partial<Record<ContextMenuScope, ContextMenuRegistration>>;
+
+const REGISTRY_KEY = '__scContextMenuRegistry__';
+
+function readRegistry(): MenuRegistry {
+  if (typeof window === 'undefined') return {};
+  const raw = (window as any)[REGISTRY_KEY];
+  return raw && typeof raw === 'object' ? (raw as MenuRegistry) : {};
+}
+
+function writeRegistry(next: MenuRegistry): void {
+  if (typeof window === 'undefined') return;
+  (window as any)[REGISTRY_KEY] = next;
+}
+
+export function registerContextMenu(registration: ContextMenuRegistration): void {
+  if (typeof window === 'undefined') return;
+  writeRegistry({ ...readRegistry(), [registration.scope]: registration });
+  window.dispatchEvent(
+    new CustomEvent<ContextMenuRegistration>(CONTEXT_MENU_REGISTER_EVENT, { detail: registration })
+  );
+}
+
+export function clearContextMenu(scope: ContextMenuScope): void {
+  if (typeof window === 'undefined') return;
+  const next = { ...readRegistry() };
+  delete next[scope];
+  writeRegistry(next);
+  window.dispatchEvent(new CustomEvent<{ scope: ContextMenuScope }>(CONTEXT_MENU_CLEAR_EVENT, { detail: { scope } }));
+}
+
+export function emitContextMenuCommand(scope: ContextMenuScope, id: string): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(
+    new CustomEvent<{ scope: ContextMenuScope; id: string }>(CONTEXT_MENU_COMMAND_EVENT, { detail: { scope, id } })
+  );
+}
+
+export function getRegisteredContextMenus(): MenuRegistry {
+  return readRegistry();
+}

@@ -1,32 +1,47 @@
 <script lang="ts">
-  import { Badge, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Separator } from '$lib/components/ui';
+  import { onMount } from 'svelte';
+  import { Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Separator } from '$lib/components/ui';
   import { cn } from '$lib/utils';
   import { MATERIALS } from '$lib/core/bushing/materials';
   import type { BushingInputs } from '$lib/core/bushing';
-  import BushingDrafting from '$lib/drafting/bushing/BushingDrafting.svelte';
-  import {
-    BUSHING_SCENE_MODULE_SENTINEL,
-    type BushingRenderMode
-  } from '$lib/drafting/bushing/bushingSceneModel';
+  import type { BabylonRenderDiagnostic } from '$lib/drafting/bushing/BushingBabylonRuntime';
+  import { BUSHING_SCENE_MODULE_SENTINEL, type BushingRenderMode } from '$lib/drafting/bushing/bushingSceneModel';
   import { evaluateBushingPipeline, getBushingPipelineCacheStats } from './BushingComputeController';
   import BushingHelperGuidance from './BushingHelperGuidance.svelte';
+  import BushingDraftingPanel from './BushingDraftingPanel.svelte';
+  import BushingProfileCard from './BushingProfileCard.svelte';
   import BushingResultSummary from './BushingResultSummary.svelte';
   import BushingDiagnosticsPanel from './BushingDiagnosticsPanel.svelte';
+  import BushingInformationPage from './BushingInformationPage.svelte';
+  import BushingPageHeader from './BushingPageHeader.svelte';
+  import { mountBushingContextMenu, updateBushingContextMenu } from './BushingContextMenuController';
   import { exportBushingPdf, exportBushingSvg } from './BushingExportController';
   import { buildBushingTraceRecord, emitBushingTrace } from './BushingTraceLogger';
   import { runBushingVisualDiagnostics } from './BushingVisualDiagnostics';
 
   const KEY = 'scd.bushing.inputs.v15';
-  const CS_MODES = [
-    { value: 'depth_angle', label: 'Depth & Angle' },
-    { value: 'dia_angle', label: 'Dia & Angle' },
-    { value: 'dia_depth', label: 'Dia & Depth' }
+  const TOL_MODE_ITEMS = [{ value: 'nominal_tol', label: 'Nominal +/- Tol' }, { value: 'limits', label: 'Lower / Upper' }];
+  const END_CONSTRAINT_ITEMS = [
+    { value: 'free', label: 'Free Ends' },
+    { value: 'one_end', label: 'One End Constrained' },
+    { value: 'both_ends', label: 'Both Ends Constrained' }
   ];
-
   let form: BushingInputs = {
     units: 'imperial',
     boreDia: 0.5,
     interference: 0.0015,
+    boreTolMode: 'nominal_tol',
+    boreNominal: 0.5,
+    boreTolPlus: 0,
+    boreTolMinus: 0,
+    boreLower: 0.5,
+    boreUpper: 0.5,
+    interferenceTolMode: 'nominal_tol',
+    interferenceNominal: 0.0015,
+    interferenceTolPlus: 0,
+    interferenceTolMinus: 0,
+    interferenceLower: 0.0015,
+    interferenceUpper: 0.0015,
     housingLen: 0.5,
     housingWidth: 1.5,
     edgeDist: 0.75,
@@ -48,7 +63,8 @@
     friction: 0.15,
     dT: 0,
     minWallStraight: 0.05,
-    minWallNeck: 0.04
+    minWallNeck: 0.04,
+    endConstraint: 'free'
   };
 
   if (typeof window !== 'undefined') {
@@ -61,7 +77,6 @@
       }
     }
   }
-
   $: if (typeof window !== 'undefined') localStorage.setItem(KEY, JSON.stringify(form));
   $: pipeline = evaluateBushingPipeline(form);
   $: results = pipeline.results;
@@ -69,6 +84,7 @@
   $: scene = pipeline.scene;
   $: cacheStats = getBushingPipelineCacheStats();
   $: visualDiagnostics = runBushingVisualDiagnostics(scene, results);
+  let babylonDiagnostics: BabylonRenderDiagnostic[] = [];
   $: isFailed = results.governing.margin < 0 || results.physics.marginHousing < 0 || results.physics.marginBushing < 0;
   if (typeof window !== 'undefined' && import.meta.env.DEV) {
     const runtimeSentinel = (globalThis as any).__SCD_BUSHING_SCENE_SENTINEL__;
@@ -84,6 +100,8 @@
   let useLegacyRenderer = false;
   let renderMode: BushingRenderMode = 'section';
   let traceEnabled = false;
+  let babylonInitNotice: string | null = null;
+  let showInformationView = false;
   if (typeof window !== 'undefined') {
     useLegacyRenderer = localStorage.getItem(LEGACY_RENDERER_KEY) === '1';
     renderMode = useLegacyRenderer ? 'legacy' : 'section';
@@ -96,19 +114,31 @@
     if (typeof window !== 'undefined') localStorage.setItem(LEGACY_RENDERER_KEY, useLegacyRenderer ? '1' : '0');
   }
 
+  function handleBabylonInitFailure(reason: string) {
+    babylonInitNotice = reason || 'Babylon initialization failed.';
+    if (typeof window !== 'undefined') {
+      const payload = {
+        at: new Date().toISOString(),
+        reason: babylonInitNotice
+      };
+      try {
+        const prior = Number(localStorage.getItem('scd.bushing.babylonInitFailCount') ?? '0');
+        localStorage.setItem('scd.bushing.babylonInitFailCount', String(prior + 1));
+        localStorage.setItem('scd.bushing.babylonInitLast', JSON.stringify(payload));
+      } catch {}
+      console.warn('[Bushing][Babylon][init-failed]', payload);
+    }
+  }
   function toggleTraceMode() {
     traceEnabled = !traceEnabled;
     if (typeof window !== 'undefined') localStorage.setItem(TRACE_MODE_KEY, traceEnabled ? '1' : '0');
   }
-
   async function onExportSvg() {
     await exportBushingSvg({ form, results, draftingView });
   }
-
   async function onExportPdf() {
     await exportBushingPdf({ form, results, draftingView });
   }
-
   $: if (typeof window !== 'undefined' && traceEnabled) {
     const trace = buildBushingTraceRecord({
       rawInput: form,
@@ -118,27 +148,38 @@
     });
     emitBushingTrace(trace);
   }
+
+  onMount(() => mountBushingContextMenu({
+    onExportSvg: () => {
+      void onExportSvg();
+    },
+    onExportPdf: () => {
+      void onExportPdf();
+    },
+    toggleRendererMode,
+    toggleTraceMode
+  }));
+
+  $: updateBushingContextMenu(useLegacyRenderer, traceEnabled);
 </script>
 
-<div class="grid h-[calc(100vh-6rem)] grid-cols-1 gap-4 overflow-hidden p-1 lg:grid-cols-[450px_1fr]">
-  <div class="flex flex-col gap-4 overflow-y-auto pb-24 pr-2 scrollbar-hide">
-    <div class="flex items-center justify-between px-1">
-      <h2 class="text-lg font-semibold tracking-tight text-white">Bushing Toolbox</h2>
-      <Badge variant="outline" class={cn('text-[10px]', isFailed ? 'border-amber-400/40 text-amber-200' : 'border-emerald-400/35 text-emerald-200')}>
-        {isFailed ? 'ATTN' : 'PASS'}
-      </Badge>
-    </div>
+{#if showInformationView}
+  <BushingInformationPage {form} {results} onBack={() => (showInformationView = false)} />
+{:else}
+<div class="grid grid-cols-1 gap-4 p-1 pt-4 lg:grid-cols-[450px_1fr]">
+  <div class="flex flex-col gap-4 pb-8 pr-2">
+    <BushingPageHeader {isFailed} onShowInformation={() => (showInformationView = true)} />
 
     <BushingHelperGuidance {form} {results} />
 
-    <Card class="glass-card bushing-pop-card">
+    <Card id="bushing-setup-card" class="glass-card bushing-pop-card bushing-depth-2">
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase text-indigo-300">1. Setup</CardTitle>
       </CardHeader>
       <CardContent class="grid grid-cols-1 gap-4">
         <div class="space-y-1">
           <Label class="text-white/70">Units</Label>
-          <div class="flex rounded-lg border border-white/10 bg-black/30 p-1 bushing-pop-sub">
+          <div class="flex rounded-lg border border-white/10 bg-black/30 p-1 bushing-pop-sub bushing-depth-0">
             <button class={cn('flex-1 rounded-md py-1 text-xs font-medium transition-all', form.units === 'imperial' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.units = 'imperial')}>Imperial</button>
             <button class={cn('flex-1 rounded-md py-1 text-xs font-medium transition-all', form.units === 'metric' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.units = 'metric')}>Metric</button>
           </div>
@@ -156,14 +197,49 @@
       </CardContent>
     </Card>
 
-    <Card class="glass-card bushing-pop-card">
+    <Card id="bushing-geometry-card" class="glass-card bushing-pop-card bushing-depth-2">
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase text-indigo-300">2. Geometry</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
-        <div class="grid grid-cols-2 gap-3">
-          <div class="space-y-1"><Label class="text-white/70">Bore Dia</Label><Input type="number" step="0.0001" bind:value={form.boreDia} /></div>
-          <div class="space-y-1"><Label class="text-white/70">Interference</Label><Input type="number" step="0.0001" bind:value={form.interference} class="text-amber-200" /></div>
+        <div class="rounded-lg border border-white/10 bg-black/20 p-3 space-y-3 bushing-pop-sub bushing-depth-0">
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <Label class="text-white/70">Bore Input Mode</Label>
+              <Select bind:value={form.boreTolMode} items={TOL_MODE_ITEMS} />
+            </div>
+            <div class="space-y-1">
+              <Label class="text-white/70">Interference Input Mode</Label>
+              <Select bind:value={form.interferenceTolMode} items={TOL_MODE_ITEMS} />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            {#if form.boreTolMode === 'limits'}
+              <div class="space-y-1"><Label class="text-white/70">Bore Lower</Label><Input type="number" step="0.0001" bind:value={form.boreLower} /></div>
+              <div class="space-y-1"><Label class="text-white/70">Bore Upper</Label><Input type="number" step="0.0001" bind:value={form.boreUpper} /></div>
+            {:else}
+              <div class="space-y-1"><Label class="text-white/70">Bore Nominal</Label><Input type="number" step="0.0001" bind:value={form.boreNominal} /></div>
+              <div class="grid grid-cols-2 gap-2">
+                <div class="space-y-1"><Label class="text-white/70">Bore +Tol</Label><Input type="number" min="0" step="0.0001" bind:value={form.boreTolPlus} /></div>
+                <div class="space-y-1"><Label class="text-white/70">Bore -Tol</Label><Input type="number" min="0" step="0.0001" bind:value={form.boreTolMinus} /></div>
+              </div>
+            {/if}
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            {#if form.interferenceTolMode === 'limits'}
+              <div class="space-y-1"><Label class="text-white/70">Interference Lower</Label><Input type="number" step="0.0001" bind:value={form.interferenceLower} class="text-amber-200" /></div>
+              <div class="space-y-1"><Label class="text-white/70">Interference Upper</Label><Input type="number" step="0.0001" bind:value={form.interferenceUpper} class="text-amber-200" /></div>
+            {:else}
+              <div class="space-y-1"><Label class="text-white/70">Interference Nominal</Label><Input type="number" step="0.0001" bind:value={form.interferenceNominal} class="text-amber-200" /></div>
+              <div class="grid grid-cols-2 gap-2">
+                <div class="space-y-1"><Label class="text-white/70">Interference +Tol</Label><Input type="number" min="0" step="0.0001" bind:value={form.interferenceTolPlus} class="text-amber-200" /></div>
+                <div class="space-y-1"><Label class="text-white/70">Interference -Tol</Label><Input type="number" min="0" step="0.0001" bind:value={form.interferenceTolMinus} class="text-amber-200" /></div>
+              </div>
+            {/if}
+          </div>
+          <div class="text-[10px] font-mono text-cyan-200/70">
+            Solved OD range: {results.tolerance.odBushing.lower.toFixed(4)} .. {results.tolerance.odBushing.upper.toFixed(4)} (nom {results.tolerance.odBushing.nominal.toFixed(4)})
+          </div>
         </div>
         <div class="grid grid-cols-3 gap-2">
           <div class="space-y-1"><Label class="text-white/70">Housing Thk</Label><Input type="number" step="0.001" bind:value={form.housingLen} /></div>
@@ -173,70 +249,28 @@
       </CardContent>
     </Card>
 
-    <Card class="glass-card bushing-pop-card">
-      <CardHeader class="pb-2 pt-4">
-        <CardTitle class="text-[10px] font-bold uppercase text-indigo-300">3. Profile</CardTitle>
-      </CardHeader>
-      <CardContent class="space-y-4">
-        <div class="rounded-lg border border-white/10 bg-black/30 p-1 text-xs font-medium bushing-pop-sub">
-          <div class="text-[10px] text-white/45 mb-1 uppercase">External</div>
-          <div class="flex gap-1">
-            <button class={cn('flex-1 rounded-md py-1 transition-all', form.bushingType === 'straight' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.bushingType = 'straight')}>Straight</button>
-            <button class={cn('flex-1 rounded-md py-1 transition-all', form.bushingType === 'flanged' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.bushingType = 'flanged')}>Flanged</button>
-            <button class={cn('flex-1 rounded-md py-1 transition-all', form.bushingType === 'countersink' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.bushingType = 'countersink')}>C'Sink</button>
-          </div>
-        </div>
+    <div id="bushing-profile-card">
+      <BushingProfileCard bind:form odInstalled={results.odInstalled} />
+    </div>
 
-        <div class="rounded-lg border border-white/10 bg-black/30 p-1 text-xs font-medium bushing-pop-sub">
-          <div class="text-[10px] text-white/45 mb-1 uppercase">Internal</div>
-          <div class="flex gap-1">
-            <button class={cn('flex-1 rounded-md py-1 transition-all', form.idType === 'straight' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.idType = 'straight')}>Straight</button>
-            <button class={cn('flex-1 rounded-md py-1 transition-all', form.idType === 'countersink' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.idType = 'countersink')}>C'Sink</button>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-3 gap-2">
-          <div class="space-y-1"><Label class="text-white/70">ID</Label><Input type="number" step="0.0001" bind:value={form.idBushing} /></div>
-          <div class="space-y-1"><Label class="text-white/70">CS Dia</Label><Input type="number" step="0.001" bind:value={form.csDia} disabled={form.idType !== 'countersink'} /></div>
-          <div class="space-y-1"><Label class="text-white/70">CS Depth</Label><Input type="number" step="0.001" bind:value={form.csDepth} disabled={form.idType !== 'countersink'} /></div>
-        </div>
-
-        {#if form.bushingType === 'flanged'}
-          <div class="grid grid-cols-2 gap-3 bushing-pop-sub rounded-lg border border-white/10 bg-white/5 p-3">
-            <div class="space-y-1"><Label class="text-white/70">Flange OD</Label><Input type="number" step="0.001" bind:value={form.flangeOd} /></div>
-            <div class="space-y-1"><Label class="text-white/70">Flange Thk</Label><Input type="number" step="0.001" bind:value={form.flangeThk} /></div>
-          </div>
-        {/if}
-
-        <details class="rounded-lg border border-white/10 bg-white/5 p-3 bushing-pop-sub">
-          <summary class="cursor-pointer text-xs font-semibold text-white/80">Advanced Profile Controls</summary>
-          <div class="mt-3 space-y-3">
-            <div class="grid grid-cols-2 gap-2">
-              <div><Label class="text-white/50 text-xs">Internal CS Mode</Label><Select bind:value={form.csMode} items={CS_MODES} /></div>
-              <div><Label class="text-white/50 text-xs">Internal CS Angle</Label><Input type="number" step="1" bind:value={form.csAngle} /></div>
-            </div>
-            <div class="grid grid-cols-3 gap-2 text-xs">
-              <div><Label class="text-white/50">External CS Dia</Label><Input type="number" step="0.001" bind:value={form.extCsDia} /></div>
-              <div><Label class="text-white/50">External CS Depth</Label><Input type="number" step="0.001" bind:value={form.extCsDepth} /></div>
-              <div><Label class="text-white/50">External CS Angle</Label><Input type="number" step="1" bind:value={form.extCsAngle} /></div>
-            </div>
-            <div><Label class="text-white/50 text-xs">External CS Mode</Label><Select bind:value={form.extCsMode} items={CS_MODES} /></div>
-          </div>
-        </details>
-      </CardContent>
-    </Card>
-
-    <Card class="glass-card bushing-pop-card">
+    <Card id="bushing-process-card" class="glass-card bushing-pop-card bushing-depth-2">
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase text-indigo-300">4. Process / Limits</CardTitle>
       </CardHeader>
       <CardContent class="space-y-3">
-        <details class="rounded-lg border border-white/10 bg-white/5 p-3 bushing-pop-sub">
+        <details class="rounded-lg border border-white/10 bg-white/5 p-3 bushing-pop-sub bushing-depth-1">
           <summary class="cursor-pointer text-xs font-semibold text-white/80">Advanced Process Controls</summary>
           <div class="mt-3 space-y-3">
             <div class="grid grid-cols-2 gap-3">
               <div class="space-y-1"><Label class="text-white/70">dT</Label><Input type="number" step="5" bind:value={form.dT} class="text-amber-200" /></div>
               <div class="space-y-1"><Label class="text-white/70">Friction</Label><Input type="number" step="0.01" bind:value={form.friction} /></div>
+            </div>
+            <div class="space-y-1">
+              <Label class="text-white/70">Axial End Constraint</Label>
+              <Select bind:value={form.endConstraint} items={END_CONSTRAINT_ITEMS} />
+              <div class="text-[10px] text-cyan-200/70">
+                Controls axial stress development: free ends -> near plane-stress axial response, constrained ends -> higher axial stress coupling.
+              </div>
             </div>
             <Separator class="bg-white/10" />
             <div class="grid grid-cols-2 gap-3">
@@ -249,61 +283,30 @@
     </Card>
   </div>
 
-  <div class="flex h-full flex-col gap-4 overflow-hidden">
-    <Card class="flex-1 flex flex-col overflow-hidden border-teal-500/20 bg-teal-500/10 backdrop-blur-sm relative group p-0 bushing-pop-card">
-      <div class="border-b border-teal-500/10 bg-teal-900/20 px-4 py-3 z-10 backdrop-blur-sm shrink-0 flex justify-between items-center">
-        <div class="flex items-center gap-2">
-          <span class="font-medium text-teal-100/90 text-sm">5. Drafting / Export</span>
-          {#if results.geometry?.isSaturationActive}
-            <Badge variant="outline" class="text-[9px] bg-indigo-500/20 text-indigo-300 border-indigo-400/30 animate-pulse">INFINITE PLATE</Badge>
-          {/if}
-        </div>
-        <div class="flex items-center gap-2">
-          <button class="rounded-md border border-teal-200/10 bg-teal-500/5 px-2 py-1 text-[10px] font-mono text-teal-100/80 hover:bg-teal-500/10 bushing-pop-sub" on:click={onExportSvg}>Export SVG</button>
-          <button class="rounded-md border border-teal-200/10 bg-teal-500/5 px-2 py-1 text-[10px] font-mono text-teal-100/80 hover:bg-teal-500/10 bushing-pop-sub" on:click={onExportPdf}>Export PDF</button>
-          <button class="rounded-md border border-teal-200/10 bg-teal-500/5 px-2 py-1 text-[10px] font-mono text-teal-100/80 hover:bg-teal-500/10 bushing-pop-sub" on:click={toggleRendererMode}>
-            {useLegacyRenderer ? 'Draft Renderer: Legacy' : 'Draft Renderer: Section'}
-          </button>
-          <button
-            class={cn(
-              'rounded-md border px-2 py-1 text-[10px] font-mono hover:bg-teal-500/10 bushing-pop-sub',
-              traceEnabled
-                ? 'border-cyan-300/45 bg-cyan-500/15 text-cyan-100'
-                : 'border-teal-200/10 bg-teal-500/5 text-teal-100/80'
-            )}
-            on:click={toggleTraceMode}>
-            {traceEnabled ? 'Trace: On' : 'Trace: Off'}
-          </button>
-          {#if traceEnabled}
-            <Badge variant="outline" class="text-[10px] border-cyan-400/40 text-cyan-200">
-              Cache H/M: {cacheStats.hits}/{cacheStats.misses}
-            </Badge>
-          {/if}
-          <Badge variant="outline" class="text-[10px] border-teal-500/30 text-teal-200">SECTION A-A</Badge>
-        </div>
-      </div>
-      <div class="flex-1 min-h-0 w-full relative">
-        <div class="absolute inset-0 opacity-[0.06] pointer-events-none" style="background-image: radial-gradient(#2dd4bf 1px, transparent 1px); background-size: 18px 18px;"></div>
-        <BushingDrafting inputs={draftingView} legacyMode={useLegacyRenderer} {renderMode} />
-        {#if visualDiagnostics.length}
-          <div class="absolute left-2 bottom-2 space-y-1 z-20">
-            {#each visualDiagnostics as diag}
-              <div class={`rounded-md border px-2 py-1 text-[10px] font-mono bushing-pop-sub ${
-                diag.severity === 'error'
-                  ? 'border-rose-300/45 bg-rose-500/15'
-                  : diag.severity === 'warning'
-                    ? 'border-amber-300/45 bg-amber-500/10'
-                    : 'border-cyan-300/40 bg-cyan-500/10'
-              }`}>
-                {diag.message}
-              </div>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    </Card>
+  <div class="flex flex-col gap-4 pb-8 pr-1">
+    <BushingDraftingPanel
+      {draftingView}
+      {useLegacyRenderer}
+      {renderMode}
+      {traceEnabled}
+      cacheHits={cacheStats.hits}
+      cacheMisses={cacheStats.misses}
+      isInfinitePlate={Boolean(results.geometry?.isSaturationActive)}
+      {babylonInitNotice}
+      {visualDiagnostics}
+      {babylonDiagnostics}
+      onExportSvg={onExportSvg}
+      onExportPdf={onExportPdf}
+      onToggleRendererMode={toggleRendererMode}
+      onToggleTraceMode={toggleTraceMode}
+      onBabylonDiagnostics={(diag) => {
+        babylonDiagnostics = diag;
+      }}
+      onBabylonInitFailure={handleBabylonInitFailure}
+    />
 
     <BushingResultSummary {form} {results} />
     <BushingDiagnosticsPanel {results} />
   </div>
 </div>
+{/if}

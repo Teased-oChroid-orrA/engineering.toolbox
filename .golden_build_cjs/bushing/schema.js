@@ -16,11 +16,11 @@ exports.bushingInputsSchema = zod_1.z.object({
     csMode: zod_1.z.enum(['depth_angle', 'dia_angle', 'dia_depth']),
     csDia: zod_1.z.number().nonnegative(),
     csDepth: zod_1.z.number().nonnegative(),
-    csAngle: zod_1.z.number().nonnegative(),
+    csAngle: zod_1.z.number().gt(0).lt(180),
     extCsMode: zod_1.z.enum(['depth_angle', 'dia_angle', 'dia_depth']),
     extCsDia: zod_1.z.number().nonnegative(),
     extCsDepth: zod_1.z.number().nonnegative(),
-    extCsAngle: zod_1.z.number().nonnegative(),
+    extCsAngle: zod_1.z.number().gt(0).lt(180),
     flangeDia: zod_1.z.number().optional(),
     flangeOd: zod_1.z.number().optional(),
     flangeThk: zod_1.z.number().optional(),
@@ -67,6 +67,38 @@ function validateBushingInputs(input) {
             message: 'Bushing ID should be smaller than bore diameter.',
             severity: 'warning'
         });
+    }
+    if (input.idType === 'countersink') {
+        if (Number.isFinite(input.csDia) && Number.isFinite(input.idBushing) && input.csDia < input.idBushing) {
+            warnings.push({
+                code: 'INPUT_INVALID',
+                message: 'Internal countersink diameter should be >= bushing ID.',
+                severity: 'warning'
+            });
+        }
+        if (!Number.isFinite(input.csAngle) || input.csAngle <= 0 || input.csAngle >= 180) {
+            warnings.push({
+                code: 'INPUT_INVALID',
+                message: 'Internal countersink angle must be between 0 and 180 degrees.',
+                severity: 'warning'
+            });
+        }
+    }
+    if (input.bushingType === 'countersink') {
+        if (Number.isFinite(input.extCsDia) && Number.isFinite(input.boreDia) && input.extCsDia < input.boreDia) {
+            warnings.push({
+                code: 'INPUT_INVALID',
+                message: 'External countersink diameter should be >= installed OD baseline.',
+                severity: 'warning'
+            });
+        }
+        if (!Number.isFinite(input.extCsAngle) || input.extCsAngle <= 0 || input.extCsAngle >= 180) {
+            warnings.push({
+                code: 'INPUT_INVALID',
+                message: 'External countersink angle must be between 0 and 180 degrees.',
+                severity: 'warning'
+            });
+        }
     }
     return warnings;
 }

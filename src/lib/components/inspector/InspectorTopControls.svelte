@@ -55,8 +55,10 @@
     onOpenRecipes,
     multiQueryEnabled = false,
     multiQueryCount = 0,
+    multiQueryExpanded = false,
     multiQueryClauses = [],
     onMultiQueryEnabledChange,
+    onMultiQueryExpandedChange,
     onAddMultiQueryClause,
     onRemoveMultiQueryClause,
     onUpdateMultiQueryClause,
@@ -96,8 +98,10 @@
     onOpenRecipes: () => void;
     multiQueryEnabled?: boolean;
     multiQueryCount?: number;
+    multiQueryExpanded?: boolean;
     multiQueryClauses?: MultiQueryClause[];
     onMultiQueryEnabledChange: (value: boolean) => void;
+    onMultiQueryExpandedChange: (value: boolean) => void;
     onAddMultiQueryClause: () => void;
     onRemoveMultiQueryClause: (id: string) => void;
     onUpdateMultiQueryClause: (id: string, patch: Partial<MultiQueryClause>) => void;
@@ -105,7 +109,7 @@
   }>();
 </script>
 
-<div class="glass-panel rounded-2xl p-4 border border-white/10 inspector-panel-slide inspector-pop-card" data-testid="inspector-top-controls">
+<div class="glass-panel rounded-2xl p-4 border border-white/10 inspector-panel-slide inspector-pop-card inspector-depth-1" data-testid="inspector-top-controls">
   <div use:aa>
     <div class="grid grid-cols-12 gap-3">
       <div class={topControlSpans.headers ?? 'col-span-12 md:col-span-2'}>
@@ -173,12 +177,21 @@
                 />
                 <span>Multi-query chain</span>
               </label>
-              <button class="btn btn-xs variant-soft" disabled={!hasLoaded} onclick={onAddMultiQueryClause}>+ Clause</button>
+              <div class="flex items-center gap-1">
+                <button
+                  class="btn btn-xs variant-soft"
+                  disabled={!hasLoaded || !multiQueryEnabled}
+                  onclick={() => onMultiQueryExpandedChange(!multiQueryExpanded)}
+                >
+                  {multiQueryExpanded ? 'Compact' : 'Expand'}
+                </button>
+                <button class="btn btn-xs variant-soft" disabled={!hasLoaded || !multiQueryEnabled} onclick={onAddMultiQueryClause}>+ Clause</button>
+              </div>
             </div>
             {#if multiQueryEnabled}
               <div class="mt-1 text-[10px] text-cyan-200/90">Multi-query active ({multiQueryCount})</div>
             {/if}
-            {#if multiQueryEnabled}
+            {#if multiQueryEnabled && multiQueryExpanded}
               <div class="mt-2 flex flex-col gap-2">
                 {#each multiQueryClauses as clause, idx (clause.id)}
                   <div class="grid grid-cols-[78px_1fr_24px] gap-1 items-center">
@@ -216,8 +229,8 @@
       </div>
       <div class={topControlSpans.options ?? 'col-span-12 md:col-span-2'}>
         <ControlCard label="Tier-2">
-          <div class="glass-panel rounded-xl border border-white/10 px-2 min-h-[38px] flex items-center justify-between gap-2 inspector-pop-sub">
-            <button class="btn btn-sm variant-soft flex items-center gap-2" disabled={!hasLoaded} title="Pick visible columns" onclick={onOpenColumnPicker}>
+          <div class="glass-panel rounded-xl border border-white/10 px-2 py-2 min-h-[38px] grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-2 items-center inspector-pop-sub">
+            <button class="btn btn-sm variant-soft w-full min-w-0 flex items-center gap-2 justify-center" disabled={!hasLoaded} title="Pick visible columns" onclick={onOpenColumnPicker}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="opacity-90">
                 <path d="M4 5h16v14H4V5Z" stroke="currentColor" stroke-width="1.8" />
                 <path d="M4 9h16" stroke="currentColor" stroke-width="1.8" />
@@ -229,8 +242,7 @@
                 <NumberFlow value={hasLoaded ? visibleColCount : 0} />
               </span>
             </button>
-            <div class="h-5 w-px bg-white/10"></div>
-            <label class="flex items-center gap-2 text-[12px] text-white/85 select-none">
+            <label class="flex items-center justify-between xl:justify-end gap-2 text-[12px] text-white/85 select-none min-w-0">
               <span class="whitespace-nowrap">Tier-2</span>
               <span class={`text-[10px] ${tier2Open ? 'text-emerald-200/80' : 'text-white/45'}`}>{tier2Open ? 'On' : 'Off'}</span>
               <input class="toggle toggle-sm" type="checkbox" checked={tier2Open} disabled={!hasLoaded} title="Toggle Tier-2 filters" onchange={(e) => onTier2Toggle((e.currentTarget as HTMLInputElement).checked)} />
@@ -241,7 +253,7 @@
       <div class={topControlSpans.maxScan ?? 'col-span-12 md:col-span-1'}>
         <ControlCard label="Max Scan">
           <div class="relative group z-50">
-            <input class="input input-sm w-full glass-input" disabled={!hasLoaded} placeholder="MAX SCAN" value={maxRowsScanText} oninput={(e) => onMaxRowsScanTextChange((e.currentTarget as HTMLInputElement).value)} />
+            <input class="input input-sm w-full min-w-0 glass-input" disabled={!hasLoaded} placeholder="MAX SCAN" value={maxRowsScanText} oninput={(e) => onMaxRowsScanTextChange((e.currentTarget as HTMLInputElement).value)} />
             <div class="pointer-events-none absolute left-2 top-full mt-2 w-60 rounded-lg border border-white/10 bg-black/85 p-2 text-[10px] text-white/80 opacity-0 shadow-2xl backdrop-blur-md transition-opacity duration-150 group-hover:opacity-100 z-[1200] inspector-pop-layer">
               Leave blank to use the backend default cap.
             </div>

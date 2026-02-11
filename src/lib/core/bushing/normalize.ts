@@ -1,5 +1,5 @@
 import { MM_TO_IN } from '../units';
-import type { BushingInputs, BushingInputsRaw, CSMode } from './types';
+import type { BushingInputs, BushingInputsRaw, CSMode, ToleranceMode } from './types';
 
 const toInches = (v: number, units: BushingInputs['units']) => (units === 'metric' ? v * MM_TO_IN : v);
 
@@ -21,9 +21,46 @@ function normalizeIdType(v: unknown): BushingInputs['idType'] {
   return s.includes('countersink') ? 'countersink' : 'straight';
 }
 
+function normalizeToleranceMode(v: unknown): ToleranceMode {
+  const s = String(v ?? '').toLowerCase();
+  return s === 'limits' ? 'limits' : 'nominal_tol';
+}
+
+function normalizeEndConstraint(v: unknown): NonNullable<BushingInputs['endConstraint']> {
+  const s = String(v ?? 'free').toLowerCase();
+  if (s === 'one_end' || s === 'one-end' || s === 'one end') return 'one_end';
+  if (s === 'both_ends' || s === 'both-ends' || s === 'both ends') return 'both_ends';
+  return 'free';
+}
+
 export function normalizeBushingInputs(raw: BushingInputsRaw): BushingInputs {
   const units: BushingInputs['units'] = raw.units === 'metric' ? 'metric' : 'imperial';
-  const boreDia = toInches(Number(raw.boreDia ?? raw.bore_dia ?? raw.bushOD ?? 0.5), units);
+  const boreTolMode = normalizeToleranceMode(raw.boreTolMode ?? raw.bore_tol_mode);
+  const boreNominalRaw = Number(raw.boreNominal ?? raw.bore_nominal ?? raw.boreDia ?? raw.bore_dia ?? raw.bushOD ?? 0.5);
+  const boreTolPlusRaw = Math.max(0, Number(raw.boreTolPlus ?? raw.bore_tol_plus ?? 0));
+  const boreTolMinusRaw = Math.max(0, Number(raw.boreTolMinus ?? raw.bore_tol_minus ?? 0));
+  const boreLowerRaw = Number(raw.boreLower ?? raw.bore_lower ?? (boreNominalRaw - boreTolMinusRaw));
+  const boreUpperRaw = Number(raw.boreUpper ?? raw.bore_upper ?? (boreNominalRaw + boreTolPlusRaw));
+  const boreNominal = toInches(boreNominalRaw, units);
+  const boreTolPlus = toInches(boreTolPlusRaw, units);
+  const boreTolMinus = toInches(boreTolMinusRaw, units);
+  const boreLower = toInches(Math.min(boreLowerRaw, boreUpperRaw), units);
+  const boreUpper = toInches(Math.max(boreLowerRaw, boreUpperRaw), units);
+  const boreDia = boreTolMode === 'limits' ? (boreLower + boreUpper) / 2 : boreNominal;
+
+  const interferenceTolMode = normalizeToleranceMode(raw.interferenceTolMode ?? raw.interference_tol_mode);
+  const interferenceNominalRaw = Number(raw.interferenceNominal ?? raw.interference_nominal ?? raw.interference ?? 0);
+  const interferenceTolPlusRaw = Math.max(0, Number(raw.interferenceTolPlus ?? raw.interference_tol_plus ?? 0));
+  const interferenceTolMinusRaw = Math.max(0, Number(raw.interferenceTolMinus ?? raw.interference_tol_minus ?? 0));
+  const interferenceLowerRaw = Number(raw.interferenceLower ?? raw.interference_lower ?? (interferenceNominalRaw - interferenceTolMinusRaw));
+  const interferenceUpperRaw = Number(raw.interferenceUpper ?? raw.interference_upper ?? (interferenceNominalRaw + interferenceTolPlusRaw));
+  const interferenceNominal = interferenceNominalRaw;
+  const interferenceTolPlus = interferenceTolPlusRaw;
+  const interferenceTolMinus = interferenceTolMinusRaw;
+  const interferenceLower = Math.min(interferenceLowerRaw, interferenceUpperRaw);
+  const interferenceUpper = Math.max(interferenceLowerRaw, interferenceUpperRaw);
+  const interference = interferenceTolMode === 'limits' ? (interferenceLower + interferenceUpper) / 2 : interferenceNominal;
+
   const idBushing = toInches(Number(raw.idBushing ?? raw.bushID ?? raw.id_bushing ?? 0.375), units);
   const housingLen = toInches(
     Number((raw.housingLen ?? raw.housing_len ?? ((raw.t1 ?? 0) + (raw.t2 ?? 0))) || 0.5),
@@ -39,7 +76,19 @@ export function normalizeBushingInputs(raw: BushingInputsRaw): BushingInputs {
     units,
     boreDia,
     idBushing,
-    interference: Number(raw.interference ?? 0),
+    interference,
+    boreTolMode,
+    boreNominal,
+    boreTolPlus,
+    boreTolMinus,
+    boreLower,
+    boreUpper,
+    interferenceTolMode,
+    interferenceNominal,
+    interferenceTolPlus,
+    interferenceTolMinus,
+    interferenceLower,
+    interferenceUpper,
     housingLen,
     housingWidth,
     edgeDist,
@@ -62,6 +111,7 @@ export function normalizeBushingInputs(raw: BushingInputsRaw): BushingInputs {
     dT: Number(raw.dT ?? 0),
     minWallStraight: toInches(Number(raw.minWallStraight ?? raw.min_wall_straight ?? 0.05), units),
     minWallNeck: toInches(Number(raw.minWallNeck ?? raw.min_wall_neck ?? 0.04), units),
+    endConstraint: normalizeEndConstraint(raw.endConstraint ?? raw.end_constraint),
     load: raw.load == null ? undefined : Number(raw.load),
     thetaDeg: raw.thetaDeg == null ? undefined : Number(raw.thetaDeg),
     idCS: raw.idCS,

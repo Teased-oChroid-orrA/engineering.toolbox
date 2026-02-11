@@ -5,6 +5,9 @@ export function captureState(ctx: any) {
     matchMode: ctx.matchMode,
     targetColIdx: ctx.targetColIdx,
     maxRowsScanText: ctx.maxRowsScanText,
+    multiQueryEnabled: ctx.multiQueryEnabled,
+    multiQueryExpanded: ctx.multiQueryExpanded,
+    multiQueryClauses: ctx.multiQueryClauses,
     numericF: ctx.numericF,
     dateF: ctx.dateF,
     catF: ctx.catF,
@@ -25,6 +28,16 @@ export async function applyState(ctx: any, st: any) {
   ctx.autoRestoreEnabled = migrated.autoRestore ?? true;
   ctx.query = migrated.query ?? '';
   ctx.matchMode = migrated.matchMode ?? 'fuzzy';
+  ctx.multiQueryEnabled = !!migrated.multiQueryEnabled;
+  ctx.multiQueryExpanded = !!migrated.multiQueryExpanded;
+  ctx.multiQueryClauses = (migrated.multiQueryClauses ?? []).map((c: any) => ({
+    id: String(c?.id ?? ''),
+    query: String(c?.query ?? ''),
+    mode: c?.mode === 'exact' || c?.mode === 'regex' ? c.mode : 'fuzzy'
+  })).filter((c: any) => c.id.length > 0 || c.query.length > 0);
+  if ((ctx.multiQueryClauses?.length ?? 0) === 0) {
+    ctx.multiQueryClauses = [{ id: `mq_${Date.now()}_0`, query: '', mode: 'fuzzy' }];
+  }
   ctx.targetColIdx = migrated.targetColIdx ?? null;
   ctx.maxRowsScanText = migrated.maxRowsScanText ?? '';
   ctx.numericF = {

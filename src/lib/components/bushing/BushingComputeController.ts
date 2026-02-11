@@ -47,8 +47,8 @@ export function evaluateBushingPipeline(rawInput: BushingInputs): BushingPipelin
   }
 
   cacheMisses += 1;
-  const results = computeBushing(rawInput);
-  const draftingView = buildBushingViewModel(rawInput, results);
+  const results = computeBushing(normalized);
+  const draftingView = buildBushingViewModel(normalized, results);
   const scene = buildBushingScene(draftingView);
   const entry: CacheEntry = { normalized, results, draftingView, scene };
   touch(key, entry);
@@ -68,4 +68,3 @@ export function clearBushingPipelineCache() {
   cacheHits = 0;
   cacheMisses = 0;
 }
-

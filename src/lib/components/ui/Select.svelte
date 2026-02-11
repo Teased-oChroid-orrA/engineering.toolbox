@@ -1,5 +1,10 @@
 <script lang="ts">
   import { cn } from '$lib/utils';
+  import { createEventDispatcher } from 'svelte';
+
+  const dispatch = createEventDispatcher<{
+    change: string | number | undefined;
+  }>();
   
   // FIX: Added 'items' prop to support dynamic options
   export let items: { value: string | number; label: string }[] = [];
@@ -9,6 +14,11 @@
   export let disabled = false;
   export let name: string | undefined = undefined;
   export let id: string | undefined = undefined;
+
+  function onChange(e: Event) {
+    value = (e.currentTarget as HTMLSelectElement).value;
+    dispatch('change', value);
+  }
 </script>
 
 <div class="relative">
@@ -17,6 +27,7 @@
     {name}
     bind:value
     {disabled}
+    on:change={onChange}
     class={cn(
       // Glassy Select Styling
       'flex h-9 w-full appearance-none rounded-md border border-white/10 bg-black/20 px-3 py-1 pr-8 text-sm text-white shadow-sm transition-all',

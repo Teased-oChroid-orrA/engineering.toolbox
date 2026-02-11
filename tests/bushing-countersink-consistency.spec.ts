@@ -19,5 +19,10 @@ test.describe('bushing countersink consistency', () => {
     const reconstructed = solveCountersink('dia_angle', dia, 0, solved.angleDeg, baseDia);
     expect(Math.abs(depth - reconstructed.depth)).toBeLessThan(1e-9);
   });
-});
 
+  test('dia_angle clamps negative depth solutions to zero', async () => {
+    const baseDia = 0.375;
+    const solved = solveCountersink('dia_angle', 0.25, 0, 100, baseDia);
+    expect(solved.depth).toBe(0);
+  });
+});

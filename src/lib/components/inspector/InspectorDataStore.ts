@@ -98,6 +98,9 @@ export type RecipeStateV2 = {
   catF?: { enabled: boolean; colIdx: number | null; selected: string[] };
   sortColIdx: number | null;
   sortDir: 'asc' | 'desc';
+  multiQueryEnabled?: boolean;
+  multiQueryExpanded?: boolean;
+  multiQueryClauses?: { id: string; query: string; mode: 'fuzzy' | 'exact' | 'regex' }[];
   visibleColumns: number[];
 };
 
@@ -128,6 +131,22 @@ export function migrateRecipeState(raw: unknown): RecipeStateV3 | null {
     catF: r.catF as RecipeStateV2['catF'],
     sortColIdx: typeof r.sortColIdx === 'number' ? r.sortColIdx : null,
     sortDir: r.sortDir === 'desc' ? 'desc' : 'asc',
+    multiQueryEnabled: !!r.multiQueryEnabled,
+    multiQueryExpanded: !!r.multiQueryExpanded,
+    multiQueryClauses: Array.isArray(r.multiQueryClauses)
+      ? (r.multiQueryClauses as unknown[])
+          .map((x) => {
+            const c = (x ?? {}) as Record<string, unknown>;
+            const mode: 'fuzzy' | 'exact' | 'regex' =
+              c.mode === 'exact' || c.mode === 'regex' ? c.mode : 'fuzzy';
+            return {
+              id: String(c.id ?? ''),
+              query: String(c.query ?? ''),
+              mode
+            };
+          })
+          .filter((c) => c.id.length > 0 || c.query.length > 0)
+      : [],
     visibleColumns: Array.isArray(r.visibleColumns) ? (r.visibleColumns as unknown[]).filter((x): x is number => typeof x === 'number') : [],
     autoRestore: true,
   };

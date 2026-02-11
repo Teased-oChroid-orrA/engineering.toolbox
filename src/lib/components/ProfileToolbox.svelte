@@ -1,22 +1,51 @@
 <script lang="ts">
-  import * as d3 from 'd3';
-  import { onMount } from 'svelte';
-
   export let points: { x: number; y: number }[] = [];
 
-  function handleDrag(ev: any, i: number) {
-    points[i].x = ev.x;
-    points[i].y = ev.y;
-    points = [...points];
-  }
-
   function dragAction(node: SVGCircleElement, i: number) {
-    const drag = d3.drag()
-      .on('drag', (ev: any) => handleDrag(ev, i));
-    d3.select(node).call(drag);
+    let active = false;
+
+    const onPointerDown = (ev: PointerEvent) => {
+      if (ev.button !== 0) return;
+      active = true;
+      node.setPointerCapture(ev.pointerId);
+    };
+
+    const onPointerMove = (ev: PointerEvent) => {
+      if (!active) return;
+      const svg = node.ownerSVGElement;
+      if (!svg) return;
+      const pt = svg.createSVGPoint();
+      pt.x = ev.clientX;
+      pt.y = ev.clientY;
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return;
+      const local = pt.matrixTransform(ctm.inverse());
+      points[i].x = local.x;
+      points[i].y = local.y;
+      points = [...points];
+    };
+
+    const onPointerUp = (ev: PointerEvent) => {
+      if (!active) return;
+      active = false;
+      try {
+        node.releasePointerCapture(ev.pointerId);
+      } catch {
+        // no-op
+      }
+    };
+
+    node.addEventListener('pointerdown', onPointerDown);
+    node.addEventListener('pointermove', onPointerMove);
+    node.addEventListener('pointerup', onPointerUp);
+    node.addEventListener('pointercancel', onPointerUp);
+
     return {
       destroy() {
-        d3.select(node).on('.drag', null);
+        node.removeEventListener('pointerdown', onPointerDown);
+        node.removeEventListener('pointermove', onPointerMove);
+        node.removeEventListener('pointerup', onPointerUp);
+        node.removeEventListener('pointercancel', onPointerUp);
       }
     };
   }

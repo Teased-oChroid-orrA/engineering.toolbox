@@ -4,171 +4,146 @@
   import { invoke } from '@tauri-apps/api/core';
   import NumberFlow from '@number-flow/svelte';
   import { type IFilterSet } from '@svar-ui/svelte-filter';
-  import InspectorVirtualGrid from '$lib/components/inspector/InspectorVirtualGrid.svelte';
-  import InspectorTopControls from '$lib/components/inspector/InspectorTopControls.svelte';
-  import InspectorToolbar from '$lib/components/inspector/InspectorToolbar.svelte';
-  import InspectorLoadedFilesBar from '$lib/components/inspector/InspectorLoadedFilesBar.svelte';
-  import InspectorMetricsBar from '$lib/components/inspector/InspectorMetricsBar.svelte';
-  import InspectorTier2Panel from '$lib/components/inspector/InspectorTier2Panel.svelte';
-  import InspectorRowDrawer from '$lib/components/inspector/InspectorRowDrawer.svelte';
-  import InspectorHeaderPromptModal from '$lib/components/inspector/InspectorHeaderPromptModal.svelte';
-  import InspectorColumnPickerModal from '$lib/components/inspector/InspectorColumnPickerModal.svelte';
-  import InspectorShortcutsModal from '$lib/components/inspector/InspectorShortcutsModal.svelte';
-  import InspectorRecipesModal from '$lib/components/inspector/InspectorRecipesModal.svelte';
-  import InspectorSchemaModal from '$lib/components/inspector/InspectorSchemaModal.svelte';
-  import InspectorSvarBuilderModal from '$lib/components/inspector/InspectorSvarBuilderModal.svelte';
-  import InspectorRegexGeneratorModal from '$lib/components/inspector/InspectorRegexGeneratorModal.svelte';
-  import InspectorRegexHelpPanel from '$lib/components/inspector/InspectorRegexHelpPanel.svelte';
-  import InspectorMergedGrid from '$lib/components/inspector/InspectorMergedGrid.svelte';
-  import { INSPECTOR_THEME } from '$lib/components/inspector/InspectorThemeTokens';
+  import InspectorTopControlsPanel from '$lib/components/inspector/InspectorTopControlsPanel.svelte';
+  import InspectorMainGridPanel from '$lib/components/inspector/InspectorMainGridPanel.svelte';
+  import InspectorFooterBars from '$lib/components/inspector/InspectorFooterBars.svelte';
+  import InspectorOverlayPanel from '$lib/components/inspector/InspectorOverlayPanel.svelte';
   import {
-    buildRegexCore,
-    computeRegexTestMatches,
-    genFlagsString,
-    getRegexWarnings,
-    newClause,
+    INSPECTOR_THEME,
     regexTemplates,
-    removeClause as removeRegexClause,
-    moveClause as moveRegexClause,
-    addClause as addRegexClause,
-    validateRegexPattern,
-    type BuildMode,
-    type Clause,
-    type ClauseKind,
-    type GenTab
-  } from '$lib/components/inspector/InspectorRegexController';
-  import {
     fmtDate,
     parseDateRelaxed,
     parseF64Relaxed,
-    profileSchemaFromRows
-  } from '$lib/components/inspector/InspectorSchemaController';
-  import {
+    profileSchemaFromRows,
     PerfRecorder,
     createRequestGate,
-    type RecipeStateV3
-  } from '$lib/components/inspector/InspectorDataStore';
-  import {
     computeDatasetIdentity,
     hasLoadedDatasetSignals,
     heuristicHasHeaders,
-    upsertWorkspaceDataset as upsertWorkspaceDatasetInList
-  } from '$lib/components/inspector/InspectorLoadController';
-  import { buildFilterSpec as buildFilterSpecFromState, parseMaxRowsScanText } from '$lib/components/inspector/InspectorQueryController';
-  import {
-    applySvarBuilderToFilters as applySvarBuilderToFiltersController,
-    buildFilterSpec as buildFilterSpecController,
-    clearAllFilters as clearAllFiltersController,
-    drainFilterQueue as drainFilterQueueController,
-    onQueryScopeChange as onQueryScopeChangeController,
-    runFilterNow as runFilterNowController,
-    scheduleCrossQuery as scheduleCrossQueryController,
-    scheduleFilter as scheduleFilterController
-  } from '$lib/components/inspector/InspectorOrchestratorFilterController';
-  import {
-    activateWorkspaceDataset as activateWorkspaceDatasetController,
-    loadCsvFromPath as loadCsvFromPathController,
-    loadCsvFromText as loadCsvFromTextController,
-    openFallbackLoadFromMenu as openFallbackLoadFromMenuController,
-    openStreamLoadFromMenu as openStreamLoadFromMenuController,
-    runCrossDatasetQuery as runCrossDatasetQueryController,
-    unloadWorkspaceDataset as unloadWorkspaceDatasetController,
-    upsertWorkspaceDataset as upsertWorkspaceDatasetController
-  } from '$lib/components/inspector/InspectorOrchestratorLoadController';
-  import {
-    clearColumnSelection as clearColumnSelectionController,
-    fetchVisibleSlice as fetchVisibleSliceController,
-    hideColumn as hideColumnController,
-    onColumnResize as onColumnResizeController,
-    openColumnPicker as openColumnPickerController,
-    requestSort as requestSortController,
-    scheduleSliceFetch as scheduleSliceFetchController,
-    selectAllColumns as selectAllColumnsController,
-    smartSelectColumns as smartSelectColumnsController,
-    togglePinLeft as togglePinLeftController,
-    togglePinRight as togglePinRightController,
-    toggleVisibleCol as toggleVisibleColController
-  } from '$lib/components/inspector/InspectorOrchestratorGridController';
-  import {
-    applyRecipe as applyRecipeController2,
-    deleteRecipe as deleteRecipeController2,
-    exportAnalysisBundle as exportAnalysisBundleController,
-    exportCsvPreset as exportCsvPresetController,
-    exportRecipesCurrent as exportRecipesCurrentController,
-    importRecipesFile as importRecipesFileController2,
-    loadLastStateForDataset as loadLastStateForDatasetController2,
-    loadRecipesForDataset as loadRecipesForDatasetController2,
-    persistLastStateForDataset as persistLastStateForDatasetController2,
-    persistRecipesForDataset as persistRecipesForDatasetController2,
-    saveCurrentAsRecipe as saveCurrentAsRecipeController2,
-    toggleRecipeFavorite as toggleRecipeFavoriteController2
-  } from '$lib/components/inspector/InspectorOrchestratorRecipesController';
-  import {
-    closeRowDrawer as closeRowDrawerController2,
-    copyDrawerAsJson as copyDrawerAsJsonController3,
-    drawerApplyCategory as drawerApplyCategoryController2,
-    drawerApplyDateExact as drawerApplyDateExactController3,
-    drawerApplyNumericExact as drawerApplyNumericExactController3,
-    drawerApplyTarget as drawerApplyTargetController2,
-    navRow as navRowController2,
-    openRowDrawer as openRowDrawerController3
-  } from '$lib/components/inspector/InspectorOrchestratorRowDrawerController';
-  import {
-    computeSchemaStats as computeSchemaStatsController2,
-    fetchCategoryValues as fetchCategoryValuesController2,
-    openSchema as openSchemaController2,
-    scheduleFetchCategory as scheduleFetchCategoryController2,
-    setSchemaDriftBaseline as setSchemaDriftBaselineController2
-  } from '$lib/components/inspector/InspectorOrchestratorSchemaController';
-  import {
+    upsertWorkspaceDatasetInList,
+    buildFilterSpecFromState,
+    parseMaxRowsScanText,
+    applySvarBuilderToFiltersController,
+    buildFilterSpecController,
+    clearAllFiltersController,
+    drainFilterQueueController,
+    onQueryScopeChangeController,
+    runFilterNowController,
+    scheduleCrossQueryController,
+    scheduleFilterController,
+    activateWorkspaceDatasetController,
+    loadCsvFromPathController,
+    loadCsvFromTextController,
+    openFallbackLoadFromMenuController,
+    openStreamLoadFromMenuController,
+    runCrossDatasetQueryController,
+    unloadWorkspaceDatasetController,
+    upsertWorkspaceDatasetController,
+    clearColumnSelectionController,
+    fetchVisibleSliceController,
+    hideColumnController,
+    onColumnResizeController,
+    openColumnPickerController,
+    requestSortController,
+    scheduleSliceFetchController,
+    selectAllColumnsController,
+    smartSelectColumnsController,
+    togglePinLeftController,
+    togglePinRightController,
+    toggleVisibleColController,
+    applyRecipeController2,
+    deleteRecipeController2,
+    exportAnalysisBundleController,
+    exportCsvPresetController,
+    exportRecipesCurrentController,
+    importRecipesFileController2,
+    loadLastStateForDatasetController2,
+    loadRecipesForDatasetController2,
+    persistLastStateForDatasetController2,
+    persistRecipesForDatasetController2,
+    saveCurrentAsRecipeController2,
+    toggleRecipeFavoriteController2,
+    closeRowDrawerController2,
+    copyDrawerAsJsonController3,
+    drawerApplyCategoryController2,
+    drawerApplyDateExactController3,
+    drawerApplyNumericExactController3,
+    drawerApplyTargetController2,
+    navRowController2,
+    openRowDrawerController3,
+    computeSchemaStatsController2,
+    fetchCategoryValuesController2,
+    openSchemaController2,
+    scheduleFetchCategoryController2,
+    setSchemaDriftBaselineController2,
     computeSchemaDrift,
     computeSchemaOutliers,
     computeSchemaRelationshipHints,
     computeSchemaSuggested,
-    schemaActionCategory as schemaActionCategoryController,
-    schemaActionDateRange as schemaActionDateRangeController,
-    schemaActionNumericRange as schemaActionNumericRangeController,
-    schemaActionTarget as schemaActionTargetController
-  } from '$lib/components/inspector/InspectorOrchestratorSchemaInsightsController';
-  import {
-    applyState as applyStateController2,
-    captureState as captureStateController2
-  } from '$lib/components/inspector/InspectorOrchestratorStateController';
-  import {
+    schemaActionCategoryController,
+    schemaActionDateRangeController,
+    schemaActionNumericRangeController,
+    schemaActionTargetController,
+    applyStateController2,
+    captureStateController2,
     buildRecipeExportBlob,
     captureRecipeState,
     downloadText,
-    loadLastStateForDataset as loadLastStateForDatasetFromStore,
-    loadRecipesForDataset as loadRecipesForDatasetFromStore,
+    loadLastStateForDatasetFromStore,
+    loadRecipesForDatasetFromStore,
     mergeImportedRecipes,
     migrateAndNormalizeRecipeState,
     newRecipeId,
-    persistLastStateForDataset as persistLastStateForDatasetToStore,
-    persistRecipesForDataset as persistRecipesForDatasetToStore,
+    persistLastStateForDatasetToStore,
+    persistRecipesForDatasetToStore,
     toCsvText,
-    type Recipe,
-    type RecipeState
-  } from '$lib/components/inspector/InspectorRecipesController';
-  import { beginDragModalState, floatingStyleForKey, resetModalPosForKey } from '$lib/components/inspector/InspectorUiState';
-  import {
     applyDrawerDateExact,
     applyDrawerNumericExact,
-    copyDrawerAsJson as copyDrawerAsJsonController,
-    loadRowDrawerData
-  } from '$lib/components/inspector/InspectorRowDrawerController';
-  import { createInspectorDebugLogger } from '$lib/components/inspector/InspectorDebugState';
-  import {
+    copyDrawerAsJsonController,
+    loadRowDrawerData,
+    createInspectorDebugLogger,
+    mountInspectorLifecycle,
     analyzeRegex,
     computeActiveFilterHash,
     escapeHtml,
     escapeRegExp,
-    fnv1a32
-  } from '$lib/components/inspector/InspectorUtilsController';
-  import {
+    fnv1a32,
     multiQueryHighlightRegexes,
     newMultiQueryClause,
-    type MultiQueryClause
-  } from '$lib/components/inspector/InspectorMultiQueryController';
+    registerContextMenu
+  } from '$lib/components/inspector/InspectorOrchestratorDeps';
+  import type { BuildMode, Clause, ClauseKind, GenTab } from '$lib/components/inspector/InspectorOrchestratorDeps';
+  import type { RecipeStateV3 } from '$lib/components/inspector/InspectorOrchestratorDeps';
+  import type { Recipe, RecipeState } from '$lib/components/inspector/InspectorOrchestratorDeps';
+  import type { MultiQueryClause } from '$lib/components/inspector/InspectorOrchestratorDeps';
+  import {
+    beginModalDrag,
+    floatingModalStyle,
+    openRecipesModal,
+    openRegexGeneratorModal,
+    openShortcutsModal,
+    openSvarBuilderModal,
+    resetModalPosition
+  } from '$lib/components/inspector/InspectorModalUiController';
+  import {
+    addMultiQueryClause,
+    removeMultiQueryClause,
+    setMultiQueryEnabled,
+    setMultiQueryExpanded,
+    updateMultiQueryClause
+  } from '$lib/components/inspector/InspectorMultiQueryUiController';
+  import {
+    addRegexGeneratorClause,
+    applyGeneratedRegexUi,
+    buildRegexGeneratorOutput,
+    defaultRegexClauses,
+    moveRegexGeneratorClause,
+    regexGeneratorMatches,
+    regexGeneratorWarnings,
+    removeRegexGeneratorClause,
+    validateRegexGenerator
+  } from '$lib/components/inspector/InspectorRegexGeneratorUiController';
+  import { buildInspectorContextMenu } from '$lib/components/inspector/InspectorMenuController';
   // AutoAnimate Svelte action (used as: use:aa)
   function aa(node: HTMLElement, opts?: { duration?: number }) {
     try {
@@ -343,7 +318,6 @@
   // Command/shortcuts overlay
   let showShortcuts = $state(false);
   let quietBackendLogs = $state(true);
-  let showInspectorMenu = $state(false);
   let modalPos = $state<Record<string, { x: number; y: number }>>({
     recipes: { x: 0, y: 0 },
     schema: { x: 0, y: 0 },
@@ -357,6 +331,7 @@
   let query = $state('');
   let matchMode = $state<MatchMode>('fuzzy');
   let multiQueryEnabled = $state(false);
+  let multiQueryExpanded = $state(false);
   let multiQueryClauses = $state<MultiQueryClause[]>([newMultiQueryClause(0)]);
   // null => all columns
   let targetColIdx = $state<number | null>(null);
@@ -447,14 +422,10 @@
     console.log('[SC][Inspector][perf]', { op, ms: Number(ms.toFixed(1)), p95: Number(p95.toFixed(1)), slo, status, ...(meta ?? {}) });
   }
 
-  function emitBaselineReportToConsole() {
-    console.log('[SC][Inspector][baseline]\\n' + perf.baselineReport(SLO_P95_MS as any));
-  }
-
   // -------------------- UI/virtualization state --------------------
   let hasLoaded = $state(false);
   let showDataControls = $state(false);
-  let showControlsDebug = $state(true); // temporary runtime probe
+  let showControlsDebug = $state(false);
   let isLoading = $state(false);
   let loadError = $state<string | null>(null);
 
@@ -537,18 +508,15 @@
     return 180;
   });
 
-  let topControlSpans = $derived.by(() => {
-    if (showDataControls) return {};
-    return {
-      headers: 'col-span-6 md:col-span-3 md:row-start-1',
-      target: 'col-span-6 md:col-span-3 md:row-start-1',
-      match: 'col-span-12 md:col-span-2 md:row-start-1',
-      scope: 'col-span-12 md:col-span-2 md:row-start-1',
-      maxScan: 'col-span-12 md:col-span-2 md:row-start-1',
-      query: 'hidden',
-      options: 'hidden',
-    } as const;
-  });
+  let topControlSpans = $derived.by(() => ({
+    headers: 'col-span-12 md:col-span-6 lg:col-span-3 md:row-start-1',
+    target: 'col-span-12 md:col-span-6 lg:col-span-3 md:row-start-1',
+    match: 'hidden',
+    scope: 'hidden',
+    query: 'hidden',
+    options: 'col-span-12 md:col-span-8 lg:col-span-4 md:row-start-1',
+    maxScan: 'col-span-12 md:col-span-4 lg:col-span-2 md:row-start-1'
+  }) as Record<string, string>);
 
   let startIdx = $derived.by(() => gridWindow.startIdx ?? 0);
   let endIdx = $derived.by(() => gridWindow.endIdx ?? 0);
@@ -718,7 +686,11 @@
       get query() { return query; },
       set query(v: string) { query = v; },
       get multiQueryEnabled() { return multiQueryEnabled; },
+      set multiQueryEnabled(v: boolean) { multiQueryEnabled = v; },
+      get multiQueryExpanded() { return multiQueryExpanded; },
+      set multiQueryExpanded(v: boolean) { multiQueryExpanded = v; },
       get multiQueryClauses() { return multiQueryClauses; },
+      set multiQueryClauses(v: MultiQueryClause[]) { multiQueryClauses = v; },
       get targetColIdx() { return targetColIdx; },
       set targetColIdx(v: number | null) { targetColIdx = v; },
       get matchMode() { return matchMode; },
@@ -823,7 +795,7 @@
     applySvarBuilderToFiltersController(filterControllerCtx());
   }
 
-  function loadControllerCtx() {
+  function loadControllerCtxCore() {
     return {
       invoke,
       debugLogger,
@@ -838,6 +810,12 @@
       runFilterNow,
       buildFilterSpec,
       queueDebug,
+      activateWorkspaceDataset
+    };
+  }
+
+  function loadControllerCtxStateMain() {
+    return {
       get hiddenUploadInput() { return hiddenUploadInput; },
       get isLoading() { return isLoading; },
       set isLoading(v: boolean) { isLoading = v; },
@@ -879,7 +857,12 @@
       get showDataControls() { return showDataControls; },
       set showDataControls(v: boolean) { showDataControls = v; },
       get activeDatasetId() { return activeDatasetId; },
-      set activeDatasetId(v: string) { activeDatasetId = v; },
+      set activeDatasetId(v: string) { activeDatasetId = v; }
+    };
+  }
+
+  function loadControllerCtxStateQueryAndGrid() {
+    return {
       get loadedDatasets() { return loadedDatasets; },
       set loadedDatasets(v: WorkspaceDataset[]) { loadedDatasets = v; },
       get query() { return query; },
@@ -926,8 +909,15 @@
       get preMergedTotalRowCount() { return preMergedTotalRowCount; },
       set preMergedTotalRowCount(v: number) { preMergedTotalRowCount = v; },
       get preMergedTotalFilteredCount() { return preMergedTotalFilteredCount; },
-      set preMergedTotalFilteredCount(v: number) { preMergedTotalFilteredCount = v; },
-      activateWorkspaceDataset
+      set preMergedTotalFilteredCount(v: number) { preMergedTotalFilteredCount = v; }
+    };
+  }
+
+  function loadControllerCtx() {
+    return {
+      ...loadControllerCtxCore(),
+      ...loadControllerCtxStateMain(),
+      ...loadControllerCtxStateQueryAndGrid()
     };
   }
 
@@ -1168,6 +1158,12 @@
       set autoRestoreEnabled(v: boolean) { autoRestoreEnabled = v; },
       get query() { return query; },
       set query(v: string) { query = v; },
+      get multiQueryEnabled() { return multiQueryEnabled; },
+      set multiQueryEnabled(v: boolean) { multiQueryEnabled = v; },
+      get multiQueryExpanded() { return multiQueryExpanded; },
+      set multiQueryExpanded(v: boolean) { multiQueryExpanded = v; },
+      get multiQueryClauses() { return multiQueryClauses; },
+      set multiQueryClauses(v: MultiQueryClause[]) { multiQueryClauses = v; },
       get matchMode() { return matchMode; },
       set matchMode(v: 'fuzzy' | 'regex' | 'exact') { matchMode = v; },
       get targetColIdx() { return targetColIdx; },
@@ -1338,32 +1334,64 @@
     drawerApplyDateExactController3(rowDrawerControllerCtx(), idx, value);
   }
 
+  function modalUiCtx() {
+    return {
+      withViewTransition,
+      modalPos,
+      setModalPos: (next: typeof modalPos) => {
+        modalPos = next;
+      },
+      dragState,
+      setDragState: (next: typeof dragState) => {
+        dragState = next;
+      },
+      setRecipeNotice: (v: string | null) => {
+        recipeNotice = v;
+      },
+      setShowRecipeModal: (v: boolean) => {
+        showRecipeModal = v;
+      },
+      setShowShortcuts: (v: boolean) => {
+        showShortcuts = v;
+      },
+      setShowSvarBuilder: (v: boolean) => {
+        showSvarBuilder = v;
+      },
+      setShowRegexGenerator: (v: boolean) => {
+        showRegexGenerator = v;
+      },
+      setGenTab: (v: typeof genTab) => {
+        genTab = v;
+      }
+    };
+  }
+
   function openRecipes() {
-    recipeNotice = null;
-    withViewTransition(() => { showRecipeModal = true; });
+    openRecipesModal(modalUiCtx());
+  }
+
+  function openShortcuts() {
+    openShortcutsModal(modalUiCtx());
+  }
+
+  function openBuilder() {
+    openSvarBuilderModal(modalUiCtx());
+  }
+
+  function openRegexGenerator() {
+    openRegexGeneratorModal(modalUiCtx());
   }
 
   function floatingStyle(key: string): string {
-    return floatingStyleForKey(modalPos, key);
+    return floatingModalStyle(modalPos, key);
   }
 
   function beginDragModal(key: string, e: MouseEvent) {
-    beginDragModalState({
-      key,
-      event: e,
-      modalPos,
-      setModalPos: (next) => {
-        modalPos = next;
-      },
-      setDragState: (next) => {
-        dragState = next;
-      },
-      getDragState: () => dragState
-    });
+    beginModalDrag(modalUiCtx(), key, e);
   }
 
   function resetModalPos(key: string) {
-    modalPos = resetModalPosForKey(modalPos, key);
+    modalPos = resetModalPosition(modalPos, key);
   }
 
   function onGridWindowChange(w: GridWindow) {
@@ -1376,6 +1404,16 @@
       end: w.endIdx,
       rendered: w.renderedCount,
       maxWindow: w.maxWindow
+    });
+  }
+
+  function onGridScrollTrace(info: { scrollTop: number; dy: number; dtMs: number; velocity: number; fastScroll: boolean }) {
+    queueDebugRate('gridScrollTrace', 150, 'gridScrollTrace', {
+      scrollTop: Math.round(info.scrollTop),
+      dy: Math.round(info.dy),
+      dtMs: Math.round(info.dtMs),
+      velocity: Number(info.velocity.toFixed(3)),
+      fast: info.fastScroll
     });
   }
 
@@ -1461,6 +1499,7 @@
   }
 
   function openSchema() {
+    resetModalPos('schema');
     openSchemaController2(schemaControllerCtx());
   }
 
@@ -1513,106 +1552,41 @@
   const queueDebug = (event: string, data?: Record<string, unknown>) => debugLogger.enqueue(event, data);
   const queueDebugRate = (key: string, minMs: number, event: string, data?: Record<string, unknown>) =>
     debugLogger.enqueueRate(key, minMs, event, data);
-  onMount(() => {
-    void invoke('inspector_debug_log_clear')
-      .then((p) => {
-        debugLogPath = String(p ?? '');
-        queueDebug('sessionStart', { debugLogPath, ts: Date.now() });
-      })
-      .catch(() => {});
-
-    // Silence benign ResizeObserver loop noise (can occur with virtualization + AutoAnimate)
-    const __roErr = (e: any) => {
-      try {
-        const msg = String(e?.message ?? '');
-        if (msg.includes('ResizeObserver loop')) {
-          e?.stopImmediatePropagation?.();
-          e?.preventDefault?.();
-          return false;
-        }
-      } catch {}
-    };
-    window.addEventListener('error', __roErr);
-    const __unhandledRejection = (e: PromiseRejectionEvent) => {
-      queueDebug('unhandledrejection', {
-        reason: String((e as any)?.reason ?? 'unknown')
-      });
-    };
-    window.addEventListener('unhandledrejection', __unhandledRejection);
-
-    try {
-      isTauri = typeof window !== 'undefined' && (!!(window as any).__TAURI__ || !!(window as any).__TAURI_INTERNALS__);
-    } catch {
-      isTauri = false;
+  onMount(() => mountInspectorLifecycle({
+    invoke: (cmd, args) => invoke(cmd, args as any),
+    queueDebug,
+    debugLogger,
+    setDebugLogPath: (path) => { debugLogPath = path; },
+    setIsTauri: (v) => { isTauri = v; },
+    setPrefersReducedMotion: (v) => { prefersReducedMotion = v; },
+    setUiAnimDur: (v) => { uiAnimDur = v; },
+    setDialogModule: (mod) => { dialogMod = mod as DialogMod; },
+    setCanOpenPath: (v) => { canOpenPath = v; },
+    getQuietBackendLogs: () => quietBackendLogs,
+    getShowShortcuts: () => showShortcuts,
+    setShowShortcuts: (v) => { showShortcuts = v; },
+    getShowRowDrawer: () => showRowDrawer,
+    closeRowDrawer,
+    openShortcuts,
+    openSchema,
+    openRecipes,
+    openRegexGenerator,
+    openBuilder,
+    openColumnPicker,
+    openStreamLoadFromMenu,
+    openFallbackLoadFromMenu,
+    clearAllFilters,
+    computeSchemaStats,
+    exportAnalysisBundle,
+    exportCsvPreset,
+    toggleRegexHelp: () => { showRegexHelp = !showRegexHelp; },
+    toggleQuietBackendLogs: () => { quietBackendLogs = !quietBackendLogs; },
+    toggleAutoRestoreEnabled: () => { autoRestoreEnabled = !autoRestoreEnabled; },
+    focusQueryInput: () => {
+      const el = document.querySelector<HTMLInputElement>('[data-inspector-query-input="true"], input[placeholder="Type to filter…"], input[placeholder="Regex pattern…"]');
+      el?.focus();
     }
-    try {
-      prefersReducedMotion =
-        typeof window !== 'undefined' &&
-        typeof window.matchMedia === 'function' &&
-        !!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    } catch {
-      prefersReducedMotion = false;
-    }
-    uiAnimDur = prefersReducedMotion ? 0 : 160;
-
-    (async () => {
-      try {
-        const mod = await import(/* @vite-ignore */ '@tauri-apps/plugin-dialog');
-        dialogMod = mod as DialogMod;
-        canOpenPath = isTauri;
-      } catch {
-        canOpenPath = false;
-        dialogMod = null;
-      }
-    })();
-
-    // Quiet backend logs by default (can be toggled from UI).
-    void invoke('inspector_set_quiet_logs', { quiet: !!quietBackendLogs }).catch(() => {});
-
-    const onKey = (e: KeyboardEvent) => {
-      const k = e.key.toLowerCase();
-      if ((e.metaKey || e.ctrlKey) && k === 'k') {
-        e.preventDefault();
-        showShortcuts = !showShortcuts;
-        return;
-      }
-      if ((e.metaKey || e.ctrlKey) && k === 'f') {
-        e.preventDefault();
-        const el = document.querySelector<HTMLInputElement>('input[placeholder=\"Type to filter…\"], input[placeholder=\"Regex pattern…\"]');
-        el?.focus();
-        return;
-      }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && k === 's') {
-        e.preventDefault();
-        openSchema();
-        return;
-      }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && k === 'r') {
-        e.preventDefault();
-        openRecipes();
-        return;
-      }
-      if (e.key === 'Escape') {
-        if (showRowDrawer) {
-          e.preventDefault();
-          closeRowDrawer();
-          return;
-        }
-        if (showShortcuts) {
-          e.preventDefault();
-          showShortcuts = false;
-        }
-      }
-    };
-    window.addEventListener('keydown', onKey);
-
-    return () => {
-      window.removeEventListener('error', __roErr);
-      window.removeEventListener('unhandledrejection', __unhandledRejection);
-      window.removeEventListener('keydown', onKey);
-      void debugLogger.flush();
-    };
-});
+  }));
 
   // Fetch slices when window changes
   $effect(() => {
@@ -1714,24 +1688,16 @@
   // Query scope changes are handled explicitly via select onchange to avoid effect feedback loops.
 
   $effect(() => {
-    showInspectorMenu;
-    if (!showInspectorMenu) return;
-    const onPointerDown = (ev: PointerEvent) => {
-      const target = ev.target as Node | null;
-      if (!target) return;
-      const el = target as HTMLElement;
-      if (el?.closest?.('[data-inspector-menu-root]')) return;
-      showInspectorMenu = false;
-    };
-    const onKeyDown = (ev: KeyboardEvent) => {
-      if (ev.key === 'Escape') showInspectorMenu = false;
-    };
-    window.addEventListener('pointerdown', onPointerDown, true);
-    window.addEventListener('keydown', onKeyDown, true);
-    return () => {
-      window.removeEventListener('pointerdown', onPointerDown, true);
-      window.removeEventListener('keydown', onKeyDown, true);
-    };
+    registerContextMenu(
+      buildInspectorContextMenu({
+        canOpenPath,
+        hasLoaded,
+        schemaLoading,
+        showRegexHelp,
+        quietBackendLogs,
+        autoRestoreEnabled
+      })
+    );
   });
 
   async function fetchCategoryValues(reset = false) {
@@ -1763,66 +1729,93 @@
   let genFlagM = $state(false);  // multiline
   let genFlagS = $state(false);  // dotAll
 
-  let genClauses = $state<Clause[]>([
-    newClause('prefix', 'AN')
-  ]);
+  let genClauses = $state<Clause[]>(defaultRegexClauses());
 
   let genAddKind = $state<ClauseKind>('contains');
 
   function moveClause(idx: number, dir: -1 | 1) {
-    genClauses = moveRegexClause(genClauses, idx, dir);
+    genClauses = moveRegexGeneratorClause(genClauses, idx, dir);
   }
 
   function removeClause(idx: number) {
-    genClauses = removeRegexClause(genClauses, idx);
+    genClauses = removeRegexGeneratorClause(genClauses, idx);
   }
 
   function addClause(kind: ClauseKind) {
-    genClauses = addRegexClause(genClauses, kind);
+    genClauses = addRegexGeneratorClause(genClauses, kind);
   }
 
-  let genBuilt = $derived.by(() => buildRegexCore(genClauses ?? [], genBuildMode));
-
-  let genOut = $derived.by(() => (genBuilt?.pattern ?? '').trim());
-  let genOutWarnExtra = $derived.by(() => genBuilt?.warn ?? null);
+  let genOutView = $derived.by(() => buildRegexGeneratorOutput(genClauses ?? [], genBuildMode));
+  let genOut = $derived.by(() => genOutView.pattern);
+  let genOutWarnExtra = $derived.by(() => genOutView.warnExtra);
 
   let genErr = $derived.by(() => {
-    return validateRegexPattern(genOut, genFlagsString({ i: genFlagI, m: genFlagM, s: genFlagS }));
+    return validateRegexGenerator(genOut, { i: genFlagI, m: genFlagM, s: genFlagS });
   });
 
   let genWarn = $derived.by(() => {
-    return getRegexWarnings(genOut, genBuildMode, genOutWarnExtra);
+    return regexGeneratorWarnings(genOut, genBuildMode, genOutWarnExtra);
   });
 
   let testText = $state('');
   let testMatches = $derived.by(() => {
-    if (genErr) return { count: 0, sample: [] as string[] };
-    return computeRegexTestMatches(genOut, genFlagsString({ i: genFlagI, m: genFlagM, s: genFlagS }), testText ?? '');
+    return regexGeneratorMatches(genOut, { i: genFlagI, m: genFlagM, s: genFlagS }, testText ?? '', !!genErr);
   });
+
   function applyGeneratedRegex(pat: string) {
-    query = pat;
-    matchMode = 'regex';
-    showRegexGenerator = false;
-    showRegexHelp = false;
+    applyGeneratedRegexUi(
+      {
+        setQuery: (v) => {
+          query = v;
+        },
+        setMatchMode: (v) => {
+          matchMode = v as typeof matchMode;
+        },
+        setShowRegexGenerator: (v) => {
+          showRegexGenerator = v;
+        },
+        setShowRegexHelp: (v) => {
+          showRegexHelp = v;
+        }
+      },
+      pat
+    );
+  }
+
+  function multiQueryCtx() {
+    return {
+      clauses: multiQueryClauses,
+      setClauses: (next: MultiQueryClause[]) => {
+        multiQueryClauses = next;
+      },
+      setExpanded: (v: boolean) => {
+        multiQueryExpanded = v;
+      },
+      setEnabled: (v: boolean) => {
+        multiQueryEnabled = v;
+      },
+      scheduleFilter
+    };
   }
 
   function onAddMultiQueryClause() {
-    multiQueryClauses = [...multiQueryClauses, newMultiQueryClause(multiQueryClauses.length)];
+    addMultiQueryClause(multiQueryCtx());
   }
 
   function onRemoveMultiQueryClause(id: string) {
-    const next = multiQueryClauses.filter((c) => c.id !== id);
-    multiQueryClauses = next.length ? next : [newMultiQueryClause(0)];
+    removeMultiQueryClause(multiQueryCtx(), id);
   }
 
   function onUpdateMultiQueryClause(id: string, patch: Partial<MultiQueryClause>) {
-    multiQueryClauses = multiQueryClauses.map((c) => (c.id === id ? { ...c, ...patch } : c));
-    scheduleFilter('multi-query-update');
+    updateMultiQueryClause(multiQueryCtx(), id, patch);
   }
 
   function onMultiQueryEnabledChange(enabled: boolean) {
-    multiQueryEnabled = enabled;
-    scheduleFilter('multi-query-toggle');
+    setMultiQueryEnabled(multiQueryCtx(), enabled);
+  }
+
+  function onMultiQueryExpandedChange(expanded: boolean) {
+    setMultiQueryExpanded(multiQueryCtx(), expanded);
   }
 </script>
 
@@ -1844,8 +1837,7 @@
     }}
   />
 
-  <!-- Tier 1: Load + Search Controls -->
-  <InspectorTopControls
+  <InspectorTopControlsPanel
     topControlSpans={topControlSpans as Record<string, string>}
     {headerMode}
     {hasLoaded}
@@ -1856,7 +1848,8 @@
     {queryScope}
     {query}
     {multiQueryEnabled}
-    multiQueryCount={multiQueryClauses.filter((c) => (c.query ?? '').trim().length > 0).length}
+    {multiQueryExpanded}
+    {multiQueryClauses}
     {maxRowsScanText}
     {tier2Open}
     visibleColCount={visibleColIdxs.length}
@@ -1867,6 +1860,21 @@
     {activeDatasetId}
     {datasetId}
     {totalRowCount}
+    {showRegexHelp}
+    {uiAnimDur}
+    {tier2Tab}
+    {numericF}
+    {dateF}
+    {catF}
+    {catSearch}
+    {catAvailSearch}
+    {catAvailItems}
+    {catAvailDistinctTotal}
+    {catAvailRowsScanned}
+    {catAvailTotalRowsInView}
+    {catAvailPartial}
+    {catAvailLoading}
+    {catAvailError}
     onHeaderModeChange={(value: 'auto' | 'yes' | 'no') => { headerMode = value; }}
     onTargetColChange={(value: number | null) => { targetColIdx = value; scheduleFilter(); }}
     onMatchModeChange={(value: 'fuzzy' | 'exact' | 'regex') => { matchMode = value; }}
@@ -1875,101 +1883,28 @@
     onMaxRowsScanTextChange={(value: string) => { maxRowsScanText = value; }}
     onTier2Toggle={(value: boolean) => { tier2Open = value; }}
     onOpenColumnPicker={openColumnPicker}
-    onOpenBuilder={() => { showSvarBuilder = true; }}
+    onOpenBuilder={openBuilder}
     onSetRegexMode={() => { matchMode = 'regex'; }}
     onOpenHelp={() => { showRegexHelp = true; }}
-    onOpenGenerator={() => { showRegexGenerator = true; genTab = 'builder'; }}
+    onOpenGenerator={openRegexGenerator}
     onOpenRecipes={openRecipes}
-    {multiQueryClauses}
     onMultiQueryEnabledChange={onMultiQueryEnabledChange}
+    onMultiQueryExpandedChange={onMultiQueryExpandedChange}
     onAddMultiQueryClause={onAddMultiQueryClause}
     onRemoveMultiQueryClause={onRemoveMultiQueryClause}
     onUpdateMultiQueryClause={onUpdateMultiQueryClause}
-  >
-
-    <InspectorRegexHelpPanel open={showRegexHelp} {uiAnimDur} />
-
-    <InspectorTier2Panel
-      {tier2Open}
-      {tier2Tab}
-      {hasLoaded}
-      {headers}
-      {numericF}
-      {dateF}
-      {catF}
-      {catSearch}
-      {catAvailSearch}
-      {catAvailItems}
-      {catAvailDistinctTotal}
-      {catAvailRowsScanned}
-      {catAvailTotalRowsInView}
-      {catAvailPartial}
-      {catAvailLoading}
-      {catAvailError}
-      {uiAnimDur}
-      {scheduleFilter}
-      {runFilterNow}
-      {fetchCategoryValues}
-      onSetTier2Tab={(tab) => (tier2Tab = tab)}
-    />
-  </InspectorTopControls>
-
-  <InspectorToolbar
-    {totalRowCount}
-    {totalFilteredCount}
-    {headers}
-    {sortColIdx}
-    {sortDir}
-    {query}
-    {targetColIdx}
-    numericEnabled={numericF.enabled}
-    dateEnabled={dateF.enabled}
-    categoryEnabled={catF.enabled}
-    {isMergedView}
-    {hasLoaded}
-    {schemaLoading}
-    {quietBackendLogs}
-    {autoRestoreEnabled}
-    {svarNotice}
-    {debugLogPath}
-    {showInspectorMenu}
-    {canOpenPath}
-    on:toggleMenu={() => (showInspectorMenu = !showInspectorMenu)}
-    on:openStream={() => { void openStreamLoadFromMenu(); showInspectorMenu = false; }}
-    on:openFallback={() => { openFallbackLoadFromMenu(); showInspectorMenu = false; }}
-    on:openSchema={() => { openSchema(); showInspectorMenu = false; }}
-    on:openRecipes={() => { openRecipes(); showInspectorMenu = false; }}
-    on:toggleRegexHelp={() => { showRegexHelp = !showRegexHelp; showInspectorMenu = false; }}
-    on:openRegexGenerator={() => { showRegexGenerator = true; genTab = 'builder'; showInspectorMenu = false; }}
-    on:openBuilder={() => { showSvarBuilder = true; showInspectorMenu = false; }}
-    on:openColumnPicker={() => { openColumnPicker(); showInspectorMenu = false; }}
-    on:openShortcuts={() => { showShortcuts = true; showInspectorMenu = false; }}
-    on:exportAnalysisBundle={() => { exportAnalysisBundle(); showInspectorMenu = false; }}
-    on:clearQuery={() => { query = ''; scheduleFilter('chip-clear-query'); }}
-    on:clearTarget={() => { targetColIdx = null; scheduleFilter('chip-clear-target'); }}
-    on:clearNumeric={() => { numericF.enabled = false; void runFilterNow(); }}
-    on:clearDate={() => { dateF.enabled = false; void runFilterNow(); }}
-    on:clearCategory={() => { catF.enabled = false; catF.selected = new Set(); void runFilterNow(); }}
-    on:clearAllFilters={clearAllFilters}
-    on:rerunSchema={() => void computeSchemaStats()}
-    on:toggleQuietLogs={(e) => { quietBackendLogs = e.detail.value; }}
-    on:toggleAutoRestore={(e) => { autoRestoreEnabled = e.detail.value; }}
-    on:exportCurrentView={() => exportCsvPreset('current_view')}
-    on:exportFilteredRows={() => exportCsvPreset('filtered_rows')}
-    on:exportSelectedColumns={() => exportCsvPreset('selected_columns')}
+    onSetTier2Tab={(tab) => (tier2Tab = tab)}
+    {scheduleFilter}
+    {runFilterNow}
+    {fetchCategoryValues}
   />
 
-  <InspectorLoadedFilesBar
+  <InspectorFooterBars
     {loadedDatasets}
     {activeDatasetId}
     {crossQueryBusy}
     {isMergedView}
     mergedRowsCount={mergedRowsAll.length}
-    on:activate={(e) => void activateWorkspaceDataset(e.detail.id)}
-    on:unload={(e) => void unloadWorkspaceDataset(e.detail.id)}
-  />
-
-  <InspectorMetricsBar
     columns={headers.length}
     rows={totalRowCount}
     filtered={totalFilteredCount}
@@ -1979,81 +1914,86 @@
     overscan={OVERSCAN}
     {maxWindow}
     {parseDiagnostics}
-    onBaselineReport={emitBaselineReportToConsole}
+    onActivateDataset={(id) => void activateWorkspaceDataset(id)}
+    onUnloadDataset={(id) => void unloadWorkspaceDataset(id)}
   />
 
-  <!-- Table -->
-  {#if isMergedView}
-    <InspectorMergedGrid
-      {mergedDisplayHeaders}
-      {mergedGroupedRows}
-      {mergedRowFxEnabled}
-      {uiAnimDur}
-    />
-  {:else}
-    <InspectorVirtualGrid
-      {headers}
-      {visibleRows}
-      {visibleColIdxs}
-      {totalFilteredCount}
-      rowHeight={ROW_HEIGHT}
-      overscan={OVERSCAN}
-      maxWindowAbs={MAX_WINDOW_ABS}
-      {sortColIdx}
-      {sortDir}
-      {sortPriority}
-      {pinnedLeft}
-      {pinnedRight}
-      {hiddenColumns}
-      {columnWidths}
-      onRequestSort={requestSort}
-      onOpenRow={openRowDrawer}
-      onColumnResize={onColumnResize}
-      {highlightCell}
-      onWindowChange={onGridWindowChange}
-      topBanner={activeDatasetLabel}
-    />
-  {/if}
-
-
-  <InspectorRecipesModal
-    open={showRecipeModal}
-    {uiAnimDur}
-    floatingStyle={floatingStyle('recipes')}
-    {recipeNotice}
-    {recipeName}
-    {recipeTags}
+  <InspectorMainGridPanel
     {hasLoaded}
-    {importMode}
-    {recipes}
-    onClose={() => (showRecipeModal = false)}
-    onReset={() => resetModalPos('recipes')}
-    onBeginDrag={(e: MouseEvent) => beginDragModal('recipes', e)}
-    onSetRecipeName={(v: string) => (recipeName = v)}
-    onSetRecipeTags={(v: string) => (recipeTags = v)}
-    onSave={saveCurrentAsRecipe}
-    onExport={exportRecipesCurrent}
-    onImport={importRecipesFile}
-    onSetImportMode={(v: 'current' | 'file') => (importMode = v)}
-    onToggleFavorite={toggleRecipeFavorite}
-    onApply={applyRecipe}
-    onDelete={deleteRecipe}
+    {matchMode}
+    {queryScope}
+    {query}
+    {queryError}
+    {multiQueryEnabled}
+    {multiQueryExpanded}
+    {multiQueryClauses}
+    {isMergedView}
+    {mergedDisplayHeaders}
+    {mergedGroupedRows}
+    {mergedRowFxEnabled}
+    {uiAnimDur}
+    {headers}
+    {visibleRows}
+    {visibleColIdxs}
+    {totalFilteredCount}
+    {ROW_HEIGHT}
+    {OVERSCAN}
+    {MAX_WINDOW_ABS}
+    {sortColIdx}
+    {sortDir}
+    {sortPriority}
+    {pinnedLeft}
+    {pinnedRight}
+    {hiddenColumns}
+    {columnWidths}
+    {activeDatasetLabel}
+    onMatchModeChange={(value: 'fuzzy' | 'exact' | 'regex') => { matchMode = value; }}
+    onQueryScopeChange={(value: 'current' | 'all' | 'ask') => { queryScope = value; onQueryScopeChange(); }}
+    onQueryChange={(value: string) => { query = value; }}
+    onOpenBuilder={openBuilder}
+    onSetRegexMode={() => { matchMode = 'regex'; }}
+    onOpenHelp={() => { showRegexHelp = true; }}
+    onOpenGenerator={openRegexGenerator}
+    onOpenRecipes={openRecipes}
+    onMultiQueryEnabledChange={onMultiQueryEnabledChange}
+    onMultiQueryExpandedChange={onMultiQueryExpandedChange}
+    onAddMultiQueryClause={onAddMultiQueryClause}
+    onRemoveMultiQueryClause={onRemoveMultiQueryClause}
+    onUpdateMultiQueryClause={onUpdateMultiQueryClause}
+    onRequestSort={requestSort}
+    onOpenRow={openRowDrawer}
+    {onColumnResize}
+    {highlightCell}
+    {onGridWindowChange}
+    {onGridScrollTrace}
   />
 
-  <InspectorSchemaModal
-    open={showSchemaModal}
+
+  <InspectorOverlayPanel
+    bind:showRecipeModal
+    bind:showSchemaModal
+    bind:showRowDrawer
+    bind:showHeaderPrompt
+    bind:showColumnPicker
+    bind:showSvarBuilder
+    bind:showRegexGenerator
+    bind:showShortcuts
     {uiAnimDur}
-    floatingStyle={floatingStyle('schema')}
+    {hasLoaded}
+    bind:recipeNotice
+    bind:recipeName
+    bind:recipeTags
+    bind:importMode
+    {recipes}
     {datasetLabel}
-    {schemaSampleN}
+    bind:schemaSampleN
     {totalFilteredCount}
     {totalRowCount}
     {schemaScopeLabel}
     {schemaError}
-    {hasLoaded}
     {schemaLoading}
-    {schemaSampleTier}
-    {schemaSearch}
+    bind:schemaSampleTier
+    bind:schemaSearch
     {schemaSuggested}
     {schemaOutliers}
     {schemaRelationshipHints}
@@ -2061,129 +2001,65 @@
     {colTypes}
     {headers}
     {schemaFiltered}
-    catSelected={catF.selected}
-    onClose={() => (showSchemaModal = false)}
-    onReset={() => resetModalPos('schema')}
-    onBeginDrag={(e: MouseEvent) => beginDragModal('schema', e)}
-    onRefresh={() => void computeSchemaStats()}
-    onSetSampleTier={(v: string) => (schemaSampleTier = v as any)}
-    onSetSampleN={(v: number) => (schemaSampleN = v)}
-    onSetSearch={(v: string) => (schemaSearch = v)}
-    onSetDriftBaseline={setSchemaDriftBaseline}
-    onActionTarget={schemaActionTarget}
-    onActionCategory={schemaActionCategory}
-    onActionNumeric={schemaActionNumericRange}
-    onActionDate={schemaActionDateRange}
-    onAddTopToCategory={(idx: number, val: string) => {
-      schemaActionCategory(idx, false);
-      const s2 = new Set(catF.selected);
-      s2.add(val);
-      catF.selected = s2;
-      void runFilterNow();
-    }}
-  />
-
-  <InspectorRowDrawer
-    open={showRowDrawer}
-    {uiAnimDur}
+    bind:catF
     {drawerVisualIdx}
-    {totalFilteredCount}
-    {drawerSearch}
+    bind:drawerSearch
     {drawerLoading}
     {drawerError}
-    drawerList={drawerList as any}
+    {drawerList}
     {drawerExplain}
-    onClose={closeRowDrawer}
-    onNavRow={navRow}
-    onCopyJson={copyDrawerAsJson}
-    onSetSearch={(value) => (drawerSearch = value)}
-    onApplyTarget={drawerApplyTarget}
-    onApplyCategory={drawerApplyCategory}
-    onApplyNumeric={drawerApplyNumericExact}
-    onApplyDate={drawerApplyDateExact}
-  />
-  <InspectorHeaderPromptModal
-    open={showHeaderPrompt}
-    {uiAnimDur}
     {headerHeuristicReason}
-    onCancel={cancelHeaderPrompt}
-    onChoose={applyHeaderChoice}
-  />
-
-  <InspectorColumnPickerModal
-    open={showColumnPicker}
-    {uiAnimDur}
-    {headers}
     {visibleColumns}
     {columnPickerNotice}
-    onClose={() => (showColumnPicker = false)}
-    onSmartSelect={smartSelectColumns}
-    onSelectAll={selectAllColumns}
-    onAutoDefault={clearColumnSelection}
-    onToggle={toggleVisibleCol}
-  />
-
-  <InspectorSvarBuilderModal
-    open={showSvarBuilder}
-    {uiAnimDur}
-    floatingStyle={floatingStyle('svar')}
-    {hasLoaded}
     {svarFields}
     {svarOptions}
-    svarFilterSet={svarFilterSet}
-    onClose={() => (showSvarBuilder = false)}
-    onReset={() => resetModalPos('svar')}
-    onBeginDrag={(e: MouseEvent) => beginDragModal('svar', e)}
-    onApply={applySvarBuilderToFilters}
-    onChange={(ev: any) => {
-      const next = ev?.value ?? ev?.detail?.value;
-      if (next) svarFilterSet = next as IFilterSet;
-    }}
-  />
-
-  <InspectorRegexGeneratorModal
-    open={showRegexGenerator}
-    {uiAnimDur}
-    {genTab}
-    {genFlagI}
-    {genFlagM}
-    {genFlagS}
+    bind:svarFilterSet
+    bind:genTab
+    bind:genFlagI
+    bind:genFlagM
+    bind:genFlagS
     {genOut}
     {genErr}
     {genWarn}
     {regexTemplates}
-    {testText}
+    bind:testText
     {testMatches}
-    {genBuildMode}
-    {genClauses}
+    bind:genBuildMode
+    bind:genClauses
     {genAddKind}
-    onClose={() => (showRegexGenerator = false)}
-    onSetTab={(v: GenTab) => (genTab = v)}
-    onToggleFlag={(k: 'i' | 'm' | 's') => {
-      if (k === 'i') genFlagI = !genFlagI;
-      if (k === 'm') genFlagM = !genFlagM;
-      if (k === 's') genFlagS = !genFlagS;
-    }}
-    onApplyRegex={applyGeneratedRegex}
-    onSetTestText={(v: string) => (testText = v)}
-    onSetBuildMode={(v: BuildMode) => (genBuildMode = v)}
-    onMoveClause={moveClause}
-    onRemoveClause={removeClause}
-    onUpdateClauseKind={(idx: number, v: ClauseKind) => (genClauses[idx].kind = v)}
-    onUpdateClauseField={(idx: number, key: string, v: any) => ((genClauses[idx] as any)[key] = v)}
-    onAddClause={(v: ClauseKind) => addClause(v)}
-    onClearClauses={() => {
-      genClauses = [newClause('contains', '')];
-      testText = '';
-    }}
-  />
-
-  <InspectorShortcutsModal
-    open={showShortcuts}
-    {uiAnimDur}
-    floatingStyle={floatingStyle('shortcuts')}
-    onClose={() => (showShortcuts = false)}
-    onReset={() => resetModalPos('shortcuts')}
-    onBeginDrag={(e: MouseEvent) => beginDragModal('shortcuts', e)}
+    {floatingStyle}
+    {resetModalPos}
+    {beginDragModal}
+    {computeSchemaStats}
+    {runFilterNow}
+    {closeRowDrawer}
+    {navRow}
+    {copyDrawerAsJson}
+    {applyHeaderChoice}
+    {cancelHeaderPrompt}
+    {smartSelectColumns}
+    {selectAllColumns}
+    {clearColumnSelection}
+    {toggleVisibleCol}
+    {saveCurrentAsRecipe}
+    {exportRecipesCurrent}
+    {importRecipesFile}
+    {toggleRecipeFavorite}
+    {applyRecipe}
+    {deleteRecipe}
+    {setSchemaDriftBaseline}
+    {schemaActionTarget}
+    {schemaActionCategory}
+    {schemaActionNumericRange}
+    {schemaActionDateRange}
+    {drawerApplyTarget}
+    {drawerApplyCategory}
+    {drawerApplyNumericExact}
+    {drawerApplyDateExact}
+    {applySvarBuilderToFilters}
+    {applyGeneratedRegex}
+    {moveClause}
+    {removeClause}
+    {addClause}
   />
 </div>

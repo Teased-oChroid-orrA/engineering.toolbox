@@ -1,130 +1,67 @@
 <script lang="ts">
-  import * as d3 from 'd3';
-  import { onMount } from 'svelte';
+import { onMount } from 'svelte';
   // @formkit/auto-animate exports a default function (not a named export)
   import autoAnimate from '@formkit/auto-animate';
 
-  import SurfaceSelectionControls from './SurfaceSelectionControls.svelte';
-  import SurfaceInterpolationPanel from './SurfaceInterpolationPanel.svelte';
-  import SurfaceSamplerPanel from './SurfaceSamplerPanel.svelte';
+  import SurfaceActionBar from './SurfaceActionBar.svelte';
+  import SurfaceRightRail from './SurfaceRightRail.svelte';
   import SurfaceCanvas from './SurfaceCanvas.svelte';
-  import SurfaceFileMenu from './SurfaceFileMenu.svelte';
-  import CurveEdgesLoftPanel from './CurveEdgesLoftPanel.svelte';
-  import SurfaceFitPanel from './SurfaceFitPanel.svelte';
-  import SurfaceOffsetIntersectionPanel from './SurfaceOffsetIntersectionPanel.svelte';
-  import SurfaceDatumSliceExportPanel from './SurfaceDatumSliceExportPanel.svelte';
-  import SurfaceStatusRail from './SurfaceStatusRail.svelte';
-  import SurfaceRecipesPanel from './SurfaceRecipesPanel.svelte';
-  import SurfaceSlicingRecommendationRail from './SurfaceSlicingRecommendationRail.svelte';
-  import SurfaceWorkflowGuideCard from './SurfaceWorkflowGuideCard.svelte';
-  import SurfaceExtrudeModal from './SurfaceExtrudeModal.svelte';
-  import SurfaceViewportSettingsModal from './SurfaceViewportSettingsModal.svelte';
+  import SurfaceModalStack from './SurfaceModalStack.svelte';
+  import { toast } from '../../ui/toast';
   import {
     computeCylinderEvaluation,
     computePlaneEvaluation,
-    computeSectionSliceEvaluation
-  } from './controllers/SurfaceEvalController';
-  import {
+    computeSectionSliceEvaluation,
     buildSurfaceCsv,
     readSurfaceCsvFile,
     readSurfaceStepFile,
     triggerCsvDownload,
-    triggerJsonDownload
-  } from './controllers/SurfaceIoController';
-  import { toast } from '../../ui/toast';
-  import {
+    triggerJsonDownload,
     buildCombinedSliceCsv,
     buildSliceMetadataSidecar,
     computeDatumPlaneSlices,
-    type DatumSliceMode,
-    type DatumSliceRunResult
-  } from './controllers/SurfaceSlicingExportController';
-  import { buildSliceSyncModel } from './controllers/SurfaceSlicingInsightsController';
-  import {
+    buildSliceSyncModel,
     toStatusFromIntersection,
     toStatusFromSliceWarnings,
-    type SurfaceStatusWarning
-  } from './controllers/SurfaceWarningsController';
-  import {
     buildSlicingRuntimeWarning,
     dispatchWarningToasts,
-    mergeWarningsUntracked
-  } from './controllers/SurfaceWarningDispatchController';
-  import {
-    createRecipe,
+    mergeWarningsUntracked,
     createRecipeRun,
-    deleteRecipe,
-    DEFAULT_RECIPE_STEPS,
     loadWorkspaceRecipes,
     recipeStepLabel,
     saveWorkspaceRecipes,
-    toggleRecipeStep,
-    upsertRecipe,
-    type RecipeRunState,
-    type SurfaceRecipe,
-    type SurfaceRecipeConfig,
-    type SurfaceRecipeStep
-  } from './controllers/SurfaceRecipesController';
-  import {
     advanceRecipeRunUntilPause,
-    findRecipeForRun
-  } from './controllers/SurfaceRecipeRunController';
-  import {
+    findRecipeForRun,
     beginRecipeTransaction,
     finalizeRecipeTransaction,
     rollbackRecipeTransaction,
-    type RecipeTransaction
-  } from './controllers/SurfaceRecipeTransactionController';
-  import {
     SURFACE_MOTION_SPEC,
-    motionMs
-  } from './controllers/SurfaceThemeController';
-  import {
+    motionMs,
     linePickState,
     nextCreateModeState,
     nextSelectionModeState,
-    surfacePickState
-  } from './controllers/SurfaceToolsController';
-  import {
+    surfacePickState,
     transitionToolCursor,
-    type ToolCursorMode
-  } from './controllers/SurfaceCursorController';
-  import {
     findBestSnapCandidate,
-    type SnapCandidate
-  } from './controllers/SurfaceSnapController';
-  import {
     makeHoverModeKey,
     nearestPointIndex,
     shouldProcessHover,
     shouldRecomputeHover,
-    snapCandidateSignature
-  } from './controllers/SurfaceInteractionController';
-  import {
+    snapCandidateSignature,
     centeredModalPos,
     draggedModalPos,
-    dragOffsetFromPointer
-  } from './controllers/SurfaceModalController';
-  import {
+    dragOffsetFromPointer,
     createDatumCsys,
     createDatumPlane,
     planeBasis,
     surfaceNormal,
     vecAdd,
     vecScale,
-    vecUnit
-  } from './controllers/SurfaceDatumController';
-  import {
+    vecUnit,
     diagnoseIntersectionResult,
     precheckIntersectionInputs,
-    type IntersectionDiagnostics
-  } from './controllers/SurfaceIntersectionController';
-  import {
     buildHoverTooltip,
-    type HoverTooltip
-  } from './controllers/SurfaceHoverController';
-  import { computeCurveOffsetBestEffort } from './controllers/SurfaceGeodesicOffsetController';
-  import {
+    computeCurveOffsetBestEffort,
     hasSeenCoreModePrompt,
     markCoreModePromptSeen,
     persistCoreMode,
@@ -132,33 +69,89 @@
     readPersistedCoreMode,
     readPersistedRightRailCollapsed,
     readWorkspaceUiState,
-    writeWorkspaceUiState
-  } from './controllers/SurfaceUiStateController';
-  import type { Curve, DatumCsys, DatumPlane, Edge, Point3D, SurfaceFace } from '../../surface/types';
-  import { bilerp, clamp, deg, lerp3, vecNorm, vecSub } from '../../surface/geom/points';
-  import { edgeExists } from '../../surface/geom/edges';
-  import { buildLoftSegments } from '../../surface/geom/curves';
-  import { activeFitPointIds } from '../../surface/geom/indexing';
-  import { calcOffsetIntersectionApi } from '../../surface/api/surfaceApi';
-  import {
+    writeWorkspaceUiState,
+    registerContextMenu,
+    buildSurfaceNavMenu,
+    mountSurfaceGlobalHandlers,
+    mountSurfaceViewportInteraction,
+    cylKeepInliersController,
+    cylRemoveOutliersController,
+    cylSelectOutliersController,
+    cylThresholdAbsController,
+    deleteSelectedRecipeController,
+    saveCurrentRecipeController,
+    selectRecipeController,
+    selectedRecipeController,
+    snapshotRecipeConfigController,
+    toggleSelectedRecipeStepController,
+    applyRecipeConfigController,
+    bilerp,
+    clamp,
+    deg,
+    lerp3,
+    vecNorm,
+    vecSub,
+    edgeExists,
+    buildLoftSegments,
+    activeFitPointIds,
+    calcOffsetIntersectionApi,
     computeCylinderAxisSegment,
-    depthOpacity as viewportDepthOpacity,
-    fitToScreen as viewportFitToScreen,
-    projectPoint
-  } from '../../surface/viewport/SurfaceViewport';
-  import {
-    applySelectionFromHits as applySelectionHits,
+    viewportFitToScreen,
+    projectPoint,
+    applySelectionHits,
     hitsInLasso,
-    hitsInRect
-  } from './SelectionEngine';
-  import { createSnapshot, materializeSnapshot, type Snapshot } from '../../surface/state/SurfaceStore';
-  import {
+    hitsInRect,
+    createSnapshot,
+    materializeSnapshot,
     canHistoryRedo,
     canHistoryUndo,
     popHistoryRedo,
     popHistoryUndo,
     pushHistoryUndo
-  } from '../../surface/state/SurfaceHistoryController';
+  } from './SurfaceOrchestratorDeps';
+  import {
+    cancelRecipeRunUi,
+    runRecipeNextStepUi,
+    runRecipeUntilPauseUi,
+    startRecipeRunUi
+  } from './controllers/SurfaceRecipeRunUiController';
+  import {
+    computeCylinderFitUi,
+    computeDatumSlicesUi,
+    computeSectionSlicesUi,
+    computeSurfaceEvalUi,
+    emitStatusWarningsUi,
+    exportDatumSliceCombinedUi
+  } from './controllers/SurfaceEvaluationUiController';
+  import {
+    depthOpacityUi,
+    nearestEdgeHitUi,
+    pickOrbitPivotUi,
+    pointDepthOpacityUi,
+    rotateForViewUi,
+    surfaceDepthOpacityUi
+  } from './controllers/SurfaceViewportMathController';
+  import type {
+    DatumSliceMode,
+    DatumSliceRunResult,
+    SurfaceStatusWarning,
+    RecipeRunState,
+    SurfaceRecipe,
+    SurfaceRecipeConfig,
+    SurfaceRecipeStep,
+    RecipeTransaction,
+    ToolCursorMode,
+    SnapCandidate,
+    IntersectionDiagnostics,
+    HoverTooltip,
+    Curve,
+    DatumCsys,
+    DatumPlane,
+    Edge,
+    Point3D,
+    SurfaceFace,
+    Snapshot
+  } from './SurfaceOrchestratorDeps';
 
   // --- Dev-only diagnostics ---
   // Track the last UI action so runtime errors are attributable.
@@ -609,7 +602,7 @@
   let extrudeFlip = $state(false);
   let extrudeDistance = $state<number>(20);
   let healTol = $state<number>(0.5);
-  let actionsBarEl: HTMLElement | null = null;
+  let actionsBarEl = $state<HTMLElement | null>(null);
   let datumsModalPanelEl = $state<HTMLElement | null>(null);
   let createGeomModalPanelEl = $state<HTMLElement | null>(null);
   let surfCurveModalPanelEl = $state<HTMLElement | null>(null);
@@ -667,20 +660,10 @@
   let zoomK = $state(1);
   let pan = $state({ x: 0, y: 0 });
   let rotateAnchor = $state<{ mx: number; my: number; pivot: Point3D } | null>(null);
-  let svgSelection: any = null;
-  let zoomBehavior: any = null;
-
-  function syncD3ZoomTransform(k: number, x: number, y: number) {
-    if (!svgSelection || !zoomBehavior) return;
-    const t = d3.zoomIdentity.translate(x, y).scale(k);
-    svgSelection.call((zoomBehavior as any).transform, t);
-  }
-
   function resetView() {
     rot = { alpha: -0.65, beta: 0.35 };
     zoomK = 1;
     pan = { x: 0, y: 0 };
-    syncD3ZoomTransform(1, 0, 0);
   }
 
   function fitToScreen() {
@@ -688,7 +671,6 @@
     if (!fitted) return;
     zoomK = fitted.zoomK;
     pan = fitted.pan;
-    syncD3ZoomTransform(fitted.zoomK, fitted.pan.x, fitted.pan.y);
   }
 
   // Probe overlay (toggle-able)
@@ -790,56 +772,35 @@
   let cylOutlierSet = $derived.by(() => new Set(cylRes?.outlierIndices ?? []));
 
   async function computeCylinderFit() {
-    cylErr = null;
-    cylBusy = true;
-    const out = await computeCylinderEvaluation({
-      points,
-      selectedPointIds,
-      cylUseSelection,
-      params: {
-        evalTol,
-        evalSigmaMult,
-        evalMaxOutliers
+    await computeCylinderFitUi(evaluationUiCtx());
+  }
+
+  function cylUiCtx() {
+    return {
+      getCylRes: () => cylRes ? { rms: cylRes.rms, absDistances: cylRes.absDistances } : null,
+      getCylRefineK: () => cylRefineK,
+      getCylFitPointIds: () => cylFitPointIds,
+      getSelectedPointIds: () => selectedPointIds,
+      setSelectedPointIds: (next: number[]) => {
+        selectedPointIds = next;
       }
-    });
-    cylFitPointIds = out.fitPointIds;
-    cylRes = out.result;
-    cylErr = out.error;
-    cylBusy = false;
+    };
   }
 
   function cylThresholdAbs() {
-    if (!cylRes) return 0;
-    const k = Number.isFinite(cylRefineK) ? Math.abs(cylRefineK) : 2;
-    return k * (cylRes.rms ?? 0);
-  }
-
-  function cylIdsByThreshold(outliers: boolean) {
-    if (!cylRes) return [];
-    const thr = cylThresholdAbs();
-    const ids: number[] = [];
-    for (let j = 0; j < (cylRes.absDistances?.length ?? 0); j++) {
-      const d = Math.abs(cylRes.absDistances[j] ?? 0);
-      if (outliers ? (d > thr) : (d <= thr)) ids.push(cylFitPointIds[j]);
-    }
-    return ids.filter((v) => Number.isFinite(v));
+    return cylThresholdAbsController(cylUiCtx());
   }
 
   function cylSelectOutliers() {
-    const ids = cylIdsByThreshold(true);
-    selectedPointIds = Array.from(new Set(ids)).sort((a, b) => a - b);
+    cylSelectOutliersController(cylUiCtx());
   }
 
   function cylKeepInliers() {
-    const ids = cylIdsByThreshold(false);
-    selectedPointIds = Array.from(new Set(ids)).sort((a, b) => a - b);
+    cylKeepInliersController(cylUiCtx());
   }
 
   function cylRemoveOutliers() {
-    const toRemove = new Set(cylIdsByThreshold(true));
-    const cur = new Set(selectedPointIds);
-    for (const id of toRemove) cur.delete(id);
-    selectedPointIds = Array.from(cur).sort((a, b) => a - b);
+    cylRemoveOutliersController(cylUiCtx());
   }
 
   function heatColor(absd: number, scale: number) {
@@ -852,38 +813,83 @@
     return `rgba(${r},${g},${b},0.80)`;
   }
 
+  function evaluationUiCtx() {
+    return {
+      getPoints: () => points,
+      getSelectedPointIds: () => selectedPointIds,
+      getEvalUseSelection: () => evalUseSelection,
+      getEvalTol: () => evalTol,
+      getEvalSigmaMult: () => evalSigmaMult,
+      getEvalMaxOutliers: () => evalMaxOutliers,
+      setCylErr: (v: string | null) => {
+        cylErr = v;
+      },
+      setCylBusy: (v: boolean) => {
+        cylBusy = v;
+      },
+      setCylFitPointIds: (v: number[]) => {
+        cylFitPointIds = v;
+      },
+      setCylRes: (v: typeof cylRes) => {
+        cylRes = v;
+      },
+      setEvalErr: (v: string | null) => {
+        evalErr = v;
+      },
+      setEvalBusy: (v: boolean) => {
+        evalBusy = v;
+      },
+      setEvalRes: (v: typeof evalRes) => {
+        evalRes = v;
+      },
+      getSliceAxis: () => sliceAxis,
+      getSliceBins: () => sliceBins,
+      getSliceThickness: () => sliceThickness,
+      setSliceErr: (v: string | null) => {
+        sliceErr = v;
+      },
+      setSliceBusy: (v: boolean) => {
+        sliceBusy = v;
+      },
+      setSliceRes: (v: typeof sliceRes) => {
+        sliceRes = v;
+      },
+      getDatumPlaneChoices: () => datumPlaneChoices,
+      getDatumSlicePlaneIdx: () => datumSlicePlaneIdx,
+      getDatumSliceMode: () => datumSliceMode,
+      getDatumSliceSpacing: () => datumSliceSpacing,
+      getDatumSliceCount: () => datumSliceCount,
+      getDatumSliceThickness: () => datumSliceThickness,
+      getDatumSliceUseSelection: () => datumSliceUseSelection,
+      setDatumSliceErr: (v: string | null) => {
+        datumSliceErr = v;
+      },
+      setDatumSliceBusy: (v: boolean) => {
+        datumSliceBusy = v;
+      },
+      setDatumSliceRes: (v: DatumSliceRunResult | null) => {
+        datumSliceRes = v;
+      },
+      getDatumSliceRes: () => datumSliceRes,
+      setSelectedSliceId: (v: number | null) => {
+        selectedSliceId = v;
+      },
+      getIncludeOptionalSliceColumns: () => includeOptionalSliceColumns,
+      getStatusWarnings: () => statusWarnings,
+      setStatusWarnings: (v: SurfaceStatusWarning[]) => {
+        statusWarnings = v;
+      },
+      getEmittedWarningIds: () => emittedWarningIds,
+      toast
+    };
+  }
+
   async function computeSurfaceEval() {
-    evalErr = null;
-    evalBusy = true;
-    const out = await computePlaneEvaluation({
-      points,
-      selectedPointIds,
-      evalUseSelection,
-      params: {
-        evalTol,
-        evalSigmaMult,
-        evalMaxOutliers
-      }
-    });
-    evalRes = out.result;
-    evalErr = out.error;
-    evalBusy = false;
+    await computeSurfaceEvalUi(evaluationUiCtx());
   }
 
   async function computeSectionSlices() {
-    sliceErr = null;
-    sliceBusy = true;
-    const out = await computeSectionSliceEvaluation({
-      points,
-      selectedPointIds,
-      evalUseSelection,
-      sliceAxis,
-      sliceBins,
-      sliceThickness
-    });
-    sliceRes = out.result;
-    sliceErr = out.error;
-    sliceBusy = false;
+    await computeSectionSlicesUi(evaluationUiCtx());
   }
 
   let datumPlaneChoices = $derived.by<DatumPlane[]>(() => {
@@ -907,208 +913,155 @@
   let sliceSyncModel = $derived.by(() => buildSliceSyncModel(datumSliceRes, selectedSliceId));
 
   async function computeDatumSlices() {
-    datumSliceErr = null;
-    datumSliceBusy = true;
-    try {
-      const plane = datumPlaneChoices[clamp(datumSlicePlaneIdx, 0, datumPlaneChoices.length - 1)];
-      if (!plane) throw new Error('No datum plane available for slicing.');
-      datumSliceRes = computeDatumPlaneSlices({
-        points,
-        pointIds: datumSliceUseSelection ? selectedPointIds : [],
-        plane,
-        mode: datumSliceMode,
-        spacing: Number(datumSliceSpacing),
-        count: Number(datumSliceCount),
-        thickness: Number(datumSliceThickness)
-      });
-      selectedSliceId = null;
-    } catch (e: any) {
-      datumSliceRes = null;
-      datumSliceErr = e?.message ? String(e.message) : String(e);
-      selectedSliceId = null;
-    } finally {
-      datumSliceBusy = false;
-    }
+    await computeDatumSlicesUi(evaluationUiCtx());
   }
 
   function exportDatumSliceCombined() {
-    if (!datumSliceRes) return;
-    const csv = buildCombinedSliceCsv(datumSliceRes, includeOptionalSliceColumns);
-    const sidecar = buildSliceMetadataSidecar(datumSliceRes, includeOptionalSliceColumns);
-    triggerCsvDownload(csv, 'surface_slices_combined');
-    triggerJsonDownload(sidecar, 'surface_slices_metadata');
+    exportDatumSliceCombinedUi(evaluationUiCtx());
   }
 
   function emitStatusWarnings(incoming: SurfaceStatusWarning[]) {
-    const out = mergeWarningsUntracked({
-      getCurrent: () => statusWarnings,
-      incoming,
-      seen: emittedWarningIds,
-      maxItems: 50
-    });
-    statusWarnings = out.warnings;
-    dispatchWarningToasts(out.toasts, toast);
+    emitStatusWarningsUi(evaluationUiCtx(), incoming);
   }
 
-  function snapshotRecipeConfig(): SurfaceRecipeConfig {
+  function recipeUiCtx() {
     return {
-      selEdgeA,
-      selEdgeB,
-      offsetDist,
-      refPointIdx,
-      datumSlicePlaneIdx,
-      datumSliceMode,
-      datumSliceSpacing,
-      datumSliceCount,
-      datumSliceThickness,
-      datumSliceUseSelection,
-      includeOptionalSliceColumns
+      getSelEdgeA: () => selEdgeA,
+      getSelEdgeB: () => selEdgeB,
+      getOffsetDist: () => offsetDist,
+      getRefPointIdx: () => refPointIdx,
+      getDatumSlicePlaneIdx: () => datumSlicePlaneIdx,
+      getDatumSliceMode: () => datumSliceMode,
+      getDatumSliceSpacing: () => datumSliceSpacing,
+      getDatumSliceCount: () => datumSliceCount,
+      getDatumSliceThickness: () => datumSliceThickness,
+      getDatumSliceUseSelection: () => datumSliceUseSelection,
+      getIncludeOptionalSliceColumns: () => includeOptionalSliceColumns,
+      setRecipeNameDraft: (v: string) => {
+        recipeNameDraft = v;
+      },
+      getRecipeNameDraft: () => recipeNameDraft,
+      getRecipes: () => recipes,
+      setRecipes: (v: SurfaceRecipe[]) => {
+        recipes = v;
+      },
+      getSelectedRecipeId: () => selectedRecipeId,
+      setSelectedRecipeId: (v: string | null) => {
+        selectedRecipeId = v;
+      },
+      setRecipeRun: (v: RecipeRunState | null) => {
+        recipeRun = v;
+      },
+      setSelEdgeA: (v: number | null) => {
+        selEdgeA = v;
+      },
+      setSelEdgeB: (v: number | null) => {
+        selEdgeB = v;
+      },
+      setOffsetDist: (v: number) => {
+        offsetDist = v;
+      },
+      setRefPointIdx: (v: number) => {
+        refPointIdx = v;
+      },
+      setDatumSlicePlaneIdx: (v: number) => {
+        datumSlicePlaneIdx = v;
+      },
+      setDatumSliceMode: (v: DatumSliceMode) => {
+        datumSliceMode = v;
+      },
+      setDatumSliceSpacing: (v: number) => {
+        datumSliceSpacing = v;
+      },
+      setDatumSliceCount: (v: number) => {
+        datumSliceCount = v;
+      },
+      setDatumSliceThickness: (v: number) => {
+        datumSliceThickness = v;
+      },
+      setDatumSliceUseSelection: (v: boolean) => {
+        datumSliceUseSelection = v;
+      },
+      setIncludeOptionalSliceColumns: (v: boolean) => {
+        includeOptionalSliceColumns = v;
+      }
     };
   }
 
+  function snapshotRecipeConfig(): SurfaceRecipeConfig {
+    return snapshotRecipeConfigController(recipeUiCtx());
+  }
+
   function applyRecipeConfig(cfg: SurfaceRecipeConfig) {
-    selEdgeA = cfg.selEdgeA;
-    selEdgeB = cfg.selEdgeB;
-    offsetDist = cfg.offsetDist;
-    refPointIdx = cfg.refPointIdx;
-    datumSlicePlaneIdx = cfg.datumSlicePlaneIdx;
-    datumSliceMode = cfg.datumSliceMode;
-    datumSliceSpacing = cfg.datumSliceSpacing;
-    datumSliceCount = cfg.datumSliceCount;
-    datumSliceThickness = cfg.datumSliceThickness;
-    datumSliceUseSelection = cfg.datumSliceUseSelection;
-    includeOptionalSliceColumns = cfg.includeOptionalSliceColumns;
+    applyRecipeConfigController(recipeUiCtx(), cfg);
   }
 
   function selectedRecipe() {
-    return recipes.find((r) => r.id === selectedRecipeId) ?? null;
+    return selectedRecipeController(recipes, selectedRecipeId);
   }
 
   function saveCurrentRecipe() {
-    const base = selectedRecipe();
-    if (base) {
-      const updated: SurfaceRecipe = {
-        ...base,
-        name: recipeNameDraft.trim() || base.name,
-        config: snapshotRecipeConfig()
-      };
-      recipes = upsertRecipe(recipes, updated);
-      recipeNameDraft = updated.name;
-      return;
-    }
-    const created = createRecipe(recipeNameDraft, snapshotRecipeConfig(), DEFAULT_RECIPE_STEPS);
-    recipes = upsertRecipe(recipes, created);
-    selectedRecipeId = created.id;
-    recipeNameDraft = created.name;
+    saveCurrentRecipeController(recipeUiCtx());
   }
 
   function deleteSelectedRecipe() {
-    if (!selectedRecipeId) return;
-    recipes = deleteRecipe(recipes, selectedRecipeId);
-    selectedRecipeId = null;
-    recipeRun = null;
+    deleteSelectedRecipeController(recipeUiCtx());
   }
 
   function selectRecipe(id: string) {
-    selectedRecipeId = id || null;
-    const r = selectedRecipe();
-    if (!r) {
-      recipeNameDraft = '';
-      return;
-    }
-    recipeNameDraft = r.name;
-    applyRecipeConfig(r.config);
+    selectRecipeController(recipeUiCtx(), id);
   }
 
   function toggleSelectedRecipeStep(step: SurfaceRecipeStep, enabled: boolean) {
-    const r = selectedRecipe();
-    if (!r) return;
-    recipes = upsertRecipe(recipes, toggleRecipeStep(r, step, enabled));
-  }
-
-  async function runRecipeStep(recipe: SurfaceRecipe, step: SurfaceRecipeStep) {
-    applyRecipeConfig(recipe.config);
-    if (step === 'compute_offset_intersection') {
-      await calcOffsetIntersection();
-      emitStatusWarnings(toStatusFromIntersection(intersectionDiagnostics));
-      return recipeStepLabel(step);
-    }
-    if (step === 'compute_datum_slices') {
-      await computeDatumSlices();
-      if (datumSliceRes) emitStatusWarnings(toStatusFromSliceWarnings(datumSliceRes.warnings));
-      return recipeStepLabel(step);
-    }
-    if (!datumSliceRes) await computeDatumSlices();
-    exportDatumSliceCombined();
-    return recipeStepLabel(step);
+    toggleSelectedRecipeStepController(recipeUiCtx(), step, enabled);
   }
 
   async function runRecipeUntilPause() {
-    const currentRun = recipeRun;
-    if (!currentRun) return;
-    const recipe = findRecipeForRun(recipes, currentRun);
-    if (!recipe) {
-      recipeTx = null;
-      recipeRun = { ...currentRun, status: 'failed', error: 'Recipe not found.', lastMessage: null };
-      return;
-    }
-
-    const out = await advanceRecipeRunUntilPause({
-      currentRun,
-      recipe,
-      executeStep: runRecipeStep
-    });
-    recipeRun = out.run;
-    if (out.failed) {
-      if (recipeTx) {
-        applySnap(rollbackRecipeTransaction(recipeTx));
-        recipeTx = null;
-      }
-      emitStatusWarnings([
-        {
-          id: `recipe:error:${Date.now()}`,
-          when: new Date().toISOString(),
-          source: 'recipe',
-          severity: 'error',
-          code: 'RECIPE_STEP_FAILED',
-          message: out.error ?? 'Recipe step failed.'
-        }
-      ]);
-      return;
-    }
-    if (recipeTx) {
-      const out = finalizeRecipeTransaction({
-        tx: recipeTx,
-        current: snap(),
-        stacks: { undoStack, redoStack },
-        historyLimit: 100
-      });
-      undoStack = out.stacks.undoStack;
-      redoStack = out.stacks.redoStack;
-      recipeTx = null;
-    }
+    await runRecipeUntilPauseUi(recipeRunUiCtx());
   }
 
   async function startRecipeRun() {
-    const recipe = selectedRecipe();
-    if (!recipe) return;
-    recipeTx = beginRecipeTransaction(snap());
-    recipeRun = createRecipeRun(recipe, recipeStepConfirmed);
-    if (!recipeStepConfirmed) await runRecipeUntilPause();
+    await startRecipeRunUi(recipeRunUiCtx());
   }
 
   async function runRecipeNextStep() {
-    if (!recipeRun || recipeRun.status !== 'waiting') return;
-    await runRecipeUntilPause();
+    await runRecipeNextStepUi(recipeRunUiCtx());
   }
 
   function cancelRecipeRun() {
-    if (!recipeRun) return;
-    if (recipeTx) {
-      applySnap(rollbackRecipeTransaction(recipeTx));
-      recipeTx = null;
-    }
-    recipeRun = { ...recipeRun, status: 'failed', error: 'Cancelled by user.' };
+    cancelRecipeRunUi(recipeRunUiCtx());
+  }
+
+  function recipeRunUiCtx() {
+    return {
+      getRecipeRun: () => recipeRun,
+      setRecipeRun: (v: RecipeRunState | null) => {
+        recipeRun = v;
+      },
+      getRecipes: () => recipes,
+      getSelectedRecipe: () => selectedRecipe(),
+      getRecipeStepConfirmed: () => recipeStepConfirmed,
+      getRecipeTx: () => recipeTx,
+      setRecipeTx: (v: RecipeTransaction | null) => {
+        recipeTx = v;
+      },
+      beginRecipeTransaction: () => beginRecipeTransaction(snap()),
+      getCurrentSnapshot: () => snap(),
+      applySnapshot: applySnap,
+      getUndoRedoStacks: () => ({ undoStack, redoStack }),
+      setUndoRedoStacks: (v: { undoStack: Snapshot[]; redoStack: Snapshot[] }) => {
+        undoStack = v.undoStack;
+        redoStack = v.redoStack;
+      },
+      applyRecipeConfig,
+      calcOffsetIntersection,
+      computeDatumSlices,
+      exportDatumSliceCombined,
+      getDatumSliceRes: () => datumSliceRes,
+      getIntersectionDiagnostics: () => intersectionDiagnostics,
+      emitStatusWarnings,
+      getDatumSliceErr: () => datumSliceErr
+    };
   }
 
   $effect(() => {
@@ -1135,72 +1088,21 @@
 
   // Rotation then projection into SVG coords.
   function rotateForView(p: Point3D, r = rot) {
-    const ca = Math.cos(r.alpha);
-    const sa = Math.sin(r.alpha);
-    const cb = Math.cos(r.beta);
-    const sb = Math.sin(r.beta);
-    const x = p.x * ca - p.z * sa;
-    const z0 = p.x * sa + p.z * ca;
-    const y = p.y * cb - z0 * sb;
-    const z = p.y * sb + z0 * cb;
-    return { x, y, z };
+    return rotateForViewUi(p, r);
   }
 
   function nearestEdgeHit(mx: number, my: number) {
-    let best: { edgeIdx: number; t: number; d: number } | null = null;
-    for (let ei = 0; ei < edges.length; ei++) {
-      const [a, b] = edges[ei];
-      const p0 = projected[a];
-      const p1 = projected[b];
-      if (!p0 || !p1) continue;
-      const vx = p1.x - p0.x;
-      const vy = p1.y - p0.y;
-      const len2 = vx * vx + vy * vy;
-      if (len2 < 1e-9) continue;
-      const t = clamp(((mx - p0.x) * vx + (my - p0.y) * vy) / len2, 0, 1);
-      const cx = p0.x + t * vx;
-      const cy = p0.y + t * vy;
-      const d = Math.hypot(mx - cx, my - cy);
-      if (!best || d < best.d) best = { edgeIdx: ei, t, d };
-    }
-    if (!best || best.d > 24) return null;
-    return best;
+    return nearestEdgeHitUi(mx, my, edges, projected);
   }
 
   function pickOrbitPivot(mx: number, my: number): Point3D {
-    const pIdx = nearestPoint(mx, my);
-    if (pIdx != null && projected[pIdx] && Math.hypot(projected[pIdx].x - mx, projected[pIdx].y - my) < 20) return points[pIdx];
-
-    const eh = nearestEdgeHit(mx, my);
-    if (eh) {
-      const [a, b] = edges[eh.edgeIdx];
-      return lerp3(points[a], points[b], eh.t);
-    }
-
-    let bestSurf: { i: number; d: number } | null = null;
-    for (let i = 0; i < surfaces.length; i++) {
-      const pp = surfaces[i].pts.map((idx) => projected[idx]).filter(Boolean);
-      if (pp.length < 3) continue;
-      const cx = pp.reduce((acc, p) => acc + p.x, 0) / pp.length;
-      const cy = pp.reduce((acc, p) => acc + p.y, 0) / pp.length;
-      const d = Math.hypot(mx - cx, my - cy);
-      if (!bestSurf || d < bestSurf.d) bestSurf = { i, d };
-    }
-    if (bestSurf && bestSurf.d < 36) {
-      const s = surfaces[bestSurf.i];
-      const centroid = s.pts.reduce((acc, idx) => ({
-        x: acc.x + points[idx].x,
-        y: acc.y + points[idx].y,
-        z: acc.z + points[idx].z
-      }), { x: 0, y: 0, z: 0 });
-      return { x: centroid.x / s.pts.length, y: centroid.y / s.pts.length, z: centroid.z / s.pts.length };
-    }
-
-    if (points.length) {
-      const c = points.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y, z: acc.z + p.z }), { x: 0, y: 0, z: 0 });
-      return { x: c.x / points.length, y: c.y / points.length, z: c.z / points.length };
-    }
-    return { x: 0, y: 0, z: 0 };
+    return pickOrbitPivotUi(mx, my, {
+      nearestPoint,
+      projected,
+      points,
+      edges,
+      surfaces
+    });
   }
 
   function project(p: Point3D) {
@@ -1317,18 +1219,15 @@
   });
 
   function depthOpacity(z: number) {
-    const base = viewportDepthOpacity(z, zRange);
-    return 0.08 + 0.92 * Math.pow(base, 1.35);
+    return depthOpacityUi(z, zRange);
   }
 
   function pointDepthOpacity(z: number) {
-    const d = depthOpacity(z);
-    return 0.25 + 0.75 * d;
+    return pointDepthOpacityUi(z, zRange);
   }
 
   function surfaceDepthOpacity(z: number) {
-    const d = depthOpacity(z);
-    return 0.15 + 0.85 * d;
+    return surfaceDepthOpacityUi(z, zRange);
   }
 
   // interpolated point along active edge
@@ -1708,63 +1607,68 @@
     return true;
   }
 
-  function handlePointClick(i: number, ev?: MouseEvent) {
-    if (datumPick) {
-      if (datumPick.target === 'csys3') {
-        if (datumPick.slot === 'origin') {
-          csysOriginPoint = i;
-          datumPick = { target: 'csys3', slot: 'x' };
-        } else if (datumPick.slot === 'x') {
-          csysXPoint = i;
-          datumPick = { target: 'csys3', slot: 'y' };
-        } else {
-          csysYPoint = i;
-          datumPick = null;
-        }
-      } else if (datumPick.slot === 'origin') {
+  function handleDatumPickClick(i: number): boolean {
+    if (!datumPick) return false;
+    if (datumPick.target === 'csys3') {
+      if (datumPick.slot === 'origin') {
         csysOriginPoint = i;
-        datumPick = { target: 'csysPointLine', slot: 'line' };
+        datumPick = { target: 'csys3', slot: 'x' };
+      } else if (datumPick.slot === 'x') {
+        csysXPoint = i;
+        datumPick = { target: 'csys3', slot: 'y' };
+      } else {
+        csysYPoint = i;
+        datumPick = null;
       }
-      selectedEntity = { kind: 'point', index: i };
-      return;
+    } else if (datumPick.slot === 'origin') {
+      csysOriginPoint = i;
+      datumPick = { target: 'csysPointLine', slot: 'line' };
     }
+    selectedEntity = { kind: 'point', index: i };
+    return true;
+  }
 
-    if (creatorPick) {
-      let created = false;
-      if (creatorPick.kind === 'line') {
-        if (creatorPick.slot === 'A') {
+  function handleCreatorPickClick(i: number): boolean {
+    if (!creatorPick) return false;
+    let created = false;
+    if (creatorPick.kind === 'line') {
+      if (creatorPick.slot === 'A') {
+        createLineA = i;
+        creatorPick = { kind: 'line', slot: 'B' };
+      } else {
+        createLineB = i;
+        created = createLineFromPair(createLineA, createLineB);
+        if (toolCursor === 'line') {
           createLineA = i;
+          createLineB = null;
           creatorPick = { kind: 'line', slot: 'B' };
         } else {
-          createLineB = i;
-          created = createLineFromPair(createLineA, createLineB);
-          if (toolCursor === 'line') {
-            createLineA = i;
-            createLineB = null;
-            creatorPick = { kind: 'line', slot: 'B' };
-          } else {
-            creatorPick = null;
-          }
-        }
-      } else {
-        if (!surfaceDraft.includes(i)) surfaceDraft = [...surfaceDraft, i];
-        const req = surfaceCreateKind === 'triangle' ? 3 : surfaceCreateKind === 'quad' ? 4 : Number.POSITIVE_INFINITY;
-        if (surfaceDraft.length >= req) {
-          created = createSurfaceFromIndices(surfaceDraft);
-          if (toolCursor === 'surface') {
-            surfaceDraft = [];
-            creatorPick = { kind: 'surface', slot: 0 };
-          } else {
-            surfaceDraft = [];
-            creatorPick = null;
-          }
-        } else {
-          creatorPick = { kind: 'surface', slot: surfaceDraft.length };
+          creatorPick = null;
         }
       }
-      if (!created) selectedEntity = { kind: 'point', index: i };
-      return;
+    } else {
+      if (!surfaceDraft.includes(i)) surfaceDraft = [...surfaceDraft, i];
+      const req = surfaceCreateKind === 'triangle' ? 3 : surfaceCreateKind === 'quad' ? 4 : Number.POSITIVE_INFINITY;
+      if (surfaceDraft.length >= req) {
+        created = createSurfaceFromIndices(surfaceDraft);
+        if (toolCursor === 'surface') {
+          surfaceDraft = [];
+          creatorPick = { kind: 'surface', slot: 0 };
+        } else {
+          surfaceDraft = [];
+          creatorPick = null;
+        }
+      } else {
+        creatorPick = { kind: 'surface', slot: surfaceDraft.length };
+      }
     }
+    if (!created) selectedEntity = { kind: 'point', index: i };
+    return true;
+  }
+
+  function handlePointClick(i: number, ev?: MouseEvent) {
+    if (handleDatumPickClick(i)) return;
+    if (handleCreatorPickClick(i)) return;
 
     if (createMode === 'line') {
       if (createLineA == null || createLineA === i) createLineA = i;
@@ -2249,143 +2153,69 @@
     }
     if (loaded.migrated) toast.info('Surface recipes migrated', 'Upgraded recipe store to v2 format.');
 
-    // Dev-only global error logger with last-action tagging.
-    // Helps pinpoint "which click" triggered an exception.
-    if (import.meta.env.DEV && typeof window !== 'undefined') {
-      const w = window as any;
-      if (!w.__scSurfaceErrLoggerPatched) {
-        w.__scSurfaceErrLoggerPatched = true;
-
-        const safeLog = (...args: any[]) => {
-          try {
-            // eslint-disable-next-line no-console
-            console.error(...args);
-          } catch {
-            /* no-op */
-          }
-        };
-
-        window.addEventListener('error', (ev: ErrorEvent) => {
-          safeLog(
-            '[SC][SurfaceToolbox][error]',
-            { file: ev.filename, line: ev.lineno, col: ev.colno },
-            'lastAction=', lastAction
-          );
-          if (ev.error?.stack) safeLog(ev.error.stack);
-        });
-
-        window.addEventListener('unhandledrejection', (ev: PromiseRejectionEvent) => {
-          const r: any = (ev as any).reason;
-          safeLog('[SC][SurfaceToolbox][unhandledrejection]', 'lastAction=', lastAction);
-          if (r?.stack) safeLog(r.stack);
-          else safeLog(r);
-        });
-      }
-    }
-    const onKey = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey;
-      if (!mod) return;
-      const key = e.key.toLowerCase();
-      if (key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        undo();
-      } else if (key === 'z' && e.shiftKey) {
-        e.preventDefault();
-        redo();
-      } else if (key === 'y') {
-        e.preventDefault();
-        redo();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-
-    // Viewport sizing: use ResizeObserver.contentRect, rAF-throttled, and only commit when changed
-    let roRAF = 0;
-    const ro = new ResizeObserver((entries) => {
-    const entry = entries[0];
-    if (!entry) return;
-    const cr = entry.contentRect;
-    // Ignore transient zero/near-zero layout passes that collapse the viewport to min clamp.
-    if (cr.width < 32 || cr.height < 32) return;
-
-    const nextW = Math.max(320, Math.floor(cr.width));
-    const nextH = Math.max(240, Math.floor(cr.height));
-
-    if (roRAF) cancelAnimationFrame(roRAF);
-    roRAF = requestAnimationFrame(() => {
-    if (nextW !== w) w = nextW;
-    if (nextH !== h) h = nextH;
-    });
+    const cleanupGlobalHandlers = mountSurfaceGlobalHandlers({
+      getLastAction: () => lastAction,
+      get canUndo() { return canUndo; },
+      get canRedo() { return canRedo; },
+      get coreMode() { return coreMode; },
+      get rightRailCollapsed() { return rightRailCollapsed; },
+      openCreateGeometry: () => {
+        createGeometryModalOpen = true;
+      },
+      openSurfaceCurveOps: () => {
+        surfaceCurveOpsModalOpen = true;
+      },
+      openExtrude: () => {
+        extrudeModalOpen = true;
+      },
+      openDatums: openDatumsModal,
+      openSettings: () => {
+        settingsOpen = true;
+      },
+      undo,
+      redo,
+      clearPicks: () => {
+        pendingPointIdx = null;
+        intersection = null;
+      },
+      fitToScreen,
+      resetView,
+      toggleCoreMode: () => {
+        coreMode = !coreMode;
+        if (coreMode) advancedOpen = false;
+        persistCoreMode(coreMode);
+      },
+      toggleRightRail: () => {
+        setRightRailCollapsed(!rightRailCollapsed);
+      },
+      exportCsv: exportCSV,
+      exportStep: exportSTEP
     });
 
-    if (viewportEl) ro.observe(viewportEl);
-
-    if (!svgEl) return;
-
-    const svg = d3.select(svgEl);
-    svgSelection = svg;
-
-    // Zoom / pan: wheel+drag (hold Shift to pan-drag; drag otherwise rotates)
-    const zoom = d3
-      .zoom()
-      .scaleExtent([0.15, 12])
-      .filter((event: any) => {
-        if (selectionMode !== 'none') return false;
-        if (event.type === 'wheel') return true;
-        if (event.type === 'touchstart') return true;
-        if (event.type === 'mousedown') return !!event.shiftKey;
-        return true;
-      })
-      .on('zoom', (event: any) => {
-        const src = event.sourceEvent as WheelEvent | MouseEvent | null;
-        // Use d3's transform for pan/zoom; keep rotation separate.
-        zoomK = event.transform.k;
-        pan = { x: event.transform.x, y: event.transform.y };
-        // Prevent the page from scrolling when wheel zooming.
-        if (src && 'preventDefault' in src) (src as any).preventDefault?.();
-      });
-
-    zoomBehavior = zoom;
-    svg.call(zoom as any);
-    syncD3ZoomTransform(zoomK, pan.x, pan.y);
-
-    const drag = d3
-      .drag()
-      .filter((event: any) => {
-        if (selectionMode !== 'none') return false;
-        if (event.type === 'mousedown') return !event.shiftKey;
-        return true;
-      })
-      .on('start', (event: any) => {
-        const src = event.sourceEvent as MouseEvent | null;
-        if (!src || !svgEl) return;
-        const rect = svgEl.getBoundingClientRect();
-        const mx = src.clientX - rect.left;
-        const my = src.clientY - rect.top;
-        rotateAnchor = { mx, my, pivot: pickOrbitPivot(mx, my) };
-      })
-      .on('drag', (event: any) => {
-        const src = event.sourceEvent as MouseEvent | null;
-        if (src?.shiftKey) return;
-        rot = { alpha: rot.alpha + event.dx * 0.01, beta: rot.beta + event.dy * 0.01 };
-        if (rotateAnchor) {
-          const r = rotateForView(rotateAnchor.pivot, rot);
-          pan = { x: rotateAnchor.mx - (r.x * zoomK + w / 2), y: rotateAnchor.my - (r.y * zoomK + h / 2) };
-          syncD3ZoomTransform(zoomK, pan.x, pan.y);
-        }
-      })
-      .on('end', () => {
-        rotateAnchor = null;
-      });
-    svg.call(drag as any);
+    const cleanupViewportMount = mountSurfaceViewportInteraction({
+      viewportEl,
+      svgEl,
+      getSelectionMode: () => selectionMode,
+      getZoomK: () => zoomK,
+      setZoomK: (v) => (zoomK = v),
+      getPan: () => pan,
+      setPan: (v) => (pan = v),
+      getRot: () => rot,
+      setRot: (v) => (rot = v),
+      getW: () => w,
+      getH: () => h,
+      setW: (v) => (w = v),
+      setH: (v) => (h = v),
+      getRotateAnchor: () => rotateAnchor,
+      setRotateAnchor: (v) => (rotateAnchor = v),
+      pickOrbitPivot,
+      rotateForView
+    });
 
     return () => {
-      window.removeEventListener('keydown', onKey);
-      ro.disconnect();
-      if (roRAF) cancelAnimationFrame(roRAF);
+      cleanupGlobalHandlers();
+      cleanupViewportMount();
       if (createNoticeTimer) clearTimeout(createNoticeTimer);
-      svgSelection = null;
-      zoomBehavior = null;
     };
   });
 
@@ -2415,6 +2245,17 @@
       emitStatusWarnings([buildSlicingRuntimeWarning(datumSliceErr)]);
     }
   });
+
+  $effect(() => {
+    registerContextMenu(
+      buildSurfaceNavMenu({
+        canUndo,
+        canRedo,
+        coreMode,
+        rightRailCollapsed
+      })
+    );
+  });
 </script>
 
 <div class="space-y-6 surface-lab surface-reveal" style={`--surface-motion-ease:${SURFACE_MOTION_SPEC.easing};`}>
@@ -2426,144 +2267,51 @@
       </div>
     </div>
 
-    <div class="flex items-center gap-2" bind:this={actionsBarEl}>
-      <div class="glass-panel surface-tech-card surface-panel-slide surface-pop-card rounded-xl px-3 py-2 flex items-center gap-2">
-        <div class="text-[10px] text-white/50 uppercase tracking-widest">Mode</div>
-        <button
-          class={coreMode ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-70'}
-          onclick={() => {
-            coreMode = !coreMode;
-            if (coreMode) advancedOpen = false;
-            persistCoreMode(coreMode);
-            markCoreModePromptSeen();
-          }}
-          title="Core Mode hides advanced controls by default"
-        >
-          {coreMode ? 'Core' : 'Advanced'}
-        </button>
-      </div>
-
-      <div class="glass-panel surface-tech-card surface-panel-slide surface-pop-card rounded-xl px-2 py-2 flex flex-col items-start gap-1 min-w-[320px]">
-        <div class="text-[10px] text-white/50 uppercase tracking-widest px-1">Create</div>
-        <div class="flex items-center gap-1">
-          <button
-            class={toolCursor === 'select' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-70'}
-            onclick={() => {
-              setToolCursor('select');
-              setSelectionMode('none');
-            }}
-            title="Select entities"
-          >
-            Select
-          </button>
-          <button
-            class={createGeometryModalOpen ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-85'}
-            onclick={() => {
-              setToolCursor('select');
-              createGeometryModalOpen = true;
-            }}
-            title="Add point with exact XYZ"
-          >
-            Point
-          </button>
-          <button
-            class={toolCursor === 'line' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-70'}
-            onclick={() => setToolCursor('line')}
-            title="Create lines by clicking points"
-            disabled={points.length < minPointsFor.line}
-          >
-            Line
-          </button>
-          <button
-            class={toolCursor === 'surface' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-70'}
-            onclick={() => setToolCursor('surface')}
-            title="Create surfaces from point picks"
-            disabled={points.length < minPointsFor.surface}
-          >
-            Surface
-          </button>
-        </div>
-        <div class={`px-1 text-[11px] ${createPrereqNotice ? 'text-amber-200/90' : 'text-white/55'}`}>{topCreateHint}</div>
-      </div>
-
-      <div class="glass-panel surface-tech-card surface-panel-slide surface-pop-card rounded-xl px-3 py-2 flex items-center gap-3">
-        <div class="text-[11px] text-white/60 uppercase tracking-widest">Probe</div>
-        <button
-          class={probeOn
-            ? 'px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs'
-            : 'px-3 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 text-xs'}
-          onclick={() => {
-            probeOn = !probeOn;
-            probe = null;
-          }}
-          title="Toggle fastener Go/No-Go overlay"
-        >
-          {probeOn ? 'On' : 'Off'}
-        </button>
-        {#if probeOn}
-          <div class="flex items-center gap-2 border-l border-white/10 pl-3">
-            <div class="text-[10px] text-white/50">Max</div>
-            <input
-              type="number"
-              min="0"
-              step="0.5"
-              class="input input-sm w-16 bg-black/20 border border-white/10"
-              bind:value={maxTaperDeg}
-              title="Max taper angle (deg)"
-            />
-            <div class="text-[10px] text-white/50">°</div>
-          </div>
-        {/if}
-      </div>
-
-      <SurfaceSelectionControls
-        selectionMode={selectionMode}
-        curveMode={curveMode}
-        selectedCount={selectedPointIds.length}
-        setSelectionMode={setSelectionMode}
-        clearSelection={clearSelection}
-        invertSelection={invertSelection}
-      />
-
-      <div class="glass-panel surface-pop-card rounded-xl px-2 py-2 flex items-center gap-1">
-        <div class="text-[10px] text-white/50 uppercase tracking-widest px-1">Selection</div>
-        <button
-          class={selectionProfile === 'precision' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-70'}
-          onclick={() => (selectionProfile = 'precision')}
-          title="Precision: tighter hit targets"
-        >
-          Precision
-        </button>
-        <button
-          class={selectionProfile === 'assisted' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-70'}
-          onclick={() => (selectionProfile = 'assisted')}
-          title="Assisted: larger hit targets"
-        >
-          Assisted
-        </button>
-      </div>
-
-      <SurfaceFileMenu
-        onLoadFile={handleLoadedFile}
-        onExportCSV={exportCSV}
-        onExportSTEP={exportSTEP}
-        onOpenDatums={openDatumsModal}
-        onOpenDrafting={() => (createGeometryModalOpen = true)}
-        onOpenCreateGeometry={() => (createGeometryModalOpen = true)}
-        onOpenSurfaceCurveOps={() => (surfaceCurveOpsModalOpen = true)}
-        onOpenExtrude={() => (extrudeModalOpen = true)}
-        onOpenHealing={() => (healingModalOpen = true)}
-        onOpenSettings={() => (settingsOpen = true)}
-        canExportSTEP={false}
-        bind:fileNotice
-      />
-
-      <div class="glass-panel surface-pop-card rounded-xl px-2 py-2 flex items-center gap-2">
-        <button class="btn btn-sm variant-soft" onclick={undo} disabled={!canUndo} title="Undo (Ctrl/Cmd+Z)">Undo</button>
-        <button class="btn btn-sm variant-soft" onclick={redo} disabled={!canRedo} title="Redo (Ctrl/Cmd+Shift+Z)">Redo</button>
-      </div>
-
-    </div>
+    <SurfaceActionBar
+      bind:actionsBarEl
+      {coreMode}
+      {toolCursor}
+      {createGeometryModalOpen}
+      {probeOn}
+      bind:maxTaperDeg
+      {selectionMode}
+      {curveMode}
+      selectedCount={selectedPointIds.length}
+      {selectionProfile}
+      {createPrereqNotice}
+      {topCreateHint}
+      bind:fileNotice
+      {canUndo}
+      {canRedo}
+      {minPointsFor}
+      pointsCount={points.length}
+      onToggleCoreMode={() => {
+        coreMode = !coreMode;
+        if (coreMode) advancedOpen = false;
+        persistCoreMode(coreMode);
+        markCoreModePromptSeen();
+      }}
+      onSetToolCursor={setToolCursor}
+      onSetSelectionMode={setSelectionMode}
+      onToggleProbe={() => {
+        probeOn = !probeOn;
+        probe = null;
+      }}
+      onSetSelectionProfile={(mode) => (selectionProfile = mode)}
+      onClearSelection={clearSelection}
+      onInvertSelection={invertSelection}
+      onLoadFile={handleLoadedFile}
+      onExportCSV={exportCSV}
+      onExportSTEP={exportSTEP}
+      onOpenDatums={openDatumsModal}
+      onOpenCreateGeometry={() => (createGeometryModalOpen = true)}
+      onOpenSurfaceCurveOps={() => (surfaceCurveOpsModalOpen = true)}
+      onOpenExtrude={() => (extrudeModalOpen = true)}
+      onOpenHealing={() => (healingModalOpen = true)}
+      onOpenSettings={() => (settingsOpen = true)}
+      onUndo={undo}
+      onRedo={redo}
+    />
   </div>
 
   <div class={`grid grid-cols-1 ${rightRailCollapsed ? 'lg:grid-cols-[1fr_56px]' : 'lg:grid-cols-[1fr_380px]'} gap-6`}>
@@ -2646,203 +2394,124 @@
       />
     </div>
 
-    <aside class={`glass-panel surface-tech-card surface-panel-slide surface-reveal surface-stagger-1 rounded-2xl ${rightRailCollapsed ? 'p-2' : 'p-5'} space-y-5`}>
-      {#if rightRailCollapsed}
-        <div class="h-full flex flex-col items-center gap-2 pt-2">
-          <button class="btn btn-xs variant-soft w-10" title="Expand tools" onclick={() => setRightRailCollapsed(false)}>»</button>
-          <button class="btn btn-xs variant-soft w-10" title="Create Geometry" onclick={() => (createGeometryModalOpen = true)}>＋</button>
-          <button class="btn btn-xs variant-soft w-10" title="Datums" onclick={openDatumsModal}>D</button>
-          <button class="btn btn-xs variant-soft w-10" title="Settings" onclick={() => (settingsOpen = true)}>⚙</button>
-        </div>
-      {:else}
-      <div class="flex items-center justify-between">
-        <div>
-          <div class="text-xs font-semibold uppercase tracking-widest text-white/60">Geometry</div>
-          <div class="text-[11px] text-white/40">Points: {points.length} • Edges: {edges.length} • Surfaces: {surfaces.length}</div>
-        </div>
-	        <button
-	          class="btn btn-sm variant-soft"
-	          onclick={() => {
-            pendingPointIdx = null;
-            intersection = null;
-          }}
-        >
-          Clear picks
-        </button>
-      </div>
-      <div class="flex items-center justify-end">
-        <button class="btn btn-xs variant-soft" title="Collapse tools panel" onclick={() => setRightRailCollapsed(true)}>Collapse</button>
-      </div>
-
-      <div class="rounded-2xl border border-white/10 bg-white/5 p-4 text-[11px] text-white/55 surface-panel-slide surface-pop-card">
-        {#if coreMode}
-          Core Mode is active. Advanced controls are hidden for focused workflow.
-        {:else}
-          Advanced mode is active. Expand advanced controls only when needed.
-        {/if}
-      </div>
-
-      <div class="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-2 text-[11px] text-white/70 surface-panel-slide surface-pop-card">
-        <div class="text-[10px] uppercase tracking-widest text-white/50">Core Flow</div>
-        <div>1. Add explicit points.</div>
-        <div>2. Create lines from existing points.</div>
-        <div>3. Create triangle/quad/contour surfaces.</div>
-      </div>
-
-      <SurfaceWorkflowGuideCard
-        pointsCount={points.length}
-        {datumSliceBusy}
-      />
-
-      <SurfaceStatusRail
-        warnings={statusWarnings}
-        clearWarnings={() => {
-          statusWarnings = [];
-          emittedWarningIds.clear();
-        }}
-      />
-
-      {#if SURFACE_ANALYTICS_ENABLED}
-        <SurfaceFitPanel
-          bind:evalUseSelection
-          bind:heatmapOn
-          bind:evalTol
-          bind:evalSigmaMult
-          {computeSurfaceEval}
-          {evalBusy}
-          {evalErr}
-          {evalRes}
-          bind:pendingPointIdx
-          bind:cylUseSelection
-          bind:cylShowAxis
-          {computeCylinderFit}
-          {cylBusy}
-          {cylErr}
-          {cylRes}
-          bind:cylRefineK
-          {cylSelectOutliers}
-          {cylKeepInliers}
-          {cylRemoveOutliers}
-          {cylThresholdAbs}
-          activeFitPointIds={currentActiveFitPointIds}
-          {selectedPointIds}
-          {cylFitPointIds}
-          bind:sliceAxis
-          bind:sliceBins
-          bind:sliceThickness
-          bind:sliceMetric
-          {computeSectionSlices}
-          {sliceBusy}
-          {sliceErr}
-          {sliceRes}
-          pointsCount={points.length}
-        />
-
-        <SurfaceDatumSliceExportPanel
-          {datumPlaneChoices}
-          bind:datumSlicePlaneIdx
-          bind:datumSliceMode
-          bind:datumSliceSpacing
-          bind:datumSliceCount
-          bind:datumSliceThickness
-          bind:datumSliceUseSelection
-          bind:includeOptionalSliceColumns
-          {datumSliceBusy}
-          {datumSliceErr}
-          {datumSliceRes}
-          computeDatumPlaneSlices={computeDatumSlices}
-          {exportDatumSliceCombined}
-        />
-
-        <SurfaceSlicingRecommendationRail
-          model={sliceSyncModel}
-          onSelectSlice={(id) => {
-            selectedSliceId = id;
-          }}
-        />
-      {/if}
-
-      <SurfaceInterpolationPanel bind:interpPct {interpPoint} />
-
-      <SurfaceOffsetIntersectionPanel
-        {edges}
-        {points}
-        bind:selEdgeA
-        bind:selEdgeB
-        bind:offsetDist
-        bind:refPointIdx
-        {intersection}
-        {intersectionBusy}
-        {intersectionDiagnostics}
-        {calcOffsetIntersection}
-      />
-
-      {#if !coreMode}
-        <div class="rounded-2xl border border-white/10 bg-black/15 overflow-hidden">
-          <button
-            class="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-white/5"
-            onclick={() => (advancedOpen = !advancedOpen)}
-            title="Advanced controls"
-          >
-            <span class="text-[11px] font-semibold uppercase tracking-widest text-white/60">Advanced</span>
-            <span class="text-[11px] text-white/50">{advancedOpen ? 'Hide' : 'Show'}</span>
-          </button>
-          {#if advancedOpen}
-            <div class="p-4 space-y-4 border-t border-white/10">
-              <SurfaceRecipesPanel
-                {recipes}
-                bind:selectedRecipeId
-                bind:recipeNameDraft
-                bind:stepConfirmed={recipeStepConfirmed}
-                runState={recipeRun}
-                onSaveCurrent={saveCurrentRecipe}
-                onDeleteSelected={deleteSelectedRecipe}
-                onSelectRecipe={selectRecipe}
-                onToggleStep={toggleSelectedRecipeStep}
-                onStartRun={startRecipeRun}
-                onRunNext={runRecipeNextStep}
-                onCancelRun={cancelRecipeRun}
-              />
-
-              <CurveEdgesLoftPanel
-                {edges}
-                {activeEdgeIdx}
-                setActiveEdgeIdx={(i) => (activeEdgeIdx = i)}
-                {deleteEdge}
-                {curves}
-                {activeCurveIdx}
-                setActiveCurveIdx={(i) => (activeCurveIdx = i)}
-                {deleteCurve}
-                {createCurve}
-                {curveMode}
-                toggleCurveMode={() => {
-                  if (toolCursor === 'curve') setToolCursor('select');
-                  else setToolCursor('curve');
-                }}
-                {loftA}
-                {loftB}
-                setLoftA={(v) => (loftA = v)}
-                setLoftB={(v) => (loftB = v)}
-                {rebuildLoftSegments}
-                loftSegmentsCount={loftSegments.length}
-                {loftErr}
-              />
-
-              <SurfaceSamplerPanel
-                bind:samplerAppend
-                bind:samplerMode
-                bind:samplerNu
-                bind:samplerNv
-                bind:samplerEdgeSegs
-                bind:samplerErr
-                onGenerate={generateSamplerPoints}
-              />
-            </div>
-          {/if}
-        </div>
-      {/if}
-      {/if}
-    </aside>
+    <SurfaceRightRail
+      bind:rightRailCollapsed
+      {coreMode}
+      bind:advancedOpen
+      {datumSliceBusy}
+      pointsCount={points.length}
+      edgesCount={edges.length}
+      surfacesCount={surfaces.length}
+      {statusWarnings}
+      {SURFACE_ANALYTICS_ENABLED}
+      bind:interpPct
+      {interpPoint}
+      {edges}
+      {points}
+      bind:selEdgeA
+      bind:selEdgeB
+      bind:offsetDist
+      bind:refPointIdx
+      {intersection}
+      {intersectionBusy}
+      {intersectionDiagnostics}
+      bind:evalUseSelection
+      bind:heatmapOn
+      bind:evalTol
+      bind:evalSigmaMult
+      {evalBusy}
+      {evalErr}
+      {evalRes}
+      bind:pendingPointIdx
+      bind:cylUseSelection
+      bind:cylShowAxis
+      {cylBusy}
+      {cylErr}
+      {cylRes}
+      bind:cylRefineK
+      {cylThresholdAbs}
+      {currentActiveFitPointIds}
+      {selectedPointIds}
+      {cylFitPointIds}
+      bind:sliceAxis
+      bind:sliceBins
+      bind:sliceThickness
+      bind:sliceMetric
+      {sliceBusy}
+      {sliceErr}
+      {sliceRes}
+      {datumPlaneChoices}
+      bind:datumSlicePlaneIdx
+      bind:datumSliceMode
+      bind:datumSliceSpacing
+      bind:datumSliceCount
+      bind:datumSliceThickness
+      bind:datumSliceUseSelection
+      bind:includeOptionalSliceColumns
+      {datumSliceErr}
+      {datumSliceRes}
+      {sliceSyncModel}
+      bind:selectedSliceId
+      {recipes}
+      bind:selectedRecipeId
+      bind:recipeNameDraft
+      bind:recipeStepConfirmed
+      {recipeRun}
+      {activeEdgeIdx}
+      setActiveEdgeIdx={(i) => (activeEdgeIdx = i)}
+      {curves}
+      {activeCurveIdx}
+      setActiveCurveIdx={(i) => (activeCurveIdx = i)}
+      {curveMode}
+      {loftA}
+      {loftB}
+      setLoftA={(v) => (loftA = v)}
+      setLoftB={(v) => (loftB = v)}
+      loftSegmentsCount={loftSegments.length}
+      {loftErr}
+      {toolCursor}
+      bind:samplerAppend
+      bind:samplerMode
+      bind:samplerNu
+      bind:samplerNv
+      bind:samplerEdgeSegs
+      bind:samplerErr
+      onSetRightRailCollapsed={setRightRailCollapsed}
+      onOpenCreateGeometry={() => (createGeometryModalOpen = true)}
+      onOpenDatums={openDatumsModal}
+      onOpenSettings={() => (settingsOpen = true)}
+      onClearPicks={() => {
+        pendingPointIdx = null;
+        intersection = null;
+      }}
+      onToggleAdvancedOpen={() => (advancedOpen = !advancedOpen)}
+      onClearWarnings={() => {
+        statusWarnings = [];
+        emittedWarningIds.clear();
+      }}
+      {computeSurfaceEval}
+      {computeCylinderFit}
+      {cylSelectOutliers}
+      {cylKeepInliers}
+      {cylRemoveOutliers}
+      {computeSectionSlices}
+      computeDatumSlices={computeDatumSlices}
+      {exportDatumSliceCombined}
+      {calcOffsetIntersection}
+      {saveCurrentRecipe}
+      {deleteSelectedRecipe}
+      {selectRecipe}
+      {toggleSelectedRecipeStep}
+      {startRecipeRun}
+      {runRecipeNextStep}
+      {cancelRecipeRun}
+      {deleteEdge}
+      {deleteCurve}
+      {createCurve}
+      {rebuildLoftSegments}
+      {setToolCursor}
+      {generateSamplerPoints}
+    />
   </div>
 
   {#if showCoreModePrompt}
@@ -2864,273 +2533,75 @@
     </div>
   {/if}
 
-  {#if datumsModalOpen}
-    <div class="fixed inset-0 z-[300] pointer-events-none">
-      <div
-        class="absolute pointer-events-auto w-[760px] max-w-[95vw] rounded-2xl border border-white/15 bg-slate-950/95 shadow-2xl p-4 space-y-4"
-        style={`left:${datumsModalPos.x}px; top:${datumsModalPos.y}px;`}
-        bind:this={datumsModalPanelEl}
-      >
-        <div
-          class="flex items-center justify-between cursor-move"
-          role="button"
-          tabindex="0"
-          onpointerdown={startDatumsModalDrag}
-          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
-        >
-          <div class="text-sm font-semibold tracking-wide text-white/90">Datums (CSYS & Planes)</div>
-          <button class="btn btn-xs variant-soft" onclick={() => { datumsModalOpen = false; datumPick = null; }}>Close</button>
-        </div>
-        <div class="text-[11px] rounded-lg border border-white/10 bg-black/20 px-2 py-1 font-mono text-white/65">{datumPickHint}</div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
-            <div class="text-[11px] text-white/50 uppercase tracking-widest">Create CSYS</div>
-            <select class="select select-xs glass-input w-full" bind:value={csysCreateMode}>
-              <option value="global">Global</option>
-              <option value="three_points">3 Points</option>
-              <option value="point_line">Point + Line</option>
-              <option value="copy">Copy Existing</option>
-            </select>
-            {#if csysCreateMode === 'three_points'}
-              <div class="grid grid-cols-3 gap-1 text-[10px]">
-                <button class={datumPick?.target === 'csys3' && datumPick.slot === 'origin' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-80'} onclick={() => armDatumPick('csys3', 'origin')}>Origin ({`P${csysOriginPoint + 1}`})</button>
-                <button class={datumPick?.target === 'csys3' && datumPick.slot === 'x' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-80'} onclick={() => armDatumPick('csys3', 'x')}>X Ref ({`P${csysXPoint + 1}`})</button>
-                <button class={datumPick?.target === 'csys3' && datumPick.slot === 'y' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-80'} onclick={() => armDatumPick('csys3', 'y')}>Y Ref ({`P${csysYPoint + 1}`})</button>
-              </div>
-            {:else if csysCreateMode === 'point_line'}
-              <div class="grid grid-cols-2 gap-1 text-[10px]">
-                <button class={datumPick?.target === 'csysPointLine' && datumPick.slot === 'origin' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-80'} onclick={() => armDatumPick('csysPointLine', 'origin')}>Origin ({`P${csysOriginPoint + 1}`})</button>
-                <button class={datumPick?.target === 'csysPointLine' && datumPick.slot === 'line' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-80'} onclick={() => armDatumPick('csysPointLine', 'line')}>Line ({`L${csysFromLine + 1}`})</button>
-              </div>
-            {:else if csysCreateMode === 'copy'}
-              <input class="input input-xs glass-input w-full" type="number" min="0" bind:value={csysCopyIdx} title="Source CSYS index" />
-            {/if}
-            <button class="btn btn-xs variant-soft w-full" onclick={addDatumCsys}>+ Add CSYS</button>
-          </div>
-          <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
-            <div class="text-[11px] text-white/50 uppercase tracking-widest">Create Plane</div>
-            <select class="select select-xs glass-input w-full" bind:value={planeCreateMode}>
-              <option value="three_points">3 Points</option>
-              <option value="point_normal">Point + Normal</option>
-              <option value="offset_surface">Offset Surface</option>
-              <option value="two_lines">2 Lines</option>
-              <option value="point_direction">Point + Direction</option>
-              <option value="csys_principal">CSYS Principal</option>
-            </select>
-            {#if planeCreateMode === 'three_points'}
-              <div class="grid grid-cols-3 gap-1 text-[10px]">
-                <input class="input input-xs glass-input" type="number" min="0" bind:value={planeP0} />
-                <input class="input input-xs glass-input" type="number" min="0" bind:value={planeP1} />
-                <input class="input input-xs glass-input" type="number" min="0" bind:value={planeP2} />
-              </div>
-            {:else if planeCreateMode === 'point_normal'}
-              <div class="grid grid-cols-4 gap-1 text-[10px]">
-                <input class="input input-xs glass-input" type="number" min="0" bind:value={planeP0} />
-                <input class="input input-xs glass-input" type="number" step="0.1" bind:value={planeNormalVec.x} />
-                <input class="input input-xs glass-input" type="number" step="0.1" bind:value={planeNormalVec.y} />
-                <input class="input input-xs glass-input" type="number" step="0.1" bind:value={planeNormalVec.z} />
-              </div>
-            {:else if planeCreateMode === 'offset_surface'}
-              <div class="grid grid-cols-2 gap-1 text-[10px]">
-                <input class="input input-xs glass-input" type="number" min="0" bind:value={planeOffsetSurface} />
-                <input class="input input-xs glass-input" type="number" step="0.1" bind:value={planeOffsetDist} />
-              </div>
-            {:else if planeCreateMode === 'two_lines'}
-              <div class="grid grid-cols-2 gap-1 text-[10px]">
-                <input class="input input-xs glass-input" type="number" min="0" bind:value={planeLineA} />
-                <input class="input input-xs glass-input" type="number" min="0" bind:value={planeLineB} />
-              </div>
-            {:else if planeCreateMode === 'point_direction'}
-              <div class="grid grid-cols-4 gap-1 text-[10px]">
-                <input class="input input-xs glass-input" type="number" min="0" bind:value={planeDirPoint} />
-                <input class="input input-xs glass-input" type="number" step="0.1" bind:value={planeDirVec.x} />
-                <input class="input input-xs glass-input" type="number" step="0.1" bind:value={planeDirVec.y} />
-                <input class="input input-xs glass-input" type="number" step="0.1" bind:value={planeDirVec.z} />
-              </div>
-            {:else}
-              <div class="grid grid-cols-2 gap-1 text-[10px]">
-                <input class="input input-xs glass-input" type="number" min="0" bind:value={planeCsysIdx} />
-                <select class="select select-xs glass-input" bind:value={planePrincipal}>
-                  <option value="XY">XY</option>
-                  <option value="YZ">YZ</option>
-                  <option value="ZX">ZX</option>
-                </select>
-              </div>
-            {/if}
-            <button class="btn btn-xs variant-soft w-full" onclick={addDatumPlane}>+ Add Plane</button>
-          </div>
-        </div>
-        <div class="max-h-28 overflow-auto custom-scrollbar pr-1 text-[11px] text-white/60 rounded-xl border border-white/10 bg-black/20 p-2">
-          {#if csys.length > 0}<div>CSYS: {csys.map((c, i) => `CS${i + 1}:${c.name}`).join(' • ')}</div>{/if}
-          {#if planes.length > 0}<div>Planes: {planes.map((p, i) => `PL${i + 1}:${p.name}`).join(' • ')}</div>{/if}
-        </div>
-      </div>
-    </div>
-  {/if}
-
-  {#if createGeometryModalOpen}
-    <div
-      class="fixed inset-0 z-[300] flex items-center justify-center bg-black/55 backdrop-blur-[1px]"
-      role="button"
-      tabindex="0"
-      onpointerdown={(e) => { if (e.target === e.currentTarget) createGeometryModalOpen = false; }}
-      onkeydown={(e) => { if (e.key === 'Escape') createGeometryModalOpen = false; }}
-    >
-      <div class="w-[620px] max-w-[94vw] rounded-2xl border border-white/15 bg-slate-950/95 shadow-2xl p-4 space-y-4" bind:this={createGeomModalPanelEl}>
-        <div class="flex items-center justify-between">
-          <div class="text-sm font-semibold tracking-wide text-white/90">Create Geometry</div>
-          <button class="btn btn-xs variant-soft" onclick={() => (createGeometryModalOpen = false)}>Close</button>
-        </div>
-        <div class="text-[11px] text-white/45">{creatorHint}</div>
-        {#if points.length < minPointsFor.surface}
-          <div class="rounded-lg border border-amber-300/30 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-100/90">
-            Point-first rule: add points before creating lines/surfaces. Current points: {points.length}
-          </div>
-        {/if}
-        <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
-          <div class="text-[11px] text-white/50 uppercase tracking-widest">Point</div>
-          <div class="grid grid-cols-3 gap-2">
-            <input type="number" step="0.1" class="input input-sm glass-input" bind:value={createPtX} placeholder="X" />
-            <input type="number" step="0.1" class="input input-sm glass-input" bind:value={createPtY} placeholder="Y" />
-            <input type="number" step="0.1" class="input input-sm glass-input" bind:value={createPtZ} placeholder="Z" />
-          </div>
-          <button class="btn btn-sm variant-soft w-full" onclick={addPoint}>+ Add point</button>
-        </div>
-        <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
-          <div class="text-[11px] text-white/50 uppercase tracking-widest">Line</div>
-          <div class="grid grid-cols-2 gap-2">
-            <button
-              class={creatorPick?.kind === 'line' && creatorPick.slot === 'A' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-70'}
-              onclick={() => beginLinePick('A')}
-              disabled={points.length < minPointsFor.line}
-            >
-              Pick A ({createLineA == null ? '-' : `P${createLineA + 1}`})
-            </button>
-            <button
-              class={creatorPick?.kind === 'line' && creatorPick.slot === 'B' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-70'}
-              onclick={() => beginLinePick('B')}
-              disabled={points.length < minPointsFor.line}
-            >
-              Pick B ({createLineB == null ? '-' : `P${createLineB + 1}`})
-            </button>
-          </div>
-        </div>
-        <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
-          <div class="flex items-center justify-between">
-            <div class="text-[11px] text-white/50 uppercase tracking-widest">Surface</div>
-            <select class="select select-xs glass-input w-28" bind:value={surfaceCreateKind}>
-              <option value="triangle">Triangle</option>
-              <option value="quad">Quad</option>
-              <option value="contour">Contour</option>
-            </select>
-          </div>
-          <div class="rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-white/70">
-            {surfaceFlowHint}
-          </div>
-          <div class="flex items-center gap-2">
-            <button
-              class={creatorPick?.kind === 'surface' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-70'}
-              onclick={() => beginSurfacePick(surfaceDraft.length)}
-              disabled={points.length < minPointsFor.surface}
-            >
-              Pick sequence
-            </button>
-            <button class="btn btn-xs variant-soft opacity-80" onclick={() => { surfaceDraft = []; creatorPick = null; }}>Reset</button>
-            <button class="btn btn-xs variant-soft opacity-80" disabled={surfaceCreateKind !== 'contour' || surfaceDraft.length < 3} onclick={finishContourSurface}>Finish contour</button>
-          </div>
-          <div class="flex items-center justify-between text-[11px] font-mono text-white/65">
-            <span>Draft: {surfaceDraft.length === 0 ? 'none' : surfaceDraft.map((p) => `P${p + 1}`).join(' -> ')}</span>
-            <span>
-              {#if surfaceCreateKind === 'contour'}
-                min 3
-              {:else}
-                {surfaceDraft.length}/{surfaceDraftRequired}
-              {/if}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  {/if}
-
-  {#if surfaceCurveOpsModalOpen}
-    <div
-      class="fixed inset-0 z-[300] flex items-center justify-center bg-black/55 backdrop-blur-[1px]"
-      role="button"
-      tabindex="0"
-      onpointerdown={(e) => { if (e.target === e.currentTarget) surfaceCurveOpsModalOpen = false; }}
-      onkeydown={(e) => { if (e.key === 'Escape') surfaceCurveOpsModalOpen = false; }}
-    >
-      <div class="w-[620px] max-w-[94vw] rounded-2xl border border-white/15 bg-slate-950/95 shadow-2xl p-4 space-y-4" bind:this={surfCurveModalPanelEl}>
-        <div class="flex items-center justify-between">
-          <div class="text-sm font-semibold tracking-wide text-white/90">Surface / Curve Operations</div>
-          <button class="btn btn-xs variant-soft" onclick={() => (surfaceCurveOpsModalOpen = false)}>Close</button>
-        </div>
-        <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
-          <div class="text-[11px] text-white/50 uppercase tracking-widest">Selected Line Actions</div>
-          <div class="text-[11px] text-white/45">{selectedEntity?.kind === 'line' ? `L${selectedEntity.index + 1}` : 'No line selected'}</div>
-          <div class="grid grid-cols-[1fr_auto] gap-2 items-center">
-            <input type="range" min="0" max="1" step="0.01" bind:value={lineInsertT} />
-            <div class="text-[11px] font-mono text-white/70">{(lineInsertT * 100).toFixed(0)}%</div>
-          </div>
-          <div class="flex items-center gap-2">
-            <button class="btn btn-xs variant-soft" disabled={selectedEntity?.kind !== 'line'} onclick={() => selectedEntity?.kind === 'line' && insertPointOnEdge(selectedEntity.index, 0.5)}>Insert midpoint</button>
-            <button class="btn btn-xs variant-soft" disabled={selectedEntity?.kind !== 'line'} onclick={() => selectedEntity?.kind === 'line' && insertPointOnEdge(selectedEntity.index, lineInsertT)}>Insert at %</button>
-            <button
-              class={lineInsertPickMode ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-70'}
-              onclick={() => {
-                if (toolCursor === 'insert') setToolCursor('select');
-                else setToolCursor('insert');
-              }}
-            >
-              Insert from click
-            </button>
-          </div>
-        </div>
-        <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
-          <div class="text-[11px] text-white/50 uppercase tracking-widest">Offset Surface</div>
-          <div class="grid grid-cols-2 gap-2">
-            <input class="input input-xs glass-input" type="number" min="0" bind:value={offsetSurfaceIdx} title="Surface index" />
-            <input class="input input-xs glass-input" type="number" step="0.1" bind:value={offsetSurfaceDist} title="Offset distance" />
-          </div>
-          <button class="btn btn-xs variant-soft w-full" onclick={offsetSurfaceCreate}>Create Offset Surface</button>
-        </div>
-        <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
-          <div class="text-[11px] text-white/50 uppercase tracking-widest">Offset Curve On Surface</div>
-          <div class="grid grid-cols-3 gap-2">
-            <input class="input input-xs glass-input" type="number" min="0" bind:value={offsetCurveIdx} title="Curve index" />
-            <input class="input input-xs glass-input" type="number" min="0" bind:value={offsetCurveSurfaceIdx} title="Surface index" />
-            <input class="input input-xs glass-input" type="number" step="0.1" bind:value={offsetCurveDist} title="Offset distance" />
-          </div>
-          <label class="flex items-center justify-between text-[11px] text-white/60"><span>Flip</span><input type="checkbox" class="checkbox checkbox-xs" bind:checked={offsetCurveFlip} /></label>
-          <button class="btn btn-xs variant-soft w-full" onclick={offsetCurveOnSurfaceCreate}>Create Offset Curve</button>
-          {#if offsetCurveStatus.method}
-            <div
-              class={`rounded-lg border px-2 py-2 text-[11px] ${
-                offsetCurveStatus.severity === 'error'
-                  ? 'border-rose-400/35 bg-rose-500/10 text-rose-200'
-                  : offsetCurveStatus.severity === 'warning'
-                    ? 'border-amber-300/30 bg-amber-400/10 text-amber-100'
-                    : 'border-cyan-300/25 bg-cyan-400/10 text-cyan-100'
-              }`}
-            >
-              <div class="font-mono uppercase tracking-widest text-[10px]">Method: {offsetCurveStatus.method}</div>
-              {#if offsetCurveStatus.message}<div class="mt-1">{offsetCurveStatus.message}</div>{/if}
-              {#if offsetCurveStatus.severity === 'error'}
-                <div class="mt-1 text-[10px] opacity-90">Recommendation: reduce offset distance, simplify curve, or use a smoother support surface patch.</div>
-              {:else if offsetCurveStatus.severity === 'warning'}
-                <div class="mt-1 text-[10px] opacity-90">Recommendation: inspect deviation and reduce local curvature for higher fidelity.</div>
-              {/if}
-            </div>
-          {/if}
-        </div>
-      </div>
-    </div>
-  {/if}
-
-  <SurfaceExtrudeModal
-    open={extrudeModalOpen}
-    onClose={() => (extrudeModalOpen = false)}
+  <SurfaceModalStack
+    bind:datumsModalOpen
+    bind:datumsModalPos
+    bind:datumsModalPanelEl
+    bind:datumPick
+    bind:csysCreateMode
+    bind:csysOriginPoint
+    bind:csysXPoint
+    bind:csysYPoint
+    bind:csysFromLine
+    bind:csysCopyIdx
+    bind:planeCreateMode
+    bind:planeP0
+    bind:planeP1
+    bind:planeP2
+    bind:planeNormalVec
+    bind:planeOffsetSurface
+    bind:planeOffsetDist
+    bind:planeLineA
+    bind:planeLineB
+    bind:planeDirPoint
+    bind:planeDirVec
+    bind:planeCsysIdx
+    bind:planePrincipal
+    {datumPickHint}
+    {startDatumsModalDrag}
+    {armDatumPick}
+    {addDatumCsys}
+    {addDatumPlane}
+    {csys}
+    {planes}
+    bind:createGeometryModalOpen
+    bind:createGeomModalPanelEl
+    pointsCount={points.length}
+    minLinePoints={minPointsFor.line}
+    minSurfacePoints={minPointsFor.surface}
+    {creatorHint}
+    {surfaceFlowHint}
+    bind:surfaceDraft
+    {surfaceDraftRequired}
+    bind:surfaceCreateKind
+    bind:creatorPick
+    bind:createLineA
+    bind:createLineB
+    bind:createPtX
+    bind:createPtY
+    bind:createPtZ
+    {beginLinePick}
+    {beginSurfacePick}
+    {addPoint}
+    {finishContourSurface}
+    bind:surfaceCurveOpsModalOpen
+    bind:surfCurveModalPanelEl
+    bind:selectedEntity
+    bind:lineInsertT
+    bind:lineInsertPickMode
+    bind:toolCursor
+    bind:offsetSurfaceIdx
+    bind:offsetSurfaceDist
+    bind:offsetCurveIdx
+    bind:offsetCurveSurfaceIdx
+    bind:offsetCurveDist
+    bind:offsetCurveFlip
+    bind:offsetCurveStatus
+    {insertPointOnEdge}
+    {setToolCursor}
+    {offsetSurfaceCreate}
+    {offsetCurveOnSurfaceCreate}
+    bind:extrudeModalOpen
     bind:extrudeTarget
     bind:extrudeLineIdx
     bind:extrudeCurveIdx
@@ -3139,34 +2610,12 @@
     bind:extrudeVector
     bind:extrudeSurfaceIdx
     bind:extrudeFlip
-    onExtrudePath={extrudeLineOrCurve}
-  />
-
-  {#if healingModalOpen}
-    <div
-      class="fixed inset-0 z-[300] flex items-center justify-center bg-black/55 backdrop-blur-[1px]"
-      role="button"
-      tabindex="0"
-      onpointerdown={(e) => { if (e.target === e.currentTarget) healingModalOpen = false; }}
-      onkeydown={(e) => { if (e.key === 'Escape') healingModalOpen = false; }}
-    >
-      <div class="w-[420px] max-w-[92vw] rounded-2xl border border-white/15 bg-slate-950/95 shadow-2xl p-4 space-y-4" bind:this={healingModalPanelEl}>
-        <div class="flex items-center justify-between">
-          <div class="text-sm font-semibold tracking-wide text-white/90">Topology Healing</div>
-          <button class="btn btn-xs variant-soft" onclick={() => (healingModalOpen = false)}>Close</button>
-        </div>
-        <div class="grid grid-cols-2 gap-2 items-center">
-          <div class="text-[11px] text-white/60">Tolerance</div>
-          <input class="input input-xs glass-input" type="number" step="0.01" min="0" bind:value={healTol} />
-        </div>
-        <button class="btn btn-xs variant-soft w-full" onclick={runTopologyHealing}>Run Healing</button>
-      </div>
-    </div>
-  {/if}
-
-  <SurfaceViewportSettingsModal
-    open={settingsOpen}
-    onClose={() => (settingsOpen = false)}
+    {extrudeLineOrCurve}
+    bind:healingModalOpen
+    bind:healingModalPanelEl
+    bind:healTol
+    {runTopologyHealing}
+    bind:settingsOpen
     bind:showSelectionLabels
     bind:showPointEntities
     bind:showLineEntities

@@ -1,5 +1,3 @@
-import { path as d3Path } from 'd3';
-
 export type SectionPoint = { x: number; y: number };
 
 export type SectionLinePrimitive = {
@@ -38,6 +36,12 @@ export type SectionProfile = {
   regions: SectionRegion[];
   tolerance: number;
 };
+
+function fmt(v: number): string {
+  if (!Number.isFinite(v)) return '0';
+  const rounded = Math.abs(v) < 1e-12 ? 0 : v;
+  return Number(rounded.toFixed(12)).toString();
+}
 
 function pointDistance(a: SectionPoint, b: SectionPoint): number {
   const dx = a.x - b.x;
@@ -80,30 +84,28 @@ export function validateClosedLoop(loop: SectionLoop, tolerance = 1e-6): { ok: b
 }
 
 export function loopToPath(loop: SectionLoop): string {
-  const p = d3Path();
   if (!loop.primitives.length) return '';
   const first = primitiveEndpoints(loop.primitives[0]);
-  p.moveTo(first.start.x, first.start.y);
+  const parts: string[] = [`M${fmt(first.start.x)},${fmt(first.start.y)}`];
 
   for (const primitive of loop.primitives) {
     if (primitive.kind === 'line') {
-      p.lineTo(primitive.to.x, primitive.to.y);
+      parts.push(`L${fmt(primitive.to.x)},${fmt(primitive.to.y)}`);
       continue;
     }
     const end = arcEndpoints(primitive).end;
     // Canonical schema supports arcs; renderer currently linearizes arc endpoints.
-    p.lineTo(end.x, end.y);
+    parts.push(`L${fmt(end.x)},${fmt(end.y)}`);
   }
 
-  p.closePath();
-  return p.toString();
+  parts.push('Z');
+  return parts.join(' ');
 }
 
 export function pathFromPolyline(points: SectionPoint[]): string {
   if (!points.length) return '';
-  const p = d3Path();
-  p.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i += 1) p.lineTo(points[i].x, points[i].y);
-  p.closePath();
-  return p.toString();
+  const parts: string[] = [`M${fmt(points[0].x)},${fmt(points[0].y)}`];
+  for (let i = 1; i < points.length; i += 1) parts.push(`L${fmt(points[i].x)},${fmt(points[i].y)}`);
+  parts.push('Z');
+  return parts.join(' ');
 }

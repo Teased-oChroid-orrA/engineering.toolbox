@@ -154,6 +154,9 @@ export function scheduleCrossQuery(ctx: any, reason = 'debounced-cross-input') {
 export function clearAllFilters(ctx: any) {
   ctx.query = '';
   ctx.matchMode = 'fuzzy';
+  if ('multiQueryEnabled' in ctx) ctx.multiQueryEnabled = false;
+  if ('multiQueryExpanded' in ctx) ctx.multiQueryExpanded = false;
+  if ('multiQueryClauses' in ctx) ctx.multiQueryClauses = [{ id: `mq_${Date.now()}_0`, query: '', mode: 'fuzzy' }];
   ctx.targetColIdx = null;
   ctx.numericF = { enabled: false, colIdx: null, minText: '', maxText: '', error: null };
   ctx.dateF = { enabled: false, colIdx: null, minIso: '', maxIso: '', error: null };
@@ -184,6 +187,135 @@ export function onQueryScopeChange(ctx: any) {
   void runFilterNow(ctx);
 }
 
+type SvarApplyState = {
+  unsupported: number;
+  textApplied: boolean;
+  numericApplied: boolean;
+  dateApplied: boolean;
+  catApplied: boolean;
+};
+
+function applySvarTextRule(ctx: any, idx: number, filter: string, cleanVal: string): boolean {
+  ctx.targetColIdx = idx;
+  if (filter === 'equal') {
+    ctx.matchMode = 'exact';
+    ctx.query = cleanVal;
+    return true;
+  }
+  if (filter === 'contains') {
+    ctx.matchMode = 'fuzzy';
+    ctx.query = cleanVal;
+    return true;
+  }
+  if (filter === 'beginsWith') {
+    ctx.matchMode = 'regex';
+    ctx.query = `^${ctx.escapeRegExp(cleanVal)}`;
+    return true;
+  }
+  if (filter === 'endsWith') {
+    ctx.matchMode = 'regex';
+    ctx.query = `${ctx.escapeRegExp(cleanVal)}$`;
+    return true;
+  }
+  return false;
+}
+
+function applySvarNumberRule(ctx: any, idx: number, filter: string, rule: any, cleanVal: string): boolean {
+  ctx.numericF.enabled = true;
+  ctx.numericF.colIdx = idx;
+  if (filter === 'between' && typeof rule.value === 'object' && rule.value != null) {
+    const v = rule.value as { start?: unknown; end?: unknown };
+    ctx.numericF.minText = v.start == null ? '' : String(v.start);
+    ctx.numericF.maxText = v.end == null ? '' : String(v.end);
+    return true;
+  }
+  if (filter === 'greater' || filter === 'greaterOrEqual') {
+    ctx.numericF.minText = cleanVal;
+    ctx.numericF.maxText = '';
+    return true;
+  }
+  if (filter === 'less' || filter === 'lessOrEqual') {
+    ctx.numericF.minText = '';
+    ctx.numericF.maxText = cleanVal;
+    return true;
+  }
+  if (filter === 'equal') {
+    ctx.numericF.minText = cleanVal;
+    ctx.numericF.maxText = cleanVal;
+    return true;
+  }
+  return false;
+}
+
+function applySvarDateRule(ctx: any, idx: number, filter: string, rule: any): boolean {
+  ctx.dateF.enabled = true;
+  ctx.dateF.colIdx = idx;
+  if (filter === 'between' && typeof rule.value === 'object' && rule.value != null) {
+    const v = rule.value as { start?: unknown; end?: unknown };
+    ctx.dateF.minIso = v.start == null ? '' : String(v.start).slice(0, 10);
+    ctx.dateF.maxIso = v.end == null ? '' : String(v.end).slice(0, 10);
+    return true;
+  }
+  if (filter === 'greater' || filter === 'greaterOrEqual') {
+    ctx.dateF.minIso = String(rule.value ?? '').slice(0, 10);
+    ctx.dateF.maxIso = '';
+    return true;
+  }
+  if (filter === 'less' || filter === 'lessOrEqual') {
+    ctx.dateF.minIso = '';
+    ctx.dateF.maxIso = String(rule.value ?? '').slice(0, 10);
+    return true;
+  }
+  if (filter === 'equal') {
+    const iso = String(rule.value ?? '').slice(0, 10);
+    ctx.dateF.minIso = iso;
+    ctx.dateF.maxIso = iso;
+    return true;
+  }
+  return false;
+}
+
+function applySvarCategoryRule(ctx: any, idx: number, rule: any): boolean {
+  if (!Array.isArray(rule.includes) || rule.includes.length === 0) return false;
+  ctx.catF.enabled = true;
+  ctx.catF.colIdx = idx;
+  ctx.catF.selected = new Set(rule.includes.map((v: unknown) => String(v)));
+  return true;
+}
+
+function applySingleSvarRule(ctx: any, state: SvarApplyState, rule: IFilter) {
+  const idx = toColIdx(rule.field, ctx.headers.length);
+  if (idx == null) {
+    state.unsupported++;
+    return;
+  }
+  const rawVal = rule.value == null ? '' : String(rule.value);
+  const cleanVal = rawVal.trim();
+  const filter = rule.filter ?? 'contains';
+  const typ = (rule.type ?? 'text') as 'text' | 'number' | 'date' | 'tuple';
+
+  if (!state.textApplied && typ === 'text') {
+    state.textApplied = applySvarTextRule(ctx, idx, filter, cleanVal);
+    if (!state.textApplied) state.unsupported++;
+    return;
+  }
+  if (!state.numericApplied && typ === 'number') {
+    state.numericApplied = applySvarNumberRule(ctx, idx, filter, rule, cleanVal);
+    if (!state.numericApplied) state.unsupported++;
+    return;
+  }
+  if (!state.dateApplied && typ === 'date') {
+    state.dateApplied = applySvarDateRule(ctx, idx, filter, rule);
+    if (!state.dateApplied) state.unsupported++;
+    return;
+  }
+  if (!state.catApplied && applySvarCategoryRule(ctx, idx, rule)) {
+    state.catApplied = true;
+    return;
+  }
+  state.unsupported++;
+}
+
 export function applySvarBuilderToFilters(ctx: any) {
   const rules = flattenSvarRules(ctx.svarFilterSet);
   if (!rules.length) {
@@ -191,114 +323,18 @@ export function applySvarBuilderToFilters(ctx: any) {
     return;
   }
 
-  let unsupported = 0;
-  let textApplied = false;
-  let numericApplied = false;
-  let dateApplied = false;
-  let catApplied = false;
-
-  for (const rule of rules) {
-    const idx = toColIdx(rule.field, ctx.headers.length);
-    if (idx == null) {
-      unsupported++;
-      continue;
-    }
-    const rawVal = rule.value == null ? '' : String(rule.value);
-    const cleanVal = rawVal.trim();
-    const filter = rule.filter ?? 'contains';
-    const typ = (rule.type ?? 'text') as 'text' | 'number' | 'date' | 'tuple';
-
-    if (!textApplied && typ === 'text') {
-      ctx.targetColIdx = idx;
-      if (filter === 'equal') {
-        ctx.matchMode = 'exact';
-        ctx.query = cleanVal;
-        textApplied = true;
-      } else if (filter === 'contains') {
-        ctx.matchMode = 'fuzzy';
-        ctx.query = cleanVal;
-        textApplied = true;
-      } else if (filter === 'beginsWith') {
-        ctx.matchMode = 'regex';
-        ctx.query = `^${ctx.escapeRegExp(cleanVal)}`;
-        textApplied = true;
-      } else if (filter === 'endsWith') {
-        ctx.matchMode = 'regex';
-        ctx.query = `${ctx.escapeRegExp(cleanVal)}$`;
-        textApplied = true;
-      } else {
-        unsupported++;
-      }
-      continue;
-    }
-
-    if (!numericApplied && typ === 'number') {
-      ctx.numericF.enabled = true;
-      ctx.numericF.colIdx = idx;
-      if (filter === 'between' && typeof rule.value === 'object' && rule.value != null) {
-        const v = rule.value as { start?: unknown; end?: unknown };
-        ctx.numericF.minText = v.start == null ? '' : String(v.start);
-        ctx.numericF.maxText = v.end == null ? '' : String(v.end);
-        numericApplied = true;
-      } else if (filter === 'greater' || filter === 'greaterOrEqual') {
-        ctx.numericF.minText = cleanVal;
-        ctx.numericF.maxText = '';
-        numericApplied = true;
-      } else if (filter === 'less' || filter === 'lessOrEqual') {
-        ctx.numericF.minText = '';
-        ctx.numericF.maxText = cleanVal;
-        numericApplied = true;
-      } else if (filter === 'equal') {
-        ctx.numericF.minText = cleanVal;
-        ctx.numericF.maxText = cleanVal;
-        numericApplied = true;
-      } else {
-        unsupported++;
-      }
-      continue;
-    }
-
-    if (!dateApplied && typ === 'date') {
-      ctx.dateF.enabled = true;
-      ctx.dateF.colIdx = idx;
-      if (filter === 'between' && typeof rule.value === 'object' && rule.value != null) {
-        const v = rule.value as { start?: unknown; end?: unknown };
-        ctx.dateF.minIso = v.start == null ? '' : String(v.start).slice(0, 10);
-        ctx.dateF.maxIso = v.end == null ? '' : String(v.end).slice(0, 10);
-        dateApplied = true;
-      } else if (filter === 'greater' || filter === 'greaterOrEqual') {
-        ctx.dateF.minIso = String(rule.value ?? '').slice(0, 10);
-        ctx.dateF.maxIso = '';
-        dateApplied = true;
-      } else if (filter === 'less' || filter === 'lessOrEqual') {
-        ctx.dateF.minIso = '';
-        ctx.dateF.maxIso = String(rule.value ?? '').slice(0, 10);
-        dateApplied = true;
-      } else if (filter === 'equal') {
-        const iso = String(rule.value ?? '').slice(0, 10);
-        ctx.dateF.minIso = iso;
-        ctx.dateF.maxIso = iso;
-        dateApplied = true;
-      } else {
-        unsupported++;
-      }
-      continue;
-    }
-
-    if (!catApplied && Array.isArray(rule.includes) && rule.includes.length > 0) {
-      ctx.catF.enabled = true;
-      ctx.catF.colIdx = idx;
-      ctx.catF.selected = new Set(rule.includes.map((v) => String(v)));
-      catApplied = true;
-      continue;
-    }
-
-    unsupported++;
-  }
+  const state: SvarApplyState = {
+    unsupported: 0,
+    textApplied: false,
+    numericApplied: false,
+    dateApplied: false,
+    catApplied: false
+  };
+  for (const rule of rules) applySingleSvarRule(ctx, state, rule);
 
   ctx.showSvarBuilder = false;
-  if (unsupported > 0) {
-    ctx.svarNotice = `Applied supported clauses. ${unsupported} unsupported clause(s) were skipped.`;
+  if (state.unsupported > 0) {
+    ctx.svarNotice = `Applied supported clauses. ${state.unsupported} unsupported clause(s) were skipped.`;
   } else {
     ctx.svarNotice = 'Applied filter builder clauses.';
   }

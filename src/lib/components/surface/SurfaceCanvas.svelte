@@ -1,5 +1,6 @@
 <script lang="ts">
   import SurfaceViewportContextMenu from './SurfaceViewportContextMenu.svelte';
+  import SurfaceCanvasScene from './SurfaceCanvasScene.svelte';
 
   export let viewportEl: HTMLDivElement | null = null;
   export let svgEl: SVGSVGElement | null = null;
@@ -119,180 +120,50 @@
     onpointermove={onSvgPointerMove}
     onpointerup={onSvgPointerUp}
   >
-    {#if selecting && selectionMode === 'box' && selRect}
-      <rect
-        x={Math.min(selRect.x0, selRect.x1)}
-        y={Math.min(selRect.y0, selRect.y1)}
-        width={Math.abs(selRect.x1 - selRect.x0)}
-        height={Math.abs(selRect.y1 - selRect.y0)}
-        fill="rgba(99,102,241,0.10)"
-        stroke="rgba(99,102,241,0.75)"
-        stroke-width="1.5"
-        stroke-dasharray="4 3"
-        class="pointer-events-none"
-      />
-    {/if}
-
-    {#if selecting && selectionMode === 'lasso' && lasso.length > 1}
-      <polyline
-        points={lasso.map((p) => `${p.x},${p.y}`).join(' ')}
-        fill="rgba(99,102,241,0.08)"
-        stroke="rgba(99,102,241,0.75)"
-        stroke-width="1.5"
-        stroke-dasharray="4 3"
-        class="pointer-events-none"
-      />
-    {/if}
-
-    {#if showSurfaces}
-      {#each sortedSurfaces as s (s.i)}
-        {@const polyPts = s.pts.map((pi) => projected[pi]).filter(Boolean)}
-        {#if polyPts.length >= 3 && polyInView(polyPts)}
-          <polygon
-            points={polyPts.map((p) => `${p.x},${p.y}`).join(' ')}
-            fill={`rgba(16,185,129,${0.05 + 0.18 * surfaceDepthOpacity(s.z)})`}
-            stroke={`rgba(16,185,129,${0.2 + 0.65 * surfaceDepthOpacity(s.z)})`}
-            stroke-width="1.1"
-            role="button"
-            tabindex="0"
-            aria-label={`Select surface S${s.i + 1}`}
-            onpointerdown={(ev) => ev.stopPropagation()}
-            onpointerup={(ev) => { ev.stopPropagation(); onSurfaceClick(s.i, ev as unknown as MouseEvent); }}
-            onclick={(ev) => onSurfaceClick(s.i, ev)}
-            onkeydown={(ke) => keyActivate(ke, () => onSurfaceClick(s.i))}
-          >
-            <title>{s.name}</title>
-          </polygon>
-        {/if}
-      {/each}
-    {/if}
-
-    {#if showDatums}
-      {#each datumPlanePatches as pl (pl.i)}
-        {@const pp = pl.pts.map((p) => project(p))}
-        {#if polyInView(pp)}
-          <polygon
-            points={pp.map((p) => `${p.x},${p.y}`).join(' ')}
-            fill="rgba(14,116,144,0.09)"
-            stroke="rgba(56,189,248,0.65)"
-            stroke-dasharray="3 2"
-            stroke-width="1.1"
-            role="button"
-            tabindex="0"
-            aria-label={`Select plane PL${pl.i + 1}`}
-            onpointerdown={(ev) => ev.stopPropagation()}
-            onpointerup={(ev) => { ev.stopPropagation(); onPlaneClick(pl.i); }}
-            onclick={() => onPlaneClick(pl.i)}
-            onkeydown={(ke) => keyActivate(ke, () => onPlaneClick(pl.i))}
-          />
-        {/if}
-      {/each}
-      {#each datumAxisSegments as ax (ax.csysIdx + '-' + ax.axis)}
-        {@const a2 = project(ax.a)}
-        {@const b2 = project(ax.b)}
-        {#if segmentInView(a2, b2)}
-          <line
-            x1={a2.x}
-            y1={a2.y}
-            x2={b2.x}
-            y2={b2.y}
-            stroke={ax.axis === 'X' ? 'rgba(248,113,113,0.9)' : ax.axis === 'Y' ? 'rgba(74,222,128,0.9)' : 'rgba(96,165,250,0.9)'}
-            stroke-width="2"
-            role="button"
-            tabindex="0"
-            aria-label={`Select csys CS${ax.csysIdx + 1}`}
-            onpointerdown={(ev) => ev.stopPropagation()}
-            onpointerup={(ev) => { ev.stopPropagation(); onCsysClick(ax.csysIdx); }}
-            onclick={() => onCsysClick(ax.csysIdx)}
-            onkeydown={(ke) => keyActivate(ke, () => onCsysClick(ax.csysIdx))}
-          />
-        {/if}
-      {/each}
-    {/if}
-
-    {#if showEdges}
-      {#each sortedEdges as e (e.i)}
-        {@const p1 = projected[e.a]}
-        {@const p2 = projected[e.b]}
-        {#if segmentInView(p1, p2)}
-          <line
-            x1={p1.x}
-            y1={p1.y}
-            x2={p2.x}
-            y2={p2.y}
-            stroke="rgba(255,255,255,0.85)"
-            stroke-width={activeEdgeIdx === e.i ? 2 : 1}
-            stroke-dasharray="4 4"
-            stroke-opacity={depthOpacity(e.z)}
-            class={activeEdgeIdx === e.i ? 'drop-shadow-[0_0_10px_rgba(99,102,241,0.35)]' : ''}
-            role="button"
-            tabindex="0"
-            aria-label={`Select line L${e.i + 1}`}
-            onpointerdown={(ev) => ev.stopPropagation()}
-            onpointerup={(ev) => { ev.stopPropagation(); onEdgeClick(e.i, ev as unknown as MouseEvent); }}
-            onclick={(ev) => onEdgeClick(e.i, ev)}
-            onkeydown={(ke) => keyActivate(ke, () => onEdgeClick(e.i))}
-          />
-          <line
-            x1={p1.x}
-            y1={p1.y}
-            x2={p2.x}
-            y2={p2.y}
-            stroke="rgba(0,0,0,0)"
-            stroke-width={edgeHitWidth}
-            class="cursor-pointer"
-            aria-hidden="true"
-            onpointerdown={(ev) => ev.stopPropagation()}
-            onpointerup={(ev) => { ev.stopPropagation(); onEdgeClick(e.i, ev as unknown as MouseEvent); }}
-            onclick={(ev) => onEdgeClick(e.i, ev)}
-          />
-        {/if}
-      {/each}
-    {/if}
-
-    {#if loftSegments.length}
-      {#each loftSegments as seg, si (si)}
-        {@const p1 = project(seg.a)}
-        {@const p2 = project(seg.b)}
-        <line
-          x1={p1.x}
-          y1={p1.y}
-          x2={p2.x}
-          y2={p2.y}
-          stroke="currentColor"
-          stroke-width="1"
-          stroke-dasharray="4 3"
-          class="text-emerald-300/70"
-          opacity="0.8"
-        />
-      {/each}
-    {/if}
-
-    {#if cylAxisSeg}
-      {@const a2 = project(cylAxisSeg.a)}
-      {@const b2 = project(cylAxisSeg.b)}
-      <line
-        x1={a2.x}
-        y1={a2.y}
-        x2={b2.x}
-        y2={b2.y}
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-dasharray="6 4"
-        class="text-sky-300/70 pointer-events-none"
-        opacity="0.9"
-      />
-    {/if}
-
-    {#if intersection}
-      {@const ip = project(intersection.p)}
-      <circle cx={ip.x} cy={ip.y} r="6" fill="rgba(239,68,68,0.85)" stroke="rgba(239,68,68,1)" stroke-width="2" />
-    {/if}
-
-    {#if interpPoint}
-      {@const sp = project(interpPoint)}
-      <circle cx={sp.x} cy={sp.y} r="5" fill="rgba(34,197,94,0.65)" stroke="rgba(34,197,94,1)" stroke-width="2" />
-    {/if}
+    <SurfaceCanvasScene
+      {selecting}
+      {selectionMode}
+      {selRect}
+      {lasso}
+      {showSurfaces}
+      {sortedSurfaces}
+      {showDatums}
+      {datumPlanePatches}
+      {datumAxisSegments}
+      {projected}
+      {showEdges}
+      {sortedEdges}
+      {activeEdgeIdx}
+      {edgeHitWidth}
+      {keyActivate}
+      {onEdgeClick}
+      {onSurfaceClick}
+      {onPlaneClick}
+      {onCsysClick}
+      {depthOpacity}
+      {pointDepthOpacity}
+      {surfaceDepthOpacity}
+      {loftSegments}
+      {project}
+      {cylAxisSeg}
+      {intersection}
+      {interpPoint}
+      {showPoints}
+      {evalRes}
+      {heatmapOn}
+      {heatScale}
+      {heatColor}
+      {pendingPointIdx}
+      {selectedSet}
+      {cylOutlierSet}
+      {outlierSet}
+      {pointBaseRadius}
+      {handlePointClick}
+      {points}
+      {inView}
+      {segmentInView}
+      {polyInView}
+    />
 
     {#if activeSnap}
       <g class="pointer-events-none">

@@ -15,6 +15,9 @@ export type RecipeState = {
   sortColIdx: number | null;
   sortDir: 'asc' | 'desc';
   sortSpecs?: { colIdx: number; dir: 'asc' | 'desc' }[];
+  multiQueryEnabled?: boolean;
+  multiQueryExpanded?: boolean;
+  multiQueryClauses?: { id: string; query: string; mode: 'fuzzy' | 'exact' | 'regex' }[];
   visibleColumns: number[];
   pinnedLeft?: number[];
   pinnedRight?: number[];
@@ -236,6 +239,9 @@ export function captureRecipeState(args: {
   sortColIdx: number | null;
   sortDir: 'asc' | 'desc';
   sortSpecs: { colIdx: number; dir: 'asc' | 'desc' }[];
+  multiQueryEnabled?: boolean;
+  multiQueryExpanded?: boolean;
+  multiQueryClauses?: { id: string; query: string; mode: 'fuzzy' | 'exact' | 'regex' }[];
   visibleColumns: Set<number>;
   pinnedLeft: number[];
   pinnedRight: number[];
@@ -255,6 +261,13 @@ export function captureRecipeState(args: {
     sortColIdx: args.sortColIdx,
     sortDir: args.sortDir,
     sortSpecs: [...(args.sortSpecs ?? [])],
+    multiQueryEnabled: !!args.multiQueryEnabled,
+    multiQueryExpanded: !!args.multiQueryExpanded,
+    multiQueryClauses: [...(args.multiQueryClauses ?? [])].map((c) => ({
+      id: String(c.id ?? ''),
+      query: String(c.query ?? ''),
+      mode: c.mode === 'exact' || c.mode === 'regex' ? c.mode : 'fuzzy'
+    })),
     visibleColumns: [...(args.visibleColumns ?? new Set<number>())],
     pinnedLeft: [...(args.pinnedLeft ?? [])],
     pinnedRight: [...(args.pinnedRight ?? [])],

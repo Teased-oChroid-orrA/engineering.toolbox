@@ -1,6 +1,5 @@
 <script lang="ts">
   import NumberFlow from '@number-flow/svelte';
-  import { Button as FlowButton } from 'flowbite-svelte';
 
   let {
     columns = 0,
@@ -11,8 +10,7 @@
     endIdx = 0,
     overscan = 0,
     maxWindow = 0,
-    parseDiagnostics = [],
-    onBaselineReport
+    parseDiagnostics = []
   } = $props<{
     columns?: number;
     rows?: number;
@@ -23,7 +21,6 @@
     overscan?: number;
     maxWindow?: number;
     parseDiagnostics?: Array<{ idx: number; name: string; numericFail: number; dateFail: number }>;
-    onBaselineReport: () => void;
   }>();
 </script>
 
@@ -61,7 +58,6 @@
       <span>rendered&nbsp;</span>
       <NumberFlow value={rendered} />
     </div>
-    <FlowButton size="xs" color="alternative" class="ml-2" onclick={onBaselineReport}>Baseline Report</FlowButton>
   </div>
   {#if (parseDiagnostics?.length ?? 0) > 0}
     <div class="mt-3 border-t border-white/10 pt-3 text-[11px] text-white/65">

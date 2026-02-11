@@ -5,6 +5,7 @@ import { renderDraftingSheetSvg } from '../src/lib/drafting/core/render';
 import { num } from '../src/lib/drafting/core/svg';
 
 const defaultViewport = { x: 26, y: 26, w: 368, h: 184 };
+const f7 = (v: number) => (Math.round(v * 1e7) / 1e7).toString();
 
 const baseInputs: BushingInputs = {
   units: 'imperial',
@@ -98,6 +99,6 @@ test.describe('bushing drafting parity', () => {
     const innerR = (countersink.idBushing ?? 0) / 2;
     const rawTopR = (countersink.geometry?.csExternal?.dia ?? 0) / 2;
     const clampedTopR = Math.min(rawTopR, outerR + (outerR - innerR) * 0.35);
-    expect(countersinkSvg).toContain(String(clampedTopR));
+    expect(countersinkSvg).toContain(f7(clampedTopR));
   });
 });

@@ -45,7 +45,7 @@
 </script>
 
 {#if open}
-  <div class="fixed inset-0 z-40">
+  <div class="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label="Row details" tabindex="-1">
     <button class="absolute inset-0 modal-backdrop" transition:fade={{ duration: uiAnimDur }} onclick={onClose} aria-label="Close row details"></button>
     <div class="absolute top-0 right-0 h-full w-full max-w-2xl glass-panel border-l border-white/10 p-5 overflow-auto inspector-pop-layer" transition:slide={{ duration: uiAnimDur, axis: 'x' }}>
       <div class="flex items-start justify-between gap-3">

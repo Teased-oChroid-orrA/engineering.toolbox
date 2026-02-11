@@ -1,5 +1,6 @@
 <script lang="ts">
   import { fade } from 'svelte/transition';
+  import { INSPECTOR_THEME } from '$lib/components/inspector/InspectorThemeTokens';
 
   let {
     mergedDisplayHeaders = [],
@@ -25,7 +26,7 @@
     </thead>
     <tbody>
       {#each mergedGroupedRows as group, gi (`group-${gi}-${group.source}`)}
-        <tr class="sticky top-[34px] z-10 border-y border-white/10 bg-white/[0.03]">
+        <tr class="sticky z-10 border-y border-white/10 bg-white/[0.03]" style={`top:${INSPECTOR_THEME.grid.headerHeight}px;`}>
           <td colspan={Math.max(1, mergedDisplayHeaders.length)} class="px-0 py-0">
             <div class="sticky left-0 w-screen text-center px-4 py-2 text-[11px] uppercase tracking-[0.14em] text-emerald-200/90 bg-surface-900/90 backdrop-blur-sm border-y border-white/10">
               {group.source}

@@ -1,9 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { fade } from 'svelte/transition';
-  import { flip } from 'svelte/animate';
   import { INSPECTOR_THEME } from '$lib/components/inspector/InspectorThemeTokens';
-
+  import InspectorVirtualGridHeader from './InspectorVirtualGridHeader.svelte';
+  import InspectorVirtualGridRows from './InspectorVirtualGridRows.svelte';
+  import {
+    computeStartIdx,
+    normalizeRowHeight,
+    snapTranslateY
+  } from '$lib/components/inspector/InspectorGridWindowController';
   type WindowInfo = {
     startIdx: number;
     endIdx: number;
@@ -13,29 +17,25 @@
     maxWindow: number;
     sliceLabel: string;
   };
-
   export let headers: string[] = [];
   export let visibleRows: string[][] = [];
   export let visibleColIdxs: number[] = [];
   export let totalFilteredCount = 0;
-
-  export let rowHeight = INSPECTOR_THEME.grid.rowHeight;
+  export let rowHeight: number = INSPECTOR_THEME.grid.rowHeight;
   export let overscan: number = INSPECTOR_THEME.grid.overscan;
-  export let maxWindowAbs = INSPECTOR_THEME.grid.maxWindowAbs;
+  export let maxWindowAbs: number = INSPECTOR_THEME.grid.maxWindowAbs;
   export let initialHeight = 560;
-
   export let sortColIdx: number | null = null;
   export let sortDir: 'asc' | 'desc' = 'asc';
   export let sortPriority: Record<number, number> = {};
-
   export let pinnedLeft: number[] = [];
   export let pinnedRight: number[] = [];
   export let columnWidths: Record<number, number> = {};
   export let hiddenColumns: number[] = [];
-
   export let onRequestSort: (idx: number, opts?: { multi?: boolean }) => void = () => {};
   export let onOpenRow: (visualIdx: number) => void = () => {};
   export let onWindowChange: (info: WindowInfo) => void = () => {};
+  export let onScrollTrace: (info: { scrollTop: number; dy: number; dtMs: number; velocity: number; fastScroll: boolean }) => void = () => {};
   export let onColumnResize: (idx: number, width: number) => void = () => {};
   export let highlightCell: (value: string) => string = (v) => v;
   export let topBanner: string | null = null;
@@ -47,18 +47,15 @@
   let viewportHeight = initialHeight;
   let viewportWidth = 1200;
   let focusVisualIdx = 0;
-  let prefersReducedMotion = false;
   let fastScroll = false;
   let fastScrollTimer: ReturnType<typeof setTimeout> | null = null;
   let lastScrollTopSample = 0;
   let lastScrollAt = 0;
-
   const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
   const EST_COL_WIDTH = 170;
   const COL_OVERSCAN = 2;
   const HEADER_HEIGHT = INSPECTOR_THEME.grid.headerHeight;
   const BANNER_HEIGHT = INSPECTOR_THEME.grid.bannerHeight;
-
   const normalizeWidth = (w: number) => clamp(Math.floor(w), 90, 480);
   const isHidden = (idx: number) => hiddenColumns.includes(idx);
   const getColWidth = (idx: number) => normalizeWidth(columnWidths[idx] ?? EST_COL_WIDTH);
@@ -68,22 +65,16 @@
   $: rightPins = pinnedRight.filter((idx) => visibleCols.includes(idx));
   $: pinnedSet = new Set<number>([...leftPins, ...rightPins]);
   $: centerCols = visibleCols.filter((idx) => !pinnedSet.has(idx));
-
   $: leftWidth = leftPins.reduce((acc, idx) => acc + getColWidth(idx), 0);
   $: rightWidth = rightPins.reduce((acc, idx) => acc + getColWidth(idx), 0);
-
   $: centerViewportWidth = Math.max(320, viewportWidth - leftWidth - rightWidth);
   $: colStart = Math.max(0, Math.floor(scrollLeft / EST_COL_WIDTH) - COL_OVERSCAN);
   $: colCount = Math.max(1, Math.ceil(centerViewportWidth / EST_COL_WIDTH) + COL_OVERSCAN * 2);
   $: colEnd = Math.min(centerCols.length, colStart + colCount);
   $: virtualCenterCols = centerCols.slice(colStart, colEnd);
 
-  $: startIdx = (() => {
-    const raw = Math.floor(scrollTop / rowHeight);
-    if (!Number.isFinite(raw) || raw < 0) return 0;
-    if (totalFilteredCount <= 0) return 0;
-    return clamp(raw, 0, Math.max(0, totalFilteredCount - 1));
-  })();
+  $: safeRowHeight = normalizeRowHeight(rowHeight);
+  $: startIdx = computeStartIdx(scrollTop, safeRowHeight, totalFilteredCount);
 
   // Progressive rendering for huge datasets and high-velocity scroll.
   $: effectiveOverscan = (() => {
@@ -94,7 +85,7 @@
   })();
 
   $: maxWindow = (() => {
-    const visible = Math.ceil(viewportHeight / rowHeight);
+    const visible = Math.ceil(viewportHeight / safeRowHeight);
     return Math.min(maxWindowAbs, visible + effectiveOverscan * 2);
   })();
 
@@ -105,13 +96,10 @@
   })();
 
   $: renderedCount = Math.max(0, endIdx - startIdx);
-  $: translateY = startIdx * rowHeight;
-  $: phantomHeight = totalFilteredCount * rowHeight;
+  $: translateY = snapTranslateY(startIdx, safeRowHeight);
+  $: phantomHeight = totalFilteredCount * safeRowHeight;
   $: sliceLabel = `Slice: ${startIdx}-${endIdx} • overscan ${effectiveOverscan} • maxWindow ${maxWindow} • rendered ${renderedCount}`;
-  // Re-enable row transitions with safety guards to avoid animation thrash on huge windows.
-  $: enableRowFx = !prefersReducedMotion && !fastScroll && renderedCount <= 120 && totalFilteredCount <= 50_000;
-  $: rowInDuration = renderedCount <= 80 ? 95 : 70;
-  $: rowOutDuration = renderedCount <= 80 ? 70 : 50;
+  $: enableRowFx = false;
 
   let lastWindowSig = '';
   $: {
@@ -148,12 +136,13 @@
     lastScrollAt = now;
     scrollTop = el.scrollTop;
     scrollLeft = el.scrollLeft;
+    onScrollTrace({ scrollTop, dy, dtMs: dt, velocity, fastScroll });
   }
 
   function ensureFocusedRowInView() {
     if (!containerEl) return;
-    const top = focusVisualIdx * rowHeight;
-    const bottom = top + rowHeight;
+    const top = focusVisualIdx * safeRowHeight;
+    const bottom = top + safeRowHeight;
     const viewTop = containerEl.scrollTop;
     const viewBottom = viewTop + containerEl.clientHeight;
     if (top < viewTop) containerEl.scrollTop = top;
@@ -176,14 +165,14 @@
     }
     if (e.key === 'PageDown') {
       e.preventDefault();
-      const jump = Math.max(1, Math.floor((viewportHeight / rowHeight) * 0.9));
+      const jump = Math.max(1, Math.floor((viewportHeight / safeRowHeight) * 0.9));
       focusVisualIdx = clamp(focusVisualIdx + jump, 0, totalFilteredCount - 1);
       ensureFocusedRowInView();
       return;
     }
     if (e.key === 'PageUp') {
       e.preventDefault();
-      const jump = Math.max(1, Math.floor((viewportHeight / rowHeight) * 0.9));
+      const jump = Math.max(1, Math.floor((viewportHeight / safeRowHeight) * 0.9));
       focusVisualIdx = clamp(focusVisualIdx - jump, 0, totalFilteredCount - 1);
       ensureFocusedRowInView();
       return;
@@ -219,15 +208,12 @@
     return p != null ? `#${p + 1}` : '';
   }
 
+  function onActivateRow(visualIdx: number) {
+    focusVisualIdx = visualIdx;
+    onOpenRow(visualIdx);
+  }
+
   onMount(() => {
-    try {
-      prefersReducedMotion =
-        typeof window !== 'undefined' &&
-        typeof window.matchMedia === 'function' &&
-        !!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    } catch {
-      prefersReducedMotion = false;
-    }
     if (!containerEl) return;
     lastScrollTopSample = containerEl.scrollTop;
     lastScrollAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -257,190 +243,54 @@
 >
   {#if headers.length > 0}
     {#if topBanner !== null}
-      <div class="sticky left-0 z-[25] w-full text-center px-4 py-2 text-[11px] uppercase tracking-[0.14em] text-emerald-200/95 bg-surface-900 border-y border-white/10 pointer-events-none" style={`top:${INSPECTOR_THEME.grid.stickyOffsetTop}px;`}>
+      <div class="sticky left-0 z-[25] w-full text-center px-4 py-2 text-[11px] uppercase tracking-[0.14em] text-emerald-200/95 bg-surface-900 border-y border-white/10 pointer-events-none" style={`top:${HEADER_HEIGHT}px;`}>
         {bannerText}
       </div>
     {/if}
 
     <table class="min-w-full text-xs whitespace-nowrap">
-      <thead class="sticky top-0 z-20 bg-surface-900/80 backdrop-blur border-b border-white/10">
-        <tr>
-          {#each leftPins as idx}
-            <th class="text-left px-3 py-2 text-[10px] uppercase tracking-widest text-white/55 select-none" style={`min-width:${getColWidth(idx)}px`}>
-              <div class="inline-flex items-center gap-1">
-                <button class="hover:text-white/85" title="Sort" onclick={(e) => onRequestSort(idx, { multi: e.shiftKey })}>{headers[idx]}</button>
-                {#if sortColIdx === idx}
-                  <span class="text-[10px] text-white/55">{sortDir === 'asc' ? '▲' : '▼'}</span>
-                {/if}
-                {#if sortLabel(idx)}
-                  <span class="text-[10px] text-emerald-200/80">{sortLabel(idx)}</span>
-                {/if}
-              </div>
-            </th>
-          {/each}
-
-          {#if colStart > 0}
-            <th class="px-0 py-0" style={`width:${colStart * EST_COL_WIDTH}px`}></th>
-          {/if}
-          {#each virtualCenterCols as idx}
-            <th class="text-left px-3 py-2 text-[10px] uppercase tracking-widest text-white/55 select-none relative group" style={`min-width:${getColWidth(idx)}px`}>
-              <div class="inline-flex items-center gap-1">
-                <button
-                  class="group inline-flex items-center gap-1 hover:text-white/80"
-                  title="Sort (Shift+click for multi-sort)"
-                  onclick={(e) => onRequestSort(idx, { multi: e.shiftKey })}
-                >
-                  <span class="truncate">{headers[idx]}</span>
-                  {#if sortColIdx === idx}
-                    <span class="text-[10px] text-white/50 group-hover:text-white/70">{sortDir === 'asc' ? '▲' : '▼'}</span>
-                  {:else}
-                    <span class="text-[10px] text-white/20 group-hover:text-white/40">↕</span>
-                  {/if}
-                </button>
-                {#if sortLabel(idx)}
-                  <span class="text-[10px] text-emerald-200/80">{sortLabel(idx)}</span>
-                {/if}
-              </div>
-              <button
-                type="button"
-                class="absolute right-0 top-0 h-full w-1 cursor-col-resize opacity-0 group-hover:opacity-100 bg-white/20"
-                aria-label={`Resize ${headers[idx]}`}
-                onmousedown={(e) => beginResize(e, idx)}
-              ></button>
-            </th>
-          {/each}
-          {#if colEnd < centerCols.length}
-            <th class="px-0 py-0" style={`width:${Math.max(0, centerCols.length - colEnd) * EST_COL_WIDTH}px`}></th>
-          {/if}
-
-          {#each rightPins as idx}
-            <th class="text-left px-3 py-2 text-[10px] uppercase tracking-widest text-white/55 select-none" style={`min-width:${getColWidth(idx)}px`}>
-              <div class="inline-flex items-center gap-1">
-                <button class="hover:text-white/85" title="Sort" onclick={(e) => onRequestSort(idx, { multi: e.shiftKey })}>{headers[idx]}</button>
-                {#if sortColIdx === idx}
-                  <span class="text-[10px] text-white/55">{sortDir === 'asc' ? '▲' : '▼'}</span>
-                {/if}
-                {#if sortLabel(idx)}
-                  <span class="text-[10px] text-emerald-200/80">{sortLabel(idx)}</span>
-                {/if}
-              </div>
-            </th>
-          {/each}
-        </tr>
-      </thead>
+      <InspectorVirtualGridHeader
+        {headers}
+        {leftPins}
+        {rightPins}
+        {centerCols}
+        {virtualCenterCols}
+        {colStart}
+        {colEnd}
+        {EST_COL_WIDTH}
+        {getColWidth}
+        {onRequestSort}
+        {sortColIdx}
+        {sortDir}
+        {sortLabel}
+        {beginResize}
+      />
       <tbody>
         <tr aria-hidden="true" style="height: {phantomHeight}px;"></tr>
       </tbody>
     </table>
-
-    <table class="absolute left-0 min-w-full text-xs whitespace-nowrap" style="top: {HEADER_HEIGHT + (topBanner !== null ? BANNER_HEIGHT : 0)}px; transform: translateY({translateY}px);">
-      <tbody>
-        {#each visibleRows as row, i (startIdx + i)}
-          {@const visualIdx = startIdx + i}
-          {#if enableRowFx}
-            <tr
-              class={`border-b border-white/5 cursor-pointer row-enter ${visualIdx === focusVisualIdx ? 'bg-emerald-400/10' : 'hover:bg-white/5'}`}
-              onclick={() => { focusVisualIdx = visualIdx; onOpenRow(visualIdx); }}
-              in:fade={{ duration: rowInDuration }}
-              out:fade={{ duration: rowOutDuration }}
-            >
-              {#each leftPins as c}
-                {@const cell = row?.[c] ?? ''}
-                <td class="px-3 py-2" style={`min-width:${getColWidth(c)}px`}>
-                  {#if (cell ?? '').trim().length === 0}
-                    <span class="italic text-white/35">∅</span>
-                  {:else}
-                    <span class="font-mono cell-smooth inspector-pop-value">{@html highlightCell(String(cell))}</span>
-                  {/if}
-                </td>
-              {/each}
-
-              {#if colStart > 0}
-                <td class="px-0 py-0" style={`width:${colStart * EST_COL_WIDTH}px`}></td>
-              {/if}
-              {#each virtualCenterCols as c}
-                {@const cell = row?.[c] ?? ''}
-                <td class="px-3 py-2" style={`min-width:${getColWidth(c)}px`}>
-                  {#if (cell ?? '').trim().length === 0}
-                    <span class="italic text-white/35">∅</span>
-                  {:else}
-                    <span class="font-mono cell-smooth inspector-pop-value">{@html highlightCell(String(cell))}</span>
-                  {/if}
-                </td>
-              {/each}
-              {#if colEnd < centerCols.length}
-                <td class="px-0 py-0" style={`width:${Math.max(0, centerCols.length - colEnd) * EST_COL_WIDTH}px`}></td>
-              {/if}
-
-              {#each rightPins as c}
-                {@const cell = row?.[c] ?? ''}
-                <td class="px-3 py-2" style={`min-width:${getColWidth(c)}px`}>
-                  {#if (cell ?? '').trim().length === 0}
-                    <span class="italic text-white/35">∅</span>
-                  {:else}
-                    <span class="font-mono cell-smooth inspector-pop-value">{@html highlightCell(String(cell))}</span>
-                  {/if}
-                </td>
-              {/each}
-            </tr>
-          {:else}
-            <tr
-              class={`border-b border-white/5 cursor-pointer ${visualIdx === focusVisualIdx ? 'bg-emerald-400/10' : 'hover:bg-white/5'}`}
-              onclick={() => { focusVisualIdx = visualIdx; onOpenRow(visualIdx); }}
-            >
-              {#each leftPins as c}
-                {@const cell = row?.[c] ?? ''}
-                <td class="px-3 py-2" style={`min-width:${getColWidth(c)}px`}>
-                  {#if (cell ?? '').trim().length === 0}
-                    <span class="italic text-white/35">∅</span>
-                  {:else}
-                    <span class="font-mono inspector-pop-value">{@html highlightCell(String(cell))}</span>
-                  {/if}
-                </td>
-              {/each}
-
-              {#if colStart > 0}
-                <td class="px-0 py-0" style={`width:${colStart * EST_COL_WIDTH}px`}></td>
-              {/if}
-              {#each virtualCenterCols as c}
-                {@const cell = row?.[c] ?? ''}
-                <td class="px-3 py-2" style={`min-width:${getColWidth(c)}px`}>
-                  {#if (cell ?? '').trim().length === 0}
-                    <span class="italic text-white/35">∅</span>
-                  {:else}
-                    <span class="font-mono inspector-pop-value">{@html highlightCell(String(cell))}</span>
-                  {/if}
-                </td>
-              {/each}
-              {#if colEnd < centerCols.length}
-                <td class="px-0 py-0" style={`width:${Math.max(0, centerCols.length - colEnd) * EST_COL_WIDTH}px`}></td>
-              {/if}
-
-              {#each rightPins as c}
-                {@const cell = row?.[c] ?? ''}
-                <td class="px-3 py-2" style={`min-width:${getColWidth(c)}px`}>
-                  {#if (cell ?? '').trim().length === 0}
-                    <span class="italic text-white/35">∅</span>
-                  {:else}
-                    <span class="font-mono inspector-pop-value">{@html highlightCell(String(cell))}</span>
-                  {/if}
-                </td>
-              {/each}
-            </tr>
-          {/if}
-        {/each}
-      </tbody>
-    </table>
+    <InspectorVirtualGridRows
+      {visibleRows}
+      {startIdx}
+      {focusVisualIdx}
+      {safeRowHeight}
+      {translateY}
+      {HEADER_HEIGHT}
+      {BANNER_HEIGHT}
+      {topBanner}
+      {enableRowFx}
+      {leftPins}
+      {rightPins}
+      {centerCols}
+      {virtualCenterCols}
+      {colStart}
+      {colEnd}
+      {EST_COL_WIDTH}
+      {getColWidth}
+      {highlightCell}
+      onActivateRow={onActivateRow}
+    />
   {:else}
     <div class="p-10 text-white/50 text-sm">Load a CSV to begin.</div>
   {/if}
 </div>
-
-<style>
-  .row-enter {
-    will-change: opacity, transform;
-  }
-  .cell-smooth {
-    display: inline-block;
-  }
-</style>
