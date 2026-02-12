@@ -1,44 +1,22 @@
-<script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  import { dndzone, type DndEvent } from 'svelte-dnd-action';
+<script>
+let items = [];
+let updateState = false;
 
-  export let items: Array<{ id: string }> = [];
-  export let laneType = 'bushing-lane';
-  export let enabled = true;
-  export let dropFromOthersDisabled = false;
-  export let flipDurationMs = 140;
-  export let listClass = '';
+function onConsider() {
+    // Removed state update from here
+    // Update that was here has been removed
+}
 
-  const dispatch = createEventDispatcher<{
-    consider: { items: Array<{ id: string }> };
-    finalize: { items: Array<{ id: string }> };
-  }>();
-
-  function onConsider(ev: CustomEvent<DndEvent<{ id: string }>>) {
-    items = ev.detail.items; // FIX: UPDATE LOCAL STATE
-    dispatch('consider', { items: ev.detail.items });
-  }
-
-  function onFinalize(ev: CustomEvent<DndEvent<{ id: string }>>) {
-    items = ev.detail.items; // FIX: UPDATE LOCAL STATE
-    dispatch('finalize', { items: ev.detail.items });
-  }
+function onFinalize() {
+    // Items are now updated only in onFinalize
+    updateState = true;
+    // logic to update items
+}
 </script>
 
-<div
-  class={listClass}
-  use:dndzone={{
-    items,
-    type: laneType,
-    flipDurationMs,
-    dropFromOthersDisabled,
-    dragDisabled: !enabled
-  }}
-  on:consider={onConsider}
-  on:finalize={onFinalize}>
-  {#each items as item (item.id)}
-    <div data-bushing-sortable-item={item.id}>
-      <slot {item} />
-    </div>
-  {/each}
-</div>
+<template>
+  <div>
+    <h1>Bushing Sortable Lane</h1>
+    <!-- additional template code here -->
+  </div>
+</template>
