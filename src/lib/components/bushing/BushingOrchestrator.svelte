@@ -9,12 +9,14 @@
   import { evaluateBushingPipeline, getBushingPipelineCacheStats } from './BushingComputeController';
   import BushingHelperGuidance from './BushingHelperGuidance.svelte';
   import BushingProfileCard from './BushingProfileCard.svelte';
-  import BushingRightLaneCards from './BushingRightLaneCards.svelte';
   import BushingInterferencePolicyControls from './BushingInterferencePolicyControls.svelte';
   import BushingDraggableCard from './BushingDraggableCard.svelte';
   import BushingSortableLane from './BushingSortableLane.svelte';
   import BushingInformationPage from './BushingInformationPage.svelte';
   import BushingPageHeader from './BushingPageHeader.svelte';
+  import BushingDraftingPanel from './BushingDraftingPanel.svelte';
+  import BushingResultSummary from './BushingResultSummary.svelte';
+  import BushingDiagnosticsPanel from './BushingDiagnosticsPanel.svelte';
   import { mountBushingContextMenu, updateBushingContextMenu } from './BushingContextMenuController';
   import { exportBushingPdf, exportBushingSvg } from './BushingExportController';
   import { buildBushingTraceRecord, emitBushingTrace } from './BushingTraceLogger';
@@ -39,12 +41,20 @@
   const commitLeftLane = (items: Array<{ id: string }>) => { leftCardOrder = normalizeOrder(items.map((i) => i.id) as LeftCardId[], LEFT_DEFAULT_ORDER); };
   const commitRightLane = (items: Array<{ id: string }>) => { rightCardOrder = normalizeOrder(items.map((i) => i.id) as RightCardId[], RIGHT_DEFAULT_ORDER); };
   const moveLeftCard = (cardId: LeftCardId, direction: -1 | 1) => { leftCardOrder = normalizeOrder(moveCardInList(leftCardOrder, cardId, direction), LEFT_DEFAULT_ORDER); };
+  const moveRightCard = (cardId: RightCardId, direction: -1 | 1) => { rightCardOrder = normalizeOrder(moveCardInList(rightCardOrder, cardId, direction), RIGHT_DEFAULT_ORDER); };
   const leftMoveProps = (cardId: LeftCardId) => ({
     dragEnabled: dndEnabled,
     canMoveUp: canMoveInList(leftCardOrder, cardId, -1),
     canMoveDown: canMoveInList(leftCardOrder, cardId, 1),
     onMoveUp: () => moveLeftCard(cardId, -1),
     onMoveDown: () => moveLeftCard(cardId, 1)
+  });
+  const rightMoveProps = (cardId: RightCardId) => ({
+    dragEnabled: dndEnabled,
+    canMoveUp: canMoveInList(rightCardOrder, cardId, -1),
+    canMoveDown: canMoveInList(rightCardOrder, cardId, 1),
+    onMoveUp: () => moveRightCard(cardId, -1),
+    onMoveDown: () => moveRightCard(cardId, 1)
   });
   let form: BushingInputs = {
     units: 'imperial',
@@ -392,31 +402,44 @@
   </div>
 
   <div class="flex flex-col gap-4 pb-8 pr-1">
-    <BushingRightLaneCards
+    <BushingSortableLane
+      listClass="flex flex-col gap-4"
+      laneType="bushing-top-right"
+      enabled={dndEnabled}
       items={rightLaneItems}
-      {dndEnabled}
-      {form}
-      {results}
-      {draftingView}
-      {useLegacyRenderer}
-      {renderMode}
-      {traceEnabled}
-      cacheHits={cacheStats.hits}
-      cacheMisses={cacheStats.misses}
-      isInfinitePlate={Boolean(results.geometry?.isSaturationActive)}
-      {babylonInitNotice}
-      {visualDiagnostics}
-      {babylonDiagnostics}
-      onReorder={commitRightLane}
-      onExportSvg={onExportSvg}
-      onExportPdf={onExportPdf}
-      onToggleRendererMode={toggleRendererMode}
-      onToggleTraceMode={toggleTraceMode}
-      onBabylonDiagnostics={(diag) => {
-        babylonDiagnostics = diag;
-      }}
-      onBabylonInitFailure={handleBabylonInitFailure}
-    />
+      on:finalize={(ev) => commitRightLane(ev.detail.items)}
+      let:item>
+      {#if item.id === 'drafting'}
+        <BushingDraggableCard column="right" cardId="drafting" title="Drafting View" {...rightMoveProps('drafting')}>
+          <BushingDraftingPanel
+            {draftingView}
+            {useLegacyRenderer}
+            {renderMode}
+            {traceEnabled}
+            cacheHits={cacheStats.hits}
+            cacheMisses={cacheStats.misses}
+            isInfinitePlate={Boolean(results.geometry?.isSaturationActive)}
+            {babylonInitNotice}
+            {visualDiagnostics}
+            {babylonDiagnostics}
+            onExportSvg={onExportSvg}
+            onExportPdf={onExportPdf}
+            onToggleRendererMode={toggleRendererMode}
+            onToggleTraceMode={toggleTraceMode}
+            onBabylonDiagnostics={(diag) => { babylonDiagnostics = diag; }}
+            onBabylonInitFailure={handleBabylonInitFailure}
+          />
+        </BushingDraggableCard>
+      {:else if item.id === 'summary'}
+        <BushingDraggableCard column="right" cardId="summary" title="Results Panel" {...rightMoveProps('summary')}>
+          <BushingResultSummary {form} {results} />
+        </BushingDraggableCard>
+      {:else if item.id === 'diagnostics'}
+        <BushingDraggableCard column="right" cardId="diagnostics" title="Diagnostics" {...rightMoveProps('diagnostics')}>
+          <BushingDiagnosticsPanel {results} {dndEnabled} />
+        </BushingDraggableCard>
+      {/if}
+    </BushingSortableLane>
   </div>
 </div>
 {/if}

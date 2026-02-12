@@ -31,7 +31,7 @@
   }>();
   
   const flipDurationMs = 200;
-  const ANIMATION_BUFFER_MS = 50; // Buffer to ensure FLIP animation completes
+  const ANIMATION_BUFFER_MS = 300; // Increased buffer to ensure FLIP animation completes reliably
   
   // Internal state for drag operations
   let workingItems = items;
