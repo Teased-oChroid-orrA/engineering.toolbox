@@ -45,11 +45,6 @@
     onReorder(next);
   }
 
-  function handleConsider(ev: CustomEvent<{ items: Array<{ id: string }> }>) {
-    items = ev.detail.items; // FIX: UPDATE LOCAL STATE
-    onReorder(ev.detail.items);
-  }
-
   function handleFinalize(ev: CustomEvent<{ items: Array<{ id: string }> }>) {
     items = ev.detail.items; // FIX: UPDATE LOCAL STATE
     onReorder(ev.detail.items);
@@ -61,7 +56,6 @@
   laneType="bushing-top-right"
   {items}
   enabled={dndEnabled}
-  on:consider={handleConsider}
   on:finalize={handleFinalize}
   let:item>
   {#if item.id === 'drafting'}

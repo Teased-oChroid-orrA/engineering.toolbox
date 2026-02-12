@@ -1,0 +1,33 @@
+class={`bushing-results-card border-l-4 bushing-pop-card bushing-depth-2 ${failed ? 'border-amber-400 shadow-[0_0_0_1px_rgba(251,191,36,0.4)]' : 'border-emerald-500'}`}>
+<div class="text-[10px] mb-2 uppercase tracking-wide text-indigo-200/95 font-bold">Safety Margins (Yield)</div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Housing</span><span class={`font-mono font-semibold ${results.physics.marginHousing >= 0 ? valOk : valFail}`}>{fmt(results.physics.marginHousing)}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Bushing</span><span class={`font-mono font-semibold ${results.physics.marginBushing >= 0 ? valOk : valFail}`}>{fmt(results.physics.marginBushing)}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Governing</span><span class={`font-mono font-semibold ${results.governing.margin >= 0 ? valOk : valFail}`}>{fmt(results.governing.margin)}</span></div>
+class={`bushing-results-card bushing-pop-card bushing-depth-2 ${fitFailed ? 'border border-amber-300/55' : ''}`}>
+<div class="text-[10px] mb-2 uppercase tracking-wide text-indigo-200/95 font-bold">Fit Physics</div>
+<div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Contact Pressure</span><span class="font-mono text-right text-slate-100 font-semibold">{fmtStress(results.physics.contactPressure)} {stressUnit()}</span></div>
+<div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Axial Stress (housing)</span><span class="font-mono text-right text-slate-100 font-semibold">{fmtStress(results.physics.stressAxialHousing)} {stressUnit()}</span></div>
+<div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Axial Stress (bushing)</span><span class="font-mono text-right text-slate-100 font-semibold">{fmtStress(results.physics.stressAxialBushing)} {stressUnit()}</span></div>
+<div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Install Force</span><span class="font-mono text-right text-slate-100 font-semibold">{fmtForce(results.physics.installForce)} {forceUnit()}</span></div>
+<div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Interference (eff.)</span><span class={`font-mono text-right font-semibold ${positiveInterference ? valOk : valFail}`}>{fmt(results.physics.deltaEffective, 4)}</span></div>
+<div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">OD (tol)</span><span class={`font-mono text-right text-[0.92rem] font-semibold ${odContained ? valOk : valFail}`}>{fmtTol(results.tolerance.odBushing.lower, results.tolerance.odBushing.upper, results.tolerance.odBushing.nominal)}</span></div>
+<div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Interference (target tol)</span><span class={`font-mono text-right text-[0.92rem] font-semibold ${valInfo}`}>{fmtTol(results.tolerance.interferenceTarget.lower, results.tolerance.interferenceTarget.upper, results.tolerance.interferenceTarget.nominal)}</span></div>
+<div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Interference (achieved tol)</span><span class={`font-mono text-right text-[0.92rem] font-semibold ${achievedWithinTarget ? valOk : valFail}`}>{fmtTol(results.tolerance.achievedInterference.lower, results.tolerance.achievedInterference.upper, results.tolerance.achievedInterference.nominal)}</span></div>
+<span class="text-slate-100/95 font-medium">Interference (effective @ dT)</span>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">External CS Dia (tol)</span><span class="font-mono text-cyan-200 font-semibold">{fmtTol(results.tolerance.csExternalDia.lower, results.tolerance.csExternalDia.upper, results.tolerance.csExternalDia.nominal)}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Internal CS Dia (tol)</span><span class="font-mono text-cyan-200 font-semibold">{fmtTol(results.tolerance.csInternalDia.lower, results.tolerance.csInternalDia.upper, results.tolerance.csInternalDia.nominal)}</span></div>
+<Card class="bushing-results-card bushing-pop-card bushing-depth-1">
+<div class="text-[10px] uppercase tracking-wide text-indigo-200/95 font-bold">Lamé Stress Field (Full Distribution)</div>
+<details id="bushing-diagnostics-card" class="glass-card rounded-xl border border-white/10 p-3 bushing-pop-card bushing-depth-2 bushing-results-card" open>
+<summary class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-indigo-200/95">
+class={`bushing-results-card bushing-pop-card bushing-depth-1 ${edgeFailed ? 'border border-amber-300/55' : ''}`}>
+<div class="text-[10px] uppercase tracking-wide text-indigo-200/95 font-bold">Edge Distance</div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Actual e/D</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.edgeDistance.edActual)}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Min (Seq)</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.edgeDistance.edMinSequence)}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Min (Strength)</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.edgeDistance.edMinStrength)}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Mode</span><span class="font-mono text-slate-100 font-semibold">{results.edgeDistance.governing}</span></div>
+class={`bushing-results-card bushing-pop-card bushing-depth-1 ${wallFailed ? 'border border-amber-300/55' : ''}`}>
+<div class="text-[10px] uppercase tracking-wide text-indigo-200/95 font-bold">Wall Thickness</div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Straight</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.sleeveWall)}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Neck</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.neckWall)}</span></div>
+<div class="flex justify-between"><span class="text-slate-100/95 font-medium">Governing</span><span class="font-mono text-slate-100 font-semibold">{results.governing.name}</span></div>
