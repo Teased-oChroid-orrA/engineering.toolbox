@@ -350,11 +350,11 @@
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1">
               <Label class="text-white/70">Bore Input Mode</Label>
-              <Select bind:value={form.boreInputMode} items={TOL_MODE_ITEMS} />
+              <Select bind:value={form.boreTolMode} items={TOL_MODE_ITEMS} />
             </div>
             <div class="space-y-1">
               <Label class="text-white/70">Interference Input Mode</Label>
-              <Select bind:value={form.interfInputMode} items={TOL_MODE_ITEMS} />
+              <Select bind:value={form.interferenceTolMode} items={TOL_MODE_ITEMS} />
             </div>
           </div>
         </CardContent>
@@ -373,7 +373,7 @@
           <CardTitle class="text-[10px] font-bold uppercase text-indigo-300">4. Process / Limits</CardTitle>
         </CardHeader>
         <CardContent>
-          <BushingInterferencePolicyControls {form} endConstraintOptions={END_CONSTRAINT_ITEMS} />
+          <BushingInterferencePolicyControls {form} {results} />
         </CardContent>
       </Card>
     </svelte:fragment>
