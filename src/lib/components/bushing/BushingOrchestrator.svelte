@@ -17,6 +17,7 @@
   import BushingDraftingPanel from './BushingDraftingPanel.svelte';
   import BushingResultSummary from './BushingResultSummary.svelte';
   import BushingDiagnosticsPanel from './BushingDiagnosticsPanel.svelte';
+  import BushingFreePositionContainer from './BushingFreePositionContainer.svelte';
   import { mountBushingContextMenu, updateBushingContextMenu } from './BushingContextMenuController';
   import { exportBushingPdf, exportBushingSvg } from './BushingExportController';
   import { buildBushingTraceRecord, emitBushingTrace } from './BushingTraceLogger';
@@ -25,6 +26,7 @@
   import { loadTopLevelLayout, persistTopLevelLayout, readBushingDndEnabled } from './BushingLayoutPersistence';
   import { safeGetItem, safeSetItem, safeParseJSON } from './BushingStorageHelper';
   const KEY = 'scd.bushing.inputs.v15';
+  const FREE_POSITIONING_KEY = 'scd.bushing.freePositioning.enabled';
   const TOL_MODE_ITEMS = [{ value: 'nominal_tol', label: 'Nominal +/- Tol' }, { value: 'limits', label: 'Lower / Upper' }];
   const END_CONSTRAINT_ITEMS = [
     { value: 'free', label: 'Free Ends' },
@@ -34,6 +36,7 @@
   let leftCardOrder: LeftCardId[] = [...LEFT_DEFAULT_ORDER];
   let rightCardOrder: RightCardId[] = [...RIGHT_DEFAULT_ORDER];
   let dndEnabled = true;
+  let useFreePositioning = false; // Feature flag for free positioning mode
   let leftLaneItems: Array<{ id: string }> = [];
   let rightLaneItems: Array<{ id: string }> = [];
   $: leftLaneItems = leftCardOrder.map((id) => ({ id }));
@@ -235,10 +238,28 @@
   onMount(() => {
     console.log('[Bushing] Mounted', { initError, units: form.units, cards: leftCardOrder.length + rightCardOrder.length });
     mountBushingContextMenu({ onExportSvg: () => { void onExportSvg(); }, onExportPdf: () => { void onExportPdf(); }, toggleRendererMode, toggleTraceMode });
+    
+    // Load free positioning flag
+    try {
+      const stored = localStorage.getItem(FREE_POSITIONING_KEY);
+      useFreePositioning = stored === '1' || stored === 'true';
+    } catch (e) {
+      console.error('[Bushing] Failed to load free positioning flag:', e);
+    }
+    
     if (typeof window !== 'undefined') {
       (window as any).__SCD_BUSHING_TEST_REORDER__ = (lane: 'left' | 'right', sourceId: string, targetId: string) => {
         if (lane === 'left') leftCardOrder = normalizeOrder(reorderList(leftCardOrder, sourceId as LeftCardId, targetId as LeftCardId), LEFT_DEFAULT_ORDER);
         else rightCardOrder = normalizeOrder(reorderList(rightCardOrder, sourceId as RightCardId, targetId as RightCardId), RIGHT_DEFAULT_ORDER);
+      };
+      // Enable free positioning by default for testing
+      (window as any).__ENABLE_FREE_POSITIONING__ = () => {
+        localStorage.setItem(FREE_POSITIONING_KEY, '1');
+        window.location.reload();
+      };
+      (window as any).__DISABLE_FREE_POSITIONING__ = () => {
+        localStorage.setItem(FREE_POSITIONING_KEY, '0');
+        window.location.reload();
       };
     }
   });
@@ -259,7 +280,138 @@
   </div>
 {:else if showInformationView}
   <BushingInformationPage {form} {results} onBack={() => (showInformationView = false)} />
+{:else if useFreePositioning}
+  <!-- Free positioning mode -->
+  <BushingFreePositionContainer
+    {form}
+    {results}
+    {draftingView}
+    {useLegacyRenderer}
+    {renderMode}
+    {traceEnabled}
+    {cacheStats}
+    {babylonInitNotice}
+    {visualDiagnostics}
+    {babylonDiagnostics}
+    {onExportSvg}
+    {onExportPdf}
+    {toggleRendererMode}
+    {toggleTraceMode}
+    {handleBabylonInitFailure}
+    {dndEnabled}
+    {showInformationView}
+    {isFailed}>
+    <!-- Header card -->
+    <svelte:fragment slot="header">
+      <BushingPageHeader {isFailed} onShowInformation={() => (showInformationView = true)} />
+    </svelte:fragment>
+    
+    <!-- Guidance card -->
+    <svelte:fragment slot="guidance">
+      <BushingHelperGuidance {form} {results} />
+    </svelte:fragment>
+    
+    <!-- Setup card -->
+    <svelte:fragment slot="setup">
+      <Card id="bushing-setup-card" class="glass-card bushing-pop-card bushing-depth-2">
+        <CardHeader class="pb-2 pt-4">
+          <CardTitle class="text-[10px] font-bold uppercase text-indigo-300">1. Setup</CardTitle>
+        </CardHeader>
+        <CardContent class="grid grid-cols-1 gap-4">
+          <div class="space-y-1">
+            <Label class="text-white/70">Units</Label>
+            <div class="flex rounded-lg border border-white/10 bg-black/30 p-1 bushing-pop-sub bushing-depth-0">
+              <button class={cn('flex-1 rounded-md py-1 text-xs font-medium transition-all', form.units === 'imperial' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.units = 'imperial')}>Imperial</button>
+              <button class={cn('flex-1 rounded-md py-1 text-xs font-medium transition-all', form.units === 'metric' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.units = 'metric')}>Metric</button>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <Label class="text-white/70">Housing Material</Label>
+              <Select bind:value={form.matHousing} items={MATERIALS.map((m) => ({ value: m.id, label: m.name }))} />
+            </div>
+            <div class="space-y-1">
+              <Label class="text-white/70">Bushing Material</Label>
+              <Select bind:value={form.matBushing} items={MATERIALS.map((m) => ({ value: m.id, label: m.name }))} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </svelte:fragment>
+    
+    <!-- Geometry card -->
+    <svelte:fragment slot="geometry">
+      <Card id="bushing-geometry-card" class="glass-card bushing-pop-card bushing-depth-2">
+        <CardHeader class="pb-2 pt-4">
+          <CardTitle class="text-[10px] font-bold uppercase text-indigo-300">2. Geometry</CardTitle>
+        </CardHeader>
+        <CardContent class="space-y-4">
+          <!-- Simplified geometry content - just key fields -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <Label class="text-white/70">Bore Input Mode</Label>
+              <Select bind:value={form.boreInputMode} items={TOL_MODE_ITEMS} />
+            </div>
+            <div class="space-y-1">
+              <Label class="text-white/70">Interference Input Mode</Label>
+              <Select bind:value={form.interfInputMode} items={TOL_MODE_ITEMS} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </svelte:fragment>
+    
+    <!-- Profile card -->
+    <svelte:fragment slot="profile">
+      <BushingProfileCard {form} />
+    </svelte:fragment>
+    
+    <!-- Process card -->
+    <svelte:fragment slot="process">
+      <Card id="bushing-process-card" class="glass-card bushing-pop-card bushing-depth-2">
+        <CardHeader class="pb-2 pt-4">
+          <CardTitle class="text-[10px] font-bold uppercase text-indigo-300">4. Process / Limits</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <BushingInterferencePolicyControls {form} endConstraintOptions={END_CONSTRAINT_ITEMS} />
+        </CardContent>
+      </Card>
+    </svelte:fragment>
+    
+    <!-- Drafting card -->
+    <svelte:fragment slot="drafting">
+      <BushingDraftingPanel
+        {draftingView}
+        {useLegacyRenderer}
+        {renderMode}
+        {traceEnabled}
+        cacheHits={cacheStats.hits}
+        cacheMisses={cacheStats.misses}
+        isInfinitePlate={Boolean(results.geometry?.isSaturationActive)}
+        {babylonInitNotice}
+        {visualDiagnostics}
+        {babylonDiagnostics}
+        onExportSvg={onExportSvg}
+        onExportPdf={onExportPdf}
+        onToggleRendererMode={toggleRendererMode}
+        onToggleTraceMode={toggleTraceMode}
+        onBabylonDiagnostics={(diag) => { babylonDiagnostics = diag; }}
+        onBabylonInitFailure={handleBabylonInitFailure}
+      />
+    </svelte:fragment>
+    
+    <!-- Summary card -->
+    <svelte:fragment slot="summary">
+      <BushingResultSummary {form} {results} />
+    </svelte:fragment>
+    
+    <!-- Diagnostics card -->
+    <svelte:fragment slot="diagnostics">
+      <BushingDiagnosticsPanel {results} {dndEnabled} />
+    </svelte:fragment>
+  </BushingFreePositionContainer>
 {:else}
+  <!-- Lane-based layout (legacy) -->
 <div class="grid grid-cols-1 gap-4 p-1 pt-4 lg:grid-cols-[450px_1fr]">
   <div class="flex flex-col gap-4 pb-8 pr-2">
     <BushingSortableLane
