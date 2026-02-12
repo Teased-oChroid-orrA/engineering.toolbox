@@ -5,7 +5,7 @@
   export let items: Array<{ id: string }> = [];
   export let laneType = 'bushing-lane';
   export let enabled = true;
-  export let dropFromOthersDisabled = true;
+  export let dropFromOthersDisabled = false;
   export let flipDurationMs = 140;
   export let listClass = '';
 
@@ -15,10 +15,12 @@
   }>();
 
   function onConsider(ev: CustomEvent<DndEvent<{ id: string }>>) {
+    items = ev.detail.items; // FIX: UPDATE LOCAL STATE
     dispatch('consider', { items: ev.detail.items });
   }
 
   function onFinalize(ev: CustomEvent<DndEvent<{ id: string }>>) {
+    items = ev.detail.items; // FIX: UPDATE LOCAL STATE
     dispatch('finalize', { items: ev.detail.items });
   }
 </script>
@@ -29,7 +31,7 @@
     items,
     type: laneType,
     flipDurationMs,
-    dropFromOthersDisabled: dropFromOthersDisabled || !enabled,
+    dropFromOthersDisabled,
     dragDisabled: !enabled
   }}
   on:consider={onConsider}

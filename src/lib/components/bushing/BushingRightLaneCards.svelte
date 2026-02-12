@@ -41,7 +41,18 @@
 
   function move(id: string, direction: -1 | 1): void {
     const next = moveCardInList(ids(), id, direction).map((itemId) => ({ id: itemId }));
+    items = next; // FIX: UPDATE LOCAL STATE
     onReorder(next);
+  }
+
+  function handleConsider(ev: CustomEvent<{ items: Array<{ id: string }> }>) {
+    items = ev.detail.items; // FIX: UPDATE LOCAL STATE
+    onReorder(ev.detail.items);
+  }
+
+  function handleFinalize(ev: CustomEvent<{ items: Array<{ id: string }> }>) {
+    items = ev.detail.items; // FIX: UPDATE LOCAL STATE
+    onReorder(ev.detail.items);
   }
 </script>
 
@@ -50,11 +61,19 @@
   laneType="bushing-top-right"
   {items}
   enabled={dndEnabled}
-  on:consider={(ev) => onReorder(ev.detail.items)}
-  on:finalize={(ev) => onReorder(ev.detail.items)}
+  on:consider={handleConsider}
+  on:finalize={handleFinalize}
   let:item>
   {#if item.id === 'drafting'}
-    <BushingDraggableCard column="right" cardId="drafting" title="Drafting View" dragEnabled={dndEnabled} canMoveUp={canMove('drafting', -1)} canMoveDown={canMove('drafting', 1)} onMoveUp={() => move('drafting', -1)} onMoveDown={() => move('drafting', 1)}>
+    <BushingDraggableCard 
+      column="right" 
+      cardId="drafting" 
+      title="Drafting View" 
+      dragEnabled={dndEnabled} 
+      canMoveUp={canMove('drafting', -1)} 
+      canMoveDown={canMove('drafting', 1)} 
+      onMoveUp={() => move('drafting', -1)} 
+      onMoveDown={() => move('drafting', 1)}>
       <BushingDraftingPanel
         {draftingView}
         {useLegacyRenderer}
@@ -75,11 +94,27 @@
       />
     </BushingDraggableCard>
   {:else if item.id === 'summary'}
-    <BushingDraggableCard column="right" cardId="summary" title="Results Panel" dragEnabled={dndEnabled} canMoveUp={canMove('summary', -1)} canMoveDown={canMove('summary', 1)} onMoveUp={() => move('summary', -1)} onMoveDown={() => move('summary', 1)}>
+    <BushingDraggableCard 
+      column="right" 
+      cardId="summary" 
+      title="Results Panel" 
+      dragEnabled={dndEnabled} 
+      canMoveUp={canMove('summary', -1)} 
+      canMoveDown={canMove('summary', 1)} 
+      onMoveUp={() => move('summary', -1)} 
+      onMoveDown={() => move('summary', 1)}>
       <BushingResultSummary {form} {results} />
     </BushingDraggableCard>
   {:else if item.id === 'diagnostics'}
-    <BushingDraggableCard column="right" cardId="diagnostics" title="Diagnostics" dragEnabled={dndEnabled} canMoveUp={canMove('diagnostics', -1)} canMoveDown={canMove('diagnostics', 1)} onMoveUp={() => move('diagnostics', -1)} onMoveDown={() => move('diagnostics', 1)}>
+    <BushingDraggableCard 
+      column="right" 
+      cardId="diagnostics" 
+      title="Diagnostics" 
+      dragEnabled={dndEnabled} 
+      canMoveUp={canMove('diagnostics', -1)} 
+      canMoveDown={canMove('diagnostics', 1)} 
+      onMoveUp={() => move('diagnostics', -1)} 
+      onMoveDown={() => move('diagnostics', 1)}>
       <BushingDiagnosticsPanel {results} dndEnabled={dndEnabled} />
     </BushingDraggableCard>
   {/if}
