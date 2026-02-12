@@ -41,12 +41,12 @@
 
   function move(id: string, direction: -1 | 1): void {
     const next = moveCardInList(ids(), id, direction).map((itemId) => ({ id: itemId }));
-    items = next; // FIX: UPDATE LOCAL STATE
+    items = next;
     onReorder(next);
   }
 
   function handleFinalize(ev: CustomEvent<{ items: Array<{ id: string }> }>) {
-    items = ev.detail.items; // FIX: UPDATE LOCAL STATE
+    items = ev.detail.items;
     onReorder(ev.detail.items);
   }
 </script>

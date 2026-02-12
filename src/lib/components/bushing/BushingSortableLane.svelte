@@ -1,4 +1,22 @@
 <script lang="ts">
+  /**
+   * BushingSortableLane - A wrapper component for svelte-dnd-action that provides drag-and-drop functionality.
+   * 
+   * IMPORTANT: Consumers should only update their state in response to the 'finalize' event, NOT the 'consider' event.
+   * - The 'consider' event is for visual preview only and fires during drag operations
+   * - The 'finalize' event fires when the drag operation completes
+   * - Updating state in 'consider' will cause DOM re-renders that break the drag operation
+   * 
+   * Example usage:
+   * ```svelte
+   * <BushingSortableLane
+   *   {items}
+   *   on:finalize={(ev) => items = ev.detail.items}
+   *   let:item>
+   *   <YourCard {item} />
+   * </BushingSortableLane>
+   * ```
+   */
   import { dndzone, type DndEvent } from 'svelte-dnd-action';
   import { createEventDispatcher } from 'svelte';
 
@@ -23,7 +41,7 @@
   function handleConsider(ev: CustomEvent<DndEvent<{ id: string }>>) {
     // Update internal state for smooth drag preview
     workingItems = ev.detail.items;
-    // Dispatch event to parent, but parent should NOT update its state yet
+    // Dispatch event to parent (parent should NOT update its state yet)
     dispatch('consider', { items: ev.detail.items });
   }
   
