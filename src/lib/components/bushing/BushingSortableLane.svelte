@@ -31,6 +31,7 @@
   }>();
   
   const flipDurationMs = 200;
+  const ANIMATION_BUFFER_MS = 50; // Buffer to ensure FLIP animation completes
   
   // Internal state for drag operations
   let workingItems = items;
@@ -54,11 +55,10 @@
     // Update internal state
     workingItems = ev.detail.items;
     // Defer dispatch to allow FLIP animation to complete
-    // Add 50ms buffer to ensure animation finishes
     setTimeout(() => {
       isDragging = false;
       dispatch('finalize', { items: ev.detail.items });
-    }, flipDurationMs + 50);
+    }, flipDurationMs + ANIMATION_BUFFER_MS);
   }
 </script>
 
