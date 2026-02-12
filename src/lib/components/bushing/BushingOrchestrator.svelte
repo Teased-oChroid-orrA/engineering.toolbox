@@ -21,6 +21,7 @@
   import { runBushingVisualDiagnostics } from './BushingVisualDiagnostics';
   import { canMoveInList, LEFT_DEFAULT_ORDER, RIGHT_DEFAULT_ORDER, moveCardInList, normalizeOrder, reorderList, type LeftCardId, type RightCardId } from './BushingCardLayoutController';
   import { loadTopLevelLayout, persistTopLevelLayout, readBushingDndEnabled } from './BushingLayoutPersistence';
+  import { safeGetItem, safeSetItem, safeParseJSON } from './BushingStorageHelper';
   const KEY = 'scd.bushing.inputs.v15';
   const TOL_MODE_ITEMS = [{ value: 'nominal_tol', label: 'Nominal +/- Tol' }, { value: 'limits', label: 'Lower / Upper' }];
   const END_CONSTRAINT_ITEMS = [
@@ -97,17 +98,17 @@
     endConstraint: 'free'
   };
 
+  let initError: string | null = null;
+  
   if (typeof window !== 'undefined') {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      try {
-        form = { ...form, ...JSON.parse(raw) };
-      } catch (e) {
-        console.error(e);
-      }
+    try {
+      form = { ...form, ...safeParseJSON(safeGetItem(KEY), {}) };
+      ({ leftCardOrder, rightCardOrder } = loadTopLevelLayout());
+      dndEnabled = readBushingDndEnabled();
+    } catch (e) {
+      console.error('[Bushing] Init error:', e);
+      initError = `Init error: ${e instanceof Error ? e.message : String(e)}`;
     }
-    ({ leftCardOrder, rightCardOrder } = loadTopLevelLayout());
-    dndEnabled = readBushingDndEnabled();
   }
   $: {
     if (!form.interferencePolicy) {
@@ -142,9 +143,13 @@
     if (form.interferencePolicy.enabled !== form.enforceInterferenceTolerance) form.interferencePolicy.enabled = Boolean(form.enforceInterferenceTolerance);
     if (form.interferencePolicy.lockBore !== form.lockBoreForInterference) form.interferencePolicy.lockBore = Boolean(form.lockBoreForInterference);
   }
-  $: if (typeof window !== 'undefined') localStorage.setItem(KEY, JSON.stringify(form));
+  $: safeSetItem(KEY, JSON.stringify(form));
   $: if (typeof window !== 'undefined') {
-    persistTopLevelLayout(leftCardOrder, rightCardOrder);
+    try {
+      persistTopLevelLayout(leftCardOrder, rightCardOrder);
+    } catch (e) {
+      console.error('[Bushing] Failed to save layout:', e);
+    }
   }
   $: pipeline = evaluateBushingPipeline(form);
   $: results = pipeline.results;
@@ -171,35 +176,32 @@
   let babylonInitNotice: string | null = null;
   let showInformationView = false;
   if (typeof window !== 'undefined') {
-    useLegacyRenderer = localStorage.getItem(LEGACY_RENDERER_KEY) === '1';
+    useLegacyRenderer = safeGetItem(LEGACY_RENDERER_KEY) === '1';
     renderMode = useLegacyRenderer ? 'legacy' : 'section';
-    traceEnabled = localStorage.getItem(TRACE_MODE_KEY) === '1';
+    traceEnabled = safeGetItem(TRACE_MODE_KEY) === '1';
   }
 
   function toggleRendererMode() {
     useLegacyRenderer = !useLegacyRenderer;
     renderMode = useLegacyRenderer ? 'legacy' : 'section';
-    if (typeof window !== 'undefined') localStorage.setItem(LEGACY_RENDERER_KEY, useLegacyRenderer ? '1' : '0');
+    safeSetItem(LEGACY_RENDERER_KEY, useLegacyRenderer ? '1' : '0');
   }
 
   function handleBabylonInitFailure(reason: string) {
     babylonInitNotice = reason || 'Babylon initialization failed.';
     if (typeof window !== 'undefined') {
-      const payload = {
-        at: new Date().toISOString(),
-        reason: babylonInitNotice
-      };
+      const payload = { at: new Date().toISOString(), reason: babylonInitNotice };
       try {
-        const prior = Number(localStorage.getItem('scd.bushing.babylonInitFailCount') ?? '0');
-        localStorage.setItem('scd.bushing.babylonInitFailCount', String(prior + 1));
-        localStorage.setItem('scd.bushing.babylonInitLast', JSON.stringify(payload));
+        const prior = Number(safeGetItem('scd.bushing.babylonInitFailCount') ?? '0');
+        safeSetItem('scd.bushing.babylonInitFailCount', String(prior + 1));
+        safeSetItem('scd.bushing.babylonInitLast', JSON.stringify(payload));
       } catch {}
       console.warn('[Bushing][Babylon][init-failed]', payload);
     }
   }
   function toggleTraceMode() {
     traceEnabled = !traceEnabled;
-    if (typeof window !== 'undefined') localStorage.setItem(TRACE_MODE_KEY, traceEnabled ? '1' : '0');
+    safeSetItem(TRACE_MODE_KEY, traceEnabled ? '1' : '0');
   }
   async function onExportSvg() {
     await exportBushingSvg({ form, results, draftingView });
@@ -221,6 +223,7 @@
     emitBushingTrace(trace);
   }
   onMount(() => {
+    console.log('[Bushing] Mounted', { initError, units: form.units, cards: leftCardOrder.length + rightCardOrder.length });
     mountBushingContextMenu({ onExportSvg: () => { void onExportSvg(); }, onExportPdf: () => { void onExportPdf(); }, toggleRendererMode, toggleTraceMode });
     if (typeof window !== 'undefined') {
       (window as any).__SCD_BUSHING_TEST_REORDER__ = (lane: 'left' | 'right', sourceId: string, targetId: string) => {
@@ -232,7 +235,19 @@
   $: updateBushingContextMenu(useLegacyRenderer, traceEnabled);
 </script>
 
-{#if showInformationView}
+{#if initError}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+    <div class="max-w-md rounded-lg bg-red-900/90 p-6 text-white shadow-xl">
+      <h2 class="mb-4 text-xl font-bold">Initialization Error</h2>
+      <p class="mb-2">{initError}</p>
+      <p class="mb-2 text-sm text-red-200">Try restarting the app or clearing data.</p>
+      <button type="button" class="mt-2 rounded bg-red-700 px-4 py-2 hover:bg-red-600"
+        on:click={() => { if (typeof window !== 'undefined') { try { localStorage.clear(); window.location.reload(); } catch {} } }}>
+        Clear Data & Reload
+      </button>
+    </div>
+  </div>
+{:else if showInformationView}
   <BushingInformationPage {form} {results} onBack={() => (showInformationView = false)} />
 {:else}
 <div class="grid grid-cols-1 gap-4 p-1 pt-4 lg:grid-cols-[450px_1fr]">
