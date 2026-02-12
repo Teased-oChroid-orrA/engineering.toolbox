@@ -101,15 +101,49 @@ export async function exportSvgText(svgText: string, filename = 'drawing.svg') {
 
 
 
-function openPrintWindow(html: string, title: string) {
+function openPrintWindow(html: string, title: string): boolean {
   const w = window.open('', '_blank', 'noopener,noreferrer');
-  if (!w) throw new Error('Popup blocked. Please allow popups for export.');
+  if (!w) return false;
   w.document.open();
   w.document.write(html);
   w.document.close();
   try { w.document.title = title; } catch {}
   setTimeout(() => {
     try { w.focus(); w.print(); } catch {}
+  }, 150);
+  return true;
+}
+
+function printWithHiddenIframe(html: string, title: string): void {
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '1px';
+  iframe.style.height = '1px';
+  iframe.style.opacity = '0';
+  iframe.style.pointerEvents = 'none';
+  iframe.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(iframe);
+  const doc = iframe.contentWindow?.document;
+  if (!doc) {
+    iframe.remove();
+    throw new Error('Print iframe unavailable.');
+  }
+  doc.open();
+  doc.write(html);
+  doc.close();
+  try { doc.title = title; } catch {}
+  const cleanup = () => {
+    try { iframe.remove(); } catch {}
+  };
+  setTimeout(() => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } finally {
+      setTimeout(cleanup, 500);
+    }
   }, 150);
 }
 
@@ -119,7 +153,8 @@ function openPrintWindow(html: string, title: string) {
  */
 export async function exportPdfFromHtml(html: string, title = 'Structural Companion Report') {
   if (typeof window === 'undefined') return;
-  openPrintWindow(html, title);
+  if (openPrintWindow(html, title)) return;
+  printWithHiddenIframe(html, title);
 }
 
 export async function exportSvg(svgEl: SVGElement, filename = 'drawing.svg') {

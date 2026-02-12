@@ -58,7 +58,7 @@
     {statusLabel}
   </div>
   <div class="absolute left-3 top-10 rounded-md border border-cyan-300/20 bg-cyan-500/10 px-2 py-1 text-[10px] font-mono text-cyan-100/85">
-    Drag pan • Rotate: Shift+drag or toggle button (3D) • Scroll/+/- zoom • Click center/realign
+    Drag pan • Rotate: toggle button (3D) • Scroll/+/- zoom • Click center/realign
   </div>
   {#if statusDetail}
     <div class="absolute left-3 top-10 rounded-md border border-rose-300/35 bg-rose-500/15 px-2 py-1 text-[10px] font-mono text-rose-100 max-w-[60%] truncate">

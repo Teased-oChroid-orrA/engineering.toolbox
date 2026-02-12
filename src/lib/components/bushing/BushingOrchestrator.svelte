@@ -8,17 +8,19 @@
   import { BUSHING_SCENE_MODULE_SENTINEL, type BushingRenderMode } from '$lib/drafting/bushing/bushingSceneModel';
   import { evaluateBushingPipeline, getBushingPipelineCacheStats } from './BushingComputeController';
   import BushingHelperGuidance from './BushingHelperGuidance.svelte';
-  import BushingDraftingPanel from './BushingDraftingPanel.svelte';
   import BushingProfileCard from './BushingProfileCard.svelte';
-  import BushingResultSummary from './BushingResultSummary.svelte';
-  import BushingDiagnosticsPanel from './BushingDiagnosticsPanel.svelte';
+  import BushingRightLaneCards from './BushingRightLaneCards.svelte';
+  import BushingInterferencePolicyControls from './BushingInterferencePolicyControls.svelte';
+  import BushingDraggableCard from './BushingDraggableCard.svelte';
+  import BushingSortableLane from './BushingSortableLane.svelte';
   import BushingInformationPage from './BushingInformationPage.svelte';
   import BushingPageHeader from './BushingPageHeader.svelte';
   import { mountBushingContextMenu, updateBushingContextMenu } from './BushingContextMenuController';
   import { exportBushingPdf, exportBushingSvg } from './BushingExportController';
   import { buildBushingTraceRecord, emitBushingTrace } from './BushingTraceLogger';
   import { runBushingVisualDiagnostics } from './BushingVisualDiagnostics';
-
+  import { canMoveInList, LEFT_DEFAULT_ORDER, RIGHT_DEFAULT_ORDER, moveCardInList, normalizeOrder, reorderList, type LeftCardId, type RightCardId } from './BushingCardLayoutController';
+  import { loadTopLevelLayout, persistTopLevelLayout, readBushingDndEnabled } from './BushingLayoutPersistence';
   const KEY = 'scd.bushing.inputs.v15';
   const TOL_MODE_ITEMS = [{ value: 'nominal_tol', label: 'Nominal +/- Tol' }, { value: 'limits', label: 'Lower / Upper' }];
   const END_CONSTRAINT_ITEMS = [
@@ -26,6 +28,23 @@
     { value: 'one_end', label: 'One End Constrained' },
     { value: 'both_ends', label: 'Both Ends Constrained' }
   ];
+  let leftCardOrder: LeftCardId[] = [...LEFT_DEFAULT_ORDER];
+  let rightCardOrder: RightCardId[] = [...RIGHT_DEFAULT_ORDER];
+  let dndEnabled = true;
+  let leftLaneItems: Array<{ id: string }> = [];
+  let rightLaneItems: Array<{ id: string }> = [];
+  $: leftLaneItems = leftCardOrder.map((id) => ({ id }));
+  $: rightLaneItems = rightCardOrder.map((id) => ({ id }));
+  const commitLeftLane = (items: Array<{ id: string }>) => { leftCardOrder = normalizeOrder(items.map((i) => i.id) as LeftCardId[], LEFT_DEFAULT_ORDER); };
+  const commitRightLane = (items: Array<{ id: string }>) => { rightCardOrder = normalizeOrder(items.map((i) => i.id) as RightCardId[], RIGHT_DEFAULT_ORDER); };
+  const moveLeftCard = (cardId: LeftCardId, direction: -1 | 1) => { leftCardOrder = normalizeOrder(moveCardInList(leftCardOrder, cardId, direction), LEFT_DEFAULT_ORDER); };
+  const leftMoveProps = (cardId: LeftCardId) => ({
+    dragEnabled: dndEnabled,
+    canMoveUp: canMoveInList(leftCardOrder, cardId, -1),
+    canMoveDown: canMoveInList(leftCardOrder, cardId, 1),
+    onMoveUp: () => moveLeftCard(cardId, -1),
+    onMoveDown: () => moveLeftCard(cardId, 1)
+  });
   let form: BushingInputs = {
     units: 'imperial',
     boreDia: 0.5,
@@ -42,6 +61,17 @@
     interferenceTolMinus: 0,
     interferenceLower: 0.0015,
     interferenceUpper: 0.0015,
+    interferencePolicy: {
+      enabled: false,
+      lockBore: true,
+      preserveBoreNominal: true,
+      allowBoreNominalShift: false
+    },
+    boreCapability: {
+      mode: 'unspecified'
+    },
+    enforceInterferenceTolerance: false,
+    lockBoreForInterference: true,
     housingLen: 0.5,
     housingWidth: 1.5,
     edgeDist: 0.75,
@@ -76,8 +106,46 @@
         console.error(e);
       }
     }
+    ({ leftCardOrder, rightCardOrder } = loadTopLevelLayout());
+    dndEnabled = readBushingDndEnabled();
+  }
+  $: {
+    if (!form.interferencePolicy) {
+      form.interferencePolicy = {
+        enabled: Boolean(form.enforceInterferenceTolerance),
+        lockBore: Boolean(form.lockBoreForInterference),
+        preserveBoreNominal: true,
+        allowBoreNominalShift: false
+      };
+    }
+    if (!form.boreCapability) {
+      form.boreCapability = { mode: 'unspecified' };
+    }
+    if (form.boreCapability.mode === 'reamer_fixed') {
+      form.interferencePolicy.lockBore = true;
+    }
+    if (form.interferencePolicy.lockBore && form.interferencePolicy.allowBoreNominalShift) {
+      form.interferencePolicy.allowBoreNominalShift = false;
+    }
+    if (form.interferencePolicy.preserveBoreNominal && form.interferencePolicy.allowBoreNominalShift) {
+      form.interferencePolicy.allowBoreNominalShift = false;
+    }
+    if (!form.interferencePolicy.allowBoreNominalShift) {
+      form.interferencePolicy.maxBoreNominalShift = undefined;
+    } else if (!Number.isFinite(form.interferencePolicy.maxBoreNominalShift as number)) {
+      form.interferencePolicy.maxBoreNominalShift = 0.0002;
+    }
+    const policyEnabled = Boolean(form.interferencePolicy.enabled);
+    const policyLock = Boolean(form.interferencePolicy.lockBore);
+    if (form.enforceInterferenceTolerance !== policyEnabled) form.enforceInterferenceTolerance = policyEnabled;
+    if (form.lockBoreForInterference !== policyLock) form.lockBoreForInterference = policyLock;
+    if (form.interferencePolicy.enabled !== form.enforceInterferenceTolerance) form.interferencePolicy.enabled = Boolean(form.enforceInterferenceTolerance);
+    if (form.interferencePolicy.lockBore !== form.lockBoreForInterference) form.interferencePolicy.lockBore = Boolean(form.lockBoreForInterference);
   }
   $: if (typeof window !== 'undefined') localStorage.setItem(KEY, JSON.stringify(form));
+  $: if (typeof window !== 'undefined') {
+    persistTopLevelLayout(leftCardOrder, rightCardOrder);
+  }
   $: pipeline = evaluateBushingPipeline(form);
   $: results = pipeline.results;
   $: draftingView = pipeline.draftingView;
@@ -137,7 +205,11 @@
     await exportBushingSvg({ form, results, draftingView });
   }
   async function onExportPdf() {
-    await exportBushingPdf({ form, results, draftingView });
+    try {
+      await exportBushingPdf({ form, results, draftingView });
+    } catch (err) {
+      console.warn('[Bushing][Export][PDF] failed', err);
+    }
   }
   $: if (typeof window !== 'undefined' && traceEnabled) {
     const trace = buildBushingTraceRecord({
@@ -148,18 +220,15 @@
     });
     emitBushingTrace(trace);
   }
-
-  onMount(() => mountBushingContextMenu({
-    onExportSvg: () => {
-      void onExportSvg();
-    },
-    onExportPdf: () => {
-      void onExportPdf();
-    },
-    toggleRendererMode,
-    toggleTraceMode
-  }));
-
+  onMount(() => {
+    mountBushingContextMenu({ onExportSvg: () => { void onExportSvg(); }, onExportPdf: () => { void onExportPdf(); }, toggleRendererMode, toggleTraceMode });
+    if (typeof window !== 'undefined') {
+      (window as any).__SCD_BUSHING_TEST_REORDER__ = (lane: 'left' | 'right', sourceId: string, targetId: string) => {
+        if (lane === 'left') leftCardOrder = normalizeOrder(reorderList(leftCardOrder, sourceId as LeftCardId, targetId as LeftCardId), LEFT_DEFAULT_ORDER);
+        else rightCardOrder = normalizeOrder(reorderList(rightCardOrder, sourceId as RightCardId, targetId as RightCardId), RIGHT_DEFAULT_ORDER);
+      };
+    }
+  });
   $: updateBushingContextMenu(useLegacyRenderer, traceEnabled);
 </script>
 
@@ -168,123 +237,151 @@
 {:else}
 <div class="grid grid-cols-1 gap-4 p-1 pt-4 lg:grid-cols-[450px_1fr]">
   <div class="flex flex-col gap-4 pb-8 pr-2">
-    <BushingPageHeader {isFailed} onShowInformation={() => (showInformationView = true)} />
-
-    <BushingHelperGuidance {form} {results} />
-
-    <Card id="bushing-setup-card" class="glass-card bushing-pop-card bushing-depth-2">
-      <CardHeader class="pb-2 pt-4">
-        <CardTitle class="text-[10px] font-bold uppercase text-indigo-300">1. Setup</CardTitle>
-      </CardHeader>
-      <CardContent class="grid grid-cols-1 gap-4">
-        <div class="space-y-1">
-          <Label class="text-white/70">Units</Label>
-          <div class="flex rounded-lg border border-white/10 bg-black/30 p-1 bushing-pop-sub bushing-depth-0">
-            <button class={cn('flex-1 rounded-md py-1 text-xs font-medium transition-all', form.units === 'imperial' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.units = 'imperial')}>Imperial</button>
-            <button class={cn('flex-1 rounded-md py-1 text-xs font-medium transition-all', form.units === 'metric' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.units = 'metric')}>Metric</button>
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div class="space-y-1">
-            <Label class="text-white/70">Housing Material</Label>
-            <Select bind:value={form.matHousing} items={MATERIALS.map((m) => ({ value: m.id, label: m.name }))} />
-          </div>
-          <div class="space-y-1">
-            <Label class="text-white/70">Bushing Material</Label>
-            <Select bind:value={form.matBushing} items={MATERIALS.map((m) => ({ value: m.id, label: m.name }))} />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-
-    <Card id="bushing-geometry-card" class="glass-card bushing-pop-card bushing-depth-2">
-      <CardHeader class="pb-2 pt-4">
-        <CardTitle class="text-[10px] font-bold uppercase text-indigo-300">2. Geometry</CardTitle>
-      </CardHeader>
-      <CardContent class="space-y-4">
-        <div class="rounded-lg border border-white/10 bg-black/20 p-3 space-y-3 bushing-pop-sub bushing-depth-0">
-          <div class="grid grid-cols-2 gap-3">
-            <div class="space-y-1">
-              <Label class="text-white/70">Bore Input Mode</Label>
-              <Select bind:value={form.boreTolMode} items={TOL_MODE_ITEMS} />
-            </div>
-            <div class="space-y-1">
-              <Label class="text-white/70">Interference Input Mode</Label>
-              <Select bind:value={form.interferenceTolMode} items={TOL_MODE_ITEMS} />
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            {#if form.boreTolMode === 'limits'}
-              <div class="space-y-1"><Label class="text-white/70">Bore Lower</Label><Input type="number" step="0.0001" bind:value={form.boreLower} /></div>
-              <div class="space-y-1"><Label class="text-white/70">Bore Upper</Label><Input type="number" step="0.0001" bind:value={form.boreUpper} /></div>
-            {:else}
-              <div class="space-y-1"><Label class="text-white/70">Bore Nominal</Label><Input type="number" step="0.0001" bind:value={form.boreNominal} /></div>
-              <div class="grid grid-cols-2 gap-2">
-                <div class="space-y-1"><Label class="text-white/70">Bore +Tol</Label><Input type="number" min="0" step="0.0001" bind:value={form.boreTolPlus} /></div>
-                <div class="space-y-1"><Label class="text-white/70">Bore -Tol</Label><Input type="number" min="0" step="0.0001" bind:value={form.boreTolMinus} /></div>
+    <BushingSortableLane
+      listClass="flex flex-col gap-4"
+      laneType="bushing-top-left"
+      enabled={dndEnabled}
+      items={leftLaneItems}
+      on:finalize={(ev) => commitLeftLane(ev.detail.items)}
+      let:item>
+      {#if item.id === 'header'}
+        <BushingDraggableCard column="left" cardId="header" title="Header" {...leftMoveProps('header')}>
+          <BushingPageHeader {isFailed} onShowInformation={() => (showInformationView = true)} />
+        </BushingDraggableCard>
+      {:else if item.id === 'guidance'}
+        <BushingDraggableCard column="left" cardId="guidance" title="Helper Guidance" {...leftMoveProps('guidance')}>
+          <BushingHelperGuidance {form} {results} />
+        </BushingDraggableCard>
+      {:else if item.id === 'setup'}
+        <BushingDraggableCard column="left" cardId="setup" title="Setup" {...leftMoveProps('setup')}>
+          <Card id="bushing-setup-card" class="glass-card bushing-pop-card bushing-depth-2">
+            <CardHeader class="pb-2 pt-4">
+              <CardTitle class="text-[10px] font-bold uppercase text-indigo-300">1. Setup</CardTitle>
+            </CardHeader>
+            <CardContent class="grid grid-cols-1 gap-4">
+              <div class="space-y-1">
+                <Label class="text-white/70">Units</Label>
+                <div class="flex rounded-lg border border-white/10 bg-black/30 p-1 bushing-pop-sub bushing-depth-0">
+                  <button class={cn('flex-1 rounded-md py-1 text-xs font-medium transition-all', form.units === 'imperial' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.units = 'imperial')}>Imperial</button>
+                  <button class={cn('flex-1 rounded-md py-1 text-xs font-medium transition-all', form.units === 'metric' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.units = 'metric')}>Metric</button>
+                </div>
               </div>
-            {/if}
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            {#if form.interferenceTolMode === 'limits'}
-              <div class="space-y-1"><Label class="text-white/70">Interference Lower</Label><Input type="number" step="0.0001" bind:value={form.interferenceLower} class="text-amber-200" /></div>
-              <div class="space-y-1"><Label class="text-white/70">Interference Upper</Label><Input type="number" step="0.0001" bind:value={form.interferenceUpper} class="text-amber-200" /></div>
-            {:else}
-              <div class="space-y-1"><Label class="text-white/70">Interference Nominal</Label><Input type="number" step="0.0001" bind:value={form.interferenceNominal} class="text-amber-200" /></div>
-              <div class="grid grid-cols-2 gap-2">
-                <div class="space-y-1"><Label class="text-white/70">Interference +Tol</Label><Input type="number" min="0" step="0.0001" bind:value={form.interferenceTolPlus} class="text-amber-200" /></div>
-                <div class="space-y-1"><Label class="text-white/70">Interference -Tol</Label><Input type="number" min="0" step="0.0001" bind:value={form.interferenceTolMinus} class="text-amber-200" /></div>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="space-y-1">
+                  <Label class="text-white/70">Housing Material</Label>
+                  <Select bind:value={form.matHousing} items={MATERIALS.map((m) => ({ value: m.id, label: m.name }))} />
+                </div>
+                <div class="space-y-1">
+                  <Label class="text-white/70">Bushing Material</Label>
+                  <Select bind:value={form.matBushing} items={MATERIALS.map((m) => ({ value: m.id, label: m.name }))} />
+                </div>
               </div>
-            {/if}
-          </div>
-          <div class="text-[10px] font-mono text-cyan-200/70">
-            Solved OD range: {results.tolerance.odBushing.lower.toFixed(4)} .. {results.tolerance.odBushing.upper.toFixed(4)} (nom {results.tolerance.odBushing.nominal.toFixed(4)})
-          </div>
-        </div>
-        <div class="grid grid-cols-3 gap-2">
-          <div class="space-y-1"><Label class="text-white/70">Housing Thk</Label><Input type="number" step="0.001" bind:value={form.housingLen} /></div>
-          <div class="space-y-1"><Label class="text-white/70">Plate Width</Label><Input type="number" step="0.001" bind:value={form.housingWidth} /></div>
-          <div class="space-y-1"><Label class="text-white/70">Edge Dist</Label><Input type="number" step="0.001" bind:value={form.edgeDist} /></div>
-        </div>
-      </CardContent>
-    </Card>
-
-    <div id="bushing-profile-card">
-      <BushingProfileCard bind:form odInstalled={results.odInstalled} />
-    </div>
-
-    <Card id="bushing-process-card" class="glass-card bushing-pop-card bushing-depth-2">
-      <CardHeader class="pb-2 pt-4">
-        <CardTitle class="text-[10px] font-bold uppercase text-indigo-300">4. Process / Limits</CardTitle>
-      </CardHeader>
-      <CardContent class="space-y-3">
-        <details class="rounded-lg border border-white/10 bg-white/5 p-3 bushing-pop-sub bushing-depth-1">
-          <summary class="cursor-pointer text-xs font-semibold text-white/80">Advanced Process Controls</summary>
-          <div class="mt-3 space-y-3">
-            <div class="grid grid-cols-2 gap-3">
-              <div class="space-y-1"><Label class="text-white/70">dT</Label><Input type="number" step="5" bind:value={form.dT} class="text-amber-200" /></div>
-              <div class="space-y-1"><Label class="text-white/70">Friction</Label><Input type="number" step="0.01" bind:value={form.friction} /></div>
-            </div>
-            <div class="space-y-1">
-              <Label class="text-white/70">Axial End Constraint</Label>
-              <Select bind:value={form.endConstraint} items={END_CONSTRAINT_ITEMS} />
-              <div class="text-[10px] text-cyan-200/70">
-                Controls axial stress development: free ends -> near plane-stress axial response, constrained ends -> higher axial stress coupling.
+            </CardContent>
+          </Card>
+        </BushingDraggableCard>
+      {:else if item.id === 'geometry'}
+        <BushingDraggableCard column="left" cardId="geometry" title="Geometry" {...leftMoveProps('geometry')}>
+          <Card id="bushing-geometry-card" class="glass-card bushing-pop-card bushing-depth-2">
+            <CardHeader class="pb-2 pt-4">
+              <CardTitle class="text-[10px] font-bold uppercase text-indigo-300">2. Geometry</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
+              <div class="rounded-lg border border-white/10 bg-black/20 p-3 space-y-3 bushing-pop-sub bushing-depth-0">
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="space-y-1">
+                    <Label class="text-white/70">Bore Input Mode</Label>
+                    <Select bind:value={form.boreTolMode} items={TOL_MODE_ITEMS} />
+                  </div>
+                  <div class="space-y-1">
+                    <Label class="text-white/70">Interference Input Mode</Label>
+                    <Select bind:value={form.interferenceTolMode} items={TOL_MODE_ITEMS} />
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  {#if form.boreTolMode === 'limits'}
+                    <div class="space-y-1"><Label class="text-white/70">Bore Lower</Label><Input type="number" step="0.0001" bind:value={form.boreLower} /></div>
+                    <div class="space-y-1"><Label class="text-white/70">Bore Upper</Label><Input type="number" step="0.0001" bind:value={form.boreUpper} /></div>
+                  {:else}
+                    <div class="space-y-1"><Label class="text-white/70">Bore Nominal</Label><Input type="number" step="0.0001" bind:value={form.boreNominal} /></div>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div class="space-y-1"><Label class="text-white/70">Bore +Tol</Label><Input type="number" min="0" step="0.0001" bind:value={form.boreTolPlus} /></div>
+                      <div class="space-y-1"><Label class="text-white/70">Bore -Tol</Label><Input type="number" min="0" step="0.0001" bind:value={form.boreTolMinus} /></div>
+                    </div>
+                  {/if}
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  {#if form.interferenceTolMode === 'limits'}
+                    <div class="space-y-1"><Label class="text-white/70">Interference Lower</Label><Input type="number" step="0.0001" bind:value={form.interferenceLower} class="text-amber-200" /></div>
+                    <div class="space-y-1"><Label class="text-white/70">Interference Upper</Label><Input type="number" step="0.0001" bind:value={form.interferenceUpper} class="text-amber-200" /></div>
+                  {:else}
+                    <div class="space-y-1"><Label class="text-white/70">Interference Nominal</Label><Input type="number" step="0.0001" bind:value={form.interferenceNominal} class="text-amber-200" /></div>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div class="space-y-1"><Label class="text-white/70">Interference +Tol</Label><Input type="number" min="0" step="0.0001" bind:value={form.interferenceTolPlus} class="text-amber-200" /></div>
+                      <div class="space-y-1"><Label class="text-white/70">Interference -Tol</Label><Input type="number" min="0" step="0.0001" bind:value={form.interferenceTolMinus} class="text-amber-200" /></div>
+                    </div>
+                  {/if}
+                </div>
+                <div class="text-[10px] font-mono text-cyan-200/70">
+                  Solved OD range: {results.tolerance.odBushing.lower.toFixed(4)} .. {results.tolerance.odBushing.upper.toFixed(4)} (nom {results.tolerance.odBushing.nominal.toFixed(4)})
+                </div>
               </div>
-            </div>
-            <Separator class="bg-white/10" />
-            <div class="grid grid-cols-2 gap-3">
-              <div class="space-y-1"><Label class="text-white/70">Min Straight Wall</Label><Input type="number" step="0.001" bind:value={form.minWallStraight} /></div>
-              <div class="space-y-1"><Label class="text-white/70">Min Neck Wall</Label><Input type="number" step="0.001" bind:value={form.minWallNeck} /></div>
-            </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div class="space-y-1"><Label class="text-white/70">Housing Thk</Label><Input type="number" step="0.001" bind:value={form.housingLen} /></div>
+                <div class="space-y-1"><Label class="text-white/70">Plate Width</Label><Input type="number" step="0.001" bind:value={form.housingWidth} /></div>
+                <div class="space-y-1"><Label class="text-white/70">Edge Dist</Label><Input type="number" step="0.001" bind:value={form.edgeDist} /></div>
+              </div>
+            </CardContent>
+          </Card>
+        </BushingDraggableCard>
+      {:else if item.id === 'profile'}
+        <BushingDraggableCard column="left" cardId="profile" title="Profile + Settings" {...leftMoveProps('profile')}>
+          <div id="bushing-profile-card">
+            <BushingProfileCard bind:form odInstalled={results.odInstalled} />
           </div>
-        </details>
-      </CardContent>
-    </Card>
+        </BushingDraggableCard>
+      {:else if item.id === 'process'}
+        <BushingDraggableCard column="left" cardId="process" title="Process / Limits" {...leftMoveProps('process')}>
+          <Card id="bushing-process-card" class="glass-card bushing-pop-card bushing-depth-2">
+            <CardHeader class="pb-2 pt-4">
+              <CardTitle class="text-[10px] font-bold uppercase text-indigo-300">4. Process / Limits</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-3">
+              <details class="rounded-lg border border-white/10 bg-white/5 p-3 bushing-pop-sub bushing-depth-1">
+                <summary class="cursor-pointer text-xs font-semibold text-white/80">Advanced Process Controls</summary>
+                <div class="mt-3 space-y-3">
+                  <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1"><Label class="text-white/70">dT</Label><Input type="number" step="5" bind:value={form.dT} class="text-amber-200" /></div>
+                    <div class="space-y-1"><Label class="text-white/70">Friction</Label><Input type="number" step="0.01" bind:value={form.friction} /></div>
+                  </div>
+                  <div class="space-y-1">
+                    <Label class="text-white/70">Axial End Constraint</Label>
+                    <Select bind:value={form.endConstraint} items={END_CONSTRAINT_ITEMS} />
+                    <div class="text-[10px] text-cyan-200/70">
+                      Controls axial stress development: free ends -> near plane-stress axial response, constrained ends -> higher axial stress coupling.
+                    </div>
+                  </div>
+                  <Separator class="bg-white/10" />
+                  <BushingInterferencePolicyControls bind:form {results} />
+                  <Separator class="bg-white/10" />
+                  <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1"><Label class="text-white/70">Min Straight Wall</Label><Input type="number" step="0.001" bind:value={form.minWallStraight} /></div>
+                    <div class="space-y-1"><Label class="text-white/70">Min Neck Wall</Label><Input type="number" step="0.001" bind:value={form.minWallNeck} /></div>
+                  </div>
+                </div>
+              </details>
+            </CardContent>
+          </Card>
+        </BushingDraggableCard>
+      {/if}
+    </BushingSortableLane>
   </div>
 
   <div class="flex flex-col gap-4 pb-8 pr-1">
-    <BushingDraftingPanel
+    <BushingRightLaneCards
+      items={rightLaneItems}
+      {dndEnabled}
+      {form}
+      {results}
       {draftingView}
       {useLegacyRenderer}
       {renderMode}
@@ -295,6 +392,7 @@
       {babylonInitNotice}
       {visualDiagnostics}
       {babylonDiagnostics}
+      onReorder={commitRightLane}
       onExportSvg={onExportSvg}
       onExportPdf={onExportPdf}
       onToggleRendererMode={toggleRendererMode}
@@ -304,9 +402,6 @@
       }}
       onBabylonInitFailure={handleBabylonInitFailure}
     />
-
-    <BushingResultSummary {form} {results} />
-    <BushingDiagnosticsPanel {results} />
   </div>
 </div>
 {/if}

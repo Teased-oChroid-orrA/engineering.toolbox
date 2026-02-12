@@ -73,6 +73,7 @@
     "jspdf-autotable": "^4.0.0",
     "katex": "^0.16.28",
     "shadcn-svelte": "^1.1.1",
+    "svelte-dnd-action": "^0.9.69",
     "tailwind-merge": "^2.5.4",
     "zod": "^3.25.0"
   },

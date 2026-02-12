@@ -216,7 +216,12 @@ export async function unloadWorkspaceDataset(ctx: any, id: string) {
 }
 
 export async function openStreamLoadFromMenu(ctx: any) {
-  if (!ctx.dialogMod) return;
+  if (!ctx.dialogMod) {
+    // In web/fallback environments, native dialog may be unavailable.
+    // Route to hidden file input instead of silently no-op.
+    openFallbackLoadFromMenu(ctx);
+    return;
+  }
   try {
     const p = await ctx.dialogMod.open({
       multiple: true,

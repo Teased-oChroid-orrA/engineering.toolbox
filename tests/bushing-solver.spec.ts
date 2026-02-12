@@ -55,4 +55,114 @@ test.describe('bushing solver regression', () => {
     expect(out.warningCodes.some((w) => w.code === 'INPUT_INVALID')).toBeTruthy();
     expect(Number.isFinite(out.pressure)).toBeTruthy();
   });
+
+  test('strict interference enforcement reports blocked state when bore is locked', async () => {
+    const out = computeBushing({
+      ...baseBushingInput,
+      boreTolMode: 'nominal_tol',
+      boreNominal: 0.5,
+      boreTolPlus: 0.0007,
+      boreTolMinus: 0,
+      interferenceTolMode: 'nominal_tol',
+      interferenceNominal: 0.0025,
+      interferenceTolPlus: 0.0005,
+      interferenceTolMinus: 0,
+      interferencePolicy: {
+        enabled: true,
+        lockBore: true,
+        preserveBoreNominal: true,
+        allowBoreNominalShift: false
+      }
+    });
+    expect(out.tolerance.enforcement.enabled).toBeTruthy();
+    expect(out.tolerance.enforcement.satisfied).toBeFalsy();
+    expect(out.tolerance.enforcement.blocked).toBeTruthy();
+    expect(out.tolerance.enforcement.reasonCodes).toContain('BLOCKED_BORE_LOCKED');
+    expect(out.warningCodes.some((w) => w.code === 'INTERFERENCE_ENFORCEMENT_BLOCKED')).toBeTruthy();
+  });
+
+  test('strict interference enforcement can satisfy containment by shrinking bore width when unlocked', async () => {
+    const out = computeBushing({
+      ...baseBushingInput,
+      boreTolMode: 'nominal_tol',
+      boreNominal: 0.5,
+      boreTolPlus: 0.0007,
+      boreTolMinus: 0,
+      interferenceTolMode: 'nominal_tol',
+      interferenceNominal: 0.0025,
+      interferenceTolPlus: 0.0005,
+      interferenceTolMinus: 0,
+      interferencePolicy: {
+        enabled: true,
+        lockBore: false,
+        preserveBoreNominal: true,
+        allowBoreNominalShift: false
+      }
+    });
+    expect(out.tolerance.enforcement.satisfied).toBeTruthy();
+    expect(out.tolerance.enforcement.blocked).toBeFalsy();
+    expect(out.tolerance.enforcement.reasonCodes).toContain('AUTO_ADJUST_BORE_WIDTH');
+    expect(out.tolerance.achievedInterference.lower + 1e-9).toBeGreaterThanOrEqual(out.tolerance.interferenceTarget.lower);
+    expect(out.tolerance.achievedInterference.upper - 1e-9).toBeLessThanOrEqual(out.tolerance.interferenceTarget.upper);
+    expect(out.tolerance.bore.nominal).toBeCloseTo(0.5, 9);
+  });
+
+  test('strict interference enforcement is blocked by bore capability floor', async () => {
+    const out = computeBushing({
+      ...baseBushingInput,
+      boreTolMode: 'nominal_tol',
+      boreNominal: 0.5,
+      boreTolPlus: 0.0007,
+      boreTolMinus: 0,
+      interferenceTolMode: 'nominal_tol',
+      interferenceNominal: 0.0025,
+      interferenceTolPlus: 0.0005,
+      interferenceTolMinus: 0,
+      interferencePolicy: {
+        enabled: true,
+        lockBore: false,
+        preserveBoreNominal: true,
+        allowBoreNominalShift: false
+      },
+      boreCapability: {
+        mode: 'adjustable',
+        minAchievableTolWidth: 0.0006
+      }
+    });
+    expect(out.tolerance.enforcement.satisfied).toBeFalsy();
+    expect(out.tolerance.enforcement.reasonCodes).toContain('BLOCKED_CAPABILITY_FLOOR');
+    expect(out.warningCodes.some((w) => w.code === 'INTERFERENCE_ENFORCEMENT_BLOCKED')).toBeTruthy();
+  });
+
+  test('countersink outputs stay finite and ordered under enforced tolerance policy', async () => {
+    const out = computeBushing({
+      ...baseBushingInput,
+      bushingType: 'countersink',
+      idType: 'countersink',
+      boreTolMode: 'nominal_tol',
+      boreNominal: 0.5,
+      boreTolPlus: 0.0007,
+      boreTolMinus: 0,
+      interferenceTolMode: 'nominal_tol',
+      interferenceNominal: 0.0025,
+      interferenceTolPlus: 0.0005,
+      interferenceTolMinus: 0,
+      interferencePolicy: {
+        enabled: true,
+        lockBore: false,
+        preserveBoreNominal: true,
+        allowBoreNominalShift: false
+      },
+      extCsMode: 'depth_angle',
+      extCsDepth: 0.1,
+      extCsAngle: 100,
+      csMode: 'depth_angle',
+      csDepth: 0.09,
+      csAngle: 100
+    });
+    expect(Number.isFinite(out.geometry.csExternal.dia)).toBeTruthy();
+    expect(Number.isFinite(out.geometry.csInternal.dia)).toBeTruthy();
+    expect(out.tolerance.csExternalDia?.lower ?? 0).toBeGreaterThanOrEqual(out.tolerance.odBushing.lower);
+    expect(out.tolerance.csInternalDia?.lower ?? 0).toBeGreaterThanOrEqual(baseBushingInput.idBushing);
+  });
 });

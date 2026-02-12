@@ -33,6 +33,24 @@ function normalizeEndConstraint(v: unknown): NonNullable<BushingInputs['endConst
   return 'free';
 }
 
+function normalizeBool(v: unknown, fallback: boolean): boolean {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v !== 0;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    if (s === 'true' || s === '1' || s === 'yes' || s === 'on') return true;
+    if (s === 'false' || s === '0' || s === 'no' || s === 'off') return false;
+  }
+  return fallback;
+}
+
+function normalizeCapabilityMode(v: unknown): NonNullable<BushingInputs['boreCapability']>['mode'] {
+  const s = String(v ?? '').toLowerCase();
+  if (s === 'reamer_fixed' || s === 'reamer-fixed' || s === 'reamer fixed') return 'reamer_fixed';
+  if (s === 'adjustable') return 'adjustable';
+  return 'unspecified';
+}
+
 export function normalizeBushingInputs(raw: BushingInputsRaw): BushingInputs {
   const units: BushingInputs['units'] = raw.units === 'metric' ? 'metric' : 'imperial';
   const boreTolMode = normalizeToleranceMode(raw.boreTolMode ?? raw.bore_tol_mode);
@@ -71,6 +89,40 @@ export function normalizeBushingInputs(raw: BushingInputsRaw): BushingInputs {
 
   const csMode = normalizeMode(raw.csMode ?? raw.cs_mode ?? raw.idCS?.defType, 'depth_angle');
   const extCsMode = normalizeMode(raw.extCsMode ?? raw.ext_cs_mode ?? raw.odCS?.defType, 'depth_angle');
+  const policyRaw = (raw.interferencePolicy ?? raw.interference_policy ?? {}) as Record<string, unknown>;
+  const capabilityRaw = (raw.boreCapability ?? raw.bore_capability ?? {}) as Record<string, unknown>;
+
+  const interferencePolicy: BushingInputs['interferencePolicy'] = {
+    enabled: normalizeBool(
+      policyRaw.enabled ?? raw.enforceInterferenceTolerance ?? raw.enforce_interference_tolerance,
+      false
+    ),
+    lockBore: normalizeBool(
+      policyRaw.lockBore ?? policyRaw.lock_bore ?? raw.lockBoreForInterference ?? raw.lock_bore_for_interference,
+      true
+    ),
+    preserveBoreNominal: normalizeBool(policyRaw.preserveBoreNominal ?? policyRaw.preserve_bore_nominal, true),
+    allowBoreNominalShift: normalizeBool(policyRaw.allowBoreNominalShift ?? policyRaw.allow_bore_nominal_shift, false),
+    maxBoreNominalShift: Number.isFinite(Number(policyRaw.maxBoreNominalShift ?? policyRaw.max_bore_nominal_shift))
+      ? toInches(Math.max(0, Number(policyRaw.maxBoreNominalShift ?? policyRaw.max_bore_nominal_shift)), units)
+      : undefined
+  };
+
+  const minAchievableTolWidthRaw = Number(capabilityRaw.minAchievableTolWidth ?? capabilityRaw.min_achievable_tol_width);
+  const maxRecommendedTolWidthRaw = Number(capabilityRaw.maxRecommendedTolWidth ?? capabilityRaw.max_recommended_tol_width);
+  const boreCapability: BushingInputs['boreCapability'] = {
+    mode: normalizeCapabilityMode(capabilityRaw.mode),
+    minAchievableTolWidth: Number.isFinite(minAchievableTolWidthRaw)
+      ? toInches(Math.max(0, minAchievableTolWidthRaw), units)
+      : undefined,
+    maxRecommendedTolWidth: Number.isFinite(maxRecommendedTolWidthRaw)
+      ? toInches(Math.max(0, maxRecommendedTolWidthRaw), units)
+      : undefined,
+    preferredItClass: String(capabilityRaw.preferredItClass ?? capabilityRaw.preferred_it_class ?? '').trim() || undefined
+  };
+  if (boreCapability.mode === 'reamer_fixed') {
+    interferencePolicy.lockBore = true;
+  }
 
   return {
     units,
@@ -89,6 +141,11 @@ export function normalizeBushingInputs(raw: BushingInputsRaw): BushingInputs {
     interferenceTolMinus,
     interferenceLower,
     interferenceUpper,
+    interferencePolicy,
+    boreCapability,
+    // Legacy mirrors, kept while UI migrates to policy object.
+    enforceInterferenceTolerance: Boolean(interferencePolicy.enabled),
+    lockBoreForInterference: Boolean(interferencePolicy.lockBore),
     housingLen,
     housingWidth,
     edgeDist,

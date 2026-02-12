@@ -1860,6 +1860,7 @@
     {activeDatasetId}
     {datasetId}
     {totalRowCount}
+    {canOpenPath}
     {showRegexHelp}
     {uiAnimDur}
     {tier2Tab}
@@ -1888,6 +1889,8 @@
     onOpenHelp={() => { showRegexHelp = true; }}
     onOpenGenerator={openRegexGenerator}
     onOpenRecipes={openRecipes}
+    onOpenStreamLoad={openStreamLoadFromMenu}
+    onOpenFallbackLoad={openFallbackLoadFromMenu}
     onMultiQueryEnabledChange={onMultiQueryEnabledChange}
     onMultiQueryExpandedChange={onMultiQueryExpandedChange}
     onAddMultiQueryClause={onAddMultiQueryClause}

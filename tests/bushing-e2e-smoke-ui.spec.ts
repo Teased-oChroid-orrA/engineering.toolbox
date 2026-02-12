@@ -164,4 +164,88 @@ test.describe('bushing e2e smoke UI', () => {
     await expect(page.getByText('Results Summary')).toBeVisible();
     await expect(page.getByText('SECTION A-A')).toBeVisible();
   });
+
+  test('interference priority controls render and diagnostics update', async ({ page }) => {
+    await page.getByText('Advanced Process Controls').click();
+    await expect(page.getByText('Tolerance Priority Controls')).toBeVisible();
+    await expect(page.getByText('Enforce Interference Tolerance')).toBeVisible();
+    await expect(page.getByText('Lock Bore (Reamer Fixed)')).toBeVisible();
+    await expect(page.getByText('Preserve Bore Nominal')).toBeVisible();
+    await expect(page.getByText('Allow Bore Nominal Shift')).toBeVisible();
+    await expect(page.getByText('Bore Capability Mode')).toBeVisible();
+    await expect(page.getByText('Min Achievable Bore Tol Width')).toBeVisible();
+
+    const enforce = page.locator("xpath=//span[normalize-space()='Enforce Interference Tolerance']/following::input[@type='checkbox'][1]");
+    await enforce.setChecked(true, { force: true });
+    await expect.poll(async () =>
+      page.evaluate(() => {
+        const raw = JSON.parse(localStorage.getItem('scd.bushing.inputs.v15') ?? '{}');
+        return Boolean(raw?.interferencePolicy?.enabled);
+      })
+    ).toBeTruthy();
+    await expect(page.getByText('Interference Enforcement')).toBeVisible();
+  });
+
+  test('top-level drag reorder persists and preview updates on hover', async ({ page }) => {
+    const setup = page.locator("[data-dnd-lane='left'][data-dnd-card='setup']").first();
+    const guidance = page.locator("[data-dnd-lane='left'][data-dnd-card='guidance']").first();
+    await expect(setup).toBeVisible();
+    await expect(guidance).toBeVisible();
+
+    const markers = await page.evaluate(() => [...document.querySelectorAll("[data-dnd-lane='left'][data-dnd-card]")].length);
+    expect(markers).toBeGreaterThan(2);
+
+    await page.evaluate(() => (window as any).__SCD_BUSHING_TEST_REORDER__?.('left', 'setup', 'guidance'));
+    await expect.poll(async () =>
+      page.evaluate(() => {
+        const raw = JSON.parse(localStorage.getItem('scd.bushing.layout.v3') ?? '{}');
+        return raw?.leftCardOrder;
+      })
+    ).toEqual(['header', 'setup', 'guidance', 'geometry', 'profile', 'process']);
+
+    await page.reload();
+    await expect(page.getByText('Bushing Toolbox')).toBeVisible();
+    await page.waitForLoadState('domcontentloaded');
+    await expect.poll(async () =>
+      page.evaluate(() => {
+        try {
+          const raw = JSON.parse(localStorage.getItem('scd.bushing.layout.v3') ?? '{}');
+          return raw?.leftCardOrder;
+        } catch {
+          return null;
+        }
+      })
+    ).toEqual(['header', 'setup', 'guidance', 'geometry', 'profile', 'process']);
+  });
+
+  test('nested diagnostics cards reorder without moving parent lane', async ({ page }) => {
+    await page.waitForLoadState('domcontentloaded');
+    await page.evaluate(() => {
+      localStorage.setItem('scd.bushing.layout.v2', JSON.stringify({
+        leftCardOrder: ['header', 'guidance', 'setup', 'geometry', 'profile', 'process'],
+        rightCardOrder: ['drafting', 'summary', 'diagnostics']
+      }));
+      localStorage.setItem('scd.bushing.layout.v2.diagnostics', JSON.stringify(['edge', 'wall', 'warnings']));
+      localStorage.removeItem('scd.bushing.layout.v3');
+      localStorage.removeItem('scd.bushing.layout.v3.diagnostics');
+    });
+    await page.reload();
+    await expect(page.getByText('Bushing Toolbox')).toBeVisible();
+
+    const edge = page.locator("[data-diag-card='edge']").first();
+    const wall = page.locator("[data-diag-card='wall']").first();
+    await expect(edge).toBeVisible();
+    await expect(wall).toBeVisible();
+    await page.evaluate(() => (window as any).__SCD_BUSHING_TEST_REORDER_DIAG__?.('edge', 'wall'));
+
+    await expect.poll(async () =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('scd.bushing.layout.v3.diagnostics') ?? '[]'))
+    ).toEqual(expect.arrayContaining(['wall', 'edge']));
+    await expect.poll(async () =>
+      page.evaluate(() => (JSON.parse(localStorage.getItem('scd.bushing.layout.v3.diagnostics') ?? '[]') as string[]).slice(0, 2))
+    ).toEqual(['wall', 'edge']);
+    await expect.poll(async () =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('scd.bushing.layout.v3') ?? '{}')?.rightCardOrder)
+    ).toEqual(['drafting', 'summary', 'diagnostics']);
+  });
 });

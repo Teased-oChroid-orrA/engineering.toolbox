@@ -1,13 +1,50 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { Card, CardContent } from '$lib/components/ui';
   import type { BushingOutput } from '$lib/core/bushing';
+  import { canMoveInList, moveCardInList, normalizeOrder, reorderList } from './BushingCardLayoutController';
+  import { loadNestedDiagnosticsLayout, persistNestedDiagnosticsLayout } from './BushingLayoutPersistence';
+  import BushingSortableLane from './BushingSortableLane.svelte';
 
   export let results: BushingOutput;
+  export let dndEnabled = true;
   let infoDialog: 'diagnostics' | 'edge' | 'wall' | null = null;
+
+  const DEFAULT_DIAG_ORDER = ['edge', 'wall', 'warnings'] as const;
 
   const fmt = (n: number | null | undefined, d = 4) => (!Number.isFinite(Number(n)) ? '---' : Number(n).toFixed(d));
   $: edgeFailed = results.warningCodes.some((w) => w.code.includes('EDGE_DISTANCE'));
   $: wallFailed = results.warningCodes.some((w) => w.code.includes('WALL_BELOW_MIN'));
+  $: hasWarnings = Boolean(results.warnings?.length);
+  $: activeDiagIds = (hasWarnings ? [...DEFAULT_DIAG_ORDER] : DEFAULT_DIAG_ORDER.filter((v) => v !== 'warnings')) as string[];
+
+  let diagOrder: string[] = [...DEFAULT_DIAG_ORDER];
+  let diagLaneItems: Array<{ id: string }> = [];
+  $: diagLaneItems = diagOrder.map((id) => ({ id }));
+
+  if (typeof window !== 'undefined') diagOrder = loadNestedDiagnosticsLayout([...DEFAULT_DIAG_ORDER]);
+
+  $: diagOrder = normalizeOrder(diagOrder, activeDiagIds);
+  $: if (typeof window !== 'undefined') persistNestedDiagnosticsLayout(diagOrder);
+
+  onMount(() => {
+    if (typeof window === 'undefined') return;
+    (window as any).__SCD_BUSHING_TEST_REORDER_DIAG__ = (sourceId: string, targetId: string) => {
+      diagOrder = normalizeOrder(reorderList(diagOrder, sourceId, targetId), activeDiagIds);
+    };
+  });
+
+  function commitDiagLane(items: Array<{ id: string }>): void {
+    diagOrder = normalizeOrder(items.map((item) => item.id), activeDiagIds);
+  }
+
+  function canMove(id: string, direction: -1 | 1): boolean {
+    return canMoveInList(diagOrder, id, direction);
+  }
+
+  function move(id: string, direction: -1 | 1): void {
+    diagOrder = normalizeOrder(moveCardInList(diagOrder, id, direction), activeDiagIds);
+  }
 
   function focusSection(id: string) {
     const el = document.getElementById(id);
@@ -30,57 +67,83 @@
         ?
       </button>
     </summary>
-    <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div
-        class="cursor-pointer"
-        role="button"
-        tabindex="0"
-        on:click={() => (infoDialog = 'edge')}
-        on:keydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (infoDialog = 'edge')}>
-      <Card
-        id="bushing-edge-distance-card"
-        class={`bushing-results-card bushing-pop-card bushing-depth-1 ${edgeFailed ? 'border border-amber-300/55' : ''}`}>
-        <CardContent class="pt-4 text-sm space-y-2">
-          <div class="text-[10px] uppercase tracking-wide text-indigo-200/95 font-bold">Edge Distance</div>
-          <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Actual e/D</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.edgeDistance.edActual)}</span></div>
-          <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Min (Seq)</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.edgeDistance.edMinSequence)}</span></div>
-          <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Min (Strength)</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.edgeDistance.edMinStrength)}</span></div>
-          <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Mode</span><span class="font-mono text-slate-100 font-semibold">{results.edgeDistance.governing}</span></div>
-        </CardContent>
-      </Card>
-      </div>
-      <div
-        class="cursor-pointer"
-        role="button"
-        tabindex="0"
-        on:click={() => (infoDialog = 'wall')}
-        on:keydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (infoDialog = 'wall')}>
-      <Card
-        id="bushing-wall-thickness-card"
-        class={`bushing-results-card bushing-pop-card bushing-depth-1 ${wallFailed ? 'border border-amber-300/55' : ''}`}>
-        <CardContent class="pt-4 text-sm space-y-2">
-          <div class="text-[10px] uppercase tracking-wide text-indigo-200/95 font-bold">Wall Thickness</div>
-          <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Straight</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.sleeveWall)}</span></div>
-          <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Neck</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.neckWall)}</span></div>
-          <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Governing</span><span class="font-mono text-slate-100 font-semibold">{results.governing.name}</span></div>
-        </CardContent>
-      </Card>
-      </div>
-    </div>
-  </details>
-
-  {#if results.warnings?.length}
-    <Card id="bushing-warnings-card" class="border border-amber-300/55 bg-amber-500/15 bushing-pop-card bushing-depth-1">
-      <CardContent class="pt-4 text-sm space-y-2">
-        <div class="text-[10px] font-bold uppercase text-amber-200">Warnings</div>
-        {#each results.warnings as w}
-          <div class="flex items-start gap-2 rounded-md border border-amber-200/35 bg-black/35 px-2 py-1.5 bushing-pop-sub bushing-depth-0 text-amber-50">
-            <span class="text-amber-200">⚠</span><span class="font-medium">{w}</span>
+    <BushingSortableLane
+      listClass="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2"
+      laneType="bushing-diagnostics-cards"
+      enabled={dndEnabled}
+      items={diagLaneItems}
+      on:consider={(ev) => commitDiagLane(ev.detail.items)}
+      on:finalize={(ev) => commitDiagLane(ev.detail.items)}
+      let:item>
+      {#if item.id === 'edge'}
+        <div class="rounded-md" data-diag-card="edge">
+          <div class="mb-1 flex justify-end gap-1 text-[10px]">
+            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" on:click={() => move('edge', -1)} disabled={!canMove('edge', -1)}>Up</button>
+            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" on:click={() => move('edge', 1)} disabled={!canMove('edge', 1)}>Down</button>
           </div>
-        {/each}
-      </CardContent>
-    </Card>
-  {/if}
+          <div
+            class="cursor-pointer"
+            role="button"
+            tabindex="0"
+            on:click={() => (infoDialog = 'edge')}
+            on:keydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (infoDialog = 'edge')}>
+            <Card
+              id="bushing-edge-distance-card"
+              class={`bushing-results-card bushing-pop-card bushing-depth-1 ${edgeFailed ? 'border border-amber-300/55' : ''}`}>
+              <CardContent class="pt-4 text-sm space-y-2">
+                <div class="text-[10px] uppercase tracking-wide text-indigo-200/95 font-bold">Edge Distance</div>
+                <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Actual e/D</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.edgeDistance.edActual)}</span></div>
+                <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Min (Seq)</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.edgeDistance.edMinSequence)}</span></div>
+                <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Min (Strength)</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.edgeDistance.edMinStrength)}</span></div>
+                <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Mode</span><span class="font-mono text-slate-100 font-semibold">{results.edgeDistance.governing}</span></div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      {:else if item.id === 'wall'}
+        <div class="rounded-md" data-diag-card="wall">
+          <div class="mb-1 flex justify-end gap-1 text-[10px]">
+            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" on:click={() => move('wall', -1)} disabled={!canMove('wall', -1)}>Up</button>
+            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" on:click={() => move('wall', 1)} disabled={!canMove('wall', 1)}>Down</button>
+          </div>
+          <div
+            class="cursor-pointer"
+            role="button"
+            tabindex="0"
+            on:click={() => (infoDialog = 'wall')}
+            on:keydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (infoDialog = 'wall')}>
+            <Card
+              id="bushing-wall-thickness-card"
+              class={`bushing-results-card bushing-pop-card bushing-depth-1 ${wallFailed ? 'border border-amber-300/55' : ''}`}>
+              <CardContent class="pt-4 text-sm space-y-2">
+                <div class="text-[10px] uppercase tracking-wide text-indigo-200/95 font-bold">Wall Thickness</div>
+                <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Straight</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.sleeveWall)}</span></div>
+                <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Neck</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.neckWall)}</span></div>
+                <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Governing</span><span class="font-mono text-slate-100 font-semibold">{results.governing.name}</span></div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      {:else if item.id === 'warnings' && results.warnings?.length}
+        <div class="rounded-md md:col-span-2" data-diag-card="warnings">
+          <div class="mb-1 flex justify-end gap-1 text-[10px]">
+            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" on:click={() => move('warnings', -1)} disabled={!canMove('warnings', -1)}>Up</button>
+            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" on:click={() => move('warnings', 1)} disabled={!canMove('warnings', 1)}>Down</button>
+          </div>
+          <Card id="bushing-warnings-card" class="border border-amber-300/55 bg-amber-500/15 bushing-pop-card bushing-depth-1">
+            <CardContent class="pt-4 text-sm space-y-2">
+              <div class="text-[10px] font-bold uppercase text-amber-200">Warnings</div>
+              {#each results.warnings as w}
+                <div class="flex items-start gap-2 rounded-md border border-amber-200/35 bg-black/35 px-2 py-1.5 bushing-pop-sub bushing-depth-0 text-amber-50">
+                  <span class="text-amber-200">⚠</span><span class="font-medium">{w}</span>
+                </div>
+              {/each}
+            </CardContent>
+          </Card>
+        </div>
+      {/if}
+    </BushingSortableLane>
+  </details>
 </div>
 
 {#if infoDialog}

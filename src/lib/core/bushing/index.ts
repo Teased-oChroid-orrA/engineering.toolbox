@@ -10,6 +10,9 @@ export type {
   BushingOutput,
   BushingWarning,
   BushingWarningCode,
+  InterferenceEnforcementPolicy,
+  BoreProcessCapability,
+  InterferenceEnforcementReasonCode,
   CSMode,
   MaterialProps,
   CountersinkInput

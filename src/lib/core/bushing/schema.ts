@@ -18,6 +18,21 @@ export const bushingInputsSchema = z.object({
   interferenceTolMinus: z.number().nonnegative().optional(),
   interferenceLower: z.number().optional(),
   interferenceUpper: z.number().optional(),
+  interferencePolicy: z.object({
+    enabled: z.boolean().optional(),
+    lockBore: z.boolean().optional(),
+    preserveBoreNominal: z.boolean().optional(),
+    allowBoreNominalShift: z.boolean().optional(),
+    maxBoreNominalShift: z.number().nonnegative().optional()
+  }).optional(),
+  boreCapability: z.object({
+    mode: z.enum(['unspecified', 'reamer_fixed', 'adjustable']).optional(),
+    minAchievableTolWidth: z.number().nonnegative().optional(),
+    maxRecommendedTolWidth: z.number().nonnegative().optional(),
+    preferredItClass: z.string().optional()
+  }).optional(),
+  enforceInterferenceTolerance: z.boolean().optional(),
+  lockBoreForInterference: z.boolean().optional(),
   housingLen: z.number().positive(),
   housingWidth: z.number().positive(),
   edgeDist: z.number().nonnegative(),
@@ -96,6 +111,29 @@ export function validateBushingInputs(input: BushingInputs): BushingWarning[] {
       code: 'INPUT_INVALID',
       message: 'Interference lower limit should be <= upper limit.',
       severity: 'warning'
+    });
+  }
+  const minAchievableTolWidth = Number(input.boreCapability?.minAchievableTolWidth);
+  const maxRecommendedTolWidth = Number(input.boreCapability?.maxRecommendedTolWidth);
+  if (Number.isFinite(minAchievableTolWidth) && Number.isFinite(maxRecommendedTolWidth) && minAchievableTolWidth > maxRecommendedTolWidth) {
+    warnings.push({
+      code: 'INPUT_INVALID',
+      message: 'Bore capability min achievable tolerance width should be <= max recommended tolerance width.',
+      severity: 'warning'
+    });
+  }
+  if (input.interferencePolicy?.preserveBoreNominal && input.interferencePolicy?.allowBoreNominalShift) {
+    warnings.push({
+      code: 'INPUT_INVALID',
+      message: 'Interference policy has both preserve-bore-nominal and allow-bore-nominal-shift enabled; preserve nominal takes precedence.',
+      severity: 'info'
+    });
+  }
+  if (input.boreCapability?.mode === 'reamer_fixed' && input.interferencePolicy?.lockBore === false) {
+    warnings.push({
+      code: 'INPUT_INVALID',
+      message: 'Reamer-fixed bore capability requires lock bore to remain enabled.',
+      severity: 'info'
     });
   }
   if (input.idType === 'countersink') {

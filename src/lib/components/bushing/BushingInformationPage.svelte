@@ -201,6 +201,22 @@
             If bore variation is wider than the allowed interference window, no single OD tolerance can satisfy all combinations. The solver reports infeasible or clamps toward the nearest feasible center.
           </div>
         </div>
+        <div class="rounded-md border border-cyan-300/30 bg-cyan-500/8 p-2">
+          <div class="font-semibold text-cyan-100">Interference Priority (strict containment mode)</div>
+          <div>
+            When enabled, the solver enforces interval containment: achieved lower must be greater than or equal to target lower, and achieved upper must be less than or equal to target upper.
+            If constraints prevent this, the result is explicitly marked blocked with reason codes.
+          </div>
+          <div class="mt-1 font-mono text-[11px] text-cyan-100/90">
+            required bore width = target upper - target lower
+          </div>
+          <div class="font-mono text-[11px] text-cyan-100/90">
+            containment feasible only if available bore width is less than or equal to required bore width
+          </div>
+          <div class="mt-1 text-white/80">
+            Reamer-fixed workflows should keep bore lock enabled. Adjustable workflows can allow bore-band tightening while preserving bore nominal.
+          </div>
+        </div>
         <div class="rounded-md border border-cyan-300/35 bg-cyan-500/10 p-2">
           <div class="text-[11px] uppercase tracking-wide text-cyan-100">Current design snapshot</div>
           <div class="font-mono">Units: {form.units}</div>
