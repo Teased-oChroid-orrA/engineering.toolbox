@@ -10,25 +10,25 @@
     DEFAULT_CARD_POSITIONS
   } from './BushingCardPositionController';
   
-  // Props for all card content
-  export let form: any;
-  export let results: any;
-  export let draftingView: any;
-  export let useLegacyRenderer: boolean;
-  export let renderMode: any;
-  export let traceEnabled: boolean;
-  export let cacheStats: any;
-  export let babylonInitNotice: string | null;
-  export let visualDiagnostics: any[];
-  export let babylonDiagnostics: any[];
-  export let onExportSvg: () => Promise<void>;
-  export let onExportPdf: () => Promise<void>;
-  export let toggleRendererMode: () => void;
-  export let toggleTraceMode: () => void;
-  export let handleBabylonInitFailure: (reason: string) => void;
+  // Props for all card content (marked as const for external reference)
+  export const form: any = undefined;
+  export const results: any = undefined;
+  export const draftingView: any = undefined;
+  export const useLegacyRenderer: boolean = false;
+  export const renderMode: any = undefined;
+  export const traceEnabled: boolean = false;
+  export const cacheStats: any = undefined;
+  export const babylonInitNotice: string | null = null;
+  export const visualDiagnostics: any[] = [];
+  export const babylonDiagnostics: any[] = [];
+  export const onExportSvg: () => Promise<void> = async () => {};
+  export const onExportPdf: () => Promise<void> = async () => {};
+  export const toggleRendererMode: () => void = () => {};
+  export const toggleTraceMode: () => void = () => {};
+  export const handleBabylonInitFailure: (reason: string) => void = () => {};
   export let dndEnabled: boolean = true;
-  export let showInformationView: boolean = false;
-  export let isFailed: boolean = false;
+  export const showInformationView: boolean = false;
+  export const isFailed: boolean = false;
   
   let layout: FreeLayoutV4;
   let overlappingCards: Record<CardId, boolean> = {} as Record<CardId, boolean>;

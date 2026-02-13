@@ -15,6 +15,7 @@ and then refactor every violating file until the policy passes.
 
 ### Svelte
 - Component `.svelte`: max 300 lines
+- **Orchestrator `.svelte` (files ending in `Orchestrator.svelte`)**: max 800 lines
 - Page `.svelte` (under `src/routes`): max 500 lines
 - Store `.js/.ts` (`store`/`stores` naming or folder): max 200 lines
 

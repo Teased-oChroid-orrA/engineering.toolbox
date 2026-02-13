@@ -3,7 +3,7 @@
   import type { BabylonRenderDiagnostic } from '$lib/drafting/bushing/BushingBabylonRuntime';
   import type { BushingRenderMode } from '$lib/drafting/bushing/bushingSceneModel';
   import { canMoveInList, moveCardInList } from './BushingCardLayoutController';
-  import BushingSortableLane from './BushingSortableLane.svelte';
+  import NativeDragLane from './NativeDragLane.svelte';
   import BushingDraggableCard from './BushingDraggableCard.svelte';
   import BushingDraftingPanel from './BushingDraftingPanel.svelte';
   import BushingResultSummary from './BushingResultSummary.svelte';
@@ -51,9 +51,8 @@
   }
 </script>
 
-<BushingSortableLane
+<NativeDragLane
   listClass="flex flex-col gap-4"
-  laneType="bushing-top-right"
   {items}
   enabled={dndEnabled}
   on:finalize={handleFinalize}
@@ -112,4 +111,4 @@
       <BushingDiagnosticsPanel {results} dndEnabled={dndEnabled} />
     </BushingDraggableCard>
   {/if}
-</BushingSortableLane>
+</NativeDragLane>

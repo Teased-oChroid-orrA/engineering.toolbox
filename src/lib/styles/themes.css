@@ -1,0 +1,44 @@
+/* Theme System - Light/Dark/Teal variations */
+
+:root,
+[data-theme="dark"] {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --border-primary: rgba(255, 255, 255, 0.1);
+  --accent-primary: #3b82f6;
+}
+
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --border-primary: rgba(0, 0, 0, 0.1);
+  --accent-primary: #2563eb;
+}
+
+[data-theme="teal-dark"] {
+  --bg-primary: #0a1f1f;
+  --bg-secondary: #0f2d2d;
+  --text-primary: #e0f2f1;
+  --text-secondary: #b2dfdb;
+  --border-primary: rgba(20, 184, 166, 0.3);
+  --accent-primary: #14b8a6;
+}
+
+[data-theme="teal-light"] {
+  --bg-primary: #f0fdfa;
+  --bg-secondary: #ccfbf1;
+  --text-primary: #134e4a;
+  --text-secondary: #115e59;
+  --border-primary: rgba(20, 184, 166, 0.3);
+  --accent-primary: #0d9488;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}

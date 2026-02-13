@@ -21,12 +21,25 @@ export const RIGHT_CARD_LABELS: Record<RightCardId, string> = {
 };
 
 export function normalizeOrder<T extends string>(raw: unknown, defaults: T[]): T[] {
-  const arr = Array.isArray(raw) ? raw : [];
-  const valid = arr.filter((v): v is T => typeof v === 'string' && defaults.includes(v as T));
-  const deduped = Array.from(new Set(valid));
+  // Failsafe: if raw is invalid or corrupted, return defaults
+  if (!Array.isArray(raw)) return [...defaults];
+  
+  const arr = raw.filter((v): v is T => typeof v === 'string' && defaults.includes(v as T));
+  
+  // Deduplicate to prevent duplicate key errors
+  const deduped = Array.from(new Set(arr));
+  
+  // Add missing defaults
   for (const key of defaults) {
     if (!deduped.includes(key)) deduped.push(key);
   }
+  
+  // Final failsafe: if deduplication failed, return defaults
+  if (deduped.length !== new Set(deduped).size) {
+    console.warn('[BushingCardLayout] Detected duplicates after normalization, returning defaults');
+    return [...defaults];
+  }
+  
   return deduped;
 }
 

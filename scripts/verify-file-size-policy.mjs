@@ -92,6 +92,10 @@ function isConfigFile(fileRel) {
 }
 
 function fileLimit(fileRel) {
+  // Special case: Orchestrator components get 800 line limit
+  if (isSvelteComponentFile(fileRel) && fileRel.endsWith('Orchestrator.svelte')) {
+    return { group: 'svelte_orchestrator', max: 800 };
+  }
   if (isSvelteComponentFile(fileRel)) return { group: 'svelte_component', max: 300 };
   if (isSveltePageFile(fileRel)) return { group: 'svelte_page', max: 500 };
   if (isStoreFile(fileRel)) return { group: 'store', max: 200 };

@@ -1,7 +1,9 @@
 <script lang="ts">
   import '../app.css';
+  import '$lib/styles/themes.css';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
+  import { themeStore } from '$lib/stores/themeStore';
   import { AppBar } from '@skeletonlabs/skeleton-svelte';
   import { cn } from '$lib/utils';
   import {
@@ -63,6 +65,7 @@
   };
 
   onMount(() => {
+    themeStore.init();
     const syncHashPath = () => {
       try {
         const raw = window.location.hash ?? '';

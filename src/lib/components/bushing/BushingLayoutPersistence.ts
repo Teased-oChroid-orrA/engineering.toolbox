@@ -25,25 +25,63 @@ export function loadTopLevelLayout(): { leftCardOrder: LeftCardId[]; rightCardOr
   if (typeof window === 'undefined') {
     return { leftCardOrder: [...LEFT_DEFAULT_ORDER], rightCardOrder: [...RIGHT_DEFAULT_ORDER] };
   }
-  const v3 = parseJson(localStorage.getItem(LAYOUT_KEY_V3));
-  if (v3) {
-    return {
-      leftCardOrder: normalizeOrder(v3?.leftCardOrder, LEFT_DEFAULT_ORDER),
-      rightCardOrder: normalizeOrder(v3?.rightCardOrder, RIGHT_DEFAULT_ORDER)
+  
+  try {
+    const v3 = parseJson(localStorage.getItem(LAYOUT_KEY_V3));
+    if (v3) {
+      const leftCardOrder = normalizeOrder(v3?.leftCardOrder, LEFT_DEFAULT_ORDER);
+      const rightCardOrder = normalizeOrder(v3?.rightCardOrder, RIGHT_DEFAULT_ORDER);
+      
+      // Failsafe: detect duplicates and clear corrupted data
+      if (leftCardOrder.length !== new Set(leftCardOrder).size || 
+          rightCardOrder.length !== new Set(rightCardOrder).size) {
+        console.warn('[BushingLayout] Detected duplicate keys in layout, clearing corrupted data');
+        localStorage.removeItem(LAYOUT_KEY_V3);
+        return { leftCardOrder: [...LEFT_DEFAULT_ORDER], rightCardOrder: [...RIGHT_DEFAULT_ORDER] };
+      }
+      
+      return { leftCardOrder, rightCardOrder };
+    }
+    
+    const v2 = parseJson(localStorage.getItem(LAYOUT_KEY_V2));
+    const migrated = {
+      leftCardOrder: normalizeOrder(v2?.leftCardOrder, LEFT_DEFAULT_ORDER),
+      rightCardOrder: normalizeOrder(v2?.rightCardOrder, RIGHT_DEFAULT_ORDER)
     };
+    
+    // Failsafe: check migrated data before persisting
+    if (migrated.leftCardOrder.length === new Set(migrated.leftCardOrder).size &&
+        migrated.rightCardOrder.length === new Set(migrated.rightCardOrder).size) {
+      localStorage.setItem(LAYOUT_KEY_V3, JSON.stringify(migrated));
+      return migrated;
+    } else {
+      console.warn('[BushingLayout] Detected duplicates during migration, using defaults');
+      return { leftCardOrder: [...LEFT_DEFAULT_ORDER], rightCardOrder: [...RIGHT_DEFAULT_ORDER] };
+    }
+  } catch (err) {
+    console.error('[BushingLayout] Error loading layout, using defaults:', err);
+    return { leftCardOrder: [...LEFT_DEFAULT_ORDER], rightCardOrder: [...RIGHT_DEFAULT_ORDER] };
   }
-  const v2 = parseJson(localStorage.getItem(LAYOUT_KEY_V2));
-  const migrated = {
-    leftCardOrder: normalizeOrder(v2?.leftCardOrder, LEFT_DEFAULT_ORDER),
-    rightCardOrder: normalizeOrder(v2?.rightCardOrder, RIGHT_DEFAULT_ORDER)
-  };
-  localStorage.setItem(LAYOUT_KEY_V3, JSON.stringify(migrated));
-  return migrated;
 }
 
 export function persistTopLevelLayout(leftCardOrder: LeftCardId[], rightCardOrder: RightCardId[]): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(LAYOUT_KEY_V3, JSON.stringify({ leftCardOrder, rightCardOrder }));
+  
+  // Failsafe: validate before persisting to prevent corruption
+  if (leftCardOrder.length !== new Set(leftCardOrder).size) {
+    console.error('[BushingLayout] Attempted to persist duplicate left card order, aborting');
+    return;
+  }
+  if (rightCardOrder.length !== new Set(rightCardOrder).size) {
+    console.error('[BushingLayout] Attempted to persist duplicate right card order, aborting');
+    return;
+  }
+  
+  try {
+    localStorage.setItem(LAYOUT_KEY_V3, JSON.stringify({ leftCardOrder, rightCardOrder }));
+  } catch (err) {
+    console.error('[BushingLayout] Error persisting layout:', err);
+  }
 }
 
 export function loadNestedDiagnosticsLayout(defaults: string[]): string[] {

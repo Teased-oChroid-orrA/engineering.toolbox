@@ -1,11 +1,48 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { Badge, Card, CardContent } from '$lib/components/ui';
   import type { BushingInputs, BushingOutput } from '$lib/core/bushing';
   import BushingLameStressPlot from './BushingLameStressPlot.svelte';
   import BushingEnforcementDetails from './BushingEnforcementDetails.svelte';
+  import NativeDragLane from './NativeDragLane.svelte';
   export let form: BushingInputs;
   export let results: BushingOutput;
   let infoDialog: 'safety' | 'fit' | null = null;
+
+  // Internal section ordering with persistence
+  type SectionId = 'metrics' | 'lame';
+  const SECTION_ORDER_KEY = 'scd.bushing.resultsSummary.sectionOrder.v1';
+  let sectionOrder: SectionId[] = ['metrics', 'lame'];
+  let sectionItems: Array<{ id: SectionId }> = [];
+  
+  onMount(() => {
+    try {
+      const saved = localStorage.getItem(SECTION_ORDER_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as SectionId[];
+        if (Array.isArray(parsed) && parsed.length === 2) {
+          sectionOrder = parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('[BushingResultSummary] Failed to load section order:', e);
+    }
+    sectionItems = sectionOrder.map(id => ({ id }));
+  });
+  
+  $: sectionItems = sectionOrder.map(id => ({ id }));
+  
+  function handleReorder(ev: CustomEvent<{ items: Array<{ id: string }> }>) {
+    const newOrder = ev.detail.items.map(i => i.id as SectionId);
+    if (JSON.stringify(newOrder) !== JSON.stringify(sectionOrder)) {
+      sectionOrder = newOrder;
+      try {
+        localStorage.setItem(SECTION_ORDER_KEY, JSON.stringify(newOrder));
+      } catch (e) {
+        console.warn('[BushingResultSummary] Failed to save section order:', e);
+      }
+    }
+  }
 
   const PSI_TO_MPA = 0.006894757;
   const LBF_TO_N = 4.4482216152605;
@@ -37,6 +74,7 @@
   $: odContained = results.tolerance.status !== 'infeasible';
 
   function focusSection(id: string) {
+    if (!id || id.trim() === '') return; // Guard against empty strings
     const el = document.getElementById(id);
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -53,111 +91,123 @@
       {failed ? 'ATTN' : 'PASS'}
     </Badge>
   </div>
-  <div class="grid grid-cols-1 gap-4 md:grid-cols-[0.78fr_1.22fr]">
-    <div
-      class="cursor-pointer"
-      role="button"
-      tabindex="0"
-      on:click={() => (infoDialog = 'safety')}
-      on:keydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (infoDialog = 'safety')}>
-    <Card
-      id="bushing-safety-card"
-      class={`bushing-results-card border-l-4 bushing-pop-card bushing-depth-2 ${failed ? 'border-amber-400 shadow-[0_0_0_1px_rgba(251,191,36,0.4)]' : 'border-emerald-500'}`}>
-      <CardContent class="pt-5 text-sm">
-        <div class="text-[10px] mb-2 uppercase tracking-wide text-indigo-200/95 font-bold">Safety Margins (Yield)</div>
-        <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Housing</span><span class={`font-mono font-semibold ${results.physics.marginHousing >= 0 ? valOk : valFail}`}>{fmt(results.physics.marginHousing)}</span></div>
-        <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Bushing</span><span class={`font-mono font-semibold ${results.physics.marginBushing >= 0 ? valOk : valFail}`}>{fmt(results.physics.marginBushing)}</span></div>
-        <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Governing</span><span class={`font-mono font-semibold ${results.governing.margin >= 0 ? valOk : valFail}`}>{fmt(results.governing.margin)}</span></div>
-      </CardContent>
-    </Card>
-    </div>
-    <div
-      class="cursor-pointer"
-      role="button"
-      tabindex="0"
-      on:click={() => (infoDialog = 'fit')}
-      on:keydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (infoDialog = 'fit')}>
-    <Card
-      id="bushing-fit-card"
-      class={`bushing-results-card bushing-pop-card bushing-depth-2 ${fitFailed ? 'border border-amber-300/55' : ''}`}>
-      <CardContent class="pt-5 text-sm space-y-1">
-        <div class="text-[10px] mb-2 uppercase tracking-wide text-indigo-200/95 font-bold">Fit Physics</div>
-        <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Contact Pressure</span><span class="font-mono text-right text-slate-100 font-semibold">{fmtStress(results.physics.contactPressure)} {stressUnit()}</span></div>
-        <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Axial Stress (housing)</span><span class="font-mono text-right text-slate-100 font-semibold">{fmtStress(results.physics.stressAxialHousing)} {stressUnit()}</span></div>
-        <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Axial Stress (bushing)</span><span class="font-mono text-right text-slate-100 font-semibold">{fmtStress(results.physics.stressAxialBushing)} {stressUnit()}</span></div>
-        <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Install Force</span><span class="font-mono text-right text-slate-100 font-semibold">{fmtForce(results.physics.installForce)} {forceUnit()}</span></div>
-        <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Interference (eff.)</span><span class={`font-mono text-right font-semibold ${positiveInterference ? valOk : valFail}`}>{fmt(results.physics.deltaEffective, 4)}</span></div>
-        <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">OD (tol)</span><span class={`font-mono text-right text-[0.92rem] font-semibold ${odContained ? valOk : valFail}`}>{fmtTol(results.tolerance.odBushing.lower, results.tolerance.odBushing.upper, results.tolerance.odBushing.nominal)}</span></div>
-        <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Interference (target tol)</span><span class={`font-mono text-right text-[0.92rem] font-semibold ${valInfo}`}>{fmtTol(results.tolerance.interferenceTarget.lower, results.tolerance.interferenceTarget.upper, results.tolerance.interferenceTarget.nominal)}</span></div>
-        <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Interference (achieved tol)</span><span class={`font-mono text-right text-[0.92rem] font-semibold ${achievedWithinTarget ? valOk : valFail}`}>{fmtTol(results.tolerance.achievedInterference.lower, results.tolerance.achievedInterference.upper, results.tolerance.achievedInterference.nominal)}</span></div>
-        {#if Math.abs(results.lame.deltaThermal) > 1e-10}
-          <div class="grid grid-cols-[1fr_auto] gap-3">
-            <span class="text-slate-100/95 font-medium">Interference (effective @ dT)</span>
-            <span class="font-mono text-right text-[0.92rem] text-amber-200 font-semibold">
-              {fmtTolWithShift(
-                results.tolerance.achievedInterference.lower,
-                results.tolerance.achievedInterference.upper,
-                results.tolerance.achievedInterference.nominal,
-                results.lame.deltaThermal
-              )}
-            </span>
+  
+  <NativeDragLane
+    listClass="space-y-3"
+    items={sectionItems}
+    enabled={true}
+    flipDurationMs={200}
+    on:finalize={handleReorder}
+    let:item>
+    {#if item.id === 'metrics'}
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-[0.78fr_1.22fr]">
+        <div
+          class="cursor-pointer"
+          role="button"
+          tabindex="0"
+          onclick={() => (infoDialog = 'safety')}
+          onkeydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (infoDialog = 'safety')}>
+        <Card
+          id="bushing-safety-card"
+          class={`bushing-results-card border-l-4 bushing-pop-card bushing-depth-2 ${failed ? 'border-amber-400 shadow-[0_0_0_1px_rgba(251,191,36,0.4)]' : 'border-emerald-500'}`}>
+          <CardContent class="pt-5 text-sm">
+            <div class="text-[10px] mb-2 uppercase tracking-wide text-indigo-200/95 font-bold">Safety Margins (Yield)</div>
+            <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Housing</span><span class={`font-mono font-semibold ${results.physics.marginHousing >= 0 ? valOk : valFail}`}>{fmt(results.physics.marginHousing)}</span></div>
+            <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Bushing</span><span class={`font-mono font-semibold ${results.physics.marginBushing >= 0 ? valOk : valFail}`}>{fmt(results.physics.marginBushing)}</span></div>
+            <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Governing</span><span class={`font-mono font-semibold ${results.governing.margin >= 0 ? valOk : valFail}`}>{fmt(results.governing.margin)}</span></div>
+          </CardContent>
+        </Card>
+        </div>
+        <div
+          class="cursor-pointer"
+          role="button"
+          tabindex="0"
+          onclick={() => (infoDialog = 'fit')}
+          onkeydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (infoDialog = 'fit')}>
+        <Card
+          id="bushing-fit-card"
+          class={`bushing-results-card bushing-pop-card bushing-depth-2 ${fitFailed ? 'border border-amber-300/55' : ''}`}>
+          <CardContent class="pt-5 text-sm space-y-1">
+            <div class="text-[10px] mb-2 uppercase tracking-wide text-indigo-200/95 font-bold">Fit Physics</div>
+            <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Contact Pressure</span><span class="font-mono text-right text-slate-100 font-semibold">{fmtStress(results.physics.contactPressure)} {stressUnit()}</span></div>
+            <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Axial Stress (housing)</span><span class="font-mono text-right text-slate-100 font-semibold">{fmtStress(results.physics.stressAxialHousing)} {stressUnit()}</span></div>
+            <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Axial Stress (bushing)</span><span class="font-mono text-right text-slate-100 font-semibold">{fmtStress(results.physics.stressAxialBushing)} {stressUnit()}</span></div>
+            <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Install Force</span><span class="font-mono text-right text-slate-100 font-semibold">{fmtForce(results.physics.installForce)} {forceUnit()}</span></div>
+            <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Interference (eff.)</span><span class={`font-mono text-right font-semibold ${positiveInterference ? valOk : valFail}`}>{fmt(results.physics.deltaEffective, 4)}</span></div>
+            <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">OD (tol)</span><span class={`font-mono text-right text-[0.92rem] font-semibold ${odContained ? valOk : valFail}`}>{fmtTol(results.tolerance.odBushing.lower, results.tolerance.odBushing.upper, results.tolerance.odBushing.nominal)}</span></div>
+            <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Interference (target tol)</span><span class={`font-mono text-right text-[0.92rem] font-semibold ${valInfo}`}>{fmtTol(results.tolerance.interferenceTarget.lower, results.tolerance.interferenceTarget.upper, results.tolerance.interferenceTarget.nominal)}</span></div>
+            <div class="grid grid-cols-[1fr_auto] gap-3"><span class="text-slate-100/95 font-medium">Interference (achieved tol)</span><span class={`font-mono text-right text-[0.92rem] font-semibold ${achievedWithinTarget ? valOk : valFail}`}>{fmtTol(results.tolerance.achievedInterference.lower, results.tolerance.achievedInterference.upper, results.tolerance.achievedInterference.nominal)}</span></div>
+            {#if Math.abs(results.lame.deltaThermal) > 1e-10}
+              <div class="grid grid-cols-[1fr_auto] gap-3">
+                <span class="text-slate-100/95 font-medium">Interference (effective @ dT)</span>
+                <span class="font-mono text-right text-[0.92rem] text-amber-200 font-semibold">
+                  {fmtTolWithShift(
+                    results.tolerance.achievedInterference.lower,
+                    results.tolerance.achievedInterference.upper,
+                    results.tolerance.achievedInterference.nominal,
+                    results.lame.deltaThermal
+                  )}
+                </span>
+              </div>
+            {/if}
+            {#if results.tolerance.csExternalDia}
+              <div class="flex justify-between"><span class="text-slate-100/95 font-medium">External CS Dia (tol)</span><span class="font-mono text-cyan-200 font-semibold">{fmtTol(results.tolerance.csExternalDia.lower, results.tolerance.csExternalDia.upper, results.tolerance.csExternalDia.nominal)}</span></div>
+            {/if}
+            {#if results.tolerance.csInternalDia}
+              <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Internal CS Dia (tol)</span><span class="font-mono text-cyan-200 font-semibold">{fmtTol(results.tolerance.csInternalDia.lower, results.tolerance.csInternalDia.upper, results.tolerance.csInternalDia.nominal)}</span></div>
+            {/if}
+            {#if results.tolerance.status === 'infeasible'}
+              <div class="mt-2 rounded-md border border-amber-300/50 bg-amber-500/15 p-2 text-[11px] text-amber-100">
+                Tolerance bands are incompatible for full-range containment. Bore band width ({fmtBand(boreBandWidth)}) exceeds target interference width ({fmtBand(targetBandWidth)}), so solver collapses OD tolerance to a single value.
+              </div>
+            {:else if results.tolerance.status === 'clamped'}
+              <div class="mt-2 rounded-md border border-cyan-300/40 bg-cyan-500/12 p-2 text-[11px] text-cyan-100">
+                OD nominal is clamped to keep interference within requested tolerance band.
+              </div>
+            {/if}
+            {#if displayToleranceNotes.length}
+              <div class="mt-2 space-y-1">
+                {#each displayToleranceNotes as n}
+                  <div class="rounded-md border border-white/10 bg-black/25 px-2 py-1 text-[10px] text-white/75">{n}</div>
+                {/each}
+              </div>
+            {/if}
+            <BushingEnforcementDetails {form} {results} />
+          </CardContent>
+        </Card>
+        </div>
+      </div>
+    {:else if item.id === 'lame'}
+      <Card class="bushing-results-card bushing-pop-card bushing-depth-1">
+        <CardContent class="pt-4 space-y-2 text-sm">
+          <div class="text-[10px] uppercase tracking-wide text-indigo-200/95 font-bold">Lamé Stress Field (Full Distribution)</div>
+          <div class="grid grid-cols-1 gap-2 text-[12px] text-white/85 md:grid-cols-2">
+            <div class="rounded-md border border-white/10 bg-black/20 p-2">
+              <div class="font-semibold text-emerald-200">Bushing Boundaries</div>
+              <div class="font-mono">σr(inner) = {fmt(results.lame.field.bushing.boundary.sigmaRInner, 2)} psi</div>
+              <div class="font-mono">σr(outer) = {fmt(results.lame.field.bushing.boundary.sigmaROuter, 2)} psi</div>
+              <div class="font-mono">σθ(inner) = {fmt(results.lame.field.bushing.boundary.sigmaThetaInner, 2)} psi</div>
+              <div class="font-mono">σθ(outer) = {fmt(results.lame.field.bushing.boundary.sigmaThetaOuter, 2)} psi</div>
+              <div class="font-mono">σz(inner/outer) = {fmt(results.lame.field.bushing.boundary.sigmaAxialInner, 2)} / {fmt(results.lame.field.bushing.boundary.sigmaAxialOuter, 2)} psi</div>
+            </div>
+            <div class="rounded-md border border-white/10 bg-black/20 p-2">
+              <div class="font-semibold text-blue-200">Housing Boundaries</div>
+              <div class="font-mono">σr(inner) = {fmt(results.lame.field.housing.boundary.sigmaRInner, 2)} psi</div>
+              <div class="font-mono">σr(outer) = {fmt(results.lame.field.housing.boundary.sigmaROuter, 2)} psi</div>
+              <div class="font-mono">σθ(inner) = {fmt(results.lame.field.housing.boundary.sigmaThetaInner, 2)} psi</div>
+              <div class="font-mono">σθ(outer) = {fmt(results.lame.field.housing.boundary.sigmaThetaOuter, 2)} psi</div>
+              <div class="font-mono">σz(inner/outer) = {fmt(results.lame.field.housing.boundary.sigmaAxialInner, 2)} / {fmt(results.lame.field.housing.boundary.sigmaAxialOuter, 2)} psi</div>
+            </div>
           </div>
-        {/if}
-        {#if results.tolerance.csExternalDia}
-          <div class="flex justify-between"><span class="text-slate-100/95 font-medium">External CS Dia (tol)</span><span class="font-mono text-cyan-200 font-semibold">{fmtTol(results.tolerance.csExternalDia.lower, results.tolerance.csExternalDia.upper, results.tolerance.csExternalDia.nominal)}</span></div>
-        {/if}
-        {#if results.tolerance.csInternalDia}
-          <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Internal CS Dia (tol)</span><span class="font-mono text-cyan-200 font-semibold">{fmtTol(results.tolerance.csInternalDia.lower, results.tolerance.csInternalDia.upper, results.tolerance.csInternalDia.nominal)}</span></div>
-        {/if}
-        {#if results.tolerance.status === 'infeasible'}
-          <div class="mt-2 rounded-md border border-amber-300/50 bg-amber-500/15 p-2 text-[11px] text-amber-100">
-            Tolerance bands are incompatible for full-range containment. Bore band width ({fmtBand(boreBandWidth)}) exceeds target interference width ({fmtBand(targetBandWidth)}), so solver collapses OD tolerance to a single value.
+          <div class="text-[11px] text-cyan-100/80">
+            Axial coupling: k<sub>constraint</sub>={results.physics.axialConstraintFactor.toFixed(2)}, k<sub>length</sub>={results.physics.axialLengthFactor.toFixed(2)}
           </div>
-        {:else if results.tolerance.status === 'clamped'}
-          <div class="mt-2 rounded-md border border-cyan-300/40 bg-cyan-500/12 p-2 text-[11px] text-cyan-100">
-            OD nominal is clamped to keep interference within requested tolerance band.
-          </div>
-        {/if}
-        {#if displayToleranceNotes.length}
-          <div class="mt-2 space-y-1">
-            {#each displayToleranceNotes as n}
-              <div class="rounded-md border border-white/10 bg-black/25 px-2 py-1 text-[10px] text-white/75">{n}</div>
-            {/each}
-          </div>
-        {/if}
-        <BushingEnforcementDetails {form} {results} />
-      </CardContent>
-    </Card>
-    </div>
-  </div>
+          <BushingLameStressPlot field={results.lame.field} />
+        </CardContent>
+      </Card>
+    {/if}
+  </NativeDragLane>
 </div>
-<Card class="bushing-results-card bushing-pop-card bushing-depth-1">
-  <CardContent class="pt-4 space-y-2 text-sm">
-    <div class="text-[10px] uppercase tracking-wide text-indigo-200/95 font-bold">Lamé Stress Field (Full Distribution)</div>
-    <div class="grid grid-cols-1 gap-2 text-[12px] text-white/85 md:grid-cols-2">
-      <div class="rounded-md border border-white/10 bg-black/20 p-2">
-        <div class="font-semibold text-emerald-200">Bushing Boundaries</div>
-        <div class="font-mono">σr(inner) = {fmt(results.lame.field.bushing.boundary.sigmaRInner, 2)} psi</div>
-        <div class="font-mono">σr(outer) = {fmt(results.lame.field.bushing.boundary.sigmaROuter, 2)} psi</div>
-        <div class="font-mono">σθ(inner) = {fmt(results.lame.field.bushing.boundary.sigmaThetaInner, 2)} psi</div>
-        <div class="font-mono">σθ(outer) = {fmt(results.lame.field.bushing.boundary.sigmaThetaOuter, 2)} psi</div>
-        <div class="font-mono">σz(inner/outer) = {fmt(results.lame.field.bushing.boundary.sigmaAxialInner, 2)} / {fmt(results.lame.field.bushing.boundary.sigmaAxialOuter, 2)} psi</div>
-      </div>
-      <div class="rounded-md border border-white/10 bg-black/20 p-2">
-        <div class="font-semibold text-blue-200">Housing Boundaries</div>
-        <div class="font-mono">σr(inner) = {fmt(results.lame.field.housing.boundary.sigmaRInner, 2)} psi</div>
-        <div class="font-mono">σr(outer) = {fmt(results.lame.field.housing.boundary.sigmaROuter, 2)} psi</div>
-        <div class="font-mono">σθ(inner) = {fmt(results.lame.field.housing.boundary.sigmaThetaInner, 2)} psi</div>
-        <div class="font-mono">σθ(outer) = {fmt(results.lame.field.housing.boundary.sigmaThetaOuter, 2)} psi</div>
-        <div class="font-mono">σz(inner/outer) = {fmt(results.lame.field.housing.boundary.sigmaAxialInner, 2)} / {fmt(results.lame.field.housing.boundary.sigmaAxialOuter, 2)} psi</div>
-      </div>
-    </div>
-    <div class="text-[11px] text-cyan-100/80">
-      Axial coupling: k<sub>constraint</sub>={results.physics.axialConstraintFactor.toFixed(2)}, k<sub>length</sub>={results.physics.axialLengthFactor.toFixed(2)}
-    </div>
-    <BushingLameStressPlot field={results.lame.field} />
-  </CardContent>
-</Card>
 
 {#if infoDialog}
   <div class="fixed inset-0 z-[120] grid place-items-center p-4">
@@ -165,7 +215,7 @@
       type="button"
       aria-label="Close dialog backdrop"
       class="absolute inset-0 bg-black/65"
-      on:click={() => (infoDialog = null)}>
+      onclick={() => (infoDialog = null)}>
     </button>
     <div class="relative z-10 w-full max-w-[760px]">
     <Card class="border-cyan-300/35 bg-slate-950/95 text-slate-100 shadow-2xl">
@@ -183,10 +233,10 @@
             <div class="rounded-md border border-amber-300/50 bg-amber-500/15 p-2 text-[12px] text-amber-100">
               Related failing checks:
               {#if edgeFailed}
-                <button class="ml-1 underline underline-offset-2" on:click={() => focusSection('bushing-edge-distance-card')}>Edge Distance</button>
+                <button class="ml-1 underline underline-offset-2" onclick={() => focusSection('bushing-edge-distance-card')}>Edge Distance</button>
               {/if}
               {#if wallFailed}
-                <button class="ml-2 underline underline-offset-2" on:click={() => focusSection('bushing-wall-thickness-card')}>Wall Thickness</button>
+                <button class="ml-2 underline underline-offset-2" onclick={() => focusSection('bushing-wall-thickness-card')}>Wall Thickness</button>
               {/if}
             </div>
           {/if}
@@ -201,12 +251,12 @@
           {#if fitFailed}
             <div class="rounded-md border border-amber-300/50 bg-amber-500/15 p-2 text-[12px] text-amber-100">
               Fit constraint warnings are active.
-              <button class="ml-1 underline underline-offset-2" on:click={() => focusSection('bushing-geometry-card')}>Open Geometry Inputs</button>
+              <button class="ml-1 underline underline-offset-2" onclick={() => focusSection('bushing-geometry-card')}>Open Geometry Inputs</button>
             </div>
           {/if}
         {/if}
         <div class="pt-2">
-          <button class="rounded-md border border-cyan-300/40 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20" on:click={() => (infoDialog = null)}>
+          <button class="rounded-md border border-cyan-300/40 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20" onclick={() => (infoDialog = null)}>
             Close
           </button>
         </div>

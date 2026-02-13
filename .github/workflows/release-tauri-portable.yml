@@ -2,9 +2,18 @@ name: Release Tauri Portable
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: false
+        type: string
   push:
     tags:
       - 'v*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build-windows:
@@ -23,31 +32,79 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Tauri app
+      - name: Build Tauri app (Structural-Toolbox)
         run: npm run tauri:build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: List build output
+        run: |
+          echo "=== Build output directory structure ==="
+          if (Test-Path src-tauri/target/release/bundle) {
+            Get-ChildItem -Recurse src-tauri/target/release/bundle
+          } else {
+            echo "No bundle directory found"
+          }
+          if (Test-Path src-tauri/target/release/*.exe) {
+            Get-ChildItem src-tauri/target/release/*.exe
+          } else {
+            echo "No .exe files found"
+          }
+        shell: pwsh
 
       - name: Upload Tauri bundles
         if: ${{ hashFiles('src-tauri/target/release/bundle/**') != '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: tauri-windows-bundles
+          name: structural-toolbox-windows-bundles
           path: src-tauri/target/release/bundle/**
           if-no-files-found: error
+          retention-days: 30
 
       - name: Upload fallback executable
         if: ${{ hashFiles('src-tauri/target/release/bundle/**') == '' && hashFiles('src-tauri/target/release/*.exe') != '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: tauri-windows-exe
+          name: structural-toolbox-windows-exe
           path: src-tauri/target/release/*.exe
           if-no-files-found: error
+          retention-days: 30
 
       - name: Verify artifact output exists
         if: ${{ hashFiles('src-tauri/target/release/bundle/**') == '' && hashFiles('src-tauri/target/release/*.exe') == '' }}
         run: |
-          echo "No bundle or executable was produced by the build."
+          echo "❌ ERROR: No bundle or executable was produced by the build."
+          echo "Expected output in src-tauri/target/release/bundle/ or src-tauri/target/release/*.exe"
           exit 1
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') && hashFiles('src-tauri/target/release/bundle/**') != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          files: src-tauri/target/release/bundle/**/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          name: Structural-Toolbox ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

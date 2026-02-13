@@ -1,17 +1,32 @@
 <script lang="ts">
   import { Badge } from '$lib/components/ui';
   import { cn } from '$lib/utils';
+  import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
 
   export let isFailed = false;
   export let onShowInformation: () => void = () => {};
+  
+  let showThemeMenu = false;
 </script>
 
 <div class="flex items-center justify-between px-1">
   <h2 class="text-lg font-semibold tracking-tight text-white">Bushing Toolbox</h2>
   <div class="flex items-center gap-2">
+    <div class="relative">
+      <button
+        class="rounded-full border border-indigo-300/35 bg-indigo-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-100 hover:bg-indigo-500/20"
+        onclick={() => (showThemeMenu = !showThemeMenu)}>
+        Theme
+      </button>
+      {#if showThemeMenu}
+        <div class="absolute right-0 top-full mt-2 z-[100] rounded-xl border border-white/10 bg-slate-900/95 shadow-2xl backdrop-blur-sm">
+          <ThemeToggle />
+        </div>
+      {/if}
+    </div>
     <button
       class="rounded-full border border-cyan-300/35 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-100 hover:bg-cyan-500/20"
-      on:click={onShowInformation}>
+      onclick={onShowInformation}>
       Information
     </button>
     <Badge variant="outline" class={cn('text-[10px]', isFailed ? 'border-amber-400/40 text-amber-200' : 'border-emerald-400/35 text-emerald-200')}>

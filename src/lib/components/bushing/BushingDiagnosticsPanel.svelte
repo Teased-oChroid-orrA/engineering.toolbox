@@ -4,7 +4,7 @@
   import type { BushingOutput } from '$lib/core/bushing';
   import { canMoveInList, moveCardInList, normalizeOrder, reorderList } from './BushingCardLayoutController';
   import { loadNestedDiagnosticsLayout, persistNestedDiagnosticsLayout } from './BushingLayoutPersistence';
-  import BushingSortableLane from './BushingSortableLane.svelte';
+  import NativeDragLane from './NativeDragLane.svelte';
 
   export let results: BushingOutput;
   export let dndEnabled = true;
@@ -47,6 +47,7 @@
   }
 
   function focusSection(id: string) {
+    if (!id || id.trim() === '') return; // Guard against empty strings
     const el = document.getElementById(id);
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -67,12 +68,10 @@
         ?
       </button>
     </summary>
-    <BushingSortableLane
+    <NativeDragLane
       listClass="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2"
-      laneType="bushing-diagnostics-cards"
       enabled={dndEnabled}
       items={diagLaneItems}
-      on:consider={(ev) => commitDiagLane(ev.detail.items)}
       on:finalize={(ev) => commitDiagLane(ev.detail.items)}
       let:item>
       {#if item.id === 'edge'}
@@ -142,7 +141,7 @@
           </Card>
         </div>
       {/if}
-    </BushingSortableLane>
+    </NativeDragLane>
   </details>
 </div>
 
