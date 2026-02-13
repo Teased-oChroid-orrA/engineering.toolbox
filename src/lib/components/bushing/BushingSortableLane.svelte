@@ -31,14 +31,20 @@
   }>();
   
   const flipDurationMs = 200;
+  const ANIMATION_BUFFER_MS = 300; // Increased buffer to ensure FLIP animation completes reliably
   
   // Internal state for drag operations
   let workingItems = items;
+  let isDragging = false;
   
-  // Sync working items when the prop changes
-  $: workingItems = items;
+  // Sync working items when the prop changes, but NOT during active drag
+  $: if (!isDragging) {
+    workingItems = items;
+  }
   
   function handleConsider(ev: CustomEvent<DndEvent<{ id: string }>>) {
+    // Mark as dragging to prevent external updates
+    isDragging = true;
     // Update internal state for smooth drag preview
     workingItems = ev.detail.items;
     // Dispatch event to parent (parent should NOT update its state yet)
@@ -48,8 +54,11 @@
   function handleFinalize(ev: CustomEvent<DndEvent<{ id: string }>>) {
     // Update internal state
     workingItems = ev.detail.items;
-    // Dispatch finalize event - parent should update its state now
-    dispatch('finalize', { items: ev.detail.items });
+    // Defer dispatch to allow FLIP animation to complete
+    setTimeout(() => {
+      isDragging = false;
+      dispatch('finalize', { items: ev.detail.items });
+    }, flipDurationMs + ANIMATION_BUFFER_MS);
   }
 </script>
 
