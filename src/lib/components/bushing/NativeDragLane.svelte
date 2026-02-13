@@ -70,10 +70,10 @@
     if (allowCrossColumn && sourceColumnId && columnId && sourceColumnId !== columnId) {
       // Item came from a different column - add it to this column
       const existingIds = items.map(i => i.id);
-      if (!existingIds.includes(droppedId)) {
+      if (droppedId && !existingIds.includes(droppedId)) {
         const targetIndex = items.findIndex(i => i.id === targetItem.id);
         const newItems = [...items];
-        newItems.splice(targetIndex, 0, { id: droppedId });
+        newItems.splice(targetIndex, 0, { id: droppedId as string });
         dispatch('finalize', { items: newItems });
       }
     } else if (droppedId) {

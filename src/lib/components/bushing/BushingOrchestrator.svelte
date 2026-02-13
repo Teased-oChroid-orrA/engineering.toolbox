@@ -50,13 +50,20 @@
   $: rightLaneItems = rightCardOrder.map((id) => ({ id }));
   
   const commitLane = (items: Array<{ id: string }>, isLeft: boolean) => {
-    const defaultOrder = isLeft ? LEFT_DEFAULT_ORDER : RIGHT_DEFAULT_ORDER;
-    const newOrder = normalizeOrder(items.map((i) => i.id) as any, defaultOrder);
-    const currentOrder = isLeft ? leftCardOrder : rightCardOrder;
-    if (JSON.stringify(newOrder) !== JSON.stringify(currentOrder)) {
-      if (isLeft) leftCardOrder = newOrder; else rightCardOrder = newOrder;
-      persistTopLevelLayout(leftCardOrder, rightCardOrder);
-      pushHistory();
+    if (isLeft) {
+      const newOrder = normalizeOrder(items.map((i) => i.id), LEFT_DEFAULT_ORDER);
+      if (JSON.stringify(newOrder) !== JSON.stringify(leftCardOrder)) {
+        leftCardOrder = newOrder;
+        persistTopLevelLayout(leftCardOrder, rightCardOrder);
+        pushHistory();
+      }
+    } else {
+      const newOrder = normalizeOrder(items.map((i) => i.id), RIGHT_DEFAULT_ORDER);
+      if (JSON.stringify(newOrder) !== JSON.stringify(rightCardOrder)) {
+        rightCardOrder = newOrder;
+        persistTopLevelLayout(leftCardOrder, rightCardOrder);
+        pushHistory();
+      }
     }
   };
   
@@ -64,13 +71,20 @@
   const commitRightLane = (items: Array<{ id: string }>) => commitLane(items, false);
   
   const moveCard = (cardId: any, direction: -1 | 1, isLeft: boolean) => {
-    const currentOrder = isLeft ? leftCardOrder : rightCardOrder;
-    const defaultOrder = isLeft ? LEFT_DEFAULT_ORDER : RIGHT_DEFAULT_ORDER;
-    const newOrder = normalizeOrder(moveCardInList(currentOrder, cardId, direction), defaultOrder);
-    if (JSON.stringify(newOrder) !== JSON.stringify(currentOrder)) {
-      if (isLeft) leftCardOrder = newOrder; else rightCardOrder = newOrder;
-      persistTopLevelLayout(leftCardOrder, rightCardOrder);
-      pushHistory();
+    if (isLeft) {
+      const newOrder = normalizeOrder(moveCardInList(leftCardOrder, cardId, direction), LEFT_DEFAULT_ORDER);
+      if (JSON.stringify(newOrder) !== JSON.stringify(leftCardOrder)) {
+        leftCardOrder = newOrder;
+        persistTopLevelLayout(leftCardOrder, rightCardOrder);
+        pushHistory();
+      }
+    } else {
+      const newOrder = normalizeOrder(moveCardInList(rightCardOrder, cardId, direction), RIGHT_DEFAULT_ORDER);
+      if (JSON.stringify(newOrder) !== JSON.stringify(rightCardOrder)) {
+        rightCardOrder = newOrder;
+        persistTopLevelLayout(leftCardOrder, rightCardOrder);
+        pushHistory();
+      }
     }
   };
   

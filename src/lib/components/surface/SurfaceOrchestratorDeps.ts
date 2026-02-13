@@ -110,6 +110,7 @@ export {
   applyRecipeConfig as applyRecipeConfigController
 } from './controllers/SurfaceRecipeUiController';
 export type { Curve, DatumCsys, DatumPlane, Edge, Point3D, SurfaceFace } from '../../surface/types';
+export type { SelectionMode, SelectionProfile } from './SurfaceTypes';
 export { bilerp, clamp, deg, lerp3, vecNorm, vecSub } from '../../surface/geom/points';
 export { edgeExists } from '../../surface/geom/edges';
 export { buildLoftSegments } from '../../surface/geom/curves';
