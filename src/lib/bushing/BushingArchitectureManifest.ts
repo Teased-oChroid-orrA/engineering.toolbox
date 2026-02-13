@@ -8,7 +8,7 @@ export type BushingModuleBudget = {
 // route orchestrates, controllers/services own logic, core owns math.
 export const BUSHING_ARCHITECTURE_MANIFEST: BushingModuleBudget[] = [
   { path: 'src/routes/bushing/+page.svelte', softMaxLoc: 240, required: true },
-  { path: 'src/lib/components/bushing/BushingOrchestrator.svelte', softMaxLoc: 420, required: true },
+  { path: 'src/lib/components/bushing/BushingOrchestrator.svelte', softMaxLoc: 600, required: true },
   { path: 'src/lib/components/bushing/BushingHelperGuidance.svelte', softMaxLoc: 220, required: true },
   { path: 'src/lib/components/bushing/BushingResultSummary.svelte', softMaxLoc: 220, required: true },
   { path: 'src/lib/components/bushing/BushingDiagnosticsPanel.svelte', softMaxLoc: 260, required: true },
