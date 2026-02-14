@@ -1048,6 +1048,7 @@
       recipeNotice,
       hasLoaded,
       headers,
+      totalRowCount,
       visibleRows,
       visibleColIdxs,
       totalFilteredCount,

@@ -1,6 +1,5 @@
 import type { IFilterSet } from '@svar-ui/svelte-filter';
-import type { GenTab, MultiQueryClause, Recipe, RecipeState } from '$lib/components/inspector/InspectorOrchestratorDeps';
-import type { SchemaColStat } from '$lib/components/inspector/InspectorOrchestratorSchemaInsightsController';
+import type { GenTab, MultiQueryClause, Recipe, RecipeState, SchemaColStat } from '$lib/components/inspector/InspectorOrchestratorDeps';
 
 type ColType = 'numeric' | 'date' | 'string';
 type MatchMode = 'fuzzy' | 'regex' | 'exact';

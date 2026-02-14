@@ -38,7 +38,7 @@ export async function applyState(ctx: StateControllerContext, st: any) {
     mode: c?.mode === 'exact' || c?.mode === 'regex' ? c.mode : 'fuzzy'
   })).filter((c: any) => c.id.length > 0 || c.query.length > 0);
   if ((ctx.multiQueryClauses?.length ?? 0) === 0) {
-    ctx.multiQueryClauses = [{ id: `mq_${Date.now()}_0`, query: '', mode: 'fuzzy' }];
+    ctx.multiQueryClauses = [{ id: `mq_${Date.now()}_0`, query: '', mode: 'fuzzy', matchMode: 'fuzzy', targetColIdx: null, logicalOp: 'AND' }];
   }
   ctx.targetColIdx = migrated.targetColIdx ?? null;
   ctx.maxRowsScanText = migrated.maxRowsScanText ?? '';

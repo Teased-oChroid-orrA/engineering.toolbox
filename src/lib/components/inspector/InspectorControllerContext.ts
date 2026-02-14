@@ -101,17 +101,12 @@ export interface InspectorControllerContext {
   // Column Management
   // ============================================================================
   visibleColumns: Set<number>;
-  hiddenColumns: Set<number>;
+  hiddenColumns: number[];
   columnWidths: Record<number, number>;
-  pinnedLeft: Set<number>;
-  pinnedRight: Set<number>;
+  pinnedLeft: number[];
+  pinnedRight: number[];
   showColumnPicker: boolean;
   columnPickerNotice: string | null;
-
-  // ============================================================================
-  // Recipes
-  // ============================================================================
-  recipes: Recipe[];
 
   // ============================================================================
   // Workspace State
@@ -196,6 +191,8 @@ export interface InspectorControllerContext {
   drawerError: string | null;
   drawerExplain: string | null;
   drawerSearch: string;
+  tier2Open: boolean;
+  tier2Tab: "numeric" | "date" | "category";
 
   // ============================================================================
   // Schema Modal State
@@ -205,7 +202,7 @@ export interface InspectorControllerContext {
   schemaCache: Map<string, any>;
   schemaDriftBaseline: SchemaColStat[] | null;
   schemaSampleN: number;
-  schemaSampleTier: 'filtered' | 'all';
+  schemaSampleTier: 'fast' | 'balanced' | 'full';
   schemaScopeLabel: string;
   showSchemaModal: boolean;
   
@@ -221,7 +218,7 @@ export interface InspectorControllerContext {
   catAvailRowsScanned: number;
   catAvailPartial: boolean;
   catAvailTimer: ReturnType<typeof setTimeout> | null;
-  categoryGate: number;
+  categoryGate: GateToken;
 
   // ============================================================================
   // Constants
@@ -453,10 +450,10 @@ export type RowDrawerControllerContext = Pick<
   | 'invoke'
   | 'recordPerf'
 > & {
-  loadRowDrawerData: (visualIdx: number) => Promise<void>;
-  copyDrawerAsJsonController: () => Promise<void>;
+  loadRowDrawerData: (args: { invoke: any; visualIdx: number; headers: string[]; colTypes: any[] }) => Promise<{ drawerKVs: any; drawerExplain: any }>;
+  copyDrawerAsJsonController: (drawerKVs: any) => Promise<void>;
   runFilterNow: () => Promise<void>;
-  scheduleFilter: (reason: string) => void;
+  scheduleFilter: (reason?: string) => void;
   withViewTransition: (fn: () => void) => void;
   clamp: (n: number, min: number, max: number) => number;
   applyDrawerNumericExact: (value: string) => void;
@@ -501,7 +498,7 @@ export type SchemaControllerContext = Pick<
   | 'invoke'
   | 'recordPerf'
 > & {
-  profileSchemaFromRows: (rows: string[][]) => any;
+  profileSchemaFromRows: (rows: string[][], headers: string[], colTypes: ColType[]) => any;
   parseMaxRowsScanText: (text: string) => number;
   activeFilterHash: () => string;
   withViewTransition: (fn: () => void) => void;
@@ -531,7 +528,7 @@ export type StateControllerContext = Pick<
   | 'headers'
   | 'invoke'
 > & {
-  captureRecipeState: () => any;
+  captureRecipeState: (state: any) => any;
   migrateAndNormalizeRecipeState: (state: any) => any;
   runFilterNow: () => Promise<void>;
 };
@@ -565,4 +562,6 @@ export type GridControllerContext = Pick<
   | 'invoke'
   | 'queueDebug'
   | 'recordPerf'
->;
+> & {
+  updateVisibleRows?: (rows: string[][]) => void;
+};
