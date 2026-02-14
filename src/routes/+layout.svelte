@@ -80,10 +80,13 @@
     };
     syncHashPath();
     console.log('[LAYOUT] Reading registered menus from registry...');
-    menuByScope = getRegisteredContextMenus();
-    console.log('[LAYOUT] menuByScope initialized to:', menuByScope);
-    console.log('[LAYOUT] activeScope:', activeScope);
-    console.log('[LAYOUT] activeToolMenu:', activeToolMenu);
+    // Use setTimeout to ensure child components have mounted and registered
+    setTimeout(() => {
+      menuByScope = getRegisteredContextMenus();
+      console.log('[LAYOUT] menuByScope initialized to:', menuByScope);
+      console.log('[LAYOUT] activeScope:', activeScope);
+      console.log('[LAYOUT] activeToolMenu:', activeToolMenu);
+    }, 0);
     window.addEventListener('hashchange', syncHashPath);
     const update = () => {
       const width = navHost?.clientWidth ?? 0;
