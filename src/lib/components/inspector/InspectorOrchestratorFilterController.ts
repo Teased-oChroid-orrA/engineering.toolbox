@@ -77,6 +77,9 @@ export async function applyFilterSpec(ctx: FilterControllerContext, spec: any): 
 
 export async function runFilterNow(ctx: FilterControllerContext, forceCurrent = false) {
   console.error('★★★ RUN FILTER NOW CALLED ★★★');
+  console.error('[FILTER NOW] loadState._id:', (ctx as any).loadState?._id);
+  console.error('[FILTER NOW] loadState.hasLoaded:', (ctx as any).loadState?.hasLoaded);
+  console.error('[FILTER NOW] ctx.hasLoaded:', ctx.hasLoaded);
   devLog('FILTER NOW CONTROLLER', 'Entry - hasLoaded:', ctx.hasLoaded, 'isMergedView:', ctx.isMergedView);
   
   ctx.queueDebugRate('runFilterNow', 150, 'runFilterNow', {

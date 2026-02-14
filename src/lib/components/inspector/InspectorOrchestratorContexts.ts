@@ -104,7 +104,7 @@ export function filterControllerCtx(state: {
     fetchVisibleSlice: state.fetchVisibleSlice,
     loadState: state.loadState,  // Return loadState by reference
     get headers() { return state.headers; },
-    get hasLoaded() { return state.hasLoaded; },
+    get hasLoaded() { return state.loadState.hasLoaded; },  // FIX: Read from reactive loadState
     get suspendReactiveFiltering() { return state.suspendReactiveFiltering; },
     get crossQueryBusy() { return state.crossQueryBusy; },
     get queryScope() { return state.queryScope; },
@@ -249,6 +249,7 @@ export function loadControllerCtxStateMain(state: {
   mergedRowsAll: string[][];  // Derived from loadState
 }) {
   return {
+    loadState: state.loadState,  // Return loadState for direct access when needed
     get hiddenUploadInput() { return state.hiddenUploadInput; },
     get isLoading() { return state.isLoading; },
     set isLoading(v: boolean) { state.isLoading = v; },
@@ -286,7 +287,11 @@ export function loadControllerCtxStateMain(state: {
     get pendingRestore() { return state.pendingRestore; },
     set pendingRestore(v: RecipeState | null) { state.pendingRestore = v; },
     get hasLoaded() { return state.loadState.hasLoaded; },
-    set hasLoaded(v: boolean) { state.loadState.hasLoaded = v; },
+    set hasLoaded(v: boolean) { 
+      console.error('★★★ SET hasLoaded to:', v);
+      state.loadState.hasLoaded = v;
+      console.error('★★★ loadState.hasLoaded is now:', state.loadState.hasLoaded);
+    },
     get showDataControls() { return state.showDataControls; },
     set showDataControls(v: boolean) { state.showDataControls = v; },
     get activeDatasetId() { return state.activeDatasetId; },

@@ -84,7 +84,15 @@ export async function loadCsvFromText(
 
     ctx.recipes = await ctx.loadRecipesForDataset(ctx.datasetId);
     ctx.pendingRestore = await ctx.loadLastStateForDataset(ctx.datasetId);
-    ctx.hasLoaded = true;
+    // CRITICAL FIX: Access loadState directly to ensure reactivity
+    // Setting ctx.hasLoaded = true creates a new property due to TypeScript cast
+    console.log('[LOAD CSV] Setting hasLoaded = true via loadState');
+    console.log('[LOAD CSV] loadState._id:', (ctx as any).loadState?._id);
+    console.log('[LOAD CSV] ctx.hasLoaded before:', ctx.hasLoaded);
+    console.log('[LOAD CSV] loadState.hasLoaded before:', (ctx as any).loadState?.hasLoaded);
+    (ctx as any).loadState.hasLoaded = true;
+    console.log('[LOAD CSV] ctx.hasLoaded after:', ctx.hasLoaded);
+    console.log('[LOAD CSV] loadState.hasLoaded after:', (ctx as any).loadState?.hasLoaded);
     devLog('LOAD CSV', 'hasLoaded set to true, datasetId:', ctx.datasetId);
     ctx.showDataControls = true;
     ctx.activeDatasetId = ctx.datasetId;
@@ -113,22 +121,29 @@ export async function loadCsvFromText(
       if (ctx.catF.colIdx != null && ctx.catF.colIdx >= ctx.headers.length) ctx.catF = { enabled: false, colIdx: null, selected: new Set() };
     }
 
+    console.log('[LOAD CSV] About to check preserveActiveQuery');
     const preserveActiveQuery = (ctx.query ?? '').trim().length > 0 || ctx.matchMode !== 'fuzzy' || ctx.targetColIdx != null;
+    console.log('[LOAD CSV] preserveActiveQuery:', preserveActiveQuery, 'pendingRestore:', !!ctx.pendingRestore, 'applyInitialFilter:', applyInitialFilter);
     if (ctx.pendingRestore && applyInitialFilter && !preserveActiveQuery) {
+      console.log('[LOAD CSV] Branch A: Applying pendingRestore state');
       await ctx.applyState(ctx.pendingRestore);
       ctx.pendingRestore = null;
     } else if (applyInitialFilter) {
-      devLog('LOAD CSV', 'Calling runFilterNow, mergedRowsAll.length:', ctx.mergedRowsAll.length);
-      devLog('LOAD CSV', 'Filter state - query:', ctx.query, 'matchMode:', ctx.matchMode, 'targetColIdx:', ctx.targetColIdx);
+      console.log('[LOAD CSV] Branch B: Calling runFilterNow, mergedRowsAll.length:', ctx.mergedRowsAll.length);
+      console.log('[LOAD CSV] Filter state - query:', ctx.query, 'matchMode:', ctx.matchMode, 'targetColIdx:', ctx.targetColIdx);
       try {
         await ctx.runFilterNow();
-        devLog('LOAD CSV', 'After runFilterNow, visibleRows:', ctx.visibleRows?.length);
+        console.log('[LOAD CSV] After runFilterNow, visibleRows:', ctx.visibleRows?.length);
       } catch (err) {
-        devLog('LOAD CSV', 'runFilterNow error (continuing):', err);
+        console.log('[LOAD CSV] runFilterNow error (continuing):', err);
         // Don't throw - continue with load, filter can be retried later
       }
+    } else {
+      console.log('[LOAD CSV] Branch C: applyInitialFilter=false, skipping filter');
     }
   } catch (e: any) {
+    console.error('[LOAD CSV] EXCEPTION CAUGHT:', e);
+    console.error('[LOAD CSV] Exception stack:', e?.stack);
     ctx.loadError = e?.message ?? String(e);
     ctx.hasLoaded = false;
     ctx.headers = [];

@@ -20,7 +20,7 @@ test('Check ALL console output', async ({ page }) => {
   await page.waitForTimeout(5000);
   
   console.log('\n=== ALL CONSOLE OUTPUT ===');
-  logs.filter(l => l.includes('LOAD') || l.includes('FILE INPUT') || l.includes('WRAPPER') || l.includes('★')).forEach(l => console.log(l));
+  logs.filter(l => l.includes('LOAD') || l.includes('FILE INPUT') || l.includes('WRAPPER') || l.includes('FILTER') || l.includes('★')).forEach(l => console.log(l));
   console.log('=== END ===\n');
   
   // Check grid

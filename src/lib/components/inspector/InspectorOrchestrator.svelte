@@ -227,7 +227,9 @@
   const categoryGate = createRequestGate();
   
   // Create a state object that controllers can mutate
+  const loadStateId = Math.random().toString(36);  // Unique ID for debugging
   const loadState = $state({
+    _id: loadStateId,  // Debug: track which loadState object this is
     headers: [] as string[],
     totalRowCount: 0,
     colTypes: [] as ColType[],
