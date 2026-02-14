@@ -216,11 +216,21 @@ export function onQueryScopeChange(ctx: any) {
   if (ctx.queryScope === 'current') {
     ctx.lastCrossReactiveSig = '';
     ctx.crossQueryResults = [];
-    ctx.loadState.isMergedView = false;
-    if (ctx.preMergedHeaders.length > 0) ctx.loadState.headers = [...ctx.preMergedHeaders];
-    if (ctx.preMergedColTypes.length > 0) ctx.loadState.colTypes = [...ctx.preMergedColTypes];
-    if (ctx.preMergedTotalRowCount > 0) ctx.loadState.totalRowCount = ctx.preMergedTotalRowCount;
-    ctx.loadState.totalFilteredCount = ctx.preMergedTotalFilteredCount > 0 ? ctx.preMergedTotalFilteredCount : ctx.loadState.totalFilteredCount;
+    
+    // Only reset isMergedView if we were in cross-query mode (multiple datasets merged)
+    // Don't reset if we're in browser mode (single CSV, all data in memory)
+    // Check: if preMergedHeaders exists, we were in cross-query mode
+    const wasInCrossQueryMode = ctx.preMergedHeaders && ctx.preMergedHeaders.length > 0;
+    
+    if (wasInCrossQueryMode) {
+      ctx.loadState.isMergedView = false;
+      ctx.loadState.headers = [...ctx.preMergedHeaders];
+      if (ctx.preMergedColTypes.length > 0) ctx.loadState.colTypes = [...ctx.preMergedColTypes];
+      if (ctx.preMergedTotalRowCount > 0) ctx.loadState.totalRowCount = ctx.preMergedTotalRowCount;
+      ctx.loadState.totalFilteredCount = ctx.preMergedTotalFilteredCount > 0 ? ctx.preMergedTotalFilteredCount : ctx.loadState.totalFilteredCount;
+    }
+    // If not in cross-query mode, keep current isMergedView state (browser mode)
+    
     void runFilterNow(ctx, true);
     return;
   }

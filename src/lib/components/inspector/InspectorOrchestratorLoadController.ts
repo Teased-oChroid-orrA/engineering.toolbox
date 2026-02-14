@@ -10,7 +10,8 @@ export async function loadCsvFromText(
   applyInitialFilter = true
 ) {
   ctx.isLoading = true;
-  ctx.isMergedView = false;
+  // Don't reset isMergedView here - it will be set correctly based on browser/Tauri mode
+  // ctx.isMergedView = false;  // REMOVED: This breaks browser mode which needs isMergedView=true
   ctx.loadError = null;
   try {
     if (hasHeadersOverride !== undefined) {
@@ -143,7 +144,8 @@ export async function loadCsvFromPath(
   applyInitialFilter = true
 ) {
   ctx.isLoading = true;
-  ctx.isMergedView = false;
+  // Don't unconditionally reset isMergedView - will be set based on mode
+  // ctx.isMergedView = false;  // REMOVED
   ctx.loadError = null;
   try {
     if (hasHeadersOverride !== undefined) {
