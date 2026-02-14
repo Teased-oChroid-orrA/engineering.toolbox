@@ -1439,6 +1439,20 @@
       },
     });
 
+    // Firefox Fix: Register menu immediately after lifecycle setup
+    // This ensures the menu is registered AFTER event listeners are attached
+    console.log('[Inspector Mount] Registering context menu immediately after lifecycle setup');
+    const menu = buildInspectorContextMenu({
+      canOpenPath,
+      hasLoaded,
+      schemaLoading,
+      showRegexHelp,
+      quietBackendLogs,
+      autoRestoreEnabled,
+    });
+    registerContextMenu(menu);
+    console.log('[Inspector Mount] Initial menu registration complete');
+
     // ⚠️ DISABLED: Menu should always be visible, not controlled by data load state
     // setupShowDataControlsEffect(
     // {
