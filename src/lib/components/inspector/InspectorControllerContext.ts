@@ -88,6 +88,41 @@ export interface InspectorControllerContext {
   multiQueryClauses: MultiQueryClause[];
 
   // ============================================================================
+  // Header & CSV Loading State
+  // ============================================================================
+  hasHeaders: boolean;
+  headerMode: 'yes' | 'no' | 'auto';
+  pendingText: string | null;
+  pendingPath: string | null;
+  showHeaderPrompt: boolean;
+  headerHeuristicReason: string;
+
+  // ============================================================================
+  // Column Management
+  // ============================================================================
+  visibleColumns: Set<number>;
+  hiddenColumns: Set<number>;
+  columnWidths: Record<number, number>;
+  pinnedLeft: Set<number>;
+  pinnedRight: Set<number>;
+  showColumnPicker: boolean;
+  columnPickerNotice: string | null;
+
+  // ============================================================================
+  // Recipes
+  // ============================================================================
+  recipes: Recipe[];
+
+  // ============================================================================
+  // Workspace State
+  // ============================================================================
+  activeDatasetId: string | null;
+  pendingRestore: any;
+  hiddenUploadInput: any;
+  debugLogger: any;
+  dialogMod: DialogMod | null;
+
+  // ============================================================================
   // UI State
   // ============================================================================
   isLoading: boolean;
@@ -167,11 +202,22 @@ export interface InspectorControllerContext {
   // ============================================================================
   // These are functions that controllers can call
   buildFilterSpecFromState: (ctx: any) => { spec: IFilterSet | null; queryError?: string; numericError?: string; dateError?: string };
+  buildFilterSpec: () => any;
   fetchVisibleSlice: () => Promise<void>;
   runFilterNow: (forceCurrent?: boolean) => Promise<void>;
   runCrossDatasetQuery: () => Promise<void>;
   applyRecipe: (recipeId: string) => Promise<void>;
   loadSchemaStats: () => Promise<void>;
+  activateWorkspaceDataset: (id: string, internal?: boolean) => Promise<void>;
+  
+  // Helper functions
+  fnv1a32: (str: string) => number;
+  heuristicHasHeaders: (first: string[], second: string[]) => { value: boolean; decided: boolean; reason: string };
+  computeDatasetIdentity: (headers: string[], text: string) => string;
+  upsertWorkspaceDatasetInList: (ds: WorkspaceDataset) => void;
+  loadRecipesForDataset: (datasetId: string) => Promise<void>;
+  loadLastStateForDataset: (datasetId: string) => Promise<void>;
+  applyState: (state: any) => void;
 
   // ============================================================================
   // Merged Headers (for cross-query mode)
@@ -248,12 +294,59 @@ export type LoadControllerContext = Pick<
   | 'loadedDatasets'
   | 'datasetId'
   | 'datasetLabel'
+  | 'headers'
+  | 'colTypes'
+  | 'totalRowCount'
+  | 'totalFilteredCount'
+  | 'visibleRows'
+  | 'hasLoaded'
+  | 'crossQueryBusy'
+  | 'crossQueryResults'
+  | 'query'
+  | 'matchMode'
+  | 'targetColIdx'
+  | 'numericF'
+  | 'dateF'
+  | 'catF'
+  | 'queryScope'
+  | 'sortColIdx'
+  | 'sortDir'
+  | 'sortSpecs'
+  | 'preMergedHeaders'
+  | 'preMergedTotalRowCount'
+  | 'preMergedTotalFilteredCount'
+  | 'hasHeaders'
+  | 'headerMode'
+  | 'pendingText'
+  | 'pendingPath'
+  | 'showHeaderPrompt'
+  | 'headerHeuristicReason'
+  | 'visibleColumns'
+  | 'hiddenColumns'
+  | 'columnWidths'
+  | 'pinnedLeft'
+  | 'pinnedRight'
+  | 'recipes'
+  | 'activeDatasetId'
+  | 'pendingRestore'
+  | 'hiddenUploadInput'
+  | 'debugLogger'
+  | 'dialogMod'
   | 'invoke'
   | 'queueDebug'
   | 'queueDebugRate'
   | 'recordPerf'
   | 'runFilterNow'
   | 'runCrossDatasetQuery'
+  | 'fnv1a32'
+  | 'heuristicHasHeaders'
+  | 'computeDatasetIdentity'
+  | 'upsertWorkspaceDatasetInList'
+  | 'loadRecipesForDataset'
+  | 'loadLastStateForDataset'
+  | 'applyState'
+  | 'buildFilterSpec'
+  | 'activateWorkspaceDataset'
 >;
 
 export type GridControllerContext = Pick<
@@ -273,6 +366,15 @@ export type GridControllerContext = Pick<
   | 'sliceGate'
   | 'sliceTimer'
   | 'loadError'
+  | 'headers'
+  | 'totalFilteredCount'
+  | 'visibleColumns'
+  | 'hiddenColumns'
+  | 'columnWidths'
+  | 'pinnedLeft'
+  | 'pinnedRight'
+  | 'showColumnPicker'
+  | 'columnPickerNotice'
   | 'invoke'
   | 'queueDebug'
   | 'recordPerf'

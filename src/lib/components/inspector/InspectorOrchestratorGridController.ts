@@ -1,6 +1,7 @@
 import { devLog } from '$lib/utils/devLog';
+import type { GridControllerContext } from './InspectorControllerContext';
 
-export async function fetchVisibleSlice(ctx: any) {
+export async function fetchVisibleSlice(ctx: GridControllerContext) {
   if (!ctx.hasLoaded) {
     devLog('FETCH SLICE', 'Skipped: hasLoaded =', ctx.hasLoaded);
     return;
@@ -63,7 +64,7 @@ export async function fetchVisibleSlice(ctx: any) {
   }
 }
 
-export function scheduleSliceFetch(ctx: any) {
+export function scheduleSliceFetch(ctx: GridControllerContext) {
   if (ctx.sliceTimer) clearTimeout(ctx.sliceTimer);
   const adaptiveMs = ctx.totalFilteredCount > 250_000 ? 55 : ctx.totalFilteredCount > 100_000 ? 35 : 0;
   if (adaptiveMs <= 0) {
@@ -73,7 +74,7 @@ export function scheduleSliceFetch(ctx: any) {
   ctx.sliceTimer = setTimeout(() => void fetchVisibleSlice(ctx), adaptiveMs);
 }
 
-export async function requestSort(ctx: any, colIdx: number, opts?: { multi?: boolean }) {
+export async function requestSort(ctx: GridControllerContext, colIdx: number, opts?: { multi?: boolean }) {
   if (!ctx.hasLoaded || !ctx.headers.length) return;
   const t0 = performance.now();
   const token = ctx.sortGate.nextToken();
@@ -131,7 +132,7 @@ export async function requestSort(ctx: any, colIdx: number, opts?: { multi?: boo
   }
 }
 
-export function smartSelectColumns(ctx: any) {
+export function smartSelectColumns(ctx: GridControllerContext) {
   const n = ctx.headers.length;
   const set = new Set<number>();
   if (!n) return;
@@ -152,7 +153,7 @@ export function smartSelectColumns(ctx: any) {
   ctx.visibleColumns = set;
 }
 
-export function openColumnPicker(ctx: any) {
+export function openColumnPicker(ctx: GridControllerContext) {
   ctx.columnPickerNotice = null;
   if ((ctx.visibleColumns?.size ?? 0) === 0 && ctx.headers.length > 50) {
     smartSelectColumns(ctx);
@@ -161,50 +162,50 @@ export function openColumnPicker(ctx: any) {
   ctx.showColumnPicker = true;
 }
 
-export function toggleVisibleCol(ctx: any, i: number) {
+export function toggleVisibleCol(ctx: GridControllerContext, i: number) {
   const set = new Set(ctx.visibleColumns);
   if (set.has(i)) set.delete(i);
   else set.add(i);
   ctx.visibleColumns = set;
 }
 
-export function selectAllColumns(ctx: any) {
+export function selectAllColumns(ctx: GridControllerContext) {
   const set = new Set<number>();
   for (let i = 0; i < ctx.headers.length; i++) set.add(i);
   ctx.visibleColumns = set;
 }
 
-export function clearColumnSelection(ctx: any) {
+export function clearColumnSelection(ctx: GridControllerContext) {
   ctx.visibleColumns = new Set();
 }
 
-export function hideColumn(ctx: any, idx: number) {
-  if (ctx.hiddenColumns.includes(idx)) return;
-  ctx.hiddenColumns = [...ctx.hiddenColumns, idx];
-  ctx.pinnedLeft = ctx.pinnedLeft.filter((x: number) => x !== idx);
-  ctx.pinnedRight = ctx.pinnedRight.filter((x: number) => x !== idx);
+export function hideColumn(ctx: GridControllerContext, idx: number) {
+  if (ctx.hiddenColumns.has(idx)) return;
+  ctx.hiddenColumns = new Set([...ctx.hiddenColumns, idx]);
+  ctx.pinnedLeft = new Set([...ctx.pinnedLeft].filter((x: number) => x !== idx));
+  ctx.pinnedRight = new Set([...ctx.pinnedRight].filter((x: number) => x !== idx));
 }
 
-export function togglePinLeft(ctx: any, idx: number) {
-  if (ctx.pinnedLeft.includes(idx)) {
-    ctx.pinnedLeft = ctx.pinnedLeft.filter((x: number) => x !== idx);
+export function togglePinLeft(ctx: GridControllerContext, idx: number) {
+  if (ctx.pinnedLeft.has(idx)) {
+    ctx.pinnedLeft = new Set([...ctx.pinnedLeft].filter((x: number) => x !== idx));
     return;
   }
-  ctx.pinnedRight = ctx.pinnedRight.filter((x: number) => x !== idx);
-  ctx.pinnedLeft = [...ctx.pinnedLeft, idx];
-  ctx.hiddenColumns = ctx.hiddenColumns.filter((x: number) => x !== idx);
+  ctx.pinnedRight = new Set([...ctx.pinnedRight].filter((x: number) => x !== idx));
+  ctx.pinnedLeft = new Set([...ctx.pinnedLeft, idx]);
+  ctx.hiddenColumns = new Set([...ctx.hiddenColumns].filter((x: number) => x !== idx));
 }
 
-export function togglePinRight(ctx: any, idx: number) {
-  if (ctx.pinnedRight.includes(idx)) {
-    ctx.pinnedRight = ctx.pinnedRight.filter((x: number) => x !== idx);
+export function togglePinRight(ctx: GridControllerContext, idx: number) {
+  if (ctx.pinnedRight.has(idx)) {
+    ctx.pinnedRight = new Set([...ctx.pinnedRight].filter((x: number) => x !== idx));
     return;
   }
-  ctx.pinnedLeft = ctx.pinnedLeft.filter((x: number) => x !== idx);
-  ctx.pinnedRight = [...ctx.pinnedRight, idx];
-  ctx.hiddenColumns = ctx.hiddenColumns.filter((x: number) => x !== idx);
+  ctx.pinnedLeft = new Set([...ctx.pinnedLeft].filter((x: number) => x !== idx));
+  ctx.pinnedRight = new Set([...ctx.pinnedRight, idx]);
+  ctx.hiddenColumns = new Set([...ctx.hiddenColumns].filter((x: number) => x !== idx));
 }
 
-export function onColumnResize(ctx: any, idx: number, width: number) {
+export function onColumnResize(ctx: GridControllerContext, idx: number, width: number) {
   ctx.columnWidths = { ...ctx.columnWidths, [idx]: Math.max(90, Math.min(480, Math.floor(width))) };
 }
