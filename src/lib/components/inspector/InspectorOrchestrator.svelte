@@ -1538,6 +1538,20 @@
     },
   );
   setupQuietBackendLogsEffect({ quietBackendLogs: () => quietBackendLogs });
+  
+  // Register menu IMMEDIATELY on mount, not via effect (timing issue fix)
+  console.log('[INSPECTOR MOUNT] Registering context menu immediately...');
+  registerContextMenu(buildInspectorContextMenu({
+    canOpenPath,
+    hasLoaded,
+    schemaLoading,
+    showRegexHelp,
+    quietBackendLogs,
+    autoRestoreEnabled,
+  }));
+  console.log('[INSPECTOR MOUNT] Menu registration complete');
+  
+  // Keep effect for updates when reactive values change
   setupContextMenuEffect(
     {
       buildInspectorContextMenu,
