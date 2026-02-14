@@ -70,13 +70,30 @@ export function setupSliceFetchEffect(deps: {
 }, callbacks: {
   scheduleSliceFetch: () => void;
 }) {
+  let lastFetchKey = '';
+  
   $effect(() => {
-    if (!deps.hasLoaded() || deps.suspendReactiveFiltering()) return;
-    if (deps.isMergedView()) return;
-    deps.startIdx(); 
-    deps.endIdx(); 
-    deps.totalFilteredCount(); 
-    deps.visibleColIdxsLength();
+    const loaded = deps.hasLoaded();
+    const suspended = deps.suspendReactiveFiltering();
+    if (!loaded || suspended) return;
+    
+    const merged = deps.isMergedView();
+    if (merged) return;
+    
+    const start = deps.startIdx();
+    const end = deps.endIdx();
+    const count = deps.totalFilteredCount();
+    const colsLen = deps.visibleColIdxsLength();
+    
+    // Prevent infinite loop: Only fetch if parameters actually changed
+    const fetchKey = `${start}|${end}|${count}|${colsLen}`;
+    if (fetchKey === lastFetchKey) {
+      devLog('[SLICE FETCH EFFECT] Skipped - params unchanged:', fetchKey);
+      return;
+    }
+    
+    lastFetchKey = fetchKey;
+    devLog('[SLICE FETCH EFFECT] Triggered - start:', start, 'end:', end, 'count:', count, 'colsLen:', colsLen);
     callbacks.scheduleSliceFetch();
   });
 }
