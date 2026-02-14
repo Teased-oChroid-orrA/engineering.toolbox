@@ -513,7 +513,11 @@ export function gridControllerCtx(state: {
     get mergedRowsAll() { return state.loadState.mergedRowsAll; },
     set mergedRowsAll(v: string[][]) { state.loadState.mergedRowsAll = v; },
     get visibleRows() { return state.loadState.visibleRows; },
-    set visibleRows(v: string[][]) { state.loadState.visibleRows = v; },
+    set visibleRows(v: string[][]) { 
+      console.log('[GRID CTX] Setting visibleRows, length:', v?.length, 'first row:', v?.[0]);
+      state.loadState.visibleRows = v; 
+      console.log('[GRID CTX] loadState.visibleRows now:', state.loadState.visibleRows?.length);
+    },
     get loadError() { return state.loadError; },
     set loadError(v: string | null) { state.loadError = v; },
     get totalFilteredCount() { return state.totalFilteredCount; },

@@ -253,6 +253,12 @@
   let mergedRowsAll = $derived(loadState.mergedRowsAll);
   let totalFilteredCount = $derived(loadState.totalFilteredCount);
   let visibleRows = $derived(loadState.visibleRows);  // Derive from loadState
+  
+  // Debug: Log when visibleRows changes
+  $effect(() => {
+    console.log('[ORCHESTRATOR] visibleRows changed, length:', visibleRows?.length, 'first row:', visibleRows?.[0]);
+  });
+  
   let loadedDatasets = $state<WorkspaceDataset[]>([]);
   let activeDatasetId = $state<string>("");
   let activeDatasetLabel = $derived.by(() => {
@@ -946,6 +952,7 @@
     );
   }
   function gridControllerCtx() {
+    console.log('[GRID CTX WRAPPER] Building context...');
     return buildGridControllerCtx({
       invoke,
       recordPerf,
@@ -958,7 +965,7 @@
       visibleColIdxs,
       isMergedView,
       mergedRowsAll,
-      visibleRows,
+      visibleRows: [],  // Don't pass derived value - use loadState.visibleRows instead
       loadError,
       totalFilteredCount,
       sliceTimer,
@@ -977,7 +984,15 @@
     });
   }
   async function fetchVisibleSlice() {
-    await fetchVisibleSliceController(gridControllerCtx());
+    console.log('[WRAPPER] fetchVisibleSlice called, hasLoaded:', hasLoaded, 'loadState.hasLoaded:', loadState.hasLoaded);
+    try {
+      const ctx = gridControllerCtx();
+      console.log('[WRAPPER] Context built, calling controller...');
+      await fetchVisibleSliceController(ctx);
+      console.log('[WRAPPER] Controller returned, loadState.visibleRows.length:', loadState.visibleRows?.length);
+    } catch (err) {
+      console.error('[WRAPPER] fetchVisibleSlice error:', err);
+    }
   }
   async function requestSort(colIdx: number, opts?: { multi?: boolean }) {
     await requestSortController(gridControllerCtx(), colIdx, opts);

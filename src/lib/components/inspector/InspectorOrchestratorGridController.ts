@@ -2,7 +2,9 @@ import { devLog } from '$lib/utils/devLog';
 import type { GridControllerContext } from './InspectorControllerContext';
 
 export async function fetchVisibleSlice(ctx: GridControllerContext) {
+  console.error('[FETCH SLICE] Called, hasLoaded:', ctx.hasLoaded, 'isMergedView:', ctx.isMergedView);
   if (!ctx.hasLoaded) {
+    console.error('[FETCH SLICE] Early return: hasLoaded =', ctx.hasLoaded);
     devLog('FETCH SLICE', 'Skipped: hasLoaded =', ctx.hasLoaded);
     return;
   }
@@ -19,16 +21,21 @@ export async function fetchVisibleSlice(ctx: GridControllerContext) {
     if (ctx.isMergedView) {
       const base = ctx.mergedRowsAll.slice(s, e);
       if (!ctx.sliceGate.isLatest(token)) return;
+      // CRITICAL FIX: Use loadState directly to ensure reactivity
       if (reqCols.length === 0) {
-        ctx.visibleRows = base;
+        console.log('[FETCH SLICE] Setting loadState.visibleRows, length:', base.length);
+        (ctx as any).loadState.visibleRows = base;
       } else {
-        ctx.visibleRows = base.map((r: string[]) => {
-          const sparse: string[] = [];
-          for (let i = 0; i < reqCols.length; i++) sparse[reqCols[i]] = r[reqCols[i]] ?? '';
-          return sparse;
+        const sparse = base.map((r: string[]) => {
+          const row: string[] = [];
+          for (let i = 0; i < reqCols.length; i++) row[reqCols[i]] = r[reqCols[i]] ?? '';
+          return row;
         });
+        console.log('[FETCH SLICE] Setting loadState.visibleRows (sparse), length:', sparse.length);
+        (ctx as any).loadState.visibleRows = sparse;
       }
-      devLog('FETCH SLICE', 'Set visibleRows to', ctx.visibleRows.length, 'rows');
+      console.log('[FETCH SLICE] loadState.visibleRows is now:', (ctx as any).loadState.visibleRows?.length);
+      devLog('FETCH SLICE', 'Set visibleRows to', (ctx as any).loadState.visibleRows.length, 'rows');
       ctx.recordPerf('slice', t0, {
         start: s,
         end: e,
