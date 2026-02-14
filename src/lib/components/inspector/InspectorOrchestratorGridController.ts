@@ -1,10 +1,18 @@
+import { devLog } from '$lib/utils/devLog';
+
 export async function fetchVisibleSlice(ctx: any) {
-  if (!ctx.hasLoaded) return;
+  if (!ctx.hasLoaded) {
+    devLog('FETCH SLICE', 'Skipped: hasLoaded =', ctx.hasLoaded);
+    return;
+  }
   const t0 = performance.now();
   const token = ctx.sliceGate.nextToken();
+  
   const s = Number.isFinite(ctx.startIdx) ? Math.max(0, ctx.startIdx) : 0;
   const e = Number.isFinite(ctx.endIdx) ? Math.max(s, ctx.endIdx) : s;
   const reqCols = ctx.visibleColIdxs;
+
+  devLog('FETCH SLICE', 'isMergedView:', ctx.isMergedView, 'mergedRowsAll.length:', ctx.mergedRowsAll?.length, 'range:', s, '-', e);
 
   try {
     if (ctx.isMergedView) {
@@ -19,6 +27,7 @@ export async function fetchVisibleSlice(ctx: any) {
           return sparse;
         });
       }
+      devLog('FETCH SLICE', 'Set visibleRows to', ctx.visibleRows.length, 'rows');
       ctx.recordPerf('slice', t0, {
         start: s,
         end: e,

@@ -1,189 +1,345 @@
 ---
 name: agentic-eval
 description: |
-  Patterns and techniques for evaluating and improving AI agent outputs. Use this skill when:
-  - Implementing self-critique and reflection loops
-  - Building evaluator-optimizer pipelines for quality-critical generation
-  - Creating test-driven code refinement workflows
-  - Designing rubric-based or LLM-as-judge evaluation systems
-  - Adding iterative improvement to agent outputs (code, reports, analysis)
-  - Measuring and improving agent response quality
+  Enterprise-grade evaluation and refinement framework for improving AI agent outputs.
+  Use this skill when:
+  - Implementing iterative refinement loops
+  - Building evaluator-optimizer architectures
+  - Designing rubric-based or LLM-as-judge systems
+  - Creating benchmark-driven quality pipelines
+  - Improving reliability across any prompt/project type
+  - Adding confidence, consensus, or adversarial review layers
 ---
 
-# Agentic Evaluation Patterns
+# Agentic Evaluation Framework (AEF)
 
-Patterns for self-improvement through iterative evaluation and refinement.
+A modular quality-control architecture for AI systems.
 
-## Overview
+This framework transforms one-shot generation into a controlled evaluation lifecycle:
 
-Evaluation patterns enable agents to assess and improve their own outputs, moving beyond single-shot generation to iterative refinement loops.
-
-```
-Generate → Evaluate → Critique → Refine → Output
-    ↑                              │
-    └──────────────────────────────┘
-```
-
-## When to Use
-
-- **Quality-critical generation**: Code, reports, analysis requiring high accuracy
-- **Tasks with clear evaluation criteria**: Defined success metrics exist
-- **Content requiring specific standards**: Style guides, compliance, formatting
+Generate → Evaluate → Adversarial Review → Optimize → Confidence Check → Converge → Output
 
 ---
 
-## Pattern 1: Basic Reflection
+# Core Architecture
 
-Agent evaluates and improves its own output through self-critique.
+## 1. Generator
+
+Responsible only for producing candidate outputs.
 
 ```python
-def reflect_and_refine(task: str, criteria: list[str], max_iterations: int = 3) -> str:
-    """Generate with reflection loop."""
-    output = llm(f"Complete this task:\n{task}")
-    
+def generate(task: str) -> str:
+    return llm(f"Complete the task:\n{task}")
+```
+
+---
+
+## 2. Evaluator
+
+Scores output using structured criteria.
+
+```python
+import json
+
+def evaluate(task: str, output: str) -> dict:
+    return json.loads(llm(f"""
+    Evaluate the output for the given task.
+
+    Task: {task}
+    Output: {output}
+
+    Return JSON:
+    {{
+        "overall_score": 0-1,
+        "dimensions": {{
+            "accuracy": 0-1,
+            "clarity": 0-1,
+            "completeness": 0-1
+        }},
+        "confidence": 0-1,
+        "feedback": "actionable critique"
+    }}
+    """))
+```
+
+---
+
+## 3. Adversarial Reviewer (Optional but Recommended)
+
+For robustness and edge-case detection.
+
+```python
+def adversarial_review(task: str, output: str) -> str:
+    return llm(f"""
+    You are a critical reviewer.
+
+    Find hidden flaws, missing assumptions,
+    edge cases, logical gaps, or failure risks.
+
+    Task: {task}
+    Output: {output}
+    """)
+```
+
+---
+
+## 4. Optimizer
+
+Refines output based on structured feedback.
+
+```python
+def optimize(task: str, output: str, feedback: str) -> str:
+    return llm(f"""
+    Improve the output based on the following critique.
+
+    Task: {task}
+    Feedback: {feedback}
+    Original Output: {output}
+    """)
+```
+
+---
+
+## 5. Controller (Refinement Loop)
+
+Coordinates lifecycle and convergence logic.
+
+```python
+def run_agent(task: str, max_iterations: int = 4, threshold: float = 0.85):
+    history = []
+    output = generate(task)
+
+    previous_score = 0.0
+
     for i in range(max_iterations):
-        # Self-critique
-        critique = llm(f"""
-        Evaluate this output against criteria: {criteria}
-        Output: {output}
-        Rate each: PASS/FAIL with feedback as JSON.
-        """)
-        
-        critique_data = json.loads(critique)
-        all_pass = all(c["status"] == "PASS" for c in critique_data.values())
-        if all_pass:
-            return output
-        
-        # Refine based on critique
-        failed = {k: v["feedback"] for k, v in critique_data.items() if v["status"] == "FAIL"}
-        output = llm(f"Improve to address: {failed}\nOriginal: {output}")
-    
-    return output
-```
+        evaluation = evaluate(task, output)
+        score = evaluation["overall_score"]
 
-**Key insight**: Use structured JSON output for reliable parsing of critique results.
+        history.append({
+            "iteration": i,
+            "output": output,
+            "score": score,
+            "confidence": evaluation["confidence"],
+            "feedback": evaluation["feedback"]
+        })
 
----
+        # Success threshold
+        if score >= threshold and evaluation["confidence"] >= 0.8:
+            break
 
-## Pattern 2: Evaluator-Optimizer
+        # Convergence detection (plateau)
+        if abs(score - previous_score) < 0.01:
+            break
 
-Separate generation and evaluation into distinct components for clearer responsibilities.
+        previous_score = score
 
-```python
-class EvaluatorOptimizer:
-    def __init__(self, score_threshold: float = 0.8):
-        self.score_threshold = score_threshold
-    
-    def generate(self, task: str) -> str:
-        return llm(f"Complete: {task}")
-    
-    def evaluate(self, output: str, task: str) -> dict:
-        return json.loads(llm(f"""
-        Evaluate output for task: {task}
-        Output: {output}
-        Return JSON: {{"overall_score": 0-1, "dimensions": {{"accuracy": ..., "clarity": ...}}}}
-        """))
-    
-    def optimize(self, output: str, feedback: dict) -> str:
-        return llm(f"Improve based on feedback: {feedback}\nOutput: {output}")
-    
-    def run(self, task: str, max_iterations: int = 3) -> str:
-        output = self.generate(task)
-        for _ in range(max_iterations):
-            evaluation = self.evaluate(output, task)
-            if evaluation["overall_score"] >= self.score_threshold:
-                break
-            output = self.optimize(output, evaluation)
-        return output
+        output = optimize(task, output, evaluation["feedback"])
+
+    return {
+        "final_output": output,
+        "history": history
+    }
 ```
 
 ---
 
-## Pattern 3: Code-Specific Reflection
-
-Test-driven refinement loop for code generation.
-
-```python
-class CodeReflector:
-    def reflect_and_fix(self, spec: str, max_iterations: int = 3) -> str:
-        code = llm(f"Write Python code for: {spec}")
-        tests = llm(f"Generate pytest tests for: {spec}\nCode: {code}")
-        
-        for _ in range(max_iterations):
-            result = run_tests(code, tests)
-            if result["success"]:
-                return code
-            code = llm(f"Fix error: {result['error']}\nCode: {code}")
-        return code
-```
+# Advanced Patterns
 
 ---
 
-## Evaluation Strategies
+## Multi-Judge Consensus
 
-### Outcome-Based
-Evaluate whether output achieves the expected result.
-
-```python
-def evaluate_outcome(task: str, output: str, expected: str) -> str:
-    return llm(f"Does output achieve expected outcome? Task: {task}, Expected: {expected}, Output: {output}")
-```
-
-### LLM-as-Judge
-Use LLM to compare and rank outputs.
+Reduces evaluator bias and increases reliability.
 
 ```python
-def llm_judge(output_a: str, output_b: str, criteria: str) -> str:
-    return llm(f"Compare outputs A and B for {criteria}. Which is better and why?")
+import statistics
+
+def ensemble_score(task: str, output: str, n: int = 3):
+    scores = []
+    for _ in range(n):
+        scores.append(evaluate(task, output)["overall_score"])
+
+    return {
+        "mean": sum(scores) / len(scores),
+        "variance": statistics.variance(scores) if len(scores) > 1 else 0
+    }
 ```
 
-### Rubric-Based
-Score outputs against weighted dimensions.
+Interpretation:
+- Low variance → stable evaluation
+- High variance → unreliable scoring, consider adversarial review
+
+---
+
+## Rubric-Based Evaluation
 
 ```python
 RUBRIC = {
-    "accuracy": {"weight": 0.4},
-    "clarity": {"weight": 0.3},
-    "completeness": {"weight": 0.3}
+    "accuracy": 0.4,
+    "clarity": 0.3,
+    "completeness": 0.3
 }
+```
 
-def evaluate_with_rubric(output: str, rubric: dict) -> float:
-    scores = json.loads(llm(f"Rate 1-5 for each dimension: {list(rubric.keys())}\nOutput: {output}"))
-    return sum(scores[d] * rubric[d]["weight"] for d in rubric) / 5
+Weighted scoring can be computed by multiplying each dimension by its weight.
+
+---
+
+## Tournament Generation (Alternative to Iteration)
+
+Generate multiple candidates and select best.
+
+```python
+def tournament(task: str, k: int = 3):
+    candidates = [generate(task) for _ in range(k)]
+    best = candidates[0]
+
+    for candidate in candidates[1:]:
+        decision = llm(f"""
+        Compare Output A and Output B.
+        Which better completes the task and why?
+
+        Task: {task}
+        Output A: {best}
+        Output B: {candidate}
+        Respond with: A or B
+        """)
+
+        if "B" in decision:
+            best = candidate
+
+    return best
 ```
 
 ---
 
-## Best Practices
+# Benchmarking Mode (Project-Wide Quality Control)
 
-| Practice | Rationale |
-|----------|-----------|
-| **Clear criteria** | Define specific, measurable evaluation criteria upfront |
-| **Iteration limits** | Set max iterations (3-5) to prevent infinite loops |
-| **Convergence check** | Stop if output score isn't improving between iterations |
-| **Log history** | Keep full trajectory for debugging and analysis |
-| **Structured output** | Use JSON for reliable parsing of evaluation results |
+Use dataset-driven regression testing.
+
+```python
+def benchmark(agent, test_set):
+    scores = []
+
+    for example in test_set:
+        result = agent(example["task"])
+        evaluation = evaluate(example["task"], result["final_output"])
+        scores.append(evaluation["overall_score"])
+
+    return sum(scores) / len(scores) if scores else 0
+```
+
+Use to:
+- Detect regressions
+- Compare model versions
+- Track improvement over time
 
 ---
 
-## Quick Start Checklist
+# Failure Modes & Mitigations
 
-```markdown
-## Evaluation Implementation Checklist
+| Failure Mode | Mitigation |
+|--------------|------------|
+| Self-affirming bias | Use separate evaluator model |
+| Score inflation drift | Benchmark against fixed dataset |
+| Reward hacking | Randomize rubric phrasing |
+| Mode collapse | Add diversity sampling |
+| Evaluator hallucination | Require justification text |
 
-### Setup
-- [ ] Define evaluation criteria/rubric
-- [ ] Set score threshold for "good enough"
-- [ ] Configure max iterations (default: 3)
+---
 
-### Implementation
-- [ ] Implement generate() function
-- [ ] Implement evaluate() function with structured output
-- [ ] Implement optimize() function
-- [ ] Wire up the refinement loop
+# Cost-Aware Routing
 
-### Safety
-- [ ] Add convergence detection
-- [ ] Log all iterations for debugging
-- [ ] Handle evaluation parse failures gracefully
+Reflection increases token cost 2–5×.
+
+Optimization strategies:
+- Skip evaluation for trivial outputs
+- Use smaller model as evaluator
+- Early-stop when high confidence
+- Cache repeated evaluations
+
+Example:
+
+```python
+if len(output) < 50:
+    return {"final_output": output, "history": []}
 ```
+
+---
+
+# Confidence-Based Routing Logic
+
+Recommended decision flow:
+
+- High score + high confidence → Accept
+- High score + low confidence → Adversarial review
+- Low score + high variance → Regenerate
+- Low score + low confidence → Optimize
+
+---
+
+# Logging & Trace Structure
+
+Always store evaluation trajectory for observability.
+
+```python
+trajectory = {
+    "task": task,
+    "iterations": [
+        {
+            "output": "...",
+            "score": 0.82,
+            "confidence": 0.74,
+            "feedback": "..."
+        }
+    ]
+}
+```
+
+Enables:
+- Debugging
+- Drift detection
+- Failure clustering
+- Evaluator monitoring
+- Auditability
+
+---
+
+# Maturity Levels
+
+Level 1 — Basic Reflection  
+Level 2 — Evaluator Separation  
+Level 3 — Adversarial & Ensemble  
+Level 4 — Benchmark-Driven  
+Level 5 — Confidence-Calibrated & Cost-Aware  
+
+---
+
+# When To Use This Skill
+
+Use for:
+- Code generation
+- Reports
+- Business analysis
+- Research synthesis
+- Data interpretation
+- Any quality-critical output
+
+Avoid for:
+- Casual chat
+- Ultra-low-latency use cases
+- Low-stakes responses
+
+---
+
+# Design Philosophy
+
+This framework treats generation as stochastic and evaluation as control.
+
+It assumes:
+- Outputs can improve
+- Scores can be quantified
+- Quality can be systematized
+- Evaluation must be auditable
+
+The goal is measurable, iterative improvement — not perfection.

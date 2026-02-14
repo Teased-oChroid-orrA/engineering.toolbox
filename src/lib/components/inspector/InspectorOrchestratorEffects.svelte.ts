@@ -321,3 +321,40 @@ export function setupCategorySearchEffect(deps: {
     callbacks.scheduleFetchCategory(true);
   });
 }
+
+// ========================= Effect 11: grid window initialization effect =========================
+import { DEFAULT_GRID_WINDOW_SIZE } from '$lib/components/inspector/InspectorGridConstants';
+import { devLog } from '$lib/utils/devLog';
+
+export function setupGridWindowInitEffect(deps: {
+  hasLoaded: () => boolean;
+  totalFilteredCount: () => number;
+  gridWindowEndIdx: () => number;
+  mergedRowsAllLength: () => number;
+  isMergedView: () => boolean;
+}, callbacks: {
+  initializeGridWindow: (endIdx: number) => void;
+}) {
+  devLog('GRID INIT EFFECT', 'Effect function created, setting up $effect');
+  
+  $effect(() => {
+    const loaded = deps.hasLoaded();
+    const count = deps.totalFilteredCount();
+    const currentEndIdx = deps.gridWindowEndIdx();
+    const isMerged = deps.isMergedView();
+    const dataLength = deps.mergedRowsAllLength();
+    
+    devLog('GRID INIT EFFECT', 'Running - loaded:', loaded, 'count:', count, 'endIdx:', currentEndIdx, 'isMerged:', isMerged, 'dataLength:', dataLength);
+    
+    // Only initialize if: loaded, data is ready (merged view has rows), count > 0, and window is 0-0
+    const dataReady = !isMerged || dataLength > 0;
+    
+    if (loaded && count > 0 && currentEndIdx === 0 && dataReady) {
+      const endIdx = Math.min(count, DEFAULT_GRID_WINDOW_SIZE);
+      devLog('GRID INIT', 'Initializing window to', endIdx, 'rows (count:', count, 'dataReady:', dataReady, ')');
+      callbacks.initializeGridWindow(endIdx);
+    } else {
+      devLog('GRID INIT EFFECT', 'Conditions not met - loaded:', loaded, 'count:', count, 'endIdx:', currentEndIdx, 'dataReady:', dataReady);
+    }
+  });
+}

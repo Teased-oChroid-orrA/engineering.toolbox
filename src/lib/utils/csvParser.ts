@@ -9,11 +9,12 @@ export function parseCsvInBrowser(text: string, hasHeaders: boolean): {
   headers: string[];
   rowCount: number;
   colTypes: ColType[];
+  rows: string[][];
 } {
   const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
   
   if (lines.length === 0) {
-    return { headers: [], rowCount: 0, colTypes: [] };
+    return { headers: [], rowCount: 0, colTypes: [], rows: [] };
   }
 
   const rows = lines.map(line => {
@@ -64,6 +65,7 @@ export function parseCsvInBrowser(text: string, hasHeaders: boolean): {
   return {
     headers,
     rowCount: dataRows.length,
-    colTypes
+    colTypes,
+    rows: dataRows
   };
 }

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSV Grid Init Test</title>
+</head>
+<body>
+  <h1>Manual Inspector CSV Load Test</h1>
+  <p>1. Open dev tools console</p>
+  <p>2. Go to: <a href="http://127.0.0.1:5173/#/inspector" target="_blank">http://127.0.0.1:5173/#/inspector</a></p>
+  <p>3. Upload a CSV file</p>
+  <p>4. Check console for [GRID INIT] logs</p>
+  <p>5. Verify grid displays data immediately (no scrolling needed)</p>
+  
+  <h2>Expected Console Output:</h2>
+  <pre>
+[LOAD CSV] Browser mode: stored X rows
+[LOAD CSV] hasLoaded set to true, datasetId: ...
+[LOAD CSV] Calling runFilterNow, mergedRowsAll.length: X
+[FILTER NOW] Called, hasLoaded: true, isMergedView: true, mergedRowsAll.length: X
+[FILTER] Browser mode: returning X rows (no filtering applied)
+[LOAD CSV] After runFilterNow, visibleRows: X
+[GRID INIT] Initializing window to 50 rows (count: X dataReady: true)
+[FETCH SLICE] isMergedView: true mergedRowsAll.length: X range: 0 - 50
+[FETCH SLICE] Set visibleRows to X rows
+  </pre>
+  
+  <h2>Test CSV Data:</h2>
+  <textarea rows="10" cols="60">Name,Age,City
+Alice,30,NYC
+Bob,25,LA
+Charlie,35,Chicago
+Diana,28,Boston
+Eve,32,Seattle</textarea>
+  
+  <p>Copy above, save as test.csv, upload to Inspector</p>
+</body>
+</html>

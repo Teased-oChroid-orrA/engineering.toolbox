@@ -50,6 +50,7 @@ export function filterControllerCtx(state: {
   recordPerf: any;
   runCrossDatasetQuery: any;
   fetchVisibleSlice: any;
+  loadState: any;  // Add loadState parameter
   headers: string[];
   hasLoaded: boolean;
   suspendReactiveFiltering: boolean;
@@ -99,13 +100,14 @@ export function filterControllerCtx(state: {
     recordPerf: state.recordPerf,
     runCrossDatasetQuery: state.runCrossDatasetQuery,
     fetchVisibleSlice: state.fetchVisibleSlice,
+    loadState: state.loadState,  // Return loadState by reference
     get headers() { return state.headers; },
     get hasLoaded() { return state.hasLoaded; },
     get suspendReactiveFiltering() { return state.suspendReactiveFiltering; },
     get crossQueryBusy() { return state.crossQueryBusy; },
     get queryScope() { return state.queryScope; },
-    get isMergedView() { return state.isMergedView; },
-    set isMergedView(v: boolean) { state.isMergedView = v; },
+    get isMergedView() { return state.loadState.isMergedView; },
+    set isMergedView(v: boolean) { state.loadState.isMergedView = v; },
     get loadedDatasets() { return state.loadedDatasets; },
     get filterPending() { return state.filterPending; },
     set filterPending(v: boolean) { state.filterPending = v; },
@@ -200,9 +202,20 @@ export function loadControllerCtxCore(state: {
 }
 
 export function loadControllerCtxStateMain(state: {
+  loadState: {
+    headers: string[];
+    totalRowCount: number;
+    colTypes: ColType[];
+    datasetId: string;
+    datasetLabel: string;
+    hasLoaded: boolean;
+    isMergedView: boolean;
+    mergedRowsAll: string[][];
+    visibleRows: string[][];  // Add visibleRows to type
+    totalFilteredCount: number;
+  };
   hiddenUploadInput: HTMLInputElement | null;
   isLoading: boolean;
-  isMergedView: boolean;
   loadError: string | null;
   hasHeaders: boolean;
   headerMode: 'auto' | 'yes' | 'no';
@@ -210,6 +223,7 @@ export function loadControllerCtxStateMain(state: {
   pendingText: string | null;
   pendingPath: string | null;
   showHeaderPrompt: boolean;
+  // Backward compatibility - these read from derived values
   headers: string[];
   totalRowCount: number;
   totalFilteredCount: number;
@@ -219,16 +233,17 @@ export function loadControllerCtxStateMain(state: {
   datasetLabel: string;
   recipes: Recipe[];
   pendingRestore: RecipeState | null;
-  hasLoaded: boolean;
+  hasLoaded: boolean;  // Derived from loadState
   showDataControls: boolean;
   activeDatasetId: string;
+  mergedRowsAll: string[][];  // Derived from loadState
 }) {
   return {
     get hiddenUploadInput() { return state.hiddenUploadInput; },
     get isLoading() { return state.isLoading; },
     set isLoading(v: boolean) { state.isLoading = v; },
-    get isMergedView() { return state.isMergedView; },
-    set isMergedView(v: boolean) { state.isMergedView = v; },
+    get isMergedView() { return state.loadState.isMergedView; },
+    set isMergedView(v: boolean) { state.loadState.isMergedView = v; },
     get loadError() { return state.loadError; },
     set loadError(v: string | null) { state.loadError = v; },
     get hasHeaders() { return state.hasHeaders; },
@@ -242,34 +257,37 @@ export function loadControllerCtxStateMain(state: {
     set pendingPath(v: string | null) { state.pendingPath = v; },
     get showHeaderPrompt() { return state.showHeaderPrompt; },
     set showHeaderPrompt(v: boolean) { state.showHeaderPrompt = v; },
-    get headers() { return state.headers; },
-    set headers(v: string[]) { state.headers = v; },
-    get totalRowCount() { return state.totalRowCount; },
-    set totalRowCount(v: number) { state.totalRowCount = v; },
+    get headers() { return state.loadState.headers; },
+    set headers(v: string[]) { state.loadState.headers = v; },
+    get totalRowCount() { return state.loadState.totalRowCount; },
+    set totalRowCount(v: number) { state.loadState.totalRowCount = v; },
     get totalFilteredCount() { return state.totalFilteredCount; },
     set totalFilteredCount(v: number) { state.totalFilteredCount = v; },
-    get visibleRows() { return state.visibleRows; },
-    set visibleRows(v: string[][]) { state.visibleRows = v; },
-    get colTypes() { return state.colTypes; },
-    set colTypes(v: ColType[]) { state.colTypes = v; },
-    get datasetId() { return state.datasetId; },
-    set datasetId(v: string) { state.datasetId = v; },
-    get datasetLabel() { return state.datasetLabel; },
-    set datasetLabel(v: string) { state.datasetLabel = v; },
+    get visibleRows() { return state.loadState.visibleRows; },
+    set visibleRows(v: string[][]) { state.loadState.visibleRows = v; },
+    get colTypes() { return state.loadState.colTypes; },
+    set colTypes(v: ColType[]) { state.loadState.colTypes = v; },
+    get datasetId() { return state.loadState.datasetId; },
+    set datasetId(v: string) { state.loadState.datasetId = v; },
+    get datasetLabel() { return state.loadState.datasetLabel; },
+    set datasetLabel(v: string) { state.loadState.datasetLabel = v; },
     get recipes() { return state.recipes; },
     set recipes(v: Recipe[]) { state.recipes = v; },
     get pendingRestore() { return state.pendingRestore; },
     set pendingRestore(v: RecipeState | null) { state.pendingRestore = v; },
-    get hasLoaded() { return state.hasLoaded; },
-    set hasLoaded(v: boolean) { state.hasLoaded = v; },
+    get hasLoaded() { return state.loadState.hasLoaded; },
+    set hasLoaded(v: boolean) { state.loadState.hasLoaded = v; },
     get showDataControls() { return state.showDataControls; },
     set showDataControls(v: boolean) { state.showDataControls = v; },
     get activeDatasetId() { return state.activeDatasetId; },
-    set activeDatasetId(v: string) { state.activeDatasetId = v; }
+    set activeDatasetId(v: string) { state.activeDatasetId = v; },
+    get mergedRowsAll() { return state.loadState.mergedRowsAll; },
+    set mergedRowsAll(v: string[][]) { state.loadState.mergedRowsAll = v; }
   };
 }
 
 export function loadControllerCtxStateQueryAndGrid(state: {
+  loadState: any;  // Required: loadState for mutable properties
   loadedDatasets: WorkspaceDataset[];
   query: string;
   matchMode: MatchMode;
@@ -334,8 +352,8 @@ export function loadControllerCtxStateQueryAndGrid(state: {
     set crossQueryResults(v: typeof state.crossQueryResults) { state.crossQueryResults = v; },
     get mergedHeaders() { return state.mergedHeaders; },
     set mergedHeaders(v: string[]) { state.mergedHeaders = v; },
-    get mergedRowsAll() { return state.mergedRowsAll; },
-    set mergedRowsAll(v: string[][]) { state.mergedRowsAll = v; },
+    get mergedRowsAll() { return state.loadState.mergedRowsAll; },
+    set mergedRowsAll(v: string[][]) { state.loadState.mergedRowsAll = v; },
     get preMergedHeaders() { return state.preMergedHeaders; },
     set preMergedHeaders(v: string[]) { state.preMergedHeaders = v; },
     get preMergedColTypes() { return state.preMergedColTypes; },
@@ -348,6 +366,18 @@ export function loadControllerCtxStateQueryAndGrid(state: {
 }
 
 export function loadControllerCtx(state: {
+  loadState: {
+    headers: string[];
+    totalRowCount: number;
+    colTypes: ColType[];
+    datasetId: string;
+    datasetLabel: string;
+    hasLoaded: boolean;
+    isMergedView: boolean;
+    mergedRowsAll: string[][];
+    visibleRows: string[][];
+    totalFilteredCount: number;
+  };
   invoke: any;
   debugLogger: any;
   dialogMod: DialogMod | null;
@@ -454,11 +484,11 @@ export function gridControllerCtx(state: {
     get startIdx() { return state.startIdx; },
     get endIdx() { return state.endIdx; },
     get visibleColIdxs() { return state.visibleColIdxs; },
-    get isMergedView() { return state.isMergedView; },
-    get mergedRowsAll() { return state.mergedRowsAll; },
-    set mergedRowsAll(v: string[][]) { state.mergedRowsAll = v; },
-    get visibleRows() { return state.visibleRows; },
-    set visibleRows(v: string[][]) { state.visibleRows = v; },
+    get isMergedView() { return state.loadState.isMergedView; },
+    get mergedRowsAll() { return state.loadState.mergedRowsAll; },
+    set mergedRowsAll(v: string[][]) { state.loadState.mergedRowsAll = v; },
+    get visibleRows() { return state.loadState.visibleRows; },
+    set visibleRows(v: string[][]) { state.loadState.visibleRows = v; },
     get loadError() { return state.loadError; },
     set loadError(v: string | null) { state.loadError = v; },
     get totalFilteredCount() { return state.totalFilteredCount; },

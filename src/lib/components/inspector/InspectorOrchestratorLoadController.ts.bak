@@ -1,6 +1,3 @@
-import { devLog } from '$lib/utils/devLog';
-import { MAX_BROWSER_MODE_ROWS } from '$lib/components/inspector/InspectorGridConstants';
-
 export async function loadCsvFromText(
   ctx: any,
   text: string,
@@ -34,38 +31,23 @@ export async function loadCsvFromText(
     }
 
     let resp;
-    let browserModeRows: string[][] | null = null;
     try {
       // Check if Tauri is available
       if (typeof window !== 'undefined' && !(window as any).__TAURI_INTERNALS__) {
         const { parseCsvInBrowser } = await import('$lib/utils/csvParser');
-        const parsed = parseCsvInBrowser(text, ctx.hasHeaders);
-        browserModeRows = parsed.rows;
-        resp = { headers: parsed.headers, rowCount: parsed.rowCount, colTypes: parsed.colTypes };
+        resp = parseCsvInBrowser(text, ctx.hasHeaders);
       } else {
         resp = (await ctx.invoke('inspector_load_csv_text', { text, hasHeaders: ctx.hasHeaders })) as any;
       }
     } catch (backendError) {
       console.error('[LOAD CSV] Backend error, trying browser fallback:', backendError);
       const { parseCsvInBrowser } = await import('$lib/utils/csvParser');
-      const parsed = parseCsvInBrowser(text, ctx.hasHeaders);
-      browserModeRows = parsed.rows;
-      resp = { headers: parsed.headers, rowCount: parsed.rowCount, colTypes: parsed.colTypes };
+      resp = parseCsvInBrowser(text, ctx.hasHeaders);
     }
 
     ctx.headers = resp.headers ?? [];
     ctx.totalRowCount = resp.rowCount ?? 0;
     ctx.colTypes = (resp.colTypes ?? []) as any[];
-
-    // If browser mode, store rows in mergedRowsAll and enable merged view
-    if (browserModeRows !== null) {
-      if (browserModeRows.length > MAX_BROWSER_MODE_ROWS) {
-        throw new Error(`CSV too large for browser mode: ${browserModeRows.length} rows (max ${MAX_BROWSER_MODE_ROWS})`);
-      }
-      ctx.isMergedView = true;
-      ctx.mergedRowsAll = [...browserModeRows];
-      devLog('LOAD CSV', 'Browser mode: stored', browserModeRows.length, 'rows');
-    }
 
     const ids = ctx.computeDatasetIdentity(
       `text:${ctx.fnv1a32((text ?? '').slice(0, 20000))}`,
@@ -80,7 +62,9 @@ export async function loadCsvFromText(
     ctx.recipes = ctx.loadRecipesForDataset(ctx.datasetId);
     ctx.pendingRestore = ctx.loadLastStateForDataset(ctx.datasetId);
     ctx.hasLoaded = true;
-    devLog('LOAD CSV', 'hasLoaded set to true, datasetId:', ctx.datasetId);
+    if (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1') {
+      console.log('[LOAD CSV] hasLoaded set to true, datasetId:', ctx.datasetId);
+    }
     ctx.showDataControls = true;
     ctx.activeDatasetId = ctx.datasetId;
 
@@ -113,14 +97,7 @@ export async function loadCsvFromText(
       await ctx.applyState(ctx.pendingRestore);
       ctx.pendingRestore = null;
     } else if (applyInitialFilter) {
-      devLog('LOAD CSV', 'Calling runFilterNow, mergedRowsAll.length:', ctx.mergedRowsAll.length);
-      try {
-        await ctx.runFilterNow();
-        devLog('LOAD CSV', 'After runFilterNow, visibleRows:', ctx.visibleRows?.length);
-      } catch (err) {
-        devLog('LOAD CSV', 'runFilterNow error (continuing):', err);
-        // Don't throw - continue with load, filter can be retried later
-      }
+      await ctx.runFilterNow();
     }
   } catch (e: any) {
     ctx.loadError = e?.message ?? String(e);

@@ -3,6 +3,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import NumberFlow from "@number-flow/svelte";
   import { type IFilterSet } from "@svar-ui/svelte-filter";
+  import { devLog } from "$lib/utils/devLog";
   import InspectorTopControlsPanel from "$lib/components/inspector/InspectorTopControlsPanel.svelte";
   import InspectorMainGridPanel from "$lib/components/inspector/InspectorMainGridPanel.svelte";
   import InspectorFooterBars from "$lib/components/inspector/InspectorFooterBars.svelte";
@@ -167,6 +168,7 @@
     setupContextMenuEffect,
     setupCategoryColumnChangeEffect,
     setupCategorySearchEffect,
+    setupGridWindowInitEffect,
   } from "$lib/components/inspector/InspectorOrchestratorEffects.svelte";
   import {
     filterControllerCtx as buildFilterControllerCtx,
@@ -222,13 +224,32 @@
   const sliceGate = createRequestGate();
   const sortGate = createRequestGate();
   const categoryGate = createRequestGate();
-  let headers = $state<string[]>([]);
-  let totalRowCount = $state(0);
-  let totalFilteredCount = $state(0);
-  let visibleRows = $state<string[][]>([]);
-  let colTypes = $state<ColType[]>([]);
-  let datasetId = $state<string>("");
-  let datasetLabel = $state<string>("(none)");
+  
+  // Create a state object that controllers can mutate
+  const loadState = $state({
+    headers: [] as string[],
+    totalRowCount: 0,
+    colTypes: [] as ColType[],
+    datasetId: "",
+    datasetLabel: "(none)",
+    hasLoaded: false,
+    isMergedView: false,
+    mergedRowsAll: [] as string[][],
+    totalFilteredCount: 0,
+    visibleRows: [] as string[][],  // Add visibleRows to loadState for mutability
+  });
+  
+  // Create derived variables for backward compatibility
+  let headers = $derived(loadState.headers);
+  let totalRowCount = $derived(loadState.totalRowCount);
+  let colTypes = $derived(loadState.colTypes);
+  let datasetId = $derived(loadState.datasetId);
+  let datasetLabel = $derived(loadState.datasetLabel);
+  let hasLoaded = $derived(loadState.hasLoaded);
+  let isMergedView = $derived(loadState.isMergedView);
+  let mergedRowsAll = $derived(loadState.mergedRowsAll);
+  let totalFilteredCount = $derived(loadState.totalFilteredCount);
+  let visibleRows = $derived(loadState.visibleRows);  // Derive from loadState
   let loadedDatasets = $state<WorkspaceDataset[]>([]);
   let activeDatasetId = $state<string>("");
   let activeDatasetLabel = $derived.by(() => {
@@ -244,8 +265,7 @@
     { datasetId: string; label: string; filtered: number; total: number }[]
   >([]);
   let mergedHeaders = $state<string[]>([]);
-  let mergedRowsAll = $state<string[][]>([]);
-  let isMergedView = $state(false);
+  // isMergedView and mergedRowsAll now in loadState
   let preMergedHeaders = $state<string[]>([]);
   let preMergedColTypes = $state<ColType[]>([]);
   let preMergedTotalRowCount = $state(0);
@@ -422,7 +442,7 @@
     maxWindow: 0,
     sliceLabel: "Slice: 0-0",
   });
-  let hasLoaded = $state(false);
+  // hasLoaded is now in loadState
   let showDataControls = $state(false);
   let showControlsDebug = $state(false);
   let isLoading = $state(false);
@@ -556,6 +576,7 @@
     const srcIdx = mergedSourceIdx;
     const groups: { source: string; rows: string[][] }[] = [];
     let lastSource = "";
+    devLog('MERGED GROUPED', 'Computing - visibleRows.length:', visibleRows?.length, 'srcIdx:', srcIdx);
     for (const rawRow of visibleRows ?? []) {
       const source =
         srcIdx >= 0 ? (rawRow?.[srcIdx] ?? "Unknown source") : "Merged results";
@@ -567,6 +588,7 @@
         groups[groups.length - 1].rows.push(row);
       }
     }
+    devLog('MERGED GROUPED', 'Computed groups:', groups.length, 'total rows:', groups.reduce((acc, g) => acc + g.rows.length, 0));
     return groups;
   });
   let parseDiagnostics = $derived.by(() => {
@@ -652,6 +674,7 @@
       recordPerf,
       runCrossDatasetQuery,
       fetchVisibleSlice,
+      loadState,  // Add loadState for reactive filter properties
       headers,
       hasLoaded,
       suspendReactiveFiltering,
@@ -704,7 +727,9 @@
       : (resp?.filteredCount ?? totalRowCount);
   }
   async function runFilterNow(forceCurrent = false) {
+    devLog('ORCHESTRATOR runFilterNow', 'Called with forceCurrent:', forceCurrent);
     await runFilterNowController(filterControllerCtx(), forceCurrent);
+    devLog('ORCHESTRATOR runFilterNow', 'Completed');
   }
   async function drainFilterQueue() {
     await drainFilterQueueController(filterControllerCtx());
@@ -751,9 +776,10 @@
   }
   function loadControllerCtxStateMain() {
     return buildLoadControllerCtxStateMain({
+      loadState,  // Pass the mutable state object (contains headers, totalRowCount, colTypes, datasetId, datasetLabel, hasLoaded, isMergedView, mergedRowsAll)
       hiddenUploadInput,
       isLoading,
-      isMergedView,
+      // isMergedView is now in loadState - don't pass separately
       loadError,
       hasHeaders,
       headerMode,
@@ -761,6 +787,7 @@
       pendingText,
       pendingPath,
       showHeaderPrompt,
+      // These are for backward compatibility but read from loadState
       headers,
       totalRowCount,
       totalFilteredCount,
@@ -770,13 +797,15 @@
       datasetLabel,
       recipes,
       pendingRestore,
-      hasLoaded,
+      hasLoaded,  // For backward compat, but read from loadState
       showDataControls,
       activeDatasetId,
+      mergedRowsAll,  // For backward compat, but read from loadState
     });
   }
   function loadControllerCtxStateQueryAndGrid() {
     return buildLoadControllerCtxStateQueryAndGrid({
+      loadState,  // Pass loadState by reference
       loadedDatasets,
       query,
       matchMode,
@@ -805,11 +834,12 @@
     });
   }
   function loadControllerCtx() {
-    return {
-      ...loadControllerCtxCore(),
-      ...loadControllerCtxStateMain(),
-      ...loadControllerCtxStateQueryAndGrid(),
-    };
+    // Preserve getters/setters by using defineProperties instead of spread
+    const ctx = {};
+    Object.defineProperties(ctx, Object.getOwnPropertyDescriptors(loadControllerCtxCore()));
+    Object.defineProperties(ctx, Object.getOwnPropertyDescriptors(loadControllerCtxStateMain()));
+    Object.defineProperties(ctx, Object.getOwnPropertyDescriptors(loadControllerCtxStateQueryAndGrid()));
+    return ctx;
   }
   async function loadCsvFromText(
     text: string,
@@ -847,6 +877,7 @@
     return buildGridControllerCtx({
       invoke,
       recordPerf,
+      loadState,  // Add loadState so grid can access reactive data
       hasLoaded,
       sliceGate,
       startIdx: gridWindow.startIdx,
@@ -1443,6 +1474,30 @@
         scheduleFetchCategoryController2(schemaControllerCtx(), reset),
     },
   );
+  setupGridWindowInitEffect(
+    {
+      hasLoaded: () => hasLoaded,
+      totalFilteredCount: () => totalFilteredCount,
+      gridWindowEndIdx: () => gridWindow.endIdx,
+      mergedRowsAllLength: () => mergedRowsAll.length,
+      isMergedView: () => isMergedView,
+    },
+    {
+      initializeGridWindow: (endIdx: number) => {
+        gridWindow = {
+          ...gridWindow,
+          endIdx,
+          renderedCount: endIdx,
+        };
+        // CRITICAL FIX: Manually trigger slice fetch after grid window init
+        // The reactive effect is disabled for merged view, so we need explicit call
+        if (isMergedView) {
+          devLog('GRID INIT', 'Merged view detected, manually calling fetchVisibleSlice');
+          fetchVisibleSlice();
+        }
+      },
+    },
+  );
   });
   let genTab = $state<GenTab>("builder");
   let genBuildMode = $state<BuildMode>("inOrder");
@@ -1481,15 +1536,14 @@
     accept=".csv,text/csv"
     bind:this={hiddenUploadInput}
     onchange={async (e) => {
-      const files = Array.from(
-        (e.currentTarget as HTMLInputElement).files ?? [],
-      );
+      const target = e.currentTarget as HTMLInputElement;
+      const files = Array.from(target.files ?? []);
       if (!files.length) return;
       for (const f of files) {
         const text = await f.text();
         await loadCsvFromText(text, undefined, true, f.name);
       }
-      (e.currentTarget as HTMLInputElement).value = "";
+      target.value = "";
     }}
   />
   <InspectorTopControlsPanel

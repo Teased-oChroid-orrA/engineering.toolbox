@@ -1,4 +1,5 @@
 import type { IFilter, IFilterSet } from '@svar-ui/svelte-filter';
+import { devLog } from '$lib/utils/devLog';
 
 export function flattenSvarRules(set?: IFilterSet): IFilter[] {
   const out: IFilter[] = [];
@@ -48,11 +49,34 @@ export function buildFilterSpec(ctx: any) {
 }
 
 export async function applyFilterSpec(ctx: any, spec: any): Promise<number> {
+  // Browser mode: filter client-side if we have mergedRowsAll
+  if (ctx.loadState.isMergedView && ctx.loadState.mergedRowsAll) {
+    if (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1') {
+      console.log('[FILTER] Browser mode client-side filtering, mergedRowsAll.length:', ctx.loadState.mergedRowsAll.length);
+    }
+    
+    // Simple client-side filtering
+    if (!spec || spec.empty) {
+      return ctx.loadState.totalRowCount ?? ctx.loadState.mergedRowsAll.length;
+    }
+    
+    // For now, return all rows (no actual filtering implemented)
+    // TODO: Implement client-side filtering logic
+    const count = ctx.loadState.mergedRowsAll.length;
+    
+    devLog('FILTER', 'Browser mode: returning', count, 'rows (no filtering applied)');
+    
+    return count;
+  }
+  
+  // Tauri mode: use backend
   const resp = (await ctx.invoke('inspector_filter', { spec })) as number | { filteredCount: number };
   return typeof resp === 'number' ? resp : (resp?.filteredCount ?? ctx.totalRowCount);
 }
 
 export async function runFilterNow(ctx: any, forceCurrent = false) {
+  devLog('FILTER NOW CONTROLLER', 'Entry - hasLoaded:', ctx.hasLoaded, 'isMergedView:', ctx.isMergedView);
+  
   ctx.queueDebugRate('runFilterNow', 150, 'runFilterNow', {
     forceCurrent,
     queryScope: ctx.queryScope,
@@ -61,7 +85,14 @@ export async function runFilterNow(ctx: any, forceCurrent = false) {
     merged: ctx.isMergedView,
     loadedDatasets: ctx.loadedDatasets.length
   });
-  if (!ctx.hasLoaded || ctx.suspendReactiveFiltering) return;
+  
+  if (!ctx.hasLoaded || ctx.suspendReactiveFiltering) {
+    devLog('FILTER NOW', 'Early exit: hasLoaded:', ctx.hasLoaded, 'suspended:', ctx.suspendReactiveFiltering);
+    return;
+  }
+  
+  devLog('FILTER NOW', 'Passed early checks');
+  
   if (ctx.crossQueryBusy) return;
   if (!forceCurrent && ctx.loadedDatasets.length > 1 && ctx.queryScope !== 'current') {
     if (ctx.queryScope === 'ask') {
@@ -77,17 +108,22 @@ export async function runFilterNow(ctx: any, forceCurrent = false) {
       return;
     }
   }
-  ctx.isMergedView = false;
+  // Don't reset isMergedView - it's set during CSV load in browser mode
+  
+  devLog('FILTER NOW', 'Setting filterPending, calling drainFilterQueue');
+  
   ctx.filterPending = true;
   await drainFilterQueue(ctx);
 }
 
 export async function drainFilterQueue(ctx: any) {
+  devLog('DRAIN FILTER QUEUE', 'Called - filterInFlight:', ctx.filterInFlight, 'hasLoaded:', ctx.hasLoaded);
   if (ctx.filterInFlight || !ctx.hasLoaded) return;
   ctx.filterInFlight = true;
   try {
     while (ctx.filterPending) {
       ctx.filterPending = false;
+      devLog('DRAIN FILTER QUEUE', 'Calling runFilterPass');
       await runFilterPass(ctx);
     }
   } finally {
@@ -106,6 +142,9 @@ export async function runFilterPass(ctx: any) {
 
     if (!ctx.filterGate.isLatest(token)) return;
     ctx.loadState.totalFilteredCount = count;
+    
+    devLog('FILTER PASS', 'Set totalFilteredCount to', count, 'on loadState');
+    
     ctx.recordPerf('filter', t0, {
       reason: ctx.filterLastReason,
       filteredRows: ctx.loadState.totalFilteredCount,
@@ -113,7 +152,9 @@ export async function runFilterPass(ctx: any) {
       visibleCols: ctx.visibleColIdxs.length
     });
 
+    devLog('FILTER PASS', 'About to call fetchVisibleSlice, totalFilteredCount:', ctx.loadState.totalFilteredCount);
     await ctx.fetchVisibleSlice();
+    devLog('FILTER PASS', 'After fetchVisibleSlice, visibleRows.length:', ctx.visibleRows?.length);
   } catch (err: any) {
     const msg = err?.message ?? String(err);
     if (ctx.matchMode === 'regex') ctx.queryError = msg;
