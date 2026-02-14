@@ -65,6 +65,23 @@ console.log('');
 // Check 4: TypeScript errors (build only - too slow for dev)
 if (process.env.npm_lifecycle_event === 'build') {
   console.log('4️⃣ Running type checks...');
+  
+  // First, ensure .svelte-kit directory exists by running svelte-kit sync
+  console.log('   🔄 Running svelte-kit sync to generate .svelte-kit directory...');
+  try {
+    execSync('npx svelte-kit sync', {
+      cwd: ROOT,
+      stdio: 'pipe',
+      encoding: 'utf-8'
+    });
+    console.log('   ✅ .svelte-kit directory generated');
+  } catch (e) {
+    console.log('   ❌ Failed to generate .svelte-kit directory');
+    console.log(e.stdout || e.message);
+    hasErrors = true;
+  }
+  
+  // Now run type checks
   try {
     execSync('npx svelte-check --tsconfig ./tsconfig.json --threshold error', {
       cwd: ROOT,
