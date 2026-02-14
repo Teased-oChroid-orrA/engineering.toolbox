@@ -173,7 +173,11 @@ export interface InspectorControllerContext {
   // ============================================================================
   // Recipes
   // ============================================================================
-  recipeState: RecipeState;
+  recipes: Recipe[];
+  recipeNotice: string | null;
+  recipeName: string;
+  recipeTags: string;
+  autoRestoreEnabled: boolean;
 
   // ============================================================================
   // SVAR Filter Builder
@@ -181,6 +185,43 @@ export interface InspectorControllerContext {
   svarFilterSet: IFilterSet;
   showSvarBuilder: boolean;
   svarNotice: string | null;
+
+  // ============================================================================
+  // Row Drawer State
+  // ============================================================================
+  showRowDrawer: boolean;
+  drawerVisualIdx: number;
+  drawerKVs: Array<{ key: string; value: string }>;
+  drawerLoading: boolean;
+  drawerError: string | null;
+  drawerExplain: string | null;
+  drawerSearch: string;
+
+  // ============================================================================
+  // Schema Modal State
+  // ============================================================================
+  schemaLoading: boolean;
+  schemaError: string | null;
+  schemaCache: Map<string, any>;
+  schemaDriftBaseline: SchemaColStat[] | null;
+  schemaSampleN: number;
+  schemaSampleTier: 'filtered' | 'all';
+  schemaScopeLabel: string;
+  showSchemaModal: boolean;
+  
+  // Category Values State
+  catAvailLoading: boolean;
+  catAvailError: string | null;
+  catAvailItems: Array<{ value: string; count: number }>;
+  catAvailSearch: string;
+  catAvailLimit: number;
+  catAvailOffset: number;
+  catAvailDistinctTotal: number;
+  catAvailTotalRowsInView: number;
+  catAvailRowsScanned: number;
+  catAvailPartial: boolean;
+  catAvailTimer: ReturnType<typeof setTimeout> | null;
+  categoryGate: number;
 
   // ============================================================================
   // Constants
