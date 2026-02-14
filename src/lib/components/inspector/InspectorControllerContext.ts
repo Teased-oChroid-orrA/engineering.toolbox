@@ -23,7 +23,6 @@ import type {
   SortSpec,
   CrossQueryResult,
   SchemaColStat,
-  Recipe,
   RecipeState,
   MultiQueryClause,
   GenTab,
@@ -31,6 +30,7 @@ import type {
   GateToken,
   DialogMod,
 } from './InspectorStateTypes';
+import type { Recipe } from './InspectorRecipesController';
 
 /**
  * Core controller context interface.
@@ -424,7 +424,7 @@ export type RecipesControllerContext = Pick<
   toCsvText: (headers: string[], rows: string[][]) => string;
   downloadText: (text: string, filename: string, mimeType: string) => void;
   perf: { lastByOp: () => any };
-  persistRecipesForDataset: (dsId: string, label: string, recipes: Recipe[]) => void;
+  persistRecipesForDataset: (dsId: string | null, label: string, recipes: Recipe[]) => void;
 };
 
 export type RowDrawerControllerContext = Pick<
@@ -533,7 +533,7 @@ export type StateControllerContext = Pick<
   runFilterNow: () => Promise<void>;
 };
 
-export type GridControllerContext = Pick<
+export type GridControllerContext = Omit<Pick<
   InspectorControllerContext,
   | 'loadState'
   | 'hasLoaded'
@@ -562,6 +562,9 @@ export type GridControllerContext = Pick<
   | 'invoke'
   | 'queueDebug'
   | 'recordPerf'
-> & {
+>, 'hiddenColumns' | 'pinnedLeft' | 'pinnedRight'> & {
+  hiddenColumns: Set<number>;
+  pinnedLeft: Set<number>;
+  pinnedRight: Set<number>;
   updateVisibleRows?: (rows: string[][]) => void;
 };

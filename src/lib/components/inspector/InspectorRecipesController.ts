@@ -35,7 +35,7 @@ export type Recipe = {
   tags?: string[];
   favorite?: boolean;
   templateVars?: string[];
-  provenance?: { datasetId: string; datasetLabel: string; createdAt: number };
+  provenance?: { datasetId: string | null; datasetLabel: string; createdAt: number };
 };
 
 export const normalizeRecipeTags = (value: string) =>

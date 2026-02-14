@@ -782,6 +782,9 @@
       runFilterNow,
       buildFilterSpec,
       queueDebug,
+      queueDebugRate,
+      recordPerf,
+      runCrossDatasetQuery,
       activateWorkspaceDataset,
     });
   }
@@ -860,6 +863,9 @@
       runFilterNow,
       buildFilterSpec,
       queueDebug,
+      queueDebugRate,
+      recordPerf,
+      runCrossDatasetQuery,
       activateWorkspaceDataset,
       hiddenUploadInput,
       isLoading,
