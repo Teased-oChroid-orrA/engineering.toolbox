@@ -119,6 +119,7 @@ export async function loadCsvFromText(
       ctx.pendingRestore = null;
     } else if (applyInitialFilter) {
       devLog('LOAD CSV', 'Calling runFilterNow, mergedRowsAll.length:', ctx.mergedRowsAll.length);
+      devLog('LOAD CSV', 'Filter state - query:', ctx.query, 'matchMode:', ctx.matchMode, 'targetColIdx:', ctx.targetColIdx);
       try {
         await ctx.runFilterNow();
         devLog('LOAD CSV', 'After runFilterNow, visibleRows:', ctx.visibleRows?.length);

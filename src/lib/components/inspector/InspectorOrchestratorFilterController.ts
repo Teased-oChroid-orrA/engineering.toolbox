@@ -76,6 +76,7 @@ export async function applyFilterSpec(ctx: FilterControllerContext, spec: any): 
 }
 
 export async function runFilterNow(ctx: FilterControllerContext, forceCurrent = false) {
+  console.error('★★★ RUN FILTER NOW CALLED ★★★');
   devLog('FILTER NOW CONTROLLER', 'Entry - hasLoaded:', ctx.hasLoaded, 'isMergedView:', ctx.isMergedView);
   
   ctx.queueDebugRate('runFilterNow', 150, 'runFilterNow', {
@@ -88,13 +89,17 @@ export async function runFilterNow(ctx: FilterControllerContext, forceCurrent = 
   });
   
   if (!ctx.hasLoaded || ctx.suspendReactiveFiltering) {
+    console.error('★★★ EARLY EXIT 1 ★★★ hasLoaded:', ctx.hasLoaded, 'suspended:', ctx.suspendReactiveFiltering);
     devLog('FILTER NOW', 'Early exit: hasLoaded:', ctx.hasLoaded, 'suspended:', ctx.suspendReactiveFiltering);
     return;
   }
   
   devLog('FILTER NOW', 'Passed early checks');
   
-  if (ctx.crossQueryBusy) return;
+  if (ctx.crossQueryBusy) {
+    console.error('★★★ EARLY EXIT 2 ★★★ crossQueryBusy:', ctx.crossQueryBusy);
+    return;
+  }
   if (!forceCurrent && ctx.loadedDatasets.length > 1 && ctx.queryScope !== 'current') {
     if (ctx.queryScope === 'ask') {
       const doAll = window.confirm('Run this query across all loaded files?');
@@ -118,8 +123,12 @@ export async function runFilterNow(ctx: FilterControllerContext, forceCurrent = 
 }
 
 export async function drainFilterQueue(ctx: FilterControllerContext) {
+  console.error('★★★ DRAIN FILTER QUEUE CALLED ★★★');
   devLog('DRAIN FILTER QUEUE', 'Called - filterInFlight:', ctx.filterInFlight, 'hasLoaded:', ctx.hasLoaded);
-  if (ctx.filterInFlight || !ctx.hasLoaded) return;
+  if (ctx.filterInFlight || !ctx.hasLoaded) {
+    devLog('DRAIN FILTER QUEUE', 'Early exit - filterInFlight:', ctx.filterInFlight, 'hasLoaded:', ctx.hasLoaded);
+    return;
+  }
   ctx.filterInFlight = true;
   try {
     while (ctx.filterPending) {
@@ -157,6 +166,7 @@ export async function runFilterPass(ctx: FilterControllerContext) {
     await ctx.fetchVisibleSlice();
     devLog('FILTER PASS', 'After fetchVisibleSlice, visibleRows.length:', ctx.visibleRows?.length);
   } catch (err: any) {
+    console.error('[FILTER PASS ERROR]', err);
     const msg = err?.message ?? String(err);
     if (ctx.matchMode === 'regex') ctx.queryError = msg;
     else ctx.loadError = msg;
