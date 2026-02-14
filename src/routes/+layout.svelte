@@ -1,4 +1,5 @@
 <script lang="ts">
+  console.log('[LAYOUT] Script block executing');
   import '../app.css';
   import '$lib/styles/themes.css';
   import { page } from '$app/stores';
@@ -14,6 +15,8 @@
     type ContextMenuRegistration,
     type ContextMenuScope
   } from '$lib/navigation/contextualMenu';
+
+  console.log('[LAYOUT] Imports complete');
 
   let { children } = $props();
 
@@ -65,6 +68,7 @@
   };
 
   onMount(() => {
+    console.log('[LAYOUT] onMount called - setting up listeners');
     themeStore.init();
     const syncHashPath = () => {
       try {
@@ -75,7 +79,11 @@
       }
     };
     syncHashPath();
+    console.log('[LAYOUT] Reading registered menus from registry...');
     menuByScope = getRegisteredContextMenus();
+    console.log('[LAYOUT] menuByScope initialized to:', menuByScope);
+    console.log('[LAYOUT] activeScope:', activeScope);
+    console.log('[LAYOUT] activeToolMenu:', activeToolMenu);
     window.addEventListener('hashchange', syncHashPath);
     const update = () => {
       const width = navHost?.clientWidth ?? 0;
@@ -93,11 +101,22 @@
       toolMenuOpen = false;
     };
     const onMenuRegister = (ev: Event) => {
+      console.log('[LAYOUT] onMenuRegister called, event:', ev);
       const reg = (ev as CustomEvent<ContextMenuRegistration>).detail;
-      if (!reg?.scope) return;
+      console.log('[LAYOUT] Registration detail:', reg);
+      if (!reg?.scope) {
+        console.log('[LAYOUT] No scope, returning');
+        return;
+      }
       const prev = menuByScope[reg.scope];
-      if (prev && JSON.stringify(prev) === JSON.stringify(reg)) return;
+      console.log('[LAYOUT] Previous menu:', prev);
+      if (prev && JSON.stringify(prev) === JSON.stringify(reg)) {
+        console.log('[LAYOUT] Menu unchanged, skipping update');
+        return;
+      }
+      console.log('[LAYOUT] Updating menuByScope for scope:', reg.scope);
       menuByScope = { ...menuByScope, [reg.scope]: reg };
+      console.log('[LAYOUT] menuByScope updated:', menuByScope);
     };
     const onMenuClear = (ev: Event) => {
       const detail = (ev as CustomEvent<{ scope: ContextMenuScope }>).detail;
@@ -108,10 +127,12 @@
       if (activeScope === detail.scope) toolMenuOpen = false;
     };
     window.addEventListener('pointerdown', onPointer, true);
+    console.log('[LAYOUT] Adding CONTEXT_MENU_REGISTER_EVENT listener');
     window.addEventListener(CONTEXT_MENU_REGISTER_EVENT, onMenuRegister as EventListener);
     window.addEventListener(CONTEXT_MENU_CLEAR_EVENT, onMenuClear as EventListener);
     window.addEventListener('resize', update);
     window.addEventListener('scroll', update, true);
+    console.log('[LAYOUT] All event listeners registered');
     return () => {
       ro.disconnect();
       window.removeEventListener('pointerdown', onPointer, true);

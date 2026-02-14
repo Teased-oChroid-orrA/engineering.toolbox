@@ -296,16 +296,18 @@ export function setupContextMenuEffect(deps: {
   registerContextMenu: (menu: any) => void;
 }) {
   $effect(() => {
-    callbacks.registerContextMenu(
-      deps.buildInspectorContextMenu({
-        canOpenPath: deps.canOpenPath(),
-        hasLoaded: deps.hasLoaded(),
-        schemaLoading: deps.schemaLoading(),
-        showRegexHelp: deps.showRegexHelp(),
-        quietBackendLogs: deps.quietBackendLogs(),
-        autoRestoreEnabled: deps.autoRestoreEnabled()
-      })
-    );
+    console.log('[MENU EFFECT] Context menu effect running...');
+    const menu = deps.buildInspectorContextMenu({
+      canOpenPath: deps.canOpenPath(),
+      hasLoaded: deps.hasLoaded(),
+      schemaLoading: deps.schemaLoading(),
+      showRegexHelp: deps.showRegexHelp(),
+      quietBackendLogs: deps.quietBackendLogs(),
+      autoRestoreEnabled: deps.autoRestoreEnabled()
+    });
+    console.log('[MENU EFFECT] Built menu:', menu);
+    callbacks.registerContextMenu(menu);
+    console.log('[MENU EFFECT] Registration complete');
   });
 }
 
