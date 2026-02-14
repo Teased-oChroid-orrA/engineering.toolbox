@@ -67,8 +67,10 @@ export async function loadCsvFromText(
       if (browserModeRows.length > MAX_BROWSER_MODE_ROWS) {
         throw new Error(`CSV too large for browser mode: ${browserModeRows.length} rows (max ${MAX_BROWSER_MODE_ROWS})`);
       }
-      ctx.isMergedView = true;
-      ctx.mergedRowsAll = [...browserModeRows];
+      // CRITICAL: Use loadState directly to ensure reactivity (same bug as hasLoaded)
+      (ctx as any).loadState.isMergedView = true;
+      (ctx as any).loadState.mergedRowsAll = [...browserModeRows];
+      console.log('[LOAD CSV] Browser mode: isMergedView set to true');
       devLog('LOAD CSV', 'Browser mode: stored', browserModeRows.length, 'rows');
     }
 

@@ -24,7 +24,18 @@ test('Check ALL console output', async ({ page }) => {
   console.log('=== END ===\n');
   
   // Check grid
+  console.log('\n=== GRID CHECK ===');
+  
+  // Check for any visible text from CSV
+  const anyText = await page.locator('text=/Alice|Bob|Name|Age/').count();
+  console.log(`Any text from CSV: ${anyText}`);
+  
+  // Check grid cells
   const gridCells = page.locator('[role="gridcell"], td, th').filter({ hasText: /Alice|Bob|Name|Age/ });
   const count = await gridCells.count();
-  console.log(`Data cells found: ${count}`);
+  console.log(`Grid cells found: ${count}`);
+  
+  // Check for virtual grid container
+  const virtualGrid = await page.locator('.virtual-grid, [data-virtual-grid]').count();
+  console.log(`Virtual grid containers: ${virtualGrid}`);
 });
