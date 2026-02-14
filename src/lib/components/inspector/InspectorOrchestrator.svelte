@@ -909,14 +909,23 @@
     forcedLabel?: string,
     applyInitialFilter = true,
   ) {
-    await loadCsvFromTextController(
-      loadControllerCtx(),
-      text,
-      hasHeadersOverride,
-      trackWorkspace,
-      forcedLabel,
-      applyInitialFilter,
-    );
+    try {
+      console.log('[WRAPPER] loadCsvFromText called, building context...');
+      const ctx = loadControllerCtx();
+      console.log('[WRAPPER] Context built, calling controller...');
+      await loadCsvFromTextController(
+        ctx,
+        text,
+        hasHeadersOverride,
+        trackWorkspace,
+        forcedLabel,
+        applyInitialFilter,
+      );
+      console.log('[WRAPPER] Controller returned successfully');
+    } catch (err) {
+      console.error('[WRAPPER] Error in loadCsvFromText:', err);
+      throw err;
+    }
   }
   async function loadCsvFromPath(
     path: string,
@@ -1598,12 +1607,18 @@
     accept=".csv,text/csv"
     bind:this={hiddenUploadInput}
     onchange={async (e) => {
+      console.log('[FILE INPUT] onchange triggered');
       const target = e.currentTarget as HTMLInputElement;
       const files = Array.from(target.files ?? []);
+      console.log('[FILE INPUT] files:', files.length);
       if (!files.length) return;
       for (const f of files) {
+        console.log('[FILE INPUT] Processing file:', f.name);
         const text = await f.text();
+        console.log('[FILE INPUT] File text length:', text.length);
+        console.log('[FILE INPUT] Calling loadCsvFromText...');
         await loadCsvFromText(text, undefined, true, f.name);
+        console.log('[FILE INPUT] loadCsvFromText complete');
       }
       target.value = "";
     }}

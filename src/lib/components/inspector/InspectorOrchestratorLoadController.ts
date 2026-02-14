@@ -10,6 +10,8 @@ export async function loadCsvFromText(
   forcedLabel?: string,
   applyInitialFilter = true
 ) {
+  console.log('[LOAD CTRL] loadCsvFromText called, text length:', text.length);
+  console.log('[LOAD CTRL] hasHeadersOverride:', hasHeadersOverride, 'trackWorkspace:', trackWorkspace);
   ctx.isLoading = true;
   // Don't reset isMergedView here - it will be set correctly based on browser/Tauri mode
   // ctx.isMergedView = false;  // REMOVED: This breaks browser mode which needs isMergedView=true
