@@ -32,10 +32,12 @@
   ];
 
   let pathname = $derived($page.url.pathname);
-  let hashPath = $state('');
+  let hash = $derived($page.url.hash);
   let routePath = $derived.by(() => {
-    const result = hashPath.startsWith('/') ? hashPath : pathname;
-    console.log('[LAYOUT] routePath derived:', result, '(hashPath:', hashPath, 'pathname:', pathname, ')');
+    // Extract path from hash (e.g., '#/inspector' -> '/inspector')
+    const hashPath = hash.startsWith('#/') ? hash.slice(1) : '';
+    const result = hashPath || pathname;
+    console.log('[LAYOUT] routePath derived:', result, '(hash:', hash, 'hashPath:', hashPath, 'pathname:', pathname, ')');
     return result;
   });
   const active = (p: string) => routePath === p;
@@ -79,17 +81,6 @@
   onMount(() => {
     console.log('[LAYOUT] onMount called - setting up listeners');
     themeStore.init();
-    const syncHashPath = () => {
-      try {
-        const raw = window.location.hash ?? '';
-        const newHashPath = raw.startsWith('#/') ? raw.slice(1) : '';
-        console.log('[LAYOUT] syncHashPath called - raw:', raw, 'newHashPath:', newHashPath, 'old hashPath:', hashPath);
-        hashPath = newHashPath;
-      } catch {
-        hashPath = '';
-      }
-    };
-    syncHashPath();
     console.log('[LAYOUT] Reading registered menus from registry...');
     // Use setTimeout to ensure child components have mounted and registered
     setTimeout(() => {
@@ -98,7 +89,6 @@
       console.log('[LAYOUT] activeScope:', activeScope);
       console.log('[LAYOUT] activeToolMenu:', activeToolMenu);
     }, 0);
-    window.addEventListener('hashchange', syncHashPath);
     const update = () => {
       const width = navHost?.clientWidth ?? 0;
       compactNav = width > 0 && width < 900;
