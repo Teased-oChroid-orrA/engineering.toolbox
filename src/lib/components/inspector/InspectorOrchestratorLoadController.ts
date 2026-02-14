@@ -270,7 +270,7 @@ export async function openStreamLoadFromMenu(ctx: LoadControllerContext) {
       multiple: true,
       directory: false,
       filters: [{ name: 'CSV', extensions: ['csv', 'tsv'] }]
-    });
+    }) as string | string[] | null;
     const paths = Array.isArray(p) ? p.filter((x: any): x is string => typeof x === 'string' && x.length > 0) : (typeof p === 'string' && p.length > 0 ? [p] : []);
     for (let i = 0; i < paths.length; i++) {
       const path = paths[i];

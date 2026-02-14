@@ -1,6 +1,6 @@
 import type { IFilterSet } from '@svar-ui/svelte-filter';
 import type { GenTab, MultiQueryClause, Recipe, RecipeState } from '$lib/components/inspector/InspectorOrchestratorDeps';
-import type { SchemaColStat } from '$lib/components/inspector/InspectorOrchestratorSchemaInsightsController';
+import type { SchemaColStat } from '$lib/components/inspector/InspectorStateTypes';
 
 type ColType = 'numeric' | 'date' | 'string';
 type MatchMode = 'fuzzy' | 'regex' | 'exact';
@@ -519,7 +519,6 @@ export function gridControllerCtx(state: {
       console.log('[GRID CTX] Setting visibleRows, length:', v?.length, 'first row:', v?.[0]);
       state.loadState.visibleRows = v;
       state.loadState._version++;  // Increment version to force reactivity
-      devLog('[GRID CTX] loadState.visibleRows now:', state.loadState.visibleRows?.length, 'version:', state.loadState._version);
     },
     get loadError() { return state.loadError; },
     set loadError(v: string | null) { state.loadError = v; },
@@ -699,6 +698,7 @@ export function recipesControllerCtx(state: {
   recipeNotice: string | null;
   hasLoaded: boolean;
   headers: string[];
+  totalRowCount: number;
   visibleRows: string[][];
   visibleColIdxs: number[];
   totalFilteredCount: number;
@@ -736,6 +736,7 @@ export function recipesControllerCtx(state: {
     set recipeNotice(v: string | null) { state.recipeNotice = v; },
     get hasLoaded() { return state.hasLoaded; },
     get headers() { return state.headers; },
+    get totalRowCount() { return state.totalRowCount; },
     get visibleRows() { return state.visibleRows; },
     get visibleColIdxs() { return state.visibleColIdxs; },
     get totalFilteredCount() { return state.totalFilteredCount; },
