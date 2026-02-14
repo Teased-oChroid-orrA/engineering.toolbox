@@ -34,8 +34,9 @@
   let pathname = $derived($page.url.pathname);
   let hashPath = $state('');
   let routePath = $derived.by(() => {
-    if (hashPath.startsWith('/')) return hashPath;
-    return pathname;
+    const result = hashPath.startsWith('/') ? hashPath : pathname;
+    console.log('[LAYOUT] routePath derived:', result, '(hashPath:', hashPath, 'pathname:', pathname, ')');
+    return result;
   });
   const active = (p: string) => routePath === p;
   const pathToScope = (p: string): ContextMenuScope | null => {
@@ -51,8 +52,16 @@
   let toolMenuButtonEl = $state<HTMLElement | null>(null);
   let toolMenuPos = $state({ x: 8, y: 8 });
   let menuByScope = $state<Partial<Record<ContextMenuScope, ContextMenuRegistration>>>({});
-  let activeScope = $derived(pathToScope(routePath));
-  let activeToolMenu = $derived(activeScope ? menuByScope[activeScope] ?? null : null);
+  let activeScope = $derived.by(() => {
+    const scope = pathToScope(routePath);
+    console.log('[LAYOUT] activeScope derived:', scope, '(routePath:', routePath, ')');
+    return scope;
+  });
+  let activeToolMenu = $derived.by(() => {
+    const menu = activeScope ? menuByScope[activeScope] ?? null : null;
+    console.log('[LAYOUT] activeToolMenu derived:', menu ? 'MENU FOUND' : 'NULL', '(activeScope:', activeScope, ')');
+    return menu;
+  });
 
   const positionToolMenu = () => {
     const panelWidth = 288;
@@ -73,7 +82,9 @@
     const syncHashPath = () => {
       try {
         const raw = window.location.hash ?? '';
-        hashPath = raw.startsWith('#/') ? raw.slice(1) : '';
+        const newHashPath = raw.startsWith('#/') ? raw.slice(1) : '';
+        console.log('[LAYOUT] syncHashPath called - raw:', raw, 'newHashPath:', newHashPath, 'old hashPath:', hashPath);
+        hashPath = newHashPath;
       } catch {
         hashPath = '';
       }
