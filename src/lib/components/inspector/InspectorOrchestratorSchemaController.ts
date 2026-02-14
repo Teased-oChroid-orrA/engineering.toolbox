@@ -1,4 +1,6 @@
-export async function computeSchemaStats(ctx: any) {
+import type { SchemaControllerContext } from './InspectorControllerContext';
+
+export async function computeSchemaStats(ctx: SchemaControllerContext) {
   if (!ctx.hasLoaded || ctx.headers.length === 0) return;
   const t0 = performance.now();
   ctx.schemaLoading = true;
@@ -31,7 +33,7 @@ export async function computeSchemaStats(ctx: any) {
   }
 }
 
-export function openSchema(ctx: any) {
+export function openSchema(ctx: SchemaControllerContext) {
   if (!ctx.hasLoaded) return;
   ctx.withViewTransition(() => {
     ctx.showSchemaModal = true;
@@ -39,13 +41,13 @@ export function openSchema(ctx: any) {
   void computeSchemaStats(ctx);
 }
 
-export function setSchemaDriftBaseline(ctx: any) {
+export function setSchemaDriftBaseline(ctx: SchemaControllerContext) {
   ctx.schemaDriftBaseline = (ctx.schemaStats ?? []).map((x: any) => ({ ...x, topSample: [...(x.topSample ?? [])] }));
   ctx.recipeNotice = 'Schema baseline captured for drift compare.';
   setTimeout(() => (ctx.recipeNotice = null), 1400);
 }
 
-export async function fetchCategoryValues(ctx: any, reset = false) {
+export async function fetchCategoryValues(ctx: SchemaControllerContext, reset = false) {
   if (!ctx.hasLoaded) return;
   const t0 = performance.now();
   const token = ctx.categoryGate.nextToken();
@@ -104,7 +106,7 @@ export async function fetchCategoryValues(ctx: any, reset = false) {
   }
 }
 
-export function scheduleFetchCategory(ctx: any, reset: boolean) {
+export function scheduleFetchCategory(ctx: SchemaControllerContext, reset: boolean) {
   if (ctx.catAvailTimer) clearTimeout(ctx.catAvailTimer);
   ctx.catAvailTimer = setTimeout(() => {
     void fetchCategoryValues(ctx, reset);

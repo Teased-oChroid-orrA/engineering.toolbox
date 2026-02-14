@@ -1,4 +1,6 @@
-export function captureState(ctx: any) {
+import type { StateControllerContext } from './InspectorControllerContext';
+
+export function captureState(ctx: StateControllerContext) {
   return ctx.captureRecipeState({
     autoRestoreEnabled: ctx.autoRestoreEnabled,
     query: ctx.query,
@@ -22,7 +24,7 @@ export function captureState(ctx: any) {
   });
 }
 
-export async function applyState(ctx: any, st: any) {
+export async function applyState(ctx: StateControllerContext, st: any) {
   const migrated = ctx.migrateAndNormalizeRecipeState(st);
   if (!migrated) return;
   ctx.autoRestoreEnabled = migrated.autoRestore ?? true;

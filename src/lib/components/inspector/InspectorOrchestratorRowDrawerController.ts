@@ -1,4 +1,6 @@
-export async function openRowDrawer(ctx: any, visualIdx: number) {
+import type { RowDrawerControllerContext } from './InspectorControllerContext';
+
+export async function openRowDrawer(ctx: RowDrawerControllerContext, visualIdx: number) {
   if (!ctx.hasLoaded) return;
   const t0 = performance.now();
   ctx.withViewTransition(() => {
@@ -27,7 +29,7 @@ export async function openRowDrawer(ctx: any, visualIdx: number) {
   }
 }
 
-export function closeRowDrawer(ctx: any) {
+export function closeRowDrawer(ctx: RowDrawerControllerContext) {
   ctx.withViewTransition(() => {
     ctx.showRowDrawer = false;
   });
@@ -39,7 +41,7 @@ export function closeRowDrawer(ctx: any) {
   ctx.drawerExplain = null;
 }
 
-export async function copyDrawerAsJson(ctx: any) {
+export async function copyDrawerAsJson(ctx: RowDrawerControllerContext) {
   try {
     await ctx.copyDrawerAsJsonController(ctx.drawerKVs as any);
     ctx.recipeNotice = 'Copied row JSON.';
@@ -47,18 +49,18 @@ export async function copyDrawerAsJson(ctx: any) {
   } catch {}
 }
 
-export function navRow(ctx: any, delta: number) {
+export function navRow(ctx: RowDrawerControllerContext, delta: number) {
   if (ctx.drawerVisualIdx == null) return;
   const next = ctx.clamp(ctx.drawerVisualIdx + delta, 0, Math.max(0, ctx.totalFilteredCount - 1));
   void openRowDrawer(ctx, next);
 }
 
-export function drawerApplyTarget(ctx: any, idx: number) {
+export function drawerApplyTarget(ctx: RowDrawerControllerContext, idx: number) {
   ctx.targetColIdx = idx;
   ctx.scheduleFilter();
 }
 
-export function drawerApplyCategory(ctx: any, idx: number, value: string) {
+export function drawerApplyCategory(ctx: RowDrawerControllerContext, idx: number, value: string) {
   ctx.tier2Open = true;
   ctx.tier2Tab = 'category';
   ctx.catF.colIdx = idx;
@@ -70,7 +72,7 @@ export function drawerApplyCategory(ctx: any, idx: number, value: string) {
   void ctx.runFilterNow();
 }
 
-export function drawerApplyNumericExact(ctx: any, idx: number, value: string) {
+export function drawerApplyNumericExact(ctx: RowDrawerControllerContext, idx: number, value: string) {
   const out = ctx.applyDrawerNumericExact(value);
   if (out == null) {
     ctx.recipeNotice = 'Value is not numeric.';
@@ -87,7 +89,7 @@ export function drawerApplyNumericExact(ctx: any, idx: number, value: string) {
   void ctx.runFilterNow();
 }
 
-export function drawerApplyDateExact(ctx: any, idx: number, value: string) {
+export function drawerApplyDateExact(ctx: RowDrawerControllerContext, idx: number, value: string) {
   const iso = ctx.applyDrawerDateExact(value);
   if (iso == null) {
     ctx.recipeNotice = 'Value is not a recognized date.';

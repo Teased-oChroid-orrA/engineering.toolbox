@@ -389,6 +389,112 @@ export type RecipesControllerContext = Pick<
   persistRecipesForDataset: (dsId: string, label: string, recipes: Recipe[]) => void;
 };
 
+export type RowDrawerControllerContext = Pick<
+  InspectorControllerContext,
+  | 'showRowDrawer'
+  | 'drawerVisualIdx'
+  | 'drawerKVs'
+  | 'drawerLoading'
+  | 'drawerError'
+  | 'drawerExplain'
+  | 'drawerSearch'
+  | 'hasLoaded'
+  | 'headers'
+  | 'colTypes'
+  | 'totalFilteredCount'
+  | 'targetColIdx'
+  | 'catF'
+  | 'numericF'
+  | 'dateF'
+  | 'tier2Open'
+  | 'tier2Tab'
+  | 'recipeNotice'
+  | 'invoke'
+  | 'recordPerf'
+> & {
+  loadRowDrawerData: (visualIdx: number) => Promise<void>;
+  copyDrawerAsJsonController: () => Promise<void>;
+  runFilterNow: () => Promise<void>;
+  scheduleFilter: (reason: string) => void;
+  withViewTransition: (fn: () => void) => void;
+  clamp: (n: number, min: number, max: number) => number;
+  applyDrawerNumericExact: (value: string) => void;
+  applyDrawerDateExact: (value: string) => void;
+};
+
+export type SchemaControllerContext = Pick<
+  InspectorControllerContext,
+  | 'hasLoaded'
+  | 'headers'
+  | 'colTypes'
+  | 'totalRowCount'
+  | 'totalFilteredCount'
+  | 'datasetId'
+  | 'query'
+  | 'matchMode'
+  | 'targetColIdx'
+  | 'catF'
+  | 'maxRowsScanText'
+  | 'schemaLoading'
+  | 'schemaError'
+  | 'schemaStats'
+  | 'schemaCache'
+  | 'schemaDriftBaseline'
+  | 'schemaSampleN'
+  | 'schemaSampleTier'
+  | 'schemaScopeLabel'
+  | 'showSchemaModal'
+  | 'catAvailLoading'
+  | 'catAvailError'
+  | 'catAvailItems'
+  | 'catAvailSearch'
+  | 'catAvailLimit'
+  | 'catAvailOffset'
+  | 'catAvailDistinctTotal'
+  | 'catAvailTotalRowsInView'
+  | 'catAvailRowsScanned'
+  | 'catAvailPartial'
+  | 'catAvailTimer'
+  | 'categoryGate'
+  | 'recipeNotice'
+  | 'invoke'
+  | 'recordPerf'
+> & {
+  profileSchemaFromRows: (rows: string[][]) => any;
+  parseMaxRowsScanText: (text: string) => number;
+  activeFilterHash: () => string;
+  withViewTransition: (fn: () => void) => void;
+};
+
+export type StateControllerContext = Pick<
+  InspectorControllerContext,
+  | 'query'
+  | 'matchMode'
+  | 'targetColIdx'
+  | 'numericF'
+  | 'dateF'
+  | 'catF'
+  | 'multiQueryEnabled'
+  | 'multiQueryExpanded'
+  | 'multiQueryClauses'
+  | 'sortColIdx'
+  | 'sortDir'
+  | 'sortSpecs'
+  | 'visibleColumns'
+  | 'hiddenColumns'
+  | 'pinnedLeft'
+  | 'pinnedRight'
+  | 'columnWidths'
+  | 'maxRowsScanText'
+  | 'autoRestoreEnabled'
+  | 'headers'
+  | 'invoke'
+> & {
+  captureRecipeState: () => any;
+  migrateAndNormalizeRecipeState: (state: any) => any;
+  runFilterNow: () => Promise<void>;
+};
+
 export type GridControllerContext = Pick<
   InspectorControllerContext,
   | 'loadState'
