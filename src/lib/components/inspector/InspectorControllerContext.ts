@@ -141,6 +141,13 @@ export interface InspectorControllerContext {
   recipeState: RecipeState;
 
   // ============================================================================
+  // SVAR Filter Builder
+  // ============================================================================
+  svarFilterSet: IFilterSet;
+  showSvarBuilder: boolean;
+  svarNotice: string | null;
+
+  // ============================================================================
   // Constants
   // ============================================================================
   FILTER_DEBOUNCE_MS: number;
@@ -210,6 +217,13 @@ export type FilterControllerContext = Pick<
   | 'queryError'
   | 'loadError'
   | 'visibleColIdxs'
+  | 'totalRowCount'
+  | 'visibleRows'
+  | 'crossQueryTimer'
+  | 'headers'
+  | 'svarFilterSet'
+  | 'svarNotice'
+  | 'showSvarBuilder'
   | 'FILTER_DEBOUNCE_MS'
   | 'invoke'
   | 'escapeRegExp'

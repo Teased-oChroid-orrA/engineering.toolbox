@@ -89,6 +89,8 @@ export function filterControllerCtx(state: {
   svarFilterSet: IFilterSet;
   showSvarBuilder: boolean;
   svarNotice: string | null;
+  mergedRowsAll: string[][];
+  visibleRows: string[][];
 }) {
   return {
     FILTER_DEBOUNCE_MS: state.FILTER_DEBOUNCE_MS,
@@ -163,7 +165,9 @@ export function filterControllerCtx(state: {
     set showSvarBuilder(v: boolean) { state.showSvarBuilder = v; },
     get svarNotice() { return state.svarNotice; },
     set svarNotice(v: string | null) { state.svarNotice = v; },
-    set headers(v: string[]) { state.headers = v; }
+    set headers(v: string[]) { state.headers = v; },
+    get mergedRowsAll() { return state.mergedRowsAll; },
+    get visibleRows() { return state.visibleRows; }
   };
 }
 

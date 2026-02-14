@@ -198,7 +198,16 @@ export function clearAllFilters(ctx: FilterControllerContext) {
   ctx.matchMode = 'fuzzy';
   if ('multiQueryEnabled' in ctx) ctx.multiQueryEnabled = false;
   if ('multiQueryExpanded' in ctx) ctx.multiQueryExpanded = false;
-  if ('multiQueryClauses' in ctx) ctx.multiQueryClauses = [{ id: `mq_${Date.now()}_0`, query: '', mode: 'fuzzy' }];
+  if ('multiQueryClauses' in ctx) {
+    ctx.multiQueryClauses = [{
+      id: `mq_${Date.now()}_0`,
+      query: '',
+      matchMode: 'fuzzy',
+      targetColIdx: null,
+      logicalOp: 'AND',
+      mode: 'fuzzy'
+    }];
+  }
   ctx.targetColIdx = null;
   ctx.numericF = { enabled: false, colIdx: null, minText: '', maxText: '', error: null };
   ctx.dateF = { enabled: false, colIdx: null, minIso: '', maxIso: '', error: null };

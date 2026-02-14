@@ -1,15 +1,12 @@
-import type { MatchMode } from '$lib/components/inspector/InspectorQueryController';
-
-export type MultiQueryClause = {
-  id: string;
-  query: string;
-  mode: MatchMode;
-};
+import type { MatchMode, MultiQueryClause } from './InspectorStateTypes';
 
 export function newMultiQueryClause(seed = 0): MultiQueryClause {
   return {
     id: `mq_${Date.now()}_${seed}`,
     query: '',
+    matchMode: 'fuzzy',
+    targetColIdx: null,
+    logicalOp: 'AND',
     mode: 'fuzzy'
   };
 }

@@ -100,8 +100,9 @@ export type SortSpec = {
 
 export type CrossQueryResult = {
   datasetId: string;
-  datasetLabel: string;
-  matchCount: number;
+  label: string;
+  filtered: number;
+  total: number;
 };
 
 // ============================================================================
@@ -148,6 +149,7 @@ export type MultiQueryClause = {
   matchMode: MatchMode;
   targetColIdx: number | null;
   logicalOp: 'AND' | 'OR';
+  mode?: string;
 };
 
 // ============================================================================

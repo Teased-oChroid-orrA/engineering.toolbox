@@ -7,8 +7,8 @@ test.describe('inspector multi-query controller', () => {
   test('combines fuzzy/exact clauses into lookahead regex', async () => {
     const out = toCombinedRegexQuery(
       [
-        { id: '1', mode: 'fuzzy', query: 'bolt' },
-        { id: '2', mode: 'exact', query: 'M12' }
+        { id: '1', mode: 'fuzzy', query: 'bolt', matchMode: 'fuzzy', targetColIdx: null, logicalOp: 'AND' },
+        { id: '2', mode: 'exact', query: 'M12', matchMode: 'exact', targetColIdx: null, logicalOp: 'AND' }
       ],
       esc
     );
@@ -18,17 +18,17 @@ test.describe('inspector multi-query controller', () => {
   });
 
   test('returns error for invalid regex clauses', async () => {
-    const out = toCombinedRegexQuery([{ id: '1', mode: 'regex', query: '([abc' }], esc);
+    const out = toCombinedRegexQuery([{ id: '1', mode: 'regex', query: '([abc', matchMode: 'regex', targetColIdx: null, logicalOp: 'AND' }], esc);
     expect(out.error).toContain('Multi-query regex invalid');
   });
 
   test('builds highlight regexes for active clauses only', async () => {
     const regexes = multiQueryHighlightRegexes(
       [
-        { id: '1', mode: 'fuzzy', query: 'bolt' },
-        { id: '2', mode: 'exact', query: 'M12' },
-        { id: '3', mode: 'regex', query: '(' },
-        { id: '4', mode: 'fuzzy', query: '' }
+        { id: '1', mode: 'fuzzy', query: 'bolt', matchMode: 'fuzzy', targetColIdx: null, logicalOp: 'AND' },
+        { id: '2', mode: 'exact', query: 'M12', matchMode: 'exact', targetColIdx: null, logicalOp: 'AND' },
+        { id: '3', mode: 'regex', query: '(', matchMode: 'regex', targetColIdx: null, logicalOp: 'AND' },
+        { id: '4', mode: 'fuzzy', query: '', matchMode: 'fuzzy', targetColIdx: null, logicalOp: 'AND' }
       ],
       esc
     );

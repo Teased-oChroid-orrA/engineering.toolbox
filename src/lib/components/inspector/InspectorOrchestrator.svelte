@@ -713,6 +713,8 @@
       svarFilterSet,
       showSvarBuilder,
       svarNotice,
+      mergedRowsAll,
+      visibleRows,
     });
   }
   function buildFilterSpec() {
