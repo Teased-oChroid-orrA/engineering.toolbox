@@ -452,7 +452,7 @@
     sliceLabel: "Slice: 0-0",
   });
   // hasLoaded is now in loadState
-  let showDataControls = $state(false);
+  let showDataControls = $state(true);  // Always show menu (contains file upload, shortcuts, etc.)
   let showControlsDebug = $state(false);
   let isLoading = $state(false);
   let loadError = $state<string | null>(null);
@@ -1432,22 +1432,21 @@
       },
     });
 
-    // 🔧 CRITICAL FIX: All setup*Effect calls MUST be inside onMount
-    // In Svelte 5, top-level code re-runs on reactive changes, creating infinite $effect loops
-    setupShowDataControlsEffect(
-    {
-      hasLoadedDatasetSignals,
-      hasLoaded: () => hasLoaded,
-      loadedDatasetsLength: () => loadedDatasets?.length ?? 0,
-      activeDatasetId: () => activeDatasetId,
-      datasetId: () => datasetId,
-      headersLength: () => headers?.length ?? 0,
-      totalRowCount: () => totalRowCount,
-    },
-    (value) => {
-      showDataControls = value;
-    },
-  );
+    // ⚠️ DISABLED: Menu should always be visible, not controlled by data load state
+    // setupShowDataControlsEffect(
+    // {
+    //   hasLoadedDatasetSignals,
+    //   hasLoaded: () => hasLoaded,
+    //   loadedDatasetsLength: () => loadedDatasets?.length ?? 0,
+    //   activeDatasetId: () => activeDatasetId,
+    //   datasetId: () => datasetId,
+    //   headersLength: () => headers?.length ?? 0,
+    //   totalRowCount: () => totalRowCount,
+    // },
+    // (value) => {
+    //   showDataControls = value;
+    // },
+    // );
   setupSliceFetchEffect(
     {
       hasLoaded: () => hasLoaded,
