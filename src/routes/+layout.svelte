@@ -85,9 +85,9 @@
     // Use setTimeout to ensure child components have mounted and registered
     setTimeout(() => {
       menuByScope = getRegisteredContextMenus();
-      console.log('[LAYOUT] menuByScope initialized to:', menuByScope);
-      console.log('[LAYOUT] activeScope:', activeScope);
-      console.log('[LAYOUT] activeToolMenu:', activeToolMenu);
+      console.log('[LAYOUT] menuByScope initialized to:', $state.snapshot(menuByScope));
+      console.log('[LAYOUT] activeScope:', $state.snapshot(activeScope));
+      console.log('[LAYOUT] activeToolMenu:', $state.snapshot(activeToolMenu));
     }, 0);
     const update = () => {
       const width = navHost?.clientWidth ?? 0;
@@ -113,14 +113,14 @@
         return;
       }
       const prev = menuByScope[reg.scope];
-      console.log('[LAYOUT] Previous menu:', prev);
+      console.log('[LAYOUT] Previous menu:', prev ? $state.snapshot(prev) : 'undefined');
       if (prev && JSON.stringify(prev) === JSON.stringify(reg)) {
         console.log('[LAYOUT] Menu unchanged, skipping update');
         return;
       }
       console.log('[LAYOUT] Updating menuByScope for scope:', reg.scope);
       menuByScope = { ...menuByScope, [reg.scope]: reg };
-      console.log('[LAYOUT] menuByScope updated:', menuByScope);
+      console.log('[LAYOUT] menuByScope updated:', $state.snapshot(menuByScope));
     };
     const onMenuClear = (ev: Event) => {
       const detail = (ev as CustomEvent<{ scope: ContextMenuScope }>).detail;
