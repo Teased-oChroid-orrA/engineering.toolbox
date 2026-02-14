@@ -519,7 +519,7 @@ export function gridControllerCtx(state: {
       console.log('[GRID CTX] Setting visibleRows, length:', v?.length, 'first row:', v?.[0]);
       state.loadState.visibleRows = v;
       state.loadState._version++;  // Increment version to force reactivity
-      console.log('[GRID CTX] loadState.visibleRows now:', state.loadState.visibleRows?.length, 'version:', state.loadState._version);
+      devLog('[GRID CTX] loadState.visibleRows now:', state.loadState.visibleRows?.length, 'version:', state.loadState._version);
     },
     get loadError() { return state.loadError; },
     set loadError(v: string | null) { state.loadError = v; },
