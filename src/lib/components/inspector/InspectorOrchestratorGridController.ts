@@ -2,58 +2,45 @@ import { devLog } from '$lib/utils/devLog';
 import type { GridControllerContext } from './InspectorControllerContext';
 
 export async function fetchVisibleSlice(ctx: GridControllerContext) {
-  try {
-    console.error('★★★★★ ENTRY 1 ★★★★★');
-    const hasLoadedValue = ctx.hasLoaded;
-    console.error('★★★★★ ENTRY 2 - hasLoaded:', hasLoadedValue);
-    const isMergedViewValue = ctx.isMergedView;
-    console.error('★★★★★ ENTRY 3 - isMergedView:', isMergedViewValue);
-    
-    if (!hasLoadedValue) {
-      console.error('[FETCH SLICE] Early return - hasLoaded was:', hasLoadedValue);
-      return;
-    }
-    
-    console.error('[FETCH SLICE] After hasLoaded check, continuing...');
-    
-    const t0 = performance.now();
-  } catch (err) {
-    console.error('[FETCH SLICE] EXCEPTION:', err);
-    throw err;
+  if (!ctx.hasLoaded) {
+    devLog('FETCH SLICE', 'Skipped: hasLoaded =', ctx.hasLoaded);
+    return;
   }
+  const t0 = performance.now();
   const token = ctx.sliceGate.nextToken();
   
   const s = Number.isFinite(ctx.startIdx) ? Math.max(0, ctx.startIdx) : 0;
   const e = Number.isFinite(ctx.endIdx) ? Math.max(s, ctx.endIdx) : s;
   const reqCols = ctx.visibleColIdxs;
 
-  console.error('[FETCH SLICE] Range:', s, '-', e, 'isMergedView:', ctx.isMergedView);
   devLog('FETCH SLICE', 'isMergedView:', ctx.isMergedView, 'mergedRowsAll.length:', ctx.mergedRowsAll?.length, 'range:', s, '-', e);
 
   try {
     if (ctx.isMergedView) {
-      console.error('[FETCH SLICE] Browser mode branch');
       const base = ctx.mergedRowsAll.slice(s, e);
       if (!ctx.sliceGate.isLatest(token)) return;
-      // CRITICAL FIX: Use loadState directly to ensure reactivity
-      if (reqCols.length === 0) {
-        console.error('[FETCH SLICE] Setting loadState.visibleRows, length:', base.length);
-        (ctx as any).loadState.visibleRows = base;
+      
+      // CRITICAL FIX: Use callback to trigger Svelte reactivity
+      const newRows = reqCols.length === 0 
+        ? base
+        : base.map((r: string[]) => {
+            const sparse: string[] = [];
+            for (let i = 0; i < reqCols.length; i++) sparse[reqCols[i]] = r[reqCols[i]] ?? '';
+            return sparse;
+          });
+      
+      if (ctx.updateVisibleRows) {
+        ctx.updateVisibleRows(newRows);
       } else {
-        const sparse = base.map((r: string[]) => {
-          const row: string[] = [];
-          for (let i = 0; i < reqCols.length; i++) row[reqCols[i]] = r[reqCols[i]] ?? '';
-          return row;
-        });
-        console.log('[FETCH SLICE] Setting loadState.visibleRows (sparse), length:', sparse.length);
-        (ctx as any).loadState.visibleRows = sparse;
+        // Fallback: direct mutation
+        (ctx as any).loadState.visibleRows = newRows;
       }
-      console.log('[FETCH SLICE] loadState.visibleRows is now:', (ctx as any).loadState.visibleRows?.length);
-      devLog('FETCH SLICE', 'Set visibleRows to', (ctx as any).loadState.visibleRows.length, 'rows');
+      
+      devLog('FETCH SLICE', 'Set visibleRows to', newRows.length, 'rows');
       ctx.recordPerf('slice', t0, {
         start: s,
         end: e,
-        renderedRows: ctx.visibleRows.length,
+        renderedRows: newRows.length,
         requestedCols: reqCols.length,
         merged: true
       });

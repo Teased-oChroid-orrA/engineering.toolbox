@@ -58,9 +58,10 @@ export async function loadCsvFromText(
       resp = { headers: parsed.headers, rowCount: parsed.rowCount, colTypes: parsed.colTypes };
     }
 
-    ctx.headers = resp.headers ?? [];
-    ctx.totalRowCount = resp.rowCount ?? 0;
-    ctx.colTypes = (resp.colTypes ?? []) as any[];
+    // CRITICAL FIX: Use loadState directly to ensure reactivity (same pattern as hasLoaded)
+    (ctx as any).loadState.headers = resp.headers ?? [];
+    (ctx as any).loadState.totalRowCount = resp.rowCount ?? 0;
+    (ctx as any).loadState.colTypes = (resp.colTypes ?? []) as any[];
 
     // If browser mode, store rows in mergedRowsAll and enable merged view
     if (browserModeRows !== null) {
@@ -70,7 +71,6 @@ export async function loadCsvFromText(
       // CRITICAL: Use loadState directly to ensure reactivity (same bug as hasLoaded)
       (ctx as any).loadState.isMergedView = true;
       (ctx as any).loadState.mergedRowsAll = [...browserModeRows];
-      console.log('[LOAD CSV] Browser mode: isMergedView set to true');
       devLog('LOAD CSV', 'Browser mode: stored', browserModeRows.length, 'rows');
     }
 
@@ -88,13 +88,7 @@ export async function loadCsvFromText(
     ctx.pendingRestore = await ctx.loadLastStateForDataset(ctx.datasetId);
     // CRITICAL FIX: Access loadState directly to ensure reactivity
     // Setting ctx.hasLoaded = true creates a new property due to TypeScript cast
-    console.log('[LOAD CSV] Setting hasLoaded = true via loadState');
-    console.log('[LOAD CSV] loadState._id:', (ctx as any).loadState?._id);
-    console.log('[LOAD CSV] ctx.hasLoaded before:', ctx.hasLoaded);
-    console.log('[LOAD CSV] loadState.hasLoaded before:', (ctx as any).loadState?.hasLoaded);
     (ctx as any).loadState.hasLoaded = true;
-    console.log('[LOAD CSV] ctx.hasLoaded after:', ctx.hasLoaded);
-    console.log('[LOAD CSV] loadState.hasLoaded after:', (ctx as any).loadState?.hasLoaded);
     devLog('LOAD CSV', 'hasLoaded set to true, datasetId:', ctx.datasetId);
     ctx.showDataControls = true;
     ctx.activeDatasetId = ctx.datasetId;
@@ -123,35 +117,20 @@ export async function loadCsvFromText(
       if (ctx.catF.colIdx != null && ctx.catF.colIdx >= ctx.headers.length) ctx.catF = { enabled: false, colIdx: null, selected: new Set() };
     }
 
-    console.log('[LOAD CSV] About to check preserveActiveQuery');
     const preserveActiveQuery = (ctx.query ?? '').trim().length > 0 || ctx.matchMode !== 'fuzzy' || ctx.targetColIdx != null;
-    console.log('[LOAD CSV] preserveActiveQuery:', preserveActiveQuery, 'pendingRestore:', !!ctx.pendingRestore, 'applyInitialFilter:', applyInitialFilter);
     if (ctx.pendingRestore && applyInitialFilter && !preserveActiveQuery) {
-      console.log('[LOAD CSV] Branch A: Applying pendingRestore state');
       await ctx.applyState(ctx.pendingRestore);
       ctx.pendingRestore = null;
     } else if (applyInitialFilter) {
-      console.log('[LOAD CSV] Branch B: Calling runFilterNow, mergedRowsAll.length:', ctx.mergedRowsAll.length);
-      console.log('[LOAD CSV] Filter state - query:', ctx.query, 'matchMode:', ctx.matchMode, 'targetColIdx:', ctx.targetColIdx);
-      try {
-        await ctx.runFilterNow();
-        console.log('[LOAD CSV] After runFilterNow, visibleRows:', ctx.visibleRows?.length);
-      } catch (err) {
-        console.log('[LOAD CSV] runFilterNow error (continuing):', err);
-        // Don't throw - continue with load, filter can be retried later
-      }
-    } else {
-      console.log('[LOAD CSV] Branch C: applyInitialFilter=false, skipping filter');
+      await ctx.runFilterNow();
     }
   } catch (e: any) {
-    console.error('[LOAD CSV] EXCEPTION CAUGHT:', e);
-    console.error('[LOAD CSV] Exception stack:', e?.stack);
     ctx.loadError = e?.message ?? String(e);
-    ctx.hasLoaded = false;
-    ctx.headers = [];
-    ctx.visibleRows = [];
-    ctx.totalRowCount = 0;
-    ctx.totalFilteredCount = 0;
+    (ctx as any).loadState.hasLoaded = false;
+    (ctx as any).loadState.headers = [];
+    (ctx as any).loadState.visibleRows = [];
+    (ctx as any).loadState.totalRowCount = 0;
+    (ctx as any).loadState.totalFilteredCount = 0;
   } finally {
     ctx.isLoading = false;
   }
@@ -193,9 +172,10 @@ export async function loadCsvFromPath(
 
     const resp = (await ctx.invoke('inspector_load_csv_path', { path, hasHeaders: ctx.hasHeaders })) as any;
 
-    ctx.headers = resp.headers ?? [];
-    ctx.totalRowCount = resp.rowCount ?? 0;
-    ctx.colTypes = (resp.colTypes ?? []) as any[];
+    // CRITICAL FIX: Use loadState directly to ensure reactivity
+    (ctx as any).loadState.headers = resp.headers ?? [];
+    (ctx as any).loadState.totalRowCount = resp.rowCount ?? 0;
+    (ctx as any).loadState.colTypes = (resp.colTypes ?? []) as any[];
 
     const ids = ctx.computeDatasetIdentity(`path:${path}`, ctx.headers, ctx.totalRowCount, ctx.fnv1a32);
     ctx.datasetId = ids.id;
@@ -240,11 +220,11 @@ export async function loadCsvFromPath(
     }
   } catch (e: any) {
     ctx.loadError = e?.message ?? String(e);
-    ctx.hasLoaded = false;
-    ctx.headers = [];
-    ctx.visibleRows = [];
-    ctx.totalRowCount = 0;
-    ctx.totalFilteredCount = 0;
+    (ctx as any).loadState.hasLoaded = false;
+    (ctx as any).loadState.headers = [];
+    (ctx as any).loadState.visibleRows = [];
+    (ctx as any).loadState.totalRowCount = 0;
+    (ctx as any).loadState.totalFilteredCount = 0;
   } finally {
     ctx.isLoading = false;
   }
@@ -264,13 +244,13 @@ export async function unloadWorkspaceDataset(ctx: LoadControllerContext, id: str
     ctx.activeDatasetId = '';
     ctx.datasetId = '';
     ctx.datasetLabel = '(none)';
-    ctx.headers = [];
-    ctx.visibleRows = [];
-    ctx.totalRowCount = 0;
-    ctx.totalFilteredCount = 0;
-    ctx.hasLoaded = false;
+    (ctx as any).loadState.headers = [];
+    (ctx as any).loadState.visibleRows = [];
+    (ctx as any).loadState.totalRowCount = 0;
+    (ctx as any).loadState.totalFilteredCount = 0;
+    (ctx as any).loadState.hasLoaded = false;
     ctx.showDataControls = false;
-    ctx.isMergedView = false;
+    (ctx as any).loadState.isMergedView = false;
     ctx.mergedHeaders = [];
     ctx.mergedRowsAll = [];
     return;
@@ -370,25 +350,25 @@ export async function runCrossDatasetQuery(ctx: LoadControllerContext) {
 
     ctx.crossQueryResults = resp?.datasetResults ?? [];
     ctx.mergedHeaders = resp?.mergedHeaders ?? [];
-    ctx.mergedRowsAll = resp?.mergedRows ?? [];
-    ctx.isMergedView = true;
-    ctx.headers = [...ctx.mergedHeaders];
+    (ctx as any).loadState.mergedRowsAll = resp?.mergedRows ?? [];
+    (ctx as any).loadState.isMergedView = true;
+    (ctx as any).loadState.headers = [...ctx.mergedHeaders];
     ctx.visibleColumns = new Set();
-    ctx.colTypes = ctx.headers.map((_: any, i: number) => (i === 0 ? 'string' : 'string')) as any[];
-    ctx.totalRowCount = ctx.mergedRowsAll.length;
-    ctx.totalFilteredCount = ctx.mergedRowsAll.length;
-    ctx.visibleRows = ctx.mergedRowsAll;
+    (ctx as any).loadState.colTypes = ctx.headers.map((_: any, i: number) => (i === 0 ? 'string' : 'string')) as any[];
+    (ctx as any).loadState.totalRowCount = (ctx as any).loadState.mergedRowsAll.length;
+    (ctx as any).loadState.totalFilteredCount = (ctx as any).loadState.mergedRowsAll.length;
+    (ctx as any).loadState.visibleRows = (ctx as any).loadState.mergedRowsAll;
   } catch (e: any) {
     ctx.loadError = e?.message ?? String(e);
     ctx.queueDebug('runCrossDatasetQuery:error', {
       error: ctx.loadError,
       ms: Math.round(performance.now() - startedAt)
     });
-    ctx.isMergedView = false;
-    if (ctx.preMergedHeaders.length > 0) ctx.headers = [...ctx.preMergedHeaders];
-    if (ctx.preMergedColTypes.length > 0) ctx.colTypes = [...ctx.preMergedColTypes];
-    ctx.totalRowCount = ctx.preMergedTotalRowCount;
-    ctx.totalFilteredCount = ctx.preMergedTotalFilteredCount;
+    (ctx as any).loadState.isMergedView = false;
+    if (ctx.preMergedHeaders.length > 0) (ctx as any).loadState.headers = [...ctx.preMergedHeaders];
+    if (ctx.preMergedColTypes.length > 0) (ctx as any).loadState.colTypes = [...ctx.preMergedColTypes];
+    (ctx as any).loadState.totalRowCount = ctx.preMergedTotalRowCount;
+    (ctx as any).loadState.totalFilteredCount = ctx.preMergedTotalFilteredCount;
   } finally {
     ctx.queueDebug('runCrossDatasetQuery:done', {
       merged: ctx.isMergedView,

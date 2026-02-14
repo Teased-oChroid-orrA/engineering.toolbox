@@ -470,6 +470,7 @@ export function gridControllerCtx(state: {
   recordPerf: any;
   queueDebug: any;
   loadState: any;  // Added: Pass loadState by reference
+  updateVisibleRows?: (rows: string[][]) => void;  // Callback for reactive updates
   hasLoaded: boolean;
   sliceGate: any;
   startIdx: number;
@@ -504,6 +505,7 @@ export function gridControllerCtx(state: {
     recordPerf: state.recordPerf,
     queueDebug: state.queueDebug,
     loadState: state.loadState,  // Added: Return loadState by reference
+    updateVisibleRows: state.updateVisibleRows,  // Return callback
     get hasLoaded() { return state.hasLoaded; },
     get sliceGate() { return state.sliceGate; },
     get startIdx() { return state.startIdx; },

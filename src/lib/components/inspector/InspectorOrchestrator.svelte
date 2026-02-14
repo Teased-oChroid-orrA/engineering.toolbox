@@ -230,7 +230,6 @@
   const loadStateId = Math.random().toString(36);  // Unique ID for debugging
   const loadState = $state({
     _id: loadStateId,  // Debug: track which loadState object this is
-    _version: 0,  // Counter to force reactivity
     headers: [] as string[],
     totalRowCount: 0,
     colTypes: [] as ColType[],
@@ -243,6 +242,11 @@
     visibleRows: [] as string[][],  // Add visibleRows to loadState for mutability
   });
   
+  // Function to update visibleRows that triggers reactivity
+  function updateVisibleRows(rows: string[][]) {
+    loadState.visibleRows = rows;
+  }
+  
   // Create derived variables for backward compatibility
   let headers = $derived(loadState.headers);
   let totalRowCount = $derived(loadState.totalRowCount);
@@ -253,16 +257,7 @@
   let isMergedView = $derived(loadState.isMergedView);
   let mergedRowsAll = $derived(loadState.mergedRowsAll);
   let totalFilteredCount = $derived(loadState.totalFilteredCount);
-  let visibleRows = $derived.by(() => {
-    // Track _version to force reactivity
-    const _ = loadState._version;
-    return loadState.visibleRows;
-  });
-  
-  // Debug: Log when visibleRows changes
-  $effect(() => {
-    console.log('[ORCHESTRATOR] visibleRows changed, length:', visibleRows?.length, 'version:', loadState._version);
-  });
+  let visibleRows = $derived(loadState.visibleRows);
   
   let loadedDatasets = $state<WorkspaceDataset[]>([]);
   let activeDatasetId = $state<string>("");
@@ -963,6 +958,7 @@
       recordPerf,
       queueDebug,
       loadState,  // Add loadState so grid can access reactive data
+      updateVisibleRows,  // Add callback for reactive updates
       hasLoaded,
       sliceGate,
       startIdx: gridWindow.startIdx,

@@ -53,7 +53,7 @@ export async function applyFilterSpec(ctx: FilterControllerContext, spec: any): 
   // Browser mode: filter client-side if we have mergedRowsAll
   if (ctx.loadState.isMergedView && ctx.loadState.mergedRowsAll) {
     if (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1') {
-      console.log('[FILTER] Browser mode client-side filtering, mergedRowsAll.length:', ctx.loadState.mergedRowsAll.length);
+      devLog('FILTER', 'Browser mode client-side, rows:', ctx.loadState.mergedRowsAll.length);
     }
     
     // Simple client-side filtering
