@@ -139,5 +139,5 @@ export {
   multiQueryHighlightRegexes,
   newMultiQueryClause
 } from '$lib/components/inspector/InspectorMultiQueryController';
-export type { MultiQueryClause } from '$lib/components/inspector/InspectorMultiQueryController';
+export type { MultiQueryClause } from '$lib/components/inspector/InspectorStateTypes';
 export { registerContextMenu } from '$lib/navigation/contextualMenu';

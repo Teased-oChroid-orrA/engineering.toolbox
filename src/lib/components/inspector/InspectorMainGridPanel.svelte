@@ -2,7 +2,7 @@
   import InspectorQueryRow from '$lib/components/inspector/InspectorQueryRow.svelte';
   import InspectorMergedGrid from '$lib/components/inspector/InspectorMergedGrid.svelte';
   import InspectorVirtualGrid from '$lib/components/inspector/InspectorVirtualGrid.svelte';
-  import type { MultiQueryClause } from '$lib/components/inspector/InspectorMultiQueryController';
+  import type { MultiQueryClause } from '$lib/components/inspector/InspectorStateTypes';
 
   export let hasLoaded = false;
   export let matchMode: 'fuzzy' | 'exact' | 'regex' = 'fuzzy';

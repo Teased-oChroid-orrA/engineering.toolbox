@@ -336,9 +336,9 @@
       out[sortSpecs[i].colIdx] = i;
     return out;
   });
-  let pinnedLeft = $state<number[]>([]);
-  let pinnedRight = $state<number[]>([]);
-  let hiddenColumns = $state<number[]>([]);
+  let pinnedLeft = $state<Set<number>>(new Set());
+  let pinnedRight = $state<Set<number>>(new Set());
+  let hiddenColumns = $state<Set<number>>(new Set());
   let columnWidths = $state<Record<number, number>>({});
   let showShortcuts = $state(false);
   let quietBackendLogs = $state(true);
@@ -879,6 +879,7 @@
     return buildGridControllerCtx({
       invoke,
       recordPerf,
+      queueDebug,
       loadState,  // Add loadState so grid can access reactive data
       hasLoaded,
       sliceGate,

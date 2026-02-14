@@ -1,4 +1,5 @@
-import { newMultiQueryClause, type MultiQueryClause } from './InspectorMultiQueryController';
+import { newMultiQueryClause } from './InspectorMultiQueryController';
+import { type MultiQueryClause } from './InspectorStateTypes';
 
 type MultiQueryCtx = {
   clauses: MultiQueryClause[];

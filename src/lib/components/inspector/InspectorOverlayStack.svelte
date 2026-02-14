@@ -11,7 +11,7 @@
   import InspectorOverlayPortal from './InspectorOverlayPortal.svelte';
   import { newClause, type BuildMode, type Clause, type ClauseKind, type GenTab } from './InspectorRegexController';
   import type { Recipe } from './InspectorRecipesController';
-  import type { MultiQueryClause } from './InspectorMultiQueryController';
+  import type { MultiQueryClause } from './InspectorStateTypes';
 
   export let uiAnimDur: number;
   export let showRecipeModal: boolean;

@@ -64,7 +64,7 @@ export interface InspectorControllerContext {
   startIdx: number;
   endIdx: number;
   visibleColIdxs: number[];
-  sortColIdx: number;
+  sortColIdx: number | null;
   sortDir: SortDirection;
   sortSpecs: SortSpec[];
 

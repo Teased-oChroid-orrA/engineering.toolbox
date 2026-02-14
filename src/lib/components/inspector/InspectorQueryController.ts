@@ -1,7 +1,11 @@
 export type QueryScope = 'current' | 'all' | 'ask';
 export type MatchMode = 'fuzzy' | 'exact' | 'regex';
-import type { CategoryFilterState, DateFilterState, NumericFilterState } from '$lib/components/inspector/InspectorTier2Controller';
-import { type MultiQueryClause } from '$lib/components/inspector/InspectorMultiQueryController';
+import type { 
+  CategoryFilterState, 
+  DateFilterState, 
+  NumericFilterState,
+  MultiQueryClause
+} from '$lib/components/inspector/InspectorStateTypes';
 
 export const shouldRunCrossFileQuery = (scope: QueryScope, loadedDatasetsLength: number) =>
   scope === 'all' && loadedDatasetsLength > 1;

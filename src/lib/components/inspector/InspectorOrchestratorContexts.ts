@@ -454,6 +454,7 @@ export function loadControllerCtx(state: {
 export function gridControllerCtx(state: {
   invoke: any;
   recordPerf: any;
+  queueDebug: any;
   loadState: any;  // Added: Pass loadState by reference
   hasLoaded: boolean;
   sliceGate: any;
@@ -474,14 +475,15 @@ export function gridControllerCtx(state: {
   visibleColumns: Set<number>;
   columnPickerNotice: string | null;
   showColumnPicker: boolean;
-  hiddenColumns: number[];
-  pinnedLeft: number[];
-  pinnedRight: number[];
+  hiddenColumns: Set<number>;
+  pinnedLeft: Set<number>;
+  pinnedRight: Set<number>;
   columnWidths: Record<number, number>;
 }) {
   return {
     invoke: state.invoke,
     recordPerf: state.recordPerf,
+    queueDebug: state.queueDebug,
     loadState: state.loadState,  // Added: Return loadState by reference
     get hasLoaded() { return state.hasLoaded; },
     get sliceGate() { return state.sliceGate; },
@@ -513,11 +515,11 @@ export function gridControllerCtx(state: {
     get showColumnPicker() { return state.showColumnPicker; },
     set showColumnPicker(v: boolean) { state.showColumnPicker = v; },
     get hiddenColumns() { return state.hiddenColumns; },
-    set hiddenColumns(v: number[]) { state.hiddenColumns = v; },
+    set hiddenColumns(v: Set<number>) { state.hiddenColumns = v; },
     get pinnedLeft() { return state.pinnedLeft; },
-    set pinnedLeft(v: number[]) { state.pinnedLeft = v; },
+    set pinnedLeft(v: Set<number>) { state.pinnedLeft = v; },
     get pinnedRight() { return state.pinnedRight; },
-    set pinnedRight(v: number[]) { state.pinnedRight = v; },
+    set pinnedRight(v: Set<number>) { state.pinnedRight = v; },
     get columnWidths() { return state.columnWidths; },
     set columnWidths(v: Record<number, number>) { state.columnWidths = v; }
   };

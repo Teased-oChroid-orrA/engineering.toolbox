@@ -1,6 +1,6 @@
 <script lang="ts">
   import QueryToolsDropdown from '$lib/components/inspector/QueryToolsDropdown.svelte';
-  import type { MultiQueryClause } from '$lib/components/inspector/InspectorMultiQueryController';
+  import type { MultiQueryClause } from '$lib/components/inspector/InspectorStateTypes';
 
   type QueryScope = 'current' | 'all' | 'ask';
   type MatchMode = 'fuzzy' | 'exact' | 'regex';

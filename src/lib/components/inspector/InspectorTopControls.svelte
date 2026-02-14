@@ -3,7 +3,7 @@
   import ControlCard from '$lib/components/inspector/ControlCard.svelte';
   import QueryToolsDropdown from '$lib/components/inspector/QueryToolsDropdown.svelte';
   import InspectorDebugBadge from '$lib/components/inspector/InspectorDebugBadge.svelte';
-  import type { MultiQueryClause } from '$lib/components/inspector/InspectorMultiQueryController';
+  import type { MultiQueryClause } from '$lib/components/inspector/InspectorStateTypes';
   import { safeAutoAnimate, isWebKitRuntime } from '$lib/utils/safeAutoAnimate';
 
   function aa(node: HTMLElement, opts?: { duration?: number }) {

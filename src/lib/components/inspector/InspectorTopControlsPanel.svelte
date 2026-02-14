@@ -2,7 +2,7 @@
   import InspectorTopControls from '$lib/components/inspector/InspectorTopControls.svelte';
   import InspectorTier2Panel from '$lib/components/inspector/InspectorTier2Panel.svelte';
   import InspectorRegexHelpPanel from '$lib/components/inspector/InspectorRegexHelpPanel.svelte';
-  import type { MultiQueryClause } from '$lib/components/inspector/InspectorMultiQueryController';
+  import type { MultiQueryClause } from '$lib/components/inspector/InspectorStateTypes';
 
   export let topControlSpans: Record<string, string> = {};
   export let headerMode: 'auto' | 'yes' | 'no' = 'auto';
