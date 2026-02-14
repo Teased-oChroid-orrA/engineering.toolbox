@@ -50,58 +50,285 @@ let probeBoltDia = $state(0.25), probe = $state<{ x: number; y: number; angleDeg
 let evalBusy = $state(false), evalErr = $state<string | null>(null), evalTol = $state(0), evalSigmaMult = $state(3), evalMaxOutliers = $state(50), heatmapOn = $state(false), evalUseSelection = $state(true);
 let evalRes = $state<{ centroid: Point3D; normal: Point3D; rms: number; meanAbs: number; maxAbs: number; p95Abs: number; sigma: number; signedDistances: number[]; outlierIndices: number[]; } | null>(null);
 let outlierSet = $derived.by(() => new Set(evalRes?.outlierIndices ?? [])), heatScale = $derived.by(() => { const dev = evalRes?.signedDistances; if (!dev?.length) return 1; let mx = 0; for (const d of dev) if (Math.abs(d) > mx) mx = Math.abs(d); return mx || 1; });
-let sliceAxis = $state<'x' | 'y' | 'z'>('x'), sliceBins = $state(5), sliceThickness = $state(20), sliceMetric = $state<'abs' | 'signed'>('abs'), sliceBusy = $state(false), sliceRes = $state<any>(null), sliceErr = $state<string | null>(null);
+let sliceAxis = $state<'x' | 'y' | 'z'>('x'), sliceBins = $state(5), sliceThickness = $state(20), sliceMetric = $state<'p95' | 'rms'>('p95'), sliceBusy = $state(false), sliceRes = $state<any>(null), sliceErr = $state<string | null>(null);
 let datumSliceMode = $state<DatumSliceMode>('equidistant'), datumSliceSpacing = $state(10), datumSliceCount = $state(5), datumSlicePlaneIdx = $state<number>(0), datumSliceBusy = $state(false), datumSliceRes = $state<DatumSliceRunResult | null>(null), datumSliceErr = $state<string | null>(null);
 let datumSliceThickness = $state(0), datumSliceUseSelection = $state(false), selectedSliceId = $state<number | null>(null), includeOptionalSliceColumns = $state(false), sliceSyncModel = $derived.by(() => buildSliceSyncModel(datumSliceRes, selectedSliceId));
-let cylBusy = $state(false), cylErr = $state<string | null>(null), cylRes = $state<any>(null), cylShowAxis = $state(true), cylRefineK = $state(2), cylFitPointIds = $state<number[]>([]), cylOutlierSet = $derived.by(() => new Set(cylRes?.outlierIds ?? [])), cylUseSelection = $state(true);
-let recipes = $state<SurfaceRecipe[]>([]), selectedRecipeId = $state<string | null>(null), recipeRun = $state<RecipeRunState | null>(null), recipeTransaction = $state<RecipeTransaction | null>(null), recipeNameDraft = $state(''), recipeStepConfirmed = $state(true);
+let cylBusy = $state(false), cylErr = $state<string | null>(null), cylRes = $state<any>(null), cylShowAxis = $state(true), cylRefineK = $state(2), cylFitPointIds = $state<number[]>([]), cylOutlierSet = $derived.by(() => new Set<number>(cylRes?.outlierIds ?? [])), cylUseSelection = $state(true);
+let recipes = $state<SurfaceRecipe[]>([]), selectedRecipeId = $state<string | null>(null), recipeRun = $state<RecipeRunState | null>(null), recipeTx = $state<RecipeTransaction | null>(null), recipeNameDraft = $state(''), recipeStepConfirmed = $state(true);
 let statusWarnings = $state<SurfaceStatusWarning[]>([]), emittedWarningIds = $state<Set<string>>(new Set()), fileNotice = $state<string | null>(null), createPrereqNotice = $state<string | null>(null), topCreateHint = $state<string>('');
 let minPointsFor = $state<{ line: number; surface: number }>({ line: 2, surface: 3 });
-let projected = $derived.by(() => points.map((p, i) => ({ ...p, ...projectPoint(p, rot, zoomK, pan, w, h), idx: i }))), surfaceScreenCenters = $derived.by(() => surfaces.map(sf => { const pts = sf.vertexIds.map(i => projected[i]); return { cx: pts.reduce((s, p) => s + p.x, 0) / pts.length, cy: pts.reduce((s, p) => s + p.y, 0) / pts.length, cz: pts.reduce((s, p) => s + p.z, 0) / pts.length }; })), surfaceWorldCenters = $derived.by(() => surfaces.map(sf => { const pts = sf.vertexIds.map(i => points[i]); return { x: pts.reduce((s, p) => s + p.x, 0) / pts.length, y: pts.reduce((s, p) => s + p.y, 0) / pts.length, z: pts.reduce((s, p) => s + p.z, 0) / pts.length }; })), sortedEdges = $derived.by(() => { const proj = projected; return [...edges].sort((a, b) => (proj[a[0]].z + proj[a[1]].z) / 2 - (proj[b[0]].z + proj[b[1]].z) / 2); }), sortedSurfaces = $derived.by(() => { const centers = surfaceScreenCenters; return surfaces.map((_, i) => i).sort((a, b) => centers[a].cz - centers[b].cz); }), datumPlanePatches = $derived.by(() => planes.map(p => { const { xDir, normal } = p, yDir = vecUnit(vecSub(vecScale(xDir, 0), vecScale(normal, 0))), pts = [vecAdd(p.origin, vecAdd(vecScale(xDir, -50), vecScale(yDir, -50))), vecAdd(p.origin, vecAdd(vecScale(xDir, 50), vecScale(yDir, -50))), vecAdd(p.origin, vecAdd(vecScale(xDir, 50), vecScale(yDir, 50))), vecAdd(p.origin, vecAdd(vecScale(xDir, -50), vecScale(yDir, 50)))]; return pts.map(pt => projectPoint(pt, rot, zoomK, pan, w, h)); })), datumAxisSegments = $derived.by(() => csys.map(cs => { const endX = vecAdd(cs.origin, vecScale(cs.xAxis, 30)), endY = vecAdd(cs.origin, vecScale(cs.yAxis, 30)), endZ = vecAdd(cs.origin, vecScale(cs.zAxis, 30)); return { origin: projectPoint(cs.origin, rot, zoomK, pan, w, h), xEnd: projectPoint(endX, rot, zoomK, pan, w, h), yEnd: projectPoint(endY, rot, zoomK, pan, w, h), zEnd: projectPoint(endZ, rot, zoomK, pan, w, h) }; })), zRange = $derived.by(() => { const zs = projected.map(p => p.z); return zs.length ? { min: Math.min(...zs), max: Math.max(...zs) } : { min: 0, max: 1 }; }), cylAxisSeg = $derived.by(() => cylRes ? computeCylinderAxisSegment(cylRes, rot, zoomK, pan, w, h) : null), interpPoint = $derived.by(() => activeEdgeIdx !== null && edges[activeEdgeIdx] ? lerp3(points[edges[activeEdgeIdx][0]], points[edges[activeEdgeIdx][1]], interpPct / 100) : null), selectedBadge = $derived.by(() => { if (selectedEntity?.kind === 'point') return `Point ${selectedEntity.index}`; if (selectedEntity?.kind === 'line') return `Line ${selectedEntity.index}`; if (selectedEntity?.kind === 'surface') return `Surface ${selectedEntity.index}`; if (selectedEntity?.kind === 'plane') return planes[selectedEntity.index]?.name ?? `Plane ${selectedEntity.index}`; if (selectedEntity?.kind === 'csys') return csys[selectedEntity.index]?.name ?? `Csys ${selectedEntity.index}`; return ''; }), creatorHint = $derived.by(() => Logic.getCreatorHint({ createMode, creatorPick, points, toolCursor })), surfaceDraftRequired = $derived(surfaceCreateKind === 'triangle' ? 3 : surfaceCreateKind === 'quad' ? 4 : 3), surfaceDraftRemaining = $derived(Math.max(0, surfaceDraftRequired - surfaceDraft.length)), surfaceFlowHint = $derived.by(() => Logic.getSurfaceFlowHint({ surfaceDraft, surfaceCreateKind, surfaceDraftRequired, surfaceDraftRemaining })), datumPickHint = $derived.by(() => Logic.getDatumPickHint({ datumPick })), datumPlaneChoices = $derived.by(() => planes.length > 0 ? planes : [{ name: 'Global XY', origin: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 1 }, xDir: { x: 1, y: 0, z: 0 }, source: 'default' }]);
-const snap = (): Snapshot => createSnapshot(points, edges, curves, surfaces, csys, planes, activeEdgeIdx), pushUndo = () => { redoStack = []; undoStack = pushHistoryUndo(undoStack, snap()); };
+let projected = $derived.by(() => points.map((p, i) => ({ ...p, ...projectPoint(p, rot, zoomK, w, h, pan), idx: i })));
+let surfaceScreenCenters = $derived.by(() => surfaces.map((sf: SurfaceFace) => { const pts = sf.vertexIds.map((i: number) => projected[i]!); return { cx: pts.reduce((s: number, p) => s + p.x, 0) / pts.length, cy: pts.reduce((s: number, p) => s + p.y, 0) / pts.length, cz: pts.reduce((s: number, p) => s + p.z, 0) / pts.length }; }));
+let surfaceWorldCenters = $derived.by(() => surfaces.map((sf: SurfaceFace) => { const pts = sf.vertexIds.map((i: number) => points[i]!); return { x: pts.reduce((s: number, p) => s + p.x, 0) / pts.length, y: pts.reduce((s: number, p) => s + p.y, 0) / pts.length, z: pts.reduce((s: number, p) => s + p.z, 0) / pts.length }; }));
+let sortedEdges = $derived.by(() => { const proj = projected; return edges.map((e, i) => ({ i, a: e[0], b: e[1], z: (proj[e[0]]!.z + proj[e[1]]!.z) / 2 })).sort((a, b) => a.z - b.z); });
+let sortedSurfaces = $derived.by(() => { const centers = surfaceScreenCenters; return surfaces.map((sf: SurfaceFace, i: number) => ({ i, pts: sf.vertexIds, z: centers[i]!.cz, name: sf.name ?? `Surface ${i}` })).sort((a, b) => a.z - b.z); });
+let datumPlanePatches = $derived.by(() => planes.map((p: DatumPlane, i: number) => { const xDirVal = p.xDir ?? { x: 1, y: 0, z: 0 }; const { normal } = p; const yDir = vecUnit(vecSub(vecScale(xDirVal, 0), vecScale(normal, 0))); const pts = [vecAdd(p.origin, vecAdd(vecScale(xDirVal, -50), vecScale(yDir, -50))), vecAdd(p.origin, vecAdd(vecScale(xDirVal, 50), vecScale(yDir, -50))), vecAdd(p.origin, vecAdd(vecScale(xDirVal, 50), vecScale(yDir, 50))), vecAdd(p.origin, vecAdd(vecScale(xDirVal, -50), vecScale(yDir, 50)))]; return { i, name: p.name, pts: pts.map((pt: Point3D) => projectPoint(pt, rot, zoomK, w, h, pan)) }; }));
+let datumAxisSegments = $derived.by(() => { const result: { i: number; csysIdx: number; axis: 'X' | 'Y' | 'Z'; a: Point3D; b: Point3D }[] = []; csys.forEach((cs: DatumCsys, idx: number) => { const endX = vecAdd(cs.origin, vecScale(cs.xAxis, 30)); const endY = vecAdd(cs.origin, vecScale(cs.yAxis, 30)); const endZ = vecAdd(cs.origin, vecScale(cs.zAxis, 30)); const origin = projectPoint(cs.origin, rot, zoomK, w, h, pan); result.push({ i: result.length, csysIdx: idx, axis: 'X', a: origin, b: projectPoint(endX, rot, zoomK, w, h, pan) }); result.push({ i: result.length, csysIdx: idx, axis: 'Y', a: origin, b: projectPoint(endY, rot, zoomK, w, h, pan) }); result.push({ i: result.length, csysIdx: idx, axis: 'Z', a: origin, b: projectPoint(endZ, rot, zoomK, w, h, pan) }); }); return result; });
+let zRange = $derived.by(() => { const zs = projected.map((p: Point3D & { z: number }) => p.z); return zs.length ? { min: Math.min(...zs), max: Math.max(...zs) } : { min: 0, max: 1 }; });
+let cylAxisSeg = $derived.by(() => cylRes && cylShowAxis ? computeCylinderAxisSegment(points, cylRes, cylShowAxis) : null);
+let interpPoint = $derived.by(() => activeEdgeIdx !== null && edges[activeEdgeIdx] ? lerp3(points[edges[activeEdgeIdx]![0]]!, points[edges[activeEdgeIdx]![1]]!, interpPct / 100) : null);
+let selectedBadge = $derived.by(() => { const entity = selectedEntity; if (!entity) return null; let label = ''; if (entity.kind === 'point') label = `Point ${entity.index}`; else if (entity.kind === 'line') label = `Line ${entity.index}`; else if (entity.kind === 'surface') label = `Surface ${entity.index}`; else if (entity.kind === 'plane') label = planes[entity.index]?.name ?? `Plane ${entity.index}`; else if (entity.kind === 'csys') label = csys[entity.index]?.name ?? `Csys ${entity.index}`; if (!label) return null; const worldPos = entity.kind === 'point' ? points[entity.index] : entity.kind === 'line' ? lerp3(points[edges[entity.index]![0]]!, points[edges[entity.index]![1]]!, 0.5) : { x: 0, y: 0, z: 0 }; const screenPos = projectPoint(worldPos, rot, zoomK, w, h, pan); return { x: screenPos.x, y: screenPos.y, label }; });
+let creatorHint = $derived.by(() => Logic.getCreatorHint({ toolCursor, creatorPick, surfaceCreateKind, surfaceDraft, datumPick }));
+let surfaceDraftRequired = $derived(surfaceCreateKind === 'triangle' ? 3 : surfaceCreateKind === 'quad' ? 4 : 3);
+let surfaceDraftRemaining = $derived(Math.max(0, surfaceDraftRequired - surfaceDraft.length));
+let surfaceFlowHint = $derived.by(() => Logic.getSurfaceFlowHint({ toolCursor, creatorPick, surfaceCreateKind, surfaceDraft, datumPick }));
+let datumPickHint = $derived.by(() => Logic.getDatumPickHint({ toolCursor, creatorPick, surfaceCreateKind, surfaceDraft, datumPick }));
+let datumPlaneChoices = $derived.by(() => planes.length > 0 ? planes : [{ name: 'Global XY', origin: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 1 }, xDir: { x: 1, y: 0, z: 0 }, source: 'default' }]);
+const snap = (): Snapshot => createSnapshot(points, edges, curves, surfaces, csys, planes, activeEdgeIdx);
+const pushUndo = () => { const stacks = pushHistoryUndo({ undoStack, redoStack }, snap()); undoStack = stacks.undoStack; redoStack = stacks.redoStack; };
 const applySnap = (s: Snapshot) => { const m = materializeSnapshot(s); points = m.points; edges = m.edges; curves = m.curves; surfaces = m.surfaces; csys = m.csys; planes = m.planes; activeEdgeIdx = m.activeEdgeIdx; };
-const undo = () => { const res = popHistoryUndo({ undoStack, redoStack, snap: snap() }); if (!res) return; undoStack = res.undoStack; redoStack = res.redoStack; applySnap(res.snap); };
-const redo = () => { const res = popHistoryRedo({ undoStack, redoStack, snap: snap() }); if (!res) return; undoStack = res.undoStack; redoStack = res.redoStack; applySnap(res.snap); };
-const clearSelection = () => (selectedPointIds = []), invertSelection = () => (selectedPointIds = Logic.invertSelection(points, selectedPointIds)), openViewportMenu = (e: MouseEvent) => { e.preventDefault(); e.stopPropagation(); const rect = viewportEl?.getBoundingClientRect(); vpMenuOpen = true; vpMenuX = rect ? e.clientX - rect.left : e.clientX; vpMenuY = rect ? e.clientY - rect.top : e.clientY; }, closeViewportMenu = () => { vpMenuOpen = false; }, resetView = () => { rot = { alpha: -0.65, beta: 0.35 }; zoomK = 1; pan = { x: 0, y: 0 }; }, fitToScreen = () => { const fitted = viewportFitToScreen(points, rot, w, h); if (!fitted) return; zoomK = fitted.zoomK; pan = fitted.pan; }, svgCoordsFromEvent = (ev: PointerEvent | MouseEvent) => Logic.svgCoordsFromEvent(ev, svgEl), applySelectionFromHits = (hits: number[], ev: PointerEvent | MouseEvent) => { selectedPointIds = Logic.applySelectionFromHits(hits, ev, selectedPointIds); }, exportCSV = () => { const csv = buildSurfaceCsv(points, edges, curves, surfaces, csys, planes); triggerCsvDownload(csv, 'surface-data.csv'); }, exportSTEP = () => { toast.info('STEP export not yet implemented'); }, createPoint = () => { pushUndo(); points = [...points, { x: createPtX, y: createPtY, z: createPtZ }]; toast.success(`Created point ${points.length - 1}`); };
+const undo = () => { const res = popHistoryUndo({ undoStack, redoStack }, snap()); if (!res.snapshot) return; undoStack = res.stacks.undoStack; redoStack = res.stacks.redoStack; applySnap(res.snapshot); };
+const redo = () => { const res = popHistoryRedo({ undoStack, redoStack }, snap()); if (!res.snapshot) return; undoStack = res.stacks.undoStack; redoStack = res.stacks.redoStack; applySnap(res.snapshot); };
+const clearSelection = () => (selectedPointIds = []);
+const invertSelection = () => (selectedPointIds = Logic.invertSelection(points, selectedPointIds));
+const openViewportMenu = (e: MouseEvent) => { e.preventDefault(); e.stopPropagation(); const rect = viewportEl?.getBoundingClientRect(); vpMenuOpen = true; vpMenuX = rect ? e.clientX - rect.left : e.clientX; vpMenuY = rect ? e.clientY - rect.top : e.clientY; };
+const closeViewportMenu = () => { vpMenuOpen = false; };
+const resetView = () => { rot = { alpha: -0.65, beta: 0.35 }; zoomK = 1; pan = { x: 0, y: 0 }; };
+const fitToScreen = () => { const fitted = viewportFitToScreen(points, rot, w, h); if (!fitted) return; zoomK = fitted.zoomK; pan = fitted.pan; };
+const svgCoordsFromEvent = (ev: PointerEvent | MouseEvent) => Logic.svgCoordsFromEvent(ev, svgEl);
+const applySelectionFromHits = (hits: number[], ev: PointerEvent | MouseEvent) => { selectedPointIds = Logic.applySelectionFromHits(hits, selectedPointIds, { shiftKey: ev.shiftKey, altKey: ev.altKey }); };
+const exportCSV = () => { const csv = buildSurfaceCsv(points, edges); triggerCsvDownload(csv, 'surface-data.csv'); };
+const exportSTEP = () => { toast.info('STEP export not yet implemented'); };
+const createPoint = () => { pushUndo(); points = [...points, { x: createPtX, y: createPtY, z: createPtZ }]; toast.success(`Created point ${points.length - 1}`); };
 const generateSamplerPoints = async () => { setLastAction('samplerGenerate'); const result = Logic.generateSamplerPoints({ points, samplerMode, samplerNu, samplerNv, samplerEdgeSegs, samplerAppend }); samplerErr = result.error; if (!result.success || !result.newPoints) return; pushUndo(); if (samplerAppend) points = [...points, ...result.newPoints]; else { points = result.newPoints; edges = []; curves = []; surfaces = []; planes = []; csys = [csys[0]]; activeCurveIdx = null; loftA = null; loftB = null; loftSegments = []; activeEdgeIdx = null; pendingPointIdx = null; selectedPointIds = []; } };
 const setSelectionMode = (m: SelectionMode) => { const next = nextSelectionModeState({ nextMode: m, curveMode, createMode, pendingPointIdx }); selectionMode = next.selectionMode; curveMode = next.curveMode; createMode = next.createMode; pendingPointIdx = next.pendingPointIdx; if (m !== 'none') toolCursor = 'select'; }, setCreateMode = (m: 'idle' | 'point' | 'line' | 'surface') => { const next = nextCreateModeState({ nextMode: m, selectionMode, curveMode, pendingPointIdx, creatorPick, surfaceDraft }); createMode = next.createMode; selectionMode = next.selectionMode; curveMode = next.curveMode; pendingPointIdx = next.pendingPointIdx; creatorPick = next.creatorPick; surfaceDraft = next.surfaceDraft; if (m === 'line') toolCursor = 'line'; else if (m === 'surface') toolCursor = 'surface'; else if (toolCursor === 'line' || toolCursor === 'surface') toolCursor = 'select'; }, requirePointPrereq = (m: string) => { if (points.length < 2) { toast.warning(`Need at least 2 points for ${m} mode`); return false; } return true; }, beginLinePick = (slot: 'A' | 'B') => { if (!requirePointPrereq('line')) return; if (slot === 'A') { setToolCursor('line'); return; } const next = linePickState(slot); createMode = next.createMode; selectionMode = next.selectionMode; curveMode = next.curveMode; pendingPointIdx = next.pendingPointIdx; creatorPick = next.creatorPick; surfaceDraft = []; }, beginSurfacePick = (slot: number) => { if (!requirePointPrereq('surface')) return; if (slot === 0) { setToolCursor('surface'); return; } const next = surfacePickState(slot); createMode = next.createMode; selectionMode = next.selectionMode; curveMode = next.curveMode; pendingPointIdx = next.pendingPointIdx; creatorPick = next.creatorPick; }, setToolCursor = (mode: ToolCursorMode) => { if (mode === 'line' && !requirePointPrereq('line')) mode = 'select'; if (mode === 'surface' && !requirePointPrereq('surface')) mode = 'select'; const next = transitionToolCursor({ mode, surfaceDraft }); toolCursor = next.toolCursor; selectionMode = next.selectionMode; createMode = next.createMode; curveMode = next.curveMode; lineInsertPickMode = next.lineInsertPickMode; creatorPick = next.creatorPick; pendingPointIdx = next.pendingPointIdx; surfaceDraft = next.surfaceDraft; };
 const openDatumsModal = () => { datumsModalOpen = true; const ww = typeof window !== 'undefined' ? window.innerWidth : 1200, wh = typeof window !== 'undefined' ? window.innerHeight : 800; if (!datumsModalDragging) datumsModalPos = centeredModalPos({ windowWidth: ww, windowHeight: wh, panelWidth: 760, panelHeight: 440, margin: 20 }); }, startDatumsModalDrag = (ev: PointerEvent) => { ev.stopPropagation(); datumsModalDragging = true; datumsModalDragOffset = dragOffsetFromPointer(ev.clientX, ev.clientY, datumsModalPos); const onMove = (e: PointerEvent) => { if (!datumsModalDragging) return; datumsModalPos = draggedModalPos(e.clientX, e.clientY, datumsModalDragOffset, 12); }, onUp = () => { datumsModalDragging = false; document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp); }; document.addEventListener('pointermove', onMove); document.addEventListener('pointerup', onUp); };
-const onSvgPointerDown = (ev: PointerEvent) => { const coords = svgCoordsFromEvent(ev); if (!coords) return; const hits = hitsInRect(projected, coords.x, coords.y, pointPriorityPx); if (hits.length) applySelectionFromHits(hits, ev); else { selecting = true; selStart = coords; selRect = null; lasso = []; } }, onSvgPointerMove = (ev: PointerEvent) => { if (!selecting || !selStart) return; const coords = svgCoordsFromEvent(ev); if (!coords) return; if (selectionMode === 'box') selRect = { x0: Math.min(selStart.x, coords.x), y0: Math.min(selStart.y, coords.y), x1: Math.max(selStart.x, coords.x), y1: Math.max(selStart.y, coords.y) }; else if (selectionMode === 'lasso') lasso = [...lasso, coords]; }, onSvgPointerUp = (ev: PointerEvent) => { if (!selecting) return; selecting = false; if (selectionMode === 'box' && selRect) applySelectionFromHits(hitsInRect(projected, selRect.x0, selRect.y0, selRect.x1 - selRect.x0, selRect.y1 - selRect.y0), ev); else if (selectionMode === 'lasso' && lasso.length) applySelectionFromHits(hitsInLasso(projected, lasso), ev); selStart = null; selRect = null; lasso = []; }, updateProbeFromEvent = (ev: MouseEvent) => { if (!probeOn) return; const coords = svgCoordsFromEvent(ev); if (!coords) return; const nearest = Logic.nearestPoint(coords.x, coords.y, projected); if (nearest === null) return; const angle = Logic.estimateTaperAngleAtPoint(nearest, edges, points); probe = { x: coords.x, y: coords.y, angleDeg: angle, ok: angle <= maxTaperDeg }; };
-const handleLoadedFile = async (file: File) => { fileNotice = `Loading ${file.name}...`; try { let loaded; if (file.name.endsWith('.csv')) loaded = await readSurfaceCsvFile(file); else if (file.name.endsWith('.step') || file.name.endsWith('.stp')) loaded = await readSurfaceStepFile(file); else throw new Error('Unsupported file type'); pushUndo(); points = loaded.points; edges = loaded.edges ?? []; curves = loaded.curves ?? []; surfaces = loaded.surfaces ?? []; csys = loaded.csys ?? [csys[0]]; planes = loaded.planes ?? []; fileNotice = `Loaded ${points.length} points`; setTimeout(() => { fileNotice = null; }, 3000); } catch (err) { fileNotice = `Error: ${err.message}`; setTimeout(() => { fileNotice = null; }, 5000); } };
-const createLine = () => { if (createLineA === null || createLineB === null) return; const result = Logic.createLineFromPair({ idxA: createLineA, idxB: createLineB, edges, curveMode, curves, points }); if (!result.success || !result.edges) { toast.error(result.error ?? 'Failed to create line'); return; } pushUndo(); edges = result.edges; if (result.curves) curves = result.curves; toast.success('Created line'); }, createSurface = () => { if (surfaceDraft.length < 3) { toast.warning('Need at least 3 points for a surface'); return; } const result = Logic.createSurfaceFromIndices({ indices: surfaceDraft, kind: surfaceCreateKind, surfaces, points }); if (!result.success || !result.surfaces) { toast.error(result.error ?? 'Failed to create surface'); return; } pushUndo(); surfaces = result.surfaces; surfaceDraft = []; toast.success('Created surface'); }, createDatumCsys = () => { const result = Logic.addDatumCsys({ mode: csysCreateMode, originIdx: csysOriginPoint, xIdx: csysXPoint, yIdx: csysYPoint, lineIdx: csysFromLine, copyIdx: csysCopyIdx, csys, points, edges }); if (!result) { toast.error('Failed to create csys'); return; } pushUndo(); csys = [...csys, result]; toast.success(`Created csys: ${result.name}`); }, createDatumPlane = () => { const result = Logic.addDatumPlane({ mode: planeCreateMode, p0: planeP0, p1: planeP1, p2: planeP2, normalVec: planeNormalVec, offsetSurface: planeOffsetSurface, offsetDist: planeOffsetDist, lineA: planeLineA, lineB: planeLineB, dirPoint: planeDirPoint, dirVec: planeDirVec, csysIdx: planeCsysIdx, principal: planePrincipal, planes, points, surfaces, edges, csys }); if (!result) { toast.error('Failed to create plane'); return; } pushUndo(); planes = [...planes, result]; toast.success(`Created plane: ${result.name}`); };
+const onSvgPointerDown = (ev: PointerEvent) => { const coords = svgCoordsFromEvent(ev); if (!coords) return; const hits = hitsInRect(projected, { x0: coords.x - pointPriorityPx / 2, y0: coords.y - pointPriorityPx / 2, x1: coords.x + pointPriorityPx / 2, y1: coords.y + pointPriorityPx / 2 }); if (hits.length) applySelectionFromHits(hits, ev); else { selecting = true; selStart = coords; selRect = null; lasso = []; } };
+const onSvgPointerMove = (ev: PointerEvent) => { if (!selecting || !selStart) return; const coords = svgCoordsFromEvent(ev); if (!coords) return; if (selectionMode === 'box') selRect = { x0: Math.min(selStart.x, coords.x), y0: Math.min(selStart.y, coords.y), x1: Math.max(selStart.x, coords.x), y1: Math.max(selStart.y, coords.y) }; else if (selectionMode === 'lasso') lasso = [...lasso, coords]; };
+const onSvgPointerUp = (ev: PointerEvent) => { if (!selecting) return; selecting = false; if (selectionMode === 'box' && selRect) applySelectionFromHits(hitsInRect(projected, selRect), ev); else if (selectionMode === 'lasso' && lasso.length) applySelectionFromHits(hitsInLasso(projected, lasso), ev); selStart = null; selRect = null; lasso = []; };
+const updateProbeFromEvent = (ev: MouseEvent) => { if (!probeOn) return; const coords = svgCoordsFromEvent(ev); if (!coords) return; const nearest = Logic.nearestPoint(coords.x, coords.y, projected); if (nearest === null) return; const angle = Logic.estimateTaperAngleAtPoint(nearest, edges, points); probe = { x: coords.x, y: coords.y, angleDeg: angle, ok: angle <= maxTaperDeg }; };
+const handleLoadedFile = async (file: File) => {
+  fileNotice = `Loading ${file.name}...`;
+  try {
+    let loaded: { points: Point3D[]; edges: Edge[] };
+    if (file.name.endsWith('.csv')) loaded = await readSurfaceCsvFile(file);
+    else if (file.name.endsWith('.step') || file.name.endsWith('.stp')) loaded = await readSurfaceStepFile(file);
+    else throw new Error('Unsupported file type');
+    pushUndo();
+    points = loaded.points;
+    edges = loaded.edges ?? [];
+    fileNotice = `Loaded ${points.length} points`;
+    setTimeout(() => { fileNotice = null; }, 3000);
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    fileNotice = `Error: ${errMsg}`;
+    setTimeout(() => { fileNotice = null; }, 5000);
+  }
+};
+const createLine = () => {
+  if (createLineA === null || createLineB === null) return;
+  const result = Logic.createLineFromPair({ aRaw: createLineA, bRaw: createLineB, points, edges });
+  if (!result.success || result.newEdgeIdx === null) {
+    toast.error('Failed to create line');
+    return;
+  }
+  pushUndo();
+  edges = [...edges, [createLineA, createLineB] as Edge];
+  toast.success('Created line');
+};
+const createSurface = () => {
+  if (surfaceDraft.length < 3) {
+    toast.warning('Need at least 3 points for a surface');
+    return;
+  }
+  const result = Logic.createSurfaceFromIndices({ idsRaw: surfaceDraft, points, surfaces });
+  if (!result.success || result.newSurfaceIdx === null) {
+    toast.error('Failed to create surface');
+    return;
+  }
+  pushUndo();
+  const newSurface: SurfaceFace = {
+    name: `Surface ${surfaces.length}`,
+    pts: surfaceDraft,
+    vertexIds: surfaceDraft
+  };
+  surfaces = [...surfaces, newSurface];
+  surfaceDraft = [];
+  toast.success('Created surface');
+};
+const createDatumCsys = () => {
+  const result = Logic.addDatumCsys({
+    mode: csysCreateMode,
+    points,
+    edges,
+    csys,
+    name: `Csys ${csys.length}`,
+    originPointIdx: csysOriginPoint,
+    xPointIdx: csysXPoint,
+    yPointIdx: csysYPoint,
+    fromLineIdx: csysFromLine,
+    copyIdx: csysCopyIdx
+  });
+  if (!result) {
+    toast.error('Failed to create csys');
+    return;
+  }
+  pushUndo();
+  csys = [...csys, result];
+  toast.success(`Created csys: ${result.name}`);
+};
+const createDatumPlane = () => {
+  const result = Logic.addDatumPlane({
+    mode: planeCreateMode,
+    points,
+    edges,
+    surfaces,
+    csys,
+    name: `Plane ${planes.length}`,
+    p0Idx: planeP0,
+    p1Idx: planeP1,
+    p2Idx: planeP2,
+    normalVec: planeNormalVec,
+    offsetSurfaceIdx: planeOffsetSurface,
+    offsetDistance: planeOffsetDist,
+    lineAIdx: planeLineA,
+    lineBIdx: planeLineB,
+    directionPointIdx: planeDirPoint,
+    directionVec: planeDirVec,
+    csysIdx: planeCsysIdx,
+    principal: planePrincipal
+  });
+  if (!result) {
+    toast.error('Failed to create plane');
+    return;
+  }
+  pushUndo();
+  planes = [...planes, result];
+  toast.success(`Created plane: ${result.name}`);
+};
 // Evaluation
-const cylUiCtx = () => ({ getPoints: () => points, getSelectedPointIds: () => selectedPointIds, getEvalUseSelection: () => evalUseSelection, getEvalTol: () => evalTol, getEvalSigmaMult: () => evalSigmaMult, getEvalMaxOutliers: () => evalMaxOutliers, setCylErr: (v: string | null) => { cylErr = v; }, setCylBusy: (v: boolean) => { cylBusy = v; }, setCylFitPointIds: (v: number[]) => { cylFitPointIds = v; }, setCylRes: (v: typeof cylRes) => { cylRes = v; }, setEvalErr: (v: string | null) => { evalErr = v; }, setEvalBusy: (v: boolean) => { evalBusy = v; }, setEvalRes: (v: typeof evalRes) => { evalRes = v; }, getSliceAxis: () => sliceAxis, getSliceBins: () => sliceBins, getSliceThickness: () => sliceThickness, setSliceErr: (v: string | null) => { sliceErr = v; }, setSliceBusy: (v: boolean) => { sliceBusy = v; }, setSliceRes: (v: typeof sliceRes) => { sliceRes = v; }, getDatumPlaneChoices: () => datumPlaneChoices, getDatumSlicePlaneIdx: () => datumSlicePlaneIdx, getDatumSliceMode: () => datumSliceMode, getDatumSliceSpacing: () => datumSliceSpacing, getDatumSliceCount: () => datumSliceCount, getDatumSliceThickness: () => datumSliceThickness, getDatumSliceUseSelection: () => datumSliceUseSelection, setDatumSliceErr: (v: string | null) => { datumSliceErr = v; }, setDatumSliceBusy: (v: boolean) => { datumSliceBusy = v; }, setDatumSliceRes: (v: DatumSliceRunResult | null) => { datumSliceRes = v; }, getDatumSliceRes: () => datumSliceRes, setSelectedSliceId: (v: number | null) => { selectedSliceId = v; }, getIncludeOptionalSliceColumns: () => includeOptionalSliceColumns, getStatusWarnings: () => statusWarnings, setStatusWarnings: (v: SurfaceStatusWarning[]) => { statusWarnings = v; }, getEmittedWarningIds: () => emittedWarningIds, toast }), evaluationUiCtx = cylUiCtx;
+const cylUiCtx = () => ({ getPoints: () => points, getSelectedPointIds: () => selectedPointIds, setSelectedPointIds: (v: number[]) => { selectedPointIds = v; }, getEvalUseSelection: () => evalUseSelection, getEvalTol: () => evalTol, getEvalSigmaMult: () => evalSigmaMult, getEvalMaxOutliers: () => evalMaxOutliers, getCylRes: () => cylRes, getCylRefineK: () => cylRefineK, getCylFitPointIds: () => cylFitPointIds, setCylErr: (v: string | null) => { cylErr = v; }, setCylBusy: (v: boolean) => { cylBusy = v; }, setCylFitPointIds: (v: number[]) => { cylFitPointIds = v; }, setCylRes: (v: typeof cylRes) => { cylRes = v; }, setEvalErr: (v: string | null) => { evalErr = v; }, setEvalBusy: (v: boolean) => { evalBusy = v; }, setEvalRes: (v: typeof evalRes) => { evalRes = v; }, getSliceAxis: () => sliceAxis, getSliceBins: () => sliceBins, getSliceThickness: () => sliceThickness, setSliceErr: (v: string | null) => { sliceErr = v; }, setSliceBusy: (v: boolean) => { sliceBusy = v; }, setSliceRes: (v: typeof sliceRes) => { sliceRes = v; }, getDatumPlaneChoices: () => datumPlaneChoices, getDatumSlicePlaneIdx: () => datumSlicePlaneIdx, getDatumSliceMode: () => datumSliceMode, getDatumSliceSpacing: () => datumSliceSpacing, getDatumSliceCount: () => datumSliceCount, getDatumSliceThickness: () => datumSliceThickness, getDatumSliceUseSelection: () => datumSliceUseSelection, setDatumSliceErr: (v: string | null) => { datumSliceErr = v; }, setDatumSliceBusy: (v: boolean) => { datumSliceBusy = v; }, setDatumSliceRes: (v: DatumSliceRunResult | null) => { datumSliceRes = v; }, getDatumSliceRes: () => datumSliceRes, setSelectedSliceId: (v: number | null) => { selectedSliceId = v; }, getIncludeOptionalSliceColumns: () => includeOptionalSliceColumns, getStatusWarnings: () => statusWarnings, setStatusWarnings: (v: SurfaceStatusWarning[]) => { statusWarnings = v; }, getEmittedWarningIds: () => emittedWarningIds, toast }), evaluationUiCtx = cylUiCtx;
 const computeSurfaceEval = async () => { await computeSurfaceEvalUi(evaluationUiCtx()); }, computeSectionSlices = async () => { await computeSectionSlicesUi(evaluationUiCtx()); }, computeDatumSlices = async () => { await computeDatumSlicesUi(evaluationUiCtx()); };
 const exportDatumSliceCombined = () => { exportDatumSliceCombinedUi(evaluationUiCtx()); }, emitStatusWarnings = (incoming: SurfaceStatusWarning[]) => { emitStatusWarningsUi(evaluationUiCtx(), incoming); };
 const computeCylinderFit = async () => { await computeCylinderFitUi(cylUiCtx()); }, cylKeepInliers = () => { cylKeepInliersController(cylUiCtx()); }, cylSelectOutliers = () => { cylSelectOutliersController(cylUiCtx()); }, cylRemoveOutliers = () => { cylRemoveOutliersController(cylUiCtx()); };
-const recipeUiCtx = () => ({ getSelEdgeA: () => selEdgeA, getSelEdgeB: () => selEdgeB, getOffsetDist: () => offsetDist, getRefPointIdx: () => refPointIdx, getDatumSlicePlaneIdx: () => datumSlicePlaneIdx, getDatumSliceMode: () => datumSliceMode, getDatumSliceSpacing: () => datumSliceSpacing, getDatumSliceCount: () => datumSliceCount, getDatumSliceThickness: () => datumSliceThickness, getDatumSliceUseSelection: () => datumSliceUseSelection, getIncludeOptionalSliceColumns: () => includeOptionalSliceColumns, setRecipeNameDraft: (v: string) => { recipeNameDraft = v; }, getRecipeNameDraft: () => recipeNameDraft, getRecipes: () => recipes, setRecipes: (v: SurfaceRecipe[]) => { recipes = v; }, getSelectedRecipeId: () => selectedRecipeId, setSelectedRecipeId: (v: string | null) => { selectedRecipeId = v; }, setRecipeRun: (v: RecipeRunState | null) => { recipeRun = v; }, setSelEdgeA: (v: number | null) => { selEdgeA = v; }, setSelEdgeB: (v: number | null) => { selEdgeB = v; }, setOffsetDist: (v: number) => { offsetDist = v; }, setRefPointIdx: (v: number) => { refPointIdx = v; }, setDatumSlicePlaneIdx: (v: number) => { datumSlicePlaneIdx = v; }, setDatumSliceMode: (v: DatumSliceMode) => { datumSliceMode = v; }, setDatumSliceSpacing: (v: number) => { datumSliceSpacing = v; }, setDatumSliceCount: (v: number) => { datumSliceCount = v; }, setDatumSliceThickness: (v: number) => { datumSliceThickness = v; }, setDatumSliceUseSelection: (v: boolean) => { datumSliceUseSelection = v; }, setIncludeOptionalSliceColumns: (v: boolean) => { includeOptionalSliceColumns = v; } });
+const recipeUiCtx = () => ({ getSelEdgeA: () => selEdgeA, getSelEdgeB: () => selEdgeB, getOffsetDist: () => offsetDist, getRefPointIdx: () => refPointIdx, getDatumSlicePlaneIdx: () => datumSlicePlaneIdx, getDatumSliceMode: () => datumSliceMode, getDatumSliceSpacing: () => datumSliceSpacing, getDatumSliceCount: () => datumSliceCount, getDatumSliceThickness: () => datumSliceThickness, getDatumSliceUseSelection: () => datumSliceUseSelection, getIncludeOptionalSliceColumns: () => includeOptionalSliceColumns, setRecipeNameDraft: (v: string) => { recipeNameDraft = v; }, getRecipeNameDraft: () => recipeNameDraft, getRecipes: () => recipes, setRecipes: (v: SurfaceRecipe[]) => { recipes = v; }, getSelectedRecipeId: () => selectedRecipeId, setSelectedRecipeId: (v: string | null) => { selectedRecipeId = v; }, getRecipeRun: () => recipeRun, setRecipeRun: (v: RecipeRunState | null) => { recipeRun = v; }, getSelectedRecipe: () => selectedRecipe(), getRecipeStepConfirmed: () => recipeStepConfirmed, getRecipeTx: () => recipeTx, setRecipeTx: (v: RecipeTransaction | null) => { recipeTx = v; }, beginRecipeTransaction, getCurrentSnapshot: () => createSnapshot(points, edges, curves, surfaces, csys, planes, activeEdgeIdx), applySnapshot: (s: any) => { const m = materializeSnapshot(s); points = m.points; edges = m.edges; curves = m.curves; surfaces = m.surfaces; csys = m.csys; planes = m.planes; activeEdgeIdx = m.activeEdgeIdx; }, getUndoRedoStacks: () => ({ undoStack, redoStack }), setUndoRedoStacks: (v: { undoStack: any[]; redoStack: any[] }) => { undoStack = v.undoStack; redoStack = v.redoStack; }, applyRecipeConfig: (cfg: any) => applyRecipeConfig(cfg), calcOffsetIntersection, computeDatumSlices, exportDatumSliceCombined, getDatumSliceRes: () => datumSliceRes, getIntersectionDiagnostics: () => intersectionDiagnostics, emitStatusWarnings, getDatumSliceErr: () => datumSliceErr, setSelEdgeA: (v: number | null) => { selEdgeA = v; }, setSelEdgeB: (v: number | null) => { selEdgeB = v; }, setOffsetDist: (v: number) => { offsetDist = v; }, setRefPointIdx: (v: number) => { refPointIdx = v; }, setDatumSlicePlaneIdx: (v: number) => { datumSlicePlaneIdx = v; }, setDatumSliceMode: (v: DatumSliceMode) => { datumSliceMode = v; }, setDatumSliceSpacing: (v: number) => { datumSliceSpacing = v; }, setDatumSliceCount: (v: number) => { datumSliceCount = v; }, setDatumSliceThickness: (v: number) => { datumSliceThickness = v; }, setDatumSliceUseSelection: (v: boolean) => { datumSliceUseSelection = v; }, setIncludeOptionalSliceColumns: (v: boolean) => { includeOptionalSliceColumns = v; } });
 const snapshotRecipeConfig = (): SurfaceRecipeConfig => snapshotRecipeConfigController(recipeUiCtx()), applyRecipeConfig = (cfg: SurfaceRecipeConfig) => { applyRecipeConfigController(recipeUiCtx(), cfg); };
-const selectedRecipe = () => selectedRecipeController(recipes, selectedRecipeId), selectRecipe = (id: string | null) => { selectRecipeController(recipeUiCtx(), id); };
+const selectedRecipe = () => selectedRecipeController(recipes, selectedRecipeId), selectRecipe = (id: string | null) => { if (id !== null) selectRecipeController(recipeUiCtx(), id); };
 const saveCurrentRecipe = () => { saveCurrentRecipeController(recipeUiCtx()); saveWorkspaceRecipes('surface', recipes); }, deleteSelectedRecipe = () => { deleteSelectedRecipeController(recipeUiCtx()); saveWorkspaceRecipes('surface', recipes); };
-const toggleSelectedRecipeStep = (idx: number) => { toggleSelectedRecipeStepController(recipeUiCtx(), idx); };
-const handlePointClick = (idx: number, ev: PointerEvent) => { const result = Logic.handlePointClick(idx, ev, creatorPick, surfaceDraft, datumPick, lineInsertPickMode, createLineA, createLineB, points, csys, edges, curves); pendingPointIdx = result.pendingPointIdx; creatorPick = result.creatorPick; surfaceDraft = result.surfaceDraft; datumPick = result.datumPick; lineInsertPickMode = result.lineInsertPickMode; if (result.createLineA !== undefined) createLineA = result.createLineA; if (result.createLineB !== undefined) createLineB = result.createLineB; };
+const toggleSelectedRecipeStep = (step: SurfaceRecipeStep, enabled: boolean) => { toggleSelectedRecipeStepController(recipeUiCtx(), step, enabled); };
+const handlePointClick = (idx: number, ev?: MouseEvent) => { const result = Logic.handlePointClick(idx, ev as PointerEvent, creatorPick, surfaceDraft, datumPick, lineInsertPickMode, createLineA, createLineB, points, csys, edges, curves); pendingPointIdx = result.pendingPointIdx; creatorPick = result.creatorPick; surfaceDraft = result.surfaceDraft; datumPick = result.datumPick; lineInsertPickMode = result.lineInsertPickMode; if (result.createLineA !== undefined) createLineA = result.createLineA; if (result.createLineB !== undefined) createLineB = result.createLineB; };
 const onEdgeClick = (idx: number) => { selectedEntity = { kind: 'line', index: idx }; }, onSurfaceClick = (idx: number) => { selectedEntity = { kind: 'surface', index: idx }; }, onPlaneClick = (idx: number) => { selectedEntity = { kind: 'plane', index: idx }; }, onCsysClick = (idx: number) => { selectedEntity = { kind: 'csys', index: idx }; };
 const armDatumPick = (target: 'csys3' | 'csysPointLine', slot: 'origin' | 'x' | 'y' | 'line') => { datumPick = { target, slot }; toast.info(`Click a point to select ${slot}`); };
 const addDatumCsys = () => createDatumCsys(), addDatumPlane = () => createDatumPlane(), addPoint = () => createPoint(), finishContourSurface = () => createSurface();
-const insertPointOnEdge = () => { const result = Logic.insertPointOnLine({ activeEdgeIdx, lineInsertT, points, edges, curves }); if (!result.success) { toast.error(result.error ?? 'Failed to insert point'); return; } pushUndo(); points = result.points!; edges = result.edges!; curves = result.curves!; activeEdgeIdx = result.newEdgeIdx!; toast.success('Inserted point on line'); };
-const offsetSurfaceCreate = async () => { const result = await Logic.createOffsetSurface({ offsetSurfaceIdx, offsetSurfaceDist, surfaces, points }); if (!result.success) { toast.error(result.error ?? 'Failed to create offset surface'); return; } pushUndo(); surfaces = result.surfaces!; toast.success('Created offset surface'); };
-const offsetCurveOnSurfaceCreate = async () => { const result = await computeCurveOffsetBestEffort({ curveIdx: offsetCurveIdx, surfaceIdx: offsetCurveSurfaceIdx, distance: offsetCurveDist, flip: offsetCurveFlip, curves, surfaces, points }); offsetCurveStatus = result.status; if (!result.success || !result.newCurve) { if (!result.status.message) toast.error('Failed to create offset curve'); return; } pushUndo(); curves = [...curves, result.newCurve]; toast.success(`Created offset curve via ${result.status.method}`); };
-const extrudeLineOrCurve = async () => { const result = await Logic.extrudeGeometry({ target: extrudeTarget, lineIdx: extrudeLineIdx, curveIdx: extrudeCurveIdx, dirMode: extrudeDirMode, vector: extrudeVector, distance: extrudeDistance, surfaceIdx: extrudeSurfaceIdx, flip: extrudeFlip, edges, curves, points, surfaces }); if (!result.success) { toast.error(result.error ?? 'Failed to extrude'); return; } pushUndo(); surfaces = result.surfaces!; toast.success('Created extruded surface'); };
-const runTopologyHealing = () => { const result = Logic.healTopology({ points, edges, curves, surfaces, healTol }); if (!result.success) { toast.error(result.error ?? 'Healing failed'); return; } pushUndo(); points = result.points!; edges = result.edges!; curves = result.curves!; surfaces = result.surfaces!; toast.success(`Healed: ${result.merged} points merged`); };
+const insertPointOnEdge = () => {
+  if (activeEdgeIdx === null) {
+    toast.error('No edge selected');
+    return;
+  }
+  const result = Logic.insertPointOnEdge({
+    edgeIdx: activeEdgeIdx,
+    t: lineInsertT,
+    points,
+    edges
+  });
+  if (!result) {
+    toast.error('Failed to insert point');
+    return;
+  }
+  pushUndo();
+  points = [...points, result.newPoint];
+  edges = edges.filter((_: Edge, i: number) => !result.edgesToRemove.includes(i)).concat(result.edgesToAdd);
+  activeEdgeIdx = result.newActiveEdgeIdx;
+  toast.success('Inserted point on line');
+};
+const offsetSurfaceCreate = () => {
+  const result = Logic.offsetSurface({
+    surfaceIdx: offsetSurfaceIdx,
+    offsetDist: offsetSurfaceDist,
+    surfaces,
+    points
+  });
+  if (!result) {
+    toast.error('Failed to create offset surface');
+    return;
+  }
+  pushUndo();
+  points = [...points, ...result.newPoints];
+  surfaces = [...surfaces, result.newSurface];
+  toast.success('Created offset surface');
+};
+const offsetCurveOnSurfaceCreate = () => {
+  const result = computeCurveOffsetBestEffort({
+    points,
+    curve: curves[offsetCurveIdx]!,
+    surface: surfaces[offsetCurveSurfaceIdx]!,
+    distance: offsetCurveFlip ? -offsetCurveDist : offsetCurveDist
+  });
+  offsetCurveStatus = {
+    severity: result.severity,
+    method: result.method,
+    message: result.message
+  };
+  if (result.severity === 'error' || result.points.length === 0) {
+    if (result.message) toast.error(result.message);
+    return;
+  }
+  pushUndo();
+  const newCurve: Curve = {
+    name: `Curve ${curves.length}`,
+    pts: result.points.map((p: Point3D, i: number) => {
+      points.push(p);
+      return points.length - 1;
+    })
+  };
+  curves = [...curves, newCurve];
+  toast.success(`Created offset curve via ${result.method}`);
+};
+const extrudeLineOrCurve = () => {
+  const result = Logic.extrudeLineOrCurve({
+    extrudeTarget,
+    extrudeLineIdx,
+    extrudeCurveIdx,
+    extrudeDirMode,
+    extrudeVector,
+    extrudeSurfaceIdx,
+    extrudeFlip,
+    extrudeDistance,
+    edges,
+    curves,
+    points,
+    surfaces
+  });
+  if (!result) {
+    toast.error('Failed to extrude');
+    return;
+  }
+  pushUndo();
+  points = [...points, ...result.newPoints];
+  surfaces = [...surfaces, ...result.newSurfaces];
+  edges = [...edges, ...result.newEdges];
+  toast.success('Created extruded surface');
+};
+const runTopologyHealing = () => {
+  const result = Logic.runTopologyHealing({
+    points,
+    edges,
+    curves,
+    surfaces,
+    tolerance: healTol
+  });
+  pushUndo();
+  points = result.points;
+  edges = result.edges;
+  curves = result.curves;
+  surfaces = result.surfaces;
+  const merged = points.length - result.points.length;
+  toast.success(`Healed: ${merged} points merged`);
+};
 const deleteEdge = (idx: number) => { pushUndo(); edges = edges.filter((_, i) => i !== idx); if (activeEdgeIdx === idx) activeEdgeIdx = null; toast.success('Deleted line'); };
 const deleteCurve = (idx: number) => { pushUndo(); curves = curves.filter((_, i) => i !== idx); if (activeCurveIdx === idx) activeCurveIdx = null; toast.success('Deleted curve'); };
 const createCurve = () => { if (activeEdgeIdx === null) return; const result = Logic.convertEdgeToCurve({ edgeIdx: activeEdgeIdx, edges, curves, points }); if (!result.success || !result.curves) { toast.error(result.error ?? 'Failed to create curve'); return; } pushUndo(); curves = result.curves; activeCurveIdx = curves.length - 1; toast.success('Created curve from line'); };
-const rebuildLoftSegments = () => { if (loftA !== null && loftB !== null) { const result = Logic.rebuildLoftSegments({ loftA, loftB, edges, curves, points }); loftSegments = result.segments; loftErr = result.error; } };
-const calcOffsetIntersection = async () => { if (selEdgeA === null || selEdgeB === null || refPointIdx === null) return; intersectionBusy = true; const diag = precheckIntersectionInputs({ edgeA: edges[selEdgeA], edgeB: edges[selEdgeB], refIdx: refPointIdx, offsetDist, points }); intersectionDiagnostics = diag; if (diag.severity === 'error') { intersectionBusy = false; return; } const result = await calcOffsetIntersectionApi({ edgeA: edges[selEdgeA], edgeB: edges[selEdgeB], refIdx: refPointIdx, offsetDist, points }); intersection = result.intersection; intersectionDiagnostics = diagnoseIntersectionResult(result, offsetDist); intersectionBusy = false; };
-const startRecipeRun = () => startRecipeRunUi(recipeUiCtx()), runRecipeNextStep = () => runRecipeNextStepUi(recipeUiCtx()), cancelRecipeRun = () => cancelRecipeRunUi(recipeUiCtx());
+const rebuildLoftSegments = () => { if (loftA !== null && loftB !== null) { const result = buildLoftSegments(curves, points, loftA, loftB); loftSegments = result.segments; loftErr = result.error; } };
+const calcOffsetIntersection = async () => { if (selEdgeA === null || selEdgeB === null || refPointIdx === null) return; intersectionBusy = true; const check = precheckIntersectionInputs({ selEdgeA, selEdgeB, edges, points }); intersectionDiagnostics = check.diagnostics; if (!check.ok) { intersectionBusy = false; return; } const ea = edges[selEdgeA]; const eb = edges[selEdgeB]; const result = await calcOffsetIntersectionApi({ p1A: points[ea[0]], p1B: points[ea[1]], p2A: points[eb[0]], p2B: points[eb[1]], offsetDist, directionRef: points[refPointIdx] }); intersection = result.intersection; intersectionDiagnostics = diagnoseIntersectionResult({ skew: result.skew, offsetDistance: offsetDist, angleDeg: check.diagnostics.angleDeg, existing: check.diagnostics }); intersectionBusy = false; };
+const startRecipeRun = () => startRecipeRunUi(recipeUiCtx() as any), runRecipeNextStep = () => runRecipeNextStepUi(recipeUiCtx() as any), cancelRecipeRun = () => cancelRecipeRunUi(recipeUiCtx() as any);
 const chooseCoreMode = (mode: boolean) => { coreMode = mode; showCoreModePrompt = false; persistCoreMode(mode); markCoreModePromptSeen(); };
 const setRightRailCollapsed = (val: boolean) => { rightRailCollapsed = val; persistRightRailCollapsed(val); };
-const depthOpacity = (z: number) => depthOpacityUi(z, zRange), pointDepthOpacity = (z: number) => pointDepthOpacityUi(z, zRange), surfaceDepthOpacity = (z: number) => surfaceDepthOpacityUi(z, zRange);
-const keyActivate = (idx: number) => (idx === pendingPointIdx), project = (p: Point3D) => projectPoint(p, rot, zoomK, pan, w, h), heatColor = (d: number) => bilerp(d, -heatScale, heatScale, '#3b82f6', '#ffffff', '#ef4444');
-const nearestEdgeHit = (mx: number, my: number) => nearestEdgeHitUi(mx, my, sortedEdges, projected, edgeHitWidth), cylThresholdAbs = () => cylThresholdAbsController(cylUiCtx());
-const currentActiveFitPointIds = () => activeFitPointIds(cylUseSelection, selectedPointIds, cylFitPointIds);
-$effect(() => { if (loftA !== null && loftB !== null) { const result = Logic.rebuildLoftSegments({ loftA, loftB, edges, curves, points }); loftSegments = result.segments; loftErr = result.error; } else { loftSegments = []; loftErr = null; } }); $effect(() => { const maxIdx = Math.max(0, datumPlaneChoices.length - 1); datumSlicePlaneIdx = clamp(datumSlicePlaneIdx, 0, maxIdx); });
-onMount(() => { if (typeof window !== 'undefined') { const mode = readPersistedCoreMode(); if (mode !== null) coreMode = mode; const col = readPersistedRightRailCollapsed(); if (col !== null) rightRailCollapsed = col; showCoreModePrompt = !hasSeenCoreModePrompt(); const ui = readWorkspaceUiState('surface'); if (ui) { if (ui.zoomK !== undefined) zoomK = ui.zoomK; if (ui.pan) pan = ui.pan; if (ui.rot) rot = ui.rot; } recipes = loadWorkspaceRecipes('surface'); } if (actionsBarEl) autoAnimate(actionsBarEl); if (viewportEl) { const unsub1 = mountSurfaceGlobalHandlers(viewportEl, { onUndo: undo, onRedo: redo, onFitView: fitToScreen, onRotateForView: (ax: string) => { const r = rotateForViewUi(ax, rot); if (r) rot = r; } }); const unsub2 = mountSurfaceViewportInteraction(viewportEl, { getState: () => ({ rot, zoomK, pan, w, h, points }), onRotate: (dr) => { rot = { alpha: rot.alpha + dr.alpha, beta: rot.beta + dr.beta }; }, onZoom: (dz) => { zoomK = Math.max(0.1, zoomK + dz); }, onPan: (dp) => { pan = { x: pan.x + dp.x, y: pan.y + dp.y }; }, onRotateAnchorStart: (a) => { rotateAnchor = a; }, onRotateAnchorEnd: () => { rotateAnchor = null; } }); return () => { unsub1(); unsub2(); }; } registerContextMenu(buildSurfaceNavMenu({ canUndo, canRedo, coreMode, rightRailCollapsed })); });
+const depthOpacity = (z: number) => depthOpacityUi(z, zRange), pointDepthOpacity = (z: number) => depthOpacityUi(z, zRange), surfaceDepthOpacity = (z: number) => surfaceDepthOpacityUi(z, zRange);
+const keyActivate = (e: KeyboardEvent, fn: () => void) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } }, project = (p: Point3D) => projectPoint(p, rot, zoomK, w, h, pan), heatColor = (d: number, scale: number) => { const low = -scale; const high = scale; if (d <= low) return '#3b82f6'; if (d >= high) return '#ef4444'; const t = (d - low) / (high - low); return t < 0.5 ? `rgb(${Math.round(59 + (255 - 59) * (t * 2))}, ${Math.round(130 + (255 - 130) * (t * 2))}, ${Math.round(246 + (255 - 246) * (t * 2))})` : `rgb(${Math.round(255 - (255 - 239) * ((t - 0.5) * 2))}, ${Math.round(255 - (255 - 68) * ((t - 0.5) * 2))}, ${Math.round(255 - (255 - 68) * ((t - 0.5) * 2))})`; };
+const nearestEdgeHit = (mx: number, my: number) => nearestEdgeHitUi(mx, my, edges, projected), cylThresholdAbs = () => cylThresholdAbsController(cylUiCtx());
+const currentActiveFitPointIds = () => activeFitPointIds(cylUseSelection, selectedPointIds, points);
+$effect(() => { if (loftA !== null && loftB !== null) { const result = buildLoftSegments(curves, points, loftA, loftB); loftSegments = result.segments; loftErr = result.error; } else { loftSegments = []; loftErr = null; } }); $effect(() => { const maxIdx = Math.max(0, datumPlaneChoices.length - 1); datumSlicePlaneIdx = clamp(datumSlicePlaneIdx, 0, maxIdx); });
+onMount(() => { if (typeof window !== 'undefined') { const mode = readPersistedCoreMode(); if (mode !== null) coreMode = mode; const col = readPersistedRightRailCollapsed(); if (col !== null) rightRailCollapsed = col; showCoreModePrompt = !hasSeenCoreModePrompt(); const ui = readWorkspaceUiState('surface'); if (ui) { if (ui.zoomK !== undefined) zoomK = ui.zoomK; if (ui.pan) pan = ui.pan; if (ui.rot) rot = ui.rot; } const loaded = loadWorkspaceRecipes('surface'); recipes = Array.isArray(loaded) ? loaded : loaded.recipes; } if (actionsBarEl) autoAnimate(actionsBarEl); if (viewportEl) { const unsub1 = mountSurfaceGlobalHandlers({ getLastAction: () => lastAction, undo, redo, canUndo, canRedo, coreMode, rightRailCollapsed, openCreateGeometry: () => { createGeometryModalOpen = true; }, openSurfaceCurveOps: () => { surfaceCurveOpsModalOpen = true; }, openExtrude: () => { extrudeModalOpen = true; }, openDatums: openDatumsModal, openSettings: () => { settingsOpen = true; }, clearPicks: () => { pendingPointIdx = null; intersection = null; }, fitToScreen, resetView, toggleCoreMode: () => { coreMode = !coreMode; persistCoreMode(coreMode); }, toggleRightRail: () => { rightRailCollapsed = !rightRailCollapsed; persistRightRailCollapsed(rightRailCollapsed); }, exportCsv: exportCSV, exportStep: exportSTEP }); const unsub2 = mountSurfaceViewportInteraction({ viewportEl, svgEl, getSelectionMode: () => selectionMode, getZoomK: () => zoomK, setZoomK: (v) => { zoomK = v; }, getPan: () => pan, setPan: (v) => { pan = v; }, getRot: () => rot, setRot: (v) => { rot = v; }, getW: () => w, getH: () => h, setW: (v) => { w = v; }, setH: (v) => { h = v; }, getRotateAnchor: () => rotateAnchor, setRotateAnchor: (v) => { rotateAnchor = v; }, pickOrbitPivot: (mx, my) => { const np = nearestPointIndex(projected, mx, my, 18); if (np != null && projected[np] && Math.hypot(projected[np].x - mx, projected[np].y - my) < 20) return points[np]; return points[0] ?? { x: 0, y: 0, z: 0 }; }, rotateForView: (p, r) => rotateForViewUi(p, r) }); return () => { unsub1(); unsub2(); }; } registerContextMenu(buildSurfaceNavMenu({ canUndo, canRedo, coreMode, rightRailCollapsed })); });
 </script>
 <div class="space-y-6 surface-lab surface-reveal" style={`--surface-motion-ease:${SURFACE_MOTION_SPEC.easing};`}>
   <div class="flex items-center justify-between">

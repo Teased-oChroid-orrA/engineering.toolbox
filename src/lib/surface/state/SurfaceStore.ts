@@ -23,7 +23,7 @@ export function cloneCurves(cs: Curve[]) {
 }
 
 export function cloneSurfaces(ss: SurfaceFace[]) {
-  return ss.map((s) => ({ name: s.name, pts: [...s.pts] }));
+  return ss.map((s) => ({ name: s.name, pts: [...s.pts], vertexIds: [...s.vertexIds] }));
 }
 
 export function cloneCsys(cs: DatumCsys[]) {

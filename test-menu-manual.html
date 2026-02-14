@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Inspector Menu Test Instructions</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        h1 { color: #4ade80; }
+        h2 { color: #60a5fa; margin-top: 30px; }
+        .step {
+            background: #2a2a2a;
+            border-left: 4px solid #4ade80;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        code {
+            background: #3a3a3a;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #fbbf24;
+        }
+        .expected {
+            background: #1e3a5f;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+        }
+        .checklist {
+            list-style: none;
+            padding-left: 0;
+        }
+        .checklist li {
+            padding: 5px 0;
+        }
+        .checklist li:before {
+            content: "☐ ";
+            color: #4ade80;
+            font-weight: bold;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Inspector Menu Testing Instructions</h1>
+    
+    <p><strong>Dev Server URL:</strong> <code>http://127.0.0.1:5173/#/inspector</code></p>
+    
+    <h2>Step 1: Open Inspector and Locate Menu</h2>
+    <div class="step">
+        <ol>
+            <li>Open browser to <code>http://127.0.0.1:5173/#/inspector</code></li>
+            <li>Look at the top-right corner of the page for a debug box showing:
+                <div class="expected">
+                    DEBUG: activeToolMenu=<span style="color: #4ade80;">YES</span> scope=inspector
+                </div>
+            </li>
+            <li>Find the blue button with yellow border that says "<strong>Inspector ▾</strong>"</li>
+            <li>Open browser DevTools (F12) and switch to Console tab</li>
+        </ol>
+    </div>
+
+    <h2>Step 2: Test Menu Opens</h2>
+    <div class="step">
+        <ol>
+            <li>Click the <strong>Inspector ▾</strong> button</li>
+            <li>Verify menu panel appears below the button</li>
+            <li>Check console logs for:
+                <div class="expected">
+                    [MENU DEBUG] Button clicked!
+                </div>
+            </li>
+        </ol>
+    </div>
+
+    <h2>Step 3: Test Upload CSV (Fallback)</h2>
+    <div class="step">
+        <ol>
+            <li>In the menu, click "<strong>📤 Upload...</strong>"</li>
+            <li>Check console logs should show:
+                <div class="expected">
+                    [MENU ACTION] Event received, detail: { scope: 'inspector', id: 'load_fallback' }<br>
+                    [MENU ACTION] Processing inspector action: load_fallback<br>
+                    [MENU ACTION] Calling openFallbackLoadFromMenu<br>
+                    [MENU] openFallbackLoadFromMenu called<br>
+                    [MENU] hiddenUploadInput: &lt;input class="hidden" type="file"...&gt;<br>
+                    [MENU] Triggering click...
+                </div>
+            </li>
+            <li>Native file browser should open</li>
+            <li>Select a CSV file (create test file if needed)</li>
+            <li>Verify file loads and green debug box updates with headers, row count</li>
+        </ol>
+    </div>
+
+    <h2>Step 4: Test Other Menu Items</h2>
+    <div class="step">
+        <p>Test each menu item and note which work:</p>
+        <ul class="checklist">
+            <li><strong>Data</strong>
+                <ul>
+                    <li>📂 Load File... (requires Tauri)</li>
+                    <li>📤 Upload...</li>
+                </ul>
+            </li>
+            <li><strong>Analysis</strong>
+                <ul>
+                    <li>📊 Schema Inspector</li>
+                    <li>⚡ Recipes</li>
+                    <li>🔢 Columns</li>
+                    <li>⌨️ Shortcuts</li>
+                </ul>
+            </li>
+            <li><strong>Filter Tools</strong>
+                <ul>
+                    <li>🔧 Advanced Builder (needs data loaded)</li>
+                    <li>🗑️ Clear Filters (needs data loaded)</li>
+                </ul>
+            </li>
+            <li><strong>Export</strong>
+                <ul>
+                    <li>💾 Current View (needs data loaded)</li>
+                    <li>📋 Filtered Rows (needs data loaded)</li>
+                    <li>📦 Analysis Bundle (needs data loaded)</li>
+                </ul>
+            </li>
+            <li><strong>Settings</strong>
+                <ul>
+                    <li>🔄 Refresh Schema (needs data loaded)</li>
+                    <li>Regex Help (toggle)</li>
+                    <li>Quiet Logs (toggle)</li>
+                    <li>Auto-restore (toggle)</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <h2>Expected Issues to Report</h2>
+    <div class="step">
+        <p>If you encounter any of these, note them:</p>
+        <ul>
+            <li>Menu doesn't appear at all</li>
+            <li>Menu button not visible</li>
+            <li>File browser doesn't open on Upload click</li>
+            <li>Console shows <code>hiddenUploadInput: null</code> or <code>undefined</code></li>
+            <li>Modals don't open when clicked</li>
+            <li>Toggle states don't update</li>
+            <li>Export actions fail or do nothing</li>
+        </ul>
+    </div>
+
+    <h2>Key Debug Info to Capture</h2>
+    <div class="step">
+        <ol>
+            <li>Screenshot of the page showing the menu button</li>
+            <li>Screenshot of the opened menu</li>
+            <li>Console logs when clicking Upload</li>
+            <li>Value of <code>hiddenUploadInput</code> in logs</li>
+            <li>Whether file browser opened</li>
+        </ol>
+    </div>
+
+    <p style="margin-top: 40px; padding: 20px; background: #2a2a2a; border-radius: 8px;">
+        <strong>Note:</strong> The fix changed <code>hiddenUploadInput</code> from a reactive <code>$state</code> variable 
+        to a regular <code>let</code> variable because Svelte's <code>bind:this</code> doesn't work with reactive state. 
+        This test verifies the fix works correctly.
+    </p>
+</body>
+</html>

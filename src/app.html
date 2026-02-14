@@ -28,12 +28,14 @@
         RO.prototype.observe = function (target, options) {
           const stack = new Error("ResizeObserver.observe called here").stack;
           try {
-            target.__roStack = stack;
-            target.__roTag = (target.tagName || "").toLowerCase();
-            target.__roClass = target.className || "";
+            if (target && typeof target === "object") {
+              target.__roStack = stack;
+              target.__roTag = (target.tagName || "").toLowerCase();
+              target.__roClass = target.className || "";
+            }
           } catch {}
 
-          if (!target.__roLogged) {
+          if (target && typeof target === "object" && !target.__roLogged) {
             target.__roLogged = true;
             console.groupCollapsed("[RO] observe", target);
             console.log("tag:", target.__roTag, "class:", target.__roClass);

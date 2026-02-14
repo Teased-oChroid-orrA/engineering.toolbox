@@ -56,8 +56,6 @@
   export let onOpenHelp: () => void = () => {};
   export let onOpenGenerator: () => void = () => {};
   export let onOpenRecipes: () => void = () => {};
-  export let onOpenStreamLoad: () => Promise<void> | void = () => {};
-  export let onOpenFallbackLoad: () => void = () => {};
   export let onMultiQueryEnabledChange: (enabled: boolean) => void = () => {};
   export let onMultiQueryExpandedChange: (expanded: boolean) => void = () => {};
   export let onAddMultiQueryClause: () => void = () => {};
@@ -72,17 +70,9 @@
 <div class="order-35">
   <details class="glass-panel rounded-2xl border border-white/10 bg-white/[0.03] inspector-pop-sub inspector-depth-0 p-2" open>
     <summary class="cursor-pointer list-none px-2 py-1 text-[11px] uppercase tracking-widest text-white/60">
-      Advanced Controls
+      Query & Filter Controls
     </summary>
     <div class="mt-2">
-      <div class="mb-2 flex flex-wrap items-center gap-2 px-1">
-        <button class="btn btn-xs variant-soft" onclick={() => void onOpenStreamLoad()} disabled={!canOpenPath}>
-          Load CSV (Native)
-        </button>
-        <button class="btn btn-xs variant-soft" onclick={onOpenFallbackLoad}>
-          Upload CSV
-        </button>
-      </div>
       <InspectorTopControls
         {topControlSpans}
         {headerMode}

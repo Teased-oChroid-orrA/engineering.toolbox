@@ -160,6 +160,8 @@
 
 <div class={listClass} role="list" aria-label="Reorderable list">
   {#each items as item (item.id)}
+    <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <div
       animate:flip={{ duration: flipDurationMs }}
       role="listitem"

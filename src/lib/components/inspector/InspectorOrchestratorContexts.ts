@@ -420,6 +420,7 @@ export function loadControllerCtx(state: {
 export function gridControllerCtx(state: {
   invoke: any;
   recordPerf: any;
+  loadState: any;  // Added: Pass loadState by reference
   hasLoaded: boolean;
   sliceGate: any;
   startIdx: number;
@@ -447,6 +448,7 @@ export function gridControllerCtx(state: {
   return {
     invoke: state.invoke,
     recordPerf: state.recordPerf,
+    loadState: state.loadState,  // Added: Return loadState by reference
     get hasLoaded() { return state.hasLoaded; },
     get sliceGate() { return state.sliceGate; },
     get startIdx() { return state.startIdx; },

@@ -2,6 +2,9 @@ export type SurfaceWorkspaceUiState = {
   coreMode: boolean;
   advancedOpen: boolean;
   rightRailCollapsed?: boolean;
+  zoomK?: number;
+  pan?: { x: number; y: number };
+  rot?: { alpha: number; beta: number };
 };
 
 const CORE_MODE_KEY = 'sc.surface.coreMode';

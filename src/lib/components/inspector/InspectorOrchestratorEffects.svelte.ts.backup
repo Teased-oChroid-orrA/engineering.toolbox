@@ -1,0 +1,324 @@
+/**
+ * InspectorOrchestratorEffects.svelte.ts
+ * 
+ * Extracted $effect blocks from InspectorOrchestrator.svelte for better organization.
+ * Each function wraps a single $effect and accepts its dependencies/callbacks as parameters.
+ */
+
+import type { RecipeState } from '$lib/components/inspector/InspectorOrchestratorDeps';
+import { invoke } from '@tauri-apps/api/core';
+
+export type NumericFilter = {
+  enabled: boolean;
+  colIdx: number | null;
+  minText: string;
+  maxText: string;
+};
+
+export type DateFilter = {
+  enabled: boolean;
+  colIdx: number | null;
+  minIso: string;
+  maxIso: string;
+};
+
+export type CategoryFilter = {
+  enabled: boolean;
+  colIdx: number | null;
+  selected: Set<string> | null;
+};
+
+// ========================= Effect 1: showDataControls =========================
+export function setupShowDataControlsEffect(deps: {
+  hasLoadedDatasetSignals: (params: {
+    hasLoaded: boolean;
+    loadedDatasetsLength: number;
+    activeDatasetId: string;
+    datasetId: string;
+    headersLength: number;
+    totalRowCount: number;
+  }) => boolean;
+  hasLoaded: () => boolean;
+  loadedDatasetsLength: () => number;
+  activeDatasetId: () => string | null;
+  datasetId: () => string;
+  headersLength: () => number;
+  totalRowCount: () => number;
+}, setShowDataControls: (value: boolean) => void) {
+  $effect(() => {
+    const hasSignals = deps.hasLoadedDatasetSignals({
+      hasLoaded: deps.hasLoaded(),
+      loadedDatasetsLength: deps.loadedDatasetsLength(),
+      activeDatasetId: deps.activeDatasetId() ?? '',
+      datasetId: deps.datasetId(),
+      headersLength: deps.headersLength(),
+      totalRowCount: deps.totalRowCount()
+    });
+    setShowDataControls(hasSignals);
+  });
+}
+
+// ========================= Effect 2: scheduleSliceFetch =========================
+export function setupSliceFetchEffect(deps: {
+  hasLoaded: () => boolean;
+  suspendReactiveFiltering: () => boolean;
+  isMergedView: () => boolean;
+  startIdx: () => number;
+  endIdx: () => number;
+  totalFilteredCount: () => number;
+  visibleColIdxsLength: () => number;
+}, callbacks: {
+  scheduleSliceFetch: () => void;
+}) {
+  $effect(() => {
+    if (!deps.hasLoaded() || deps.suspendReactiveFiltering()) return;
+    if (deps.isMergedView()) return;
+    deps.startIdx(); 
+    deps.endIdx(); 
+    deps.totalFilteredCount(); 
+    deps.visibleColIdxsLength();
+    callbacks.scheduleSliceFetch();
+  });
+}
+
+// ========================= Effect 3: reactive filter (scheduleFilter) =========================
+export function setupReactiveFilterEffect(deps: {
+  hasLoaded: () => boolean;
+  suspendReactiveFiltering: () => boolean;
+  queryScope: () => string;
+  query: () => string;
+  matchMode: () => string;
+  targetColIdx: () => number | null;
+  maxRowsScanText: () => string;
+  numericF: () => NumericFilter;
+  dateF: () => DateFilter;
+  catF: () => CategoryFilter;
+}, callbacks: {
+  scheduleFilter: (source?: string) => void;
+}) {
+  $effect(() => {
+    if (!deps.hasLoaded() || deps.suspendReactiveFiltering() || deps.queryScope() !== 'current') return;
+    deps.query(); 
+    deps.matchMode(); 
+    deps.targetColIdx(); 
+    deps.maxRowsScanText();
+    const nf = deps.numericF();
+    nf.enabled; nf.colIdx; nf.minText; nf.maxText;
+    const df = deps.dateF();
+    df.enabled; df.colIdx; df.minIso; df.maxIso;
+    const cf = deps.catF();
+    cf.enabled; cf.colIdx; (cf.selected?.size ?? 0);
+    callbacks.scheduleFilter('reactive-input');
+  });
+}
+
+// ========================= Effect 4: cross-query effect (scheduleCrossQuery) =========================
+export function setupCrossQueryEffect(deps: {
+  hasLoaded: () => boolean;
+  queryScope: () => string;
+  loadedDatasets: () => Array<{ id: string }>;
+  query: () => string;
+  matchMode: () => string;
+  targetColIdx: () => number | null;
+  maxRowsScanText: () => string;
+  numericF: () => NumericFilter;
+  dateF: () => DateFilter;
+  catF: () => CategoryFilter;
+  multiQueryEnabled: () => boolean;
+  multiQueryClauses: () => Array<any>;
+  lastCrossReactiveSig: () => string;
+}, callbacks: {
+  scheduleCrossQuery: (source?: string) => void;
+  setLastCrossReactiveSig: (sig: string) => void;
+}) {
+  $effect(() => {
+    if (!deps.hasLoaded() || deps.queryScope() === 'current') return;
+
+    const cf = deps.catF();
+    const catSelected = [...(cf.selected ?? new Set())].sort();
+    const dsSig = (deps.loadedDatasets() ?? []).map((d) => d.id).sort().join('|');
+    const nf = deps.numericF();
+    const df = deps.dateF();
+    const sig = JSON.stringify({
+      scope: deps.queryScope(),
+      dsSig,
+      q: deps.query() ?? '',
+      mm: deps.matchMode(),
+      tc: deps.targetColIdx(),
+      mrs: deps.maxRowsScanText() ?? '',
+      n: {
+        e: nf.enabled,
+        c: nf.colIdx,
+        min: nf.minText ?? '',
+        max: nf.maxText ?? ''
+      },
+      d: {
+        e: df.enabled,
+        c: df.colIdx,
+        min: df.minIso ?? '',
+        max: df.maxIso ?? ''
+      },
+      c: {
+        e: cf.enabled,
+        c: cf.colIdx,
+        s: catSelected
+      }
+    });
+    if (sig === deps.lastCrossReactiveSig()) return;
+    callbacks.setLastCrossReactiveSig(sig);
+    callbacks.scheduleCrossQuery('reactive-cross-input');
+  });
+}
+
+// ========================= Effect 5: persist state effect =========================
+export function setupPersistStateEffect(deps: {
+  hasLoaded: () => boolean;
+  datasetId: () => string | null;
+  query: () => string;
+  matchMode: () => string;
+  targetColIdx: () => number | null;
+  maxRowsScanText: () => string;
+  numericF: () => NumericFilter;
+  dateF: () => DateFilter;
+  catF: () => CategoryFilter;
+  sortColIdx: () => number | null;
+  sortDir: () => string;
+  sortSpecs: () => Array<any>;
+  visibleColumns: () => Set<number> | null;
+  pinnedLeft: () => number[];
+  pinnedRight: () => number[];
+  hiddenColumns: () => number[];
+  columnWidths: () => Record<number, number>;
+  captureState: () => RecipeState;
+}, callbacks: {
+  persistLastStateForDataset: (datasetId: string, state: RecipeState) => void;
+}) {
+  $effect(() => {
+    if (!deps.hasLoaded() || !deps.datasetId()) return;
+    // dependencies
+    deps.query(); 
+    deps.matchMode(); 
+    deps.targetColIdx(); 
+    deps.maxRowsScanText();
+    const nf = deps.numericF();
+    nf.enabled; nf.colIdx; nf.minText; nf.maxText;
+    const df = deps.dateF();
+    df.enabled; df.colIdx; df.minIso; df.maxIso;
+    const cf = deps.catF();
+    cf.enabled; cf.colIdx; (cf.selected?.size ?? 0);
+    deps.sortColIdx(); 
+    deps.sortDir(); 
+    deps.sortSpecs(); 
+    deps.visibleColumns();
+    deps.pinnedLeft(); 
+    deps.pinnedRight(); 
+    deps.hiddenColumns(); 
+    deps.columnWidths();
+    const st = deps.captureState();
+    callbacks.persistLastStateForDataset(deps.datasetId()!, st);
+  });
+}
+
+// ========================= Effect 6: uiAnimDur effect =========================
+export function setupUiAnimDurEffect(deps: {
+  prefersReducedMotion: () => boolean;
+  crossQueryBusy: () => boolean;
+  totalFilteredCount: () => number;
+}, setUiAnimDur: (value: number) => void) {
+  $effect(() => {
+    deps.prefersReducedMotion();
+    deps.crossQueryBusy();
+    deps.totalFilteredCount();
+    if (deps.prefersReducedMotion()) {
+      setUiAnimDur(0);
+      return;
+    }
+    if (deps.crossQueryBusy() || deps.totalFilteredCount() > 200_000) {
+      setUiAnimDur(90);
+      return;
+    }
+    if (deps.totalFilteredCount() > 50_000) {
+      setUiAnimDur(120);
+      return;
+    }
+    if (deps.totalFilteredCount() > 10_000) {
+      setUiAnimDur(145);
+      return;
+    }
+    setUiAnimDur(170);
+  });
+}
+
+// ========================= Effect 7: quietBackendLogs effect =========================
+export function setupQuietBackendLogsEffect(deps: {
+  quietBackendLogs: () => boolean;
+}) {
+  $effect(() => {
+    const quiet = deps.quietBackendLogs();
+    void invoke('inspector_set_quiet_logs', { quiet: !!quiet }).catch(() => {});
+  });
+}
+
+// ========================= Effect 8: context menu registration effect =========================
+export function setupContextMenuEffect(deps: {
+  buildInspectorContextMenu: (params: {
+    canOpenPath: boolean;
+    hasLoaded: boolean;
+    schemaLoading: boolean;
+    showRegexHelp: boolean;
+    quietBackendLogs: boolean;
+    autoRestoreEnabled: boolean;
+  }) => any;
+  canOpenPath: () => boolean;
+  hasLoaded: () => boolean;
+  schemaLoading: () => boolean;
+  showRegexHelp: () => boolean;
+  quietBackendLogs: () => boolean;
+  autoRestoreEnabled: () => boolean;
+}, callbacks: {
+  registerContextMenu: (menu: any) => void;
+}) {
+  $effect(() => {
+    const menu = deps.buildInspectorContextMenu({
+      canOpenPath: deps.canOpenPath(),
+      hasLoaded: deps.hasLoaded(),
+      schemaLoading: deps.schemaLoading(),
+      showRegexHelp: deps.showRegexHelp(),
+      quietBackendLogs: deps.quietBackendLogs(),
+      autoRestoreEnabled: deps.autoRestoreEnabled()
+    });
+    console.log('[MENU DEBUG] Inspector menu built:', menu);
+    console.log('[MENU DEBUG] Calling registerContextMenu...');
+    callbacks.registerContextMenu(menu);
+  });
+}
+
+// ========================= Effect 9: category column change effect =========================
+export function setupCategoryColumnChangeEffect(deps: {
+  hasLoaded: () => boolean;
+  catFColIdx: () => number | null;
+}, callbacks: {
+  scheduleFetchCategory: (reset: boolean) => void;
+}) {
+  $effect(() => {
+    if (!deps.hasLoaded()) return;
+    // When column changes, reset paging.
+    deps.catFColIdx();
+    callbacks.scheduleFetchCategory(true);
+  });
+}
+
+// ========================= Effect 10: category search effect =========================
+export function setupCategorySearchEffect(deps: {
+  hasLoaded: () => boolean;
+  catAvailSearch: () => string;
+}, callbacks: {
+  scheduleFetchCategory: (reset: boolean) => void;
+}) {
+  $effect(() => {
+    if (!deps.hasLoaded()) return;
+    // Search within available values should reset paging.
+    deps.catAvailSearch();
+    callbacks.scheduleFetchCategory(true);
+  });
+}

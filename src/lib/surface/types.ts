@@ -1,7 +1,7 @@
 export type Point3D = { x: number; y: number; z: number };
 export type Edge = [number, number];
 export type Curve = { name: string; pts: number[] };
-export type SurfaceFace = { name: string; pts: number[] };
+export type SurfaceFace = { name: string; pts: number[]; vertexIds: number[] };
 
 export type DatumCsys = {
   name: string;

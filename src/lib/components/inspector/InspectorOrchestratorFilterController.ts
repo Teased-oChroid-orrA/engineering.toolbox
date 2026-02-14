@@ -105,11 +105,11 @@ export async function runFilterPass(ctx: any) {
     const count = await applyFilterSpec(ctx, spec);
 
     if (!ctx.filterGate.isLatest(token)) return;
-    ctx.totalFilteredCount = count;
+    ctx.loadState.totalFilteredCount = count;
     ctx.recordPerf('filter', t0, {
       reason: ctx.filterLastReason,
-      filteredRows: ctx.totalFilteredCount,
-      totalRows: ctx.totalRowCount,
+      filteredRows: ctx.loadState.totalFilteredCount,
+      totalRows: ctx.loadState.totalRowCount,
       visibleCols: ctx.visibleColIdxs.length
     });
 
@@ -175,11 +175,11 @@ export function onQueryScopeChange(ctx: any) {
   if (ctx.queryScope === 'current') {
     ctx.lastCrossReactiveSig = '';
     ctx.crossQueryResults = [];
-    ctx.isMergedView = false;
-    if (ctx.preMergedHeaders.length > 0) ctx.headers = [...ctx.preMergedHeaders];
-    if (ctx.preMergedColTypes.length > 0) ctx.colTypes = [...ctx.preMergedColTypes];
-    if (ctx.preMergedTotalRowCount > 0) ctx.totalRowCount = ctx.preMergedTotalRowCount;
-    ctx.totalFilteredCount = ctx.preMergedTotalFilteredCount > 0 ? ctx.preMergedTotalFilteredCount : ctx.totalFilteredCount;
+    ctx.loadState.isMergedView = false;
+    if (ctx.preMergedHeaders.length > 0) ctx.loadState.headers = [...ctx.preMergedHeaders];
+    if (ctx.preMergedColTypes.length > 0) ctx.loadState.colTypes = [...ctx.preMergedColTypes];
+    if (ctx.preMergedTotalRowCount > 0) ctx.loadState.totalRowCount = ctx.preMergedTotalRowCount;
+    ctx.loadState.totalFilteredCount = ctx.preMergedTotalFilteredCount > 0 ? ctx.preMergedTotalFilteredCount : ctx.loadState.totalFilteredCount;
     void runFilterNow(ctx, true);
     return;
   }

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Inspector Menu Test</title>
+  <script>
+    // Navigate to Inspector and check console
+    setTimeout(() => {
+      console.log('========================================');
+      console.log('INSPECTOR MENU DIAGNOSTIC TEST');
+      console.log('========================================');
+      console.log('Current URL:', window.location.href);
+      console.log('Path:', window.location.pathname);
+      console.log('');
+      
+      // Check registry
+      console.log('Context Menu Registry:', window.__scContextMenuRegistry__);
+      console.log('');
+      
+      // Navigate to inspector
+      if (!window.location.pathname.includes('/inspector')) {
+        console.log('Navigating to /inspector...');
+        window.location.href = '/inspector';
+      } else {
+        console.log('Already on /inspector route');
+        
+        // Wait a bit and check again
+        setTimeout(() => {
+          console.log('');
+          console.log('After mount check:');
+          console.log('Registry:', window.__scContextMenuRegistry__);
+          
+          // Look for menu button
+          const menuButton = document.querySelector('[data-menu-button="inspector"]');
+          console.log('Menu button found:', !!menuButton);
+          
+          if (menuButton) {
+            console.log('Menu button HTML:', menuButton.outerHTML);
+          } else {
+            console.log('Searching for any menu buttons...');
+            const allButtons = document.querySelectorAll('button');
+            console.log('Total buttons on page:', allButtons.length);
+            allButtons.forEach((btn, idx) => {
+              if (btn.textContent?.toLowerCase().includes('inspector') || 
+                  btn.textContent?.toLowerCase().includes('menu')) {
+                console.log(`  Button ${idx}:`, btn.textContent, btn.outerHTML.substring(0, 100));
+              }
+            });
+          }
+        }, 2000);
+      }
+    }, 1000);
+  </script>
+</head>
+<body>
+  <h1>Testing Inspector Menu...</h1>
+  <p>Check browser console for diagnostic information</p>
+</body>
+</html>

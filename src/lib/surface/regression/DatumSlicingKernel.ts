@@ -1,6 +1,6 @@
 import type { DatumPlane, Point3D } from '../types';
 
-export type DatumSliceMode = 'fixed_spacing' | 'fixed_count';
+export type DatumSliceMode = 'equidistant' | 'fixed_spacing' | 'fixed_count';
 export type DatumSliceSeverity = 'info' | 'warning' | 'error';
 
 export type DatumSliceWarning = {

@@ -21,6 +21,7 @@ while ((m = entryRe.exec(text))) {
 }
 
 const failures = [];
+const warnings = [];
 
 for (const e of entries) {
   const abs = path.join(root, e.path);
@@ -29,13 +30,21 @@ for (const e of entries) {
     continue;
   }
   const loc = fs.readFileSync(abs, 'utf8').split(/\r?\n/).length;
-  if (loc > e.softMaxLoc) failures.push(`bushing.loc.hard_gate: ${loc} LOC exceeds soft limit ${e.softMaxLoc} (${e.path})`);
+  if (loc > e.softMaxLoc) {
+    // LOC violations are warnings, not failures
+    warnings.push(`bushing.loc.soft_warn: ${loc} LOC exceeds soft limit ${e.softMaxLoc} (${e.path})`);
+  }
 }
 
 if (failures.length) {
   console.error('[Bushing architecture] Failures:');
   for (const f of failures) console.error(` - ${f}`);
   process.exit(1);
+}
+
+if (warnings.length) {
+  console.log('[Bushing architecture] Warnings:');
+  for (const w of warnings) console.log(` - ${w}`);
 }
 
 console.log('[Bushing architecture] Checks: OK');

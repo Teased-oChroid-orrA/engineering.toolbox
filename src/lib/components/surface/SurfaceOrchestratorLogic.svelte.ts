@@ -512,7 +512,7 @@ export function offsetSurface(params: OffsetSurfaceParams): OffsetSurfaceResult 
   
   return {
     newPoints,
-    newSurface: { name: `Surface ${surfaces.length + 1}`, pts: newPts }
+    newSurface: { name: `Surface ${surfaces.length + 1}`, pts: newPts, vertexIds: newPts }
   };
 }
 
@@ -677,7 +677,7 @@ export function extrudeLineOrCurve(params: ExtrudeLineOrCurveParams): ExtrudeRes
     const c = topIdx[i + 1];
     const d = topIdx[i];
     
-    newSurfaces.push({ name: `Surface ${surfaces.length + newSurfaces.length + 1}`, pts: [a, b0, c, d] });
+    newSurfaces.push({ name: `Surface ${surfaces.length + newSurfaces.length + 1}`, pts: [a, b0, c, d], vertexIds: [a, b0, c, d] });
     
     if (!edgeExists(edges, a, b0)) newEdges.push([a, b0]);
     if (!edgeExists(edges, b0, c)) newEdges.push([b0, c]);
@@ -1146,4 +1146,56 @@ export function rebuildLoftSegments(params: RebuildLoftSegmentsParams): RebuildL
     error: out.error,
     segments: out.segments
   };
+}
+
+// Stub: handlePointClick
+export interface HandlePointClickResult {
+  pendingPointIdx: number | null;
+  creatorPick: any;
+  surfaceDraft: number[];
+  datumPick: any;
+  lineInsertPickMode: boolean;
+  createLineA?: number | null;
+  createLineB?: number | null;
+}
+
+export function handlePointClick(
+  idx: number,
+  ev: PointerEvent,
+  creatorPick: any,
+  surfaceDraft: number[],
+  datumPick: any,
+  lineInsertPickMode: boolean,
+  createLineA: number | null,
+  createLineB: number | null,
+  points: Point3D[],
+  csys: DatumCsys[],
+  edges: Edge[],
+  curves: Curve[]
+): HandlePointClickResult {
+  return {
+    pendingPointIdx: null,
+    creatorPick,
+    surfaceDraft,
+    datumPick,
+    lineInsertPickMode
+  };
+}
+
+// Stub: convertEdgeToCurve
+export interface ConvertEdgeToCurveParams {
+  edgeIdx: number;
+  edges: Edge[];
+  curves: Curve[];
+  points: Point3D[];
+}
+
+export interface ConvertEdgeToCurveResult {
+  success: boolean;
+  error?: string;
+  curves?: Curve[];
+}
+
+export function convertEdgeToCurve(params: ConvertEdgeToCurveParams): ConvertEdgeToCurveResult {
+  return { success: false, error: 'Not implemented' };
 }
