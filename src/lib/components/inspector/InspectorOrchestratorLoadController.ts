@@ -1,8 +1,9 @@
 import { devLog } from '$lib/utils/devLog';
 import { MAX_BROWSER_MODE_ROWS } from '$lib/components/inspector/InspectorGridConstants';
+import type { LoadControllerContext } from './InspectorControllerContext';
 
 export async function loadCsvFromText(
-  ctx: any,
+  ctx: LoadControllerContext,
   text: string,
   hasHeadersOverride?: boolean,
   trackWorkspace = true,
@@ -136,7 +137,7 @@ export async function loadCsvFromText(
 }
 
 export async function loadCsvFromPath(
-  ctx: any,
+  ctx: LoadControllerContext,
   path: string,
   hasHeadersOverride?: boolean,
   trackWorkspace = true,
@@ -228,12 +229,12 @@ export async function loadCsvFromPath(
   }
 }
 
-export function upsertWorkspaceDataset(ctx: any, ds: any) {
+export function upsertWorkspaceDataset(ctx: LoadControllerContext, ds: any) {
   ctx.loadedDatasets = ctx.upsertWorkspaceDatasetInList(ctx.loadedDatasets, ds);
   ctx.activeDatasetId = ds.id;
 }
 
-export async function unloadWorkspaceDataset(ctx: any, id: string) {
+export async function unloadWorkspaceDataset(ctx: LoadControllerContext, id: string) {
   const remaining = (ctx.loadedDatasets ?? []).filter((x: any) => x.id !== id);
   ctx.loadedDatasets = remaining;
   ctx.crossQueryResults = ctx.crossQueryResults.filter((x: any) => x.datasetId !== id);
@@ -256,7 +257,7 @@ export async function unloadWorkspaceDataset(ctx: any, id: string) {
   await ctx.activateWorkspaceDataset(remaining[0].id);
 }
 
-export async function openStreamLoadFromMenu(ctx: any) {
+export async function openStreamLoadFromMenu(ctx: LoadControllerContext) {
   if (!ctx.dialogMod) {
     // In web/fallback environments, native dialog may be unavailable.
     // Route to hidden file input instead of silently no-op.
@@ -279,11 +280,11 @@ export async function openStreamLoadFromMenu(ctx: any) {
   }
 }
 
-export function openFallbackLoadFromMenu(ctx: any) {
+export function openFallbackLoadFromMenu(ctx: LoadControllerContext) {
   ctx.hiddenUploadInput?.click();
 }
 
-export async function activateWorkspaceDataset(ctx: any, datasetIdToActivate: string, internal = false) {
+export async function activateWorkspaceDataset(ctx: LoadControllerContext, datasetIdToActivate: string, internal = false) {
   const ds = (ctx.loadedDatasets ?? []).find((x: any) => x.id === datasetIdToActivate);
   if (!ds) return;
   ctx.suspendReactiveFiltering = true;
@@ -303,7 +304,7 @@ export async function activateWorkspaceDataset(ctx: any, datasetIdToActivate: st
   }
 }
 
-export async function runCrossDatasetQuery(ctx: any) {
+export async function runCrossDatasetQuery(ctx: LoadControllerContext) {
   if (ctx.crossQueryBusy || ctx.loadedDatasets.length <= 1 || !ctx.hasLoaded) return;
   const spec = ctx.buildFilterSpec();
   if (!spec) return;
