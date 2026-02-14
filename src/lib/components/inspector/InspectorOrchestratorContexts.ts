@@ -475,11 +475,16 @@ export function gridControllerCtx(state: {
   visibleColumns: Set<number>;
   columnPickerNotice: string | null;
   showColumnPicker: boolean;
-  hiddenColumns: Set<number>;
-  pinnedLeft: Set<number>;
-  pinnedRight: Set<number>;
+  hiddenColumns: number[];
+  pinnedLeft: number[];
+  pinnedRight: number[];
   columnWidths: Record<number, number>;
 }) {
+  // Convert arrays to Sets for GridController (GridController uses Set operations internally)
+  const hiddenColumnsSet = new Set(state.hiddenColumns);
+  const pinnedLeftSet = new Set(state.pinnedLeft);
+  const pinnedRightSet = new Set(state.pinnedRight);
+  
   return {
     invoke: state.invoke,
     recordPerf: state.recordPerf,
@@ -514,12 +519,18 @@ export function gridControllerCtx(state: {
     set columnPickerNotice(v: string | null) { state.columnPickerNotice = v; },
     get showColumnPicker() { return state.showColumnPicker; },
     set showColumnPicker(v: boolean) { state.showColumnPicker = v; },
-    get hiddenColumns() { return state.hiddenColumns; },
-    set hiddenColumns(v: Set<number>) { state.hiddenColumns = v; },
-    get pinnedLeft() { return state.pinnedLeft; },
-    set pinnedLeft(v: Set<number>) { state.pinnedLeft = v; },
-    get pinnedRight() { return state.pinnedRight; },
-    set pinnedRight(v: Set<number>) { state.pinnedRight = v; },
+    get hiddenColumns() { return hiddenColumnsSet; },
+    set hiddenColumns(v: Set<number>) { 
+      state.hiddenColumns = Array.from(v);
+    },
+    get pinnedLeft() { return pinnedLeftSet; },
+    set pinnedLeft(v: Set<number>) { 
+      state.pinnedLeft = Array.from(v);
+    },
+    get pinnedRight() { return pinnedRightSet; },
+    set pinnedRight(v: Set<number>) { 
+      state.pinnedRight = Array.from(v);
+    },
     get columnWidths() { return state.columnWidths; },
     set columnWidths(v: Record<number, number>) { state.columnWidths = v; }
   };

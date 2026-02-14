@@ -336,9 +336,9 @@
       out[sortSpecs[i].colIdx] = i;
     return out;
   });
-  let pinnedLeft = $state<Set<number>>(new Set());
-  let pinnedRight = $state<Set<number>>(new Set());
-  let hiddenColumns = $state<Set<number>>(new Set());
+  let pinnedLeft = $state<number[]>([]);
+  let pinnedRight = $state<number[]>([]);
+  let hiddenColumns = $state<number[]>([]);
   let columnWidths = $state<Record<number, number>>({});
   let showShortcuts = $state(false);
   let quietBackendLogs = $state(true);
@@ -1621,10 +1621,6 @@
     }}
     onOpenGenerator={() => openRegexGeneratorModal(modalUiCtx())}
     onOpenRecipes={() => openRecipesModal(modalUiCtx())}
-    onOpenStreamLoad={async () =>
-      await openStreamLoadFromMenuController(loadControllerCtx())}
-    onOpenFallbackLoad={() =>
-      openFallbackLoadFromMenuController(loadControllerCtx())}
     {onMultiQueryEnabledChange}
     {onMultiQueryExpandedChange}
     {onAddMultiQueryClause}
