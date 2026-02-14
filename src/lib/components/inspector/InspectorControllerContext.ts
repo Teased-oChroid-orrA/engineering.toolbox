@@ -213,10 +213,10 @@ export interface InspectorControllerContext {
   // Helper functions
   fnv1a32: (str: string) => number;
   heuristicHasHeaders: (first: string[], second: string[]) => { value: boolean; decided: boolean; reason: string };
-  computeDatasetIdentity: (headers: string[], text: string) => string;
-  upsertWorkspaceDatasetInList: (ds: WorkspaceDataset) => void;
-  loadRecipesForDataset: (datasetId: string) => Promise<void>;
-  loadLastStateForDataset: (datasetId: string) => Promise<void>;
+  computeDatasetIdentity: (source: string, hdrs: string[], rowCount: number, hashFn: (s: string) => number) => { id: string; label: string };
+  upsertWorkspaceDatasetInList: (list: WorkspaceDataset[], ds: WorkspaceDataset) => WorkspaceDataset[];
+  loadRecipesForDataset: (datasetId: string) => Promise<Recipe[]>;
+  loadLastStateForDataset: (datasetId: string) => Promise<any>;
   applyState: (state: any) => void;
 
   // ============================================================================
@@ -281,7 +281,7 @@ export type FilterControllerContext = Pick<
   | 'runCrossDatasetQuery'
 >;
 
-export type LoadControllerContext = Pick<
+export type LoadControllerContext = Omit<Pick<
   InspectorControllerContext,
   | 'loadState'
   | 'isLoading'
@@ -315,17 +315,14 @@ export type LoadControllerContext = Pick<
   | 'preMergedHeaders'
   | 'preMergedTotalRowCount'
   | 'preMergedTotalFilteredCount'
+  | 'preMergedColTypes'
   | 'hasHeaders'
   | 'headerMode'
   | 'pendingText'
   | 'pendingPath'
   | 'showHeaderPrompt'
   | 'headerHeuristicReason'
-  | 'visibleColumns'
-  | 'hiddenColumns'
   | 'columnWidths'
-  | 'pinnedLeft'
-  | 'pinnedRight'
   | 'recipes'
   | 'activeDatasetId'
   | 'pendingRestore'
@@ -347,7 +344,12 @@ export type LoadControllerContext = Pick<
   | 'applyState'
   | 'buildFilterSpec'
   | 'activateWorkspaceDataset'
->;
+>, 'visibleColumns' | 'hiddenColumns' | 'pinnedLeft' | 'pinnedRight'> & {
+  visibleColumns: Set<number>;
+  hiddenColumns: number[];
+  pinnedLeft: number[];
+  pinnedRight: number[];
+};
 
 export type GridControllerContext = Pick<
   InspectorControllerContext,

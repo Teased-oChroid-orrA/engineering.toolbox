@@ -127,6 +127,7 @@
     Recipe,
     RecipeState,
     MultiQueryClause,
+    LoadControllerContext,
   } from "$lib/components/inspector/InspectorOrchestratorDeps";
   import {
     beginModalDrag,
@@ -835,13 +836,71 @@
       preMergedTotalFilteredCount,
     });
   }
-  function loadControllerCtx() {
-    // Preserve getters/setters by using defineProperties instead of spread
-    const ctx = {};
-    Object.defineProperties(ctx, Object.getOwnPropertyDescriptors(loadControllerCtxCore()));
-    Object.defineProperties(ctx, Object.getOwnPropertyDescriptors(loadControllerCtxStateMain()));
-    Object.defineProperties(ctx, Object.getOwnPropertyDescriptors(loadControllerCtxStateQueryAndGrid()));
-    return ctx;
+  function loadControllerCtx(): LoadControllerContext {
+    return buildLoadControllerCtx({
+      loadState,
+      invoke,
+      debugLogger,
+      dialogMod,
+      fnv1a32,
+      heuristicHasHeaders,
+      computeDatasetIdentity,
+      upsertWorkspaceDatasetInList,
+      loadRecipesForDataset,
+      loadLastStateForDataset,
+      applyState,
+      runFilterNow,
+      buildFilterSpec,
+      queueDebug,
+      activateWorkspaceDataset,
+      hiddenUploadInput,
+      isLoading,
+      isMergedView,
+      loadError,
+      hasHeaders,
+      headerMode,
+      headerHeuristicReason,
+      pendingText,
+      pendingPath,
+      showHeaderPrompt,
+      headers,
+      totalRowCount,
+      totalFilteredCount,
+      visibleRows,
+      colTypes,
+      datasetId,
+      datasetLabel,
+      recipes,
+      pendingRestore,
+      hasLoaded,
+      showDataControls,
+      activeDatasetId,
+      mergedRowsAll,
+      loadedDatasets,
+      query,
+      matchMode,
+      targetColIdx,
+      numericF,
+      dateF,
+      catF,
+      suspendReactiveFiltering,
+      sortColIdx,
+      sortDir,
+      sortSpecs,
+      visibleColumns,
+      pinnedLeft,
+      pinnedRight,
+      hiddenColumns,
+      columnWidths,
+      crossQueryBusy,
+      queryScope,
+      crossQueryResults,
+      mergedHeaders,
+      preMergedHeaders,
+      preMergedColTypes,
+      preMergedTotalRowCount,
+      preMergedTotalFilteredCount,
+    }) as unknown as LoadControllerContext;
   }
   async function loadCsvFromText(
     text: string,

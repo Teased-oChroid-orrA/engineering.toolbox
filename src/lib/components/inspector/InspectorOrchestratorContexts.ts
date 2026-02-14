@@ -185,6 +185,9 @@ export function loadControllerCtxCore(state: {
   runFilterNow: any;
   buildFilterSpec: any;
   queueDebug: any;
+  queueDebugRate: any;
+  recordPerf: any;
+  runCrossDatasetQuery: any;
   activateWorkspaceDataset: any;
 }) {
   return {
@@ -201,6 +204,9 @@ export function loadControllerCtxCore(state: {
     runFilterNow: state.runFilterNow,
     buildFilterSpec: state.buildFilterSpec,
     queueDebug: state.queueDebug,
+    queueDebugRate: state.queueDebugRate,
+    recordPerf: state.recordPerf,
+    runCrossDatasetQuery: state.runCrossDatasetQuery,
     activateWorkspaceDataset: state.activateWorkspaceDataset
   };
 }
@@ -395,6 +401,9 @@ export function loadControllerCtx(state: {
   runFilterNow: any;
   buildFilterSpec: any;
   queueDebug: any;
+  queueDebugRate: any;
+  recordPerf: any;
+  runCrossDatasetQuery: any;
   activateWorkspaceDataset: any;
   hiddenUploadInput: HTMLInputElement | null;
   isLoading: boolean;

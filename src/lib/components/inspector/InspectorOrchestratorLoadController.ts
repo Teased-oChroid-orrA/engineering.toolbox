@@ -79,8 +79,8 @@ export async function loadCsvFromText(
     ctx.datasetLabel = ids.label;
     if (forcedLabel) ctx.datasetLabel = forcedLabel;
 
-    ctx.recipes = ctx.loadRecipesForDataset(ctx.datasetId);
-    ctx.pendingRestore = ctx.loadLastStateForDataset(ctx.datasetId);
+    ctx.recipes = await ctx.loadRecipesForDataset(ctx.datasetId);
+    ctx.pendingRestore = await ctx.loadLastStateForDataset(ctx.datasetId);
     ctx.hasLoaded = true;
     devLog('LOAD CSV', 'hasLoaded set to true, datasetId:', ctx.datasetId);
     ctx.showDataControls = true;
@@ -180,8 +180,8 @@ export async function loadCsvFromPath(
     ctx.datasetId = ids.id;
     ctx.datasetLabel = ids.label;
     if (forcedLabel) ctx.datasetLabel = forcedLabel;
-    ctx.recipes = ctx.loadRecipesForDataset(ctx.datasetId);
-    ctx.pendingRestore = ctx.loadLastStateForDataset(ctx.datasetId);
+    ctx.recipes = await ctx.loadRecipesForDataset(ctx.datasetId);
+    ctx.pendingRestore = await ctx.loadLastStateForDataset(ctx.datasetId);
     ctx.hasLoaded = true;
     ctx.showDataControls = true;
     ctx.activeDatasetId = ctx.datasetId;

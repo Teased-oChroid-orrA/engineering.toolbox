@@ -140,4 +140,5 @@ export {
   newMultiQueryClause
 } from '$lib/components/inspector/InspectorMultiQueryController';
 export type { MultiQueryClause } from '$lib/components/inspector/InspectorStateTypes';
+export type { LoadControllerContext } from '$lib/components/inspector/InspectorControllerContext';
 export { registerContextMenu } from '$lib/navigation/contextualMenu';
