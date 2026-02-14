@@ -1,22 +1,5 @@
-type ColType = 'numeric' | 'date' | 'string';
-
-export type SchemaColStat = {
-  idx: number;
-  name: string;
-  type: ColType;
-  empty: number;
-  nonEmpty: number;
-  emptyPct: number;
-  typeConfidence: number;
-  numericParseRate: number;
-  dateParseRate: number;
-  distinctSample: number;
-  distinctRatio: number;
-  entropyNorm: number;
-  topSample: { v: string; n: number }[];
-  min?: string;
-  max?: string;
-};
+import type { ColType, SchemaColStat } from './InspectorStateTypes';
+import type { SchemaControllerContext } from './InspectorControllerContext';
 
 export type SuggestedCol = {
   idx: number;

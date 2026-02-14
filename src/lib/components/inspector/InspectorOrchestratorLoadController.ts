@@ -10,6 +10,7 @@ export async function loadCsvFromText(
   forcedLabel?: string,
   applyInitialFilter = true
 ) {
+  console.error('★★★ LOAD CONTROLLER EXECUTING ★★★ text length:', text.length);
   console.log('[LOAD CTRL] loadCsvFromText called, text length:', text.length);
   console.log('[LOAD CTRL] hasHeadersOverride:', hasHeadersOverride, 'trackWorkspace:', trackWorkspace);
   ctx.isLoading = true;

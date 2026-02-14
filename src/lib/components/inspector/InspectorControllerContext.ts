@@ -190,7 +190,7 @@ export interface InspectorControllerContext {
   // Row Drawer State
   // ============================================================================
   showRowDrawer: boolean;
-  drawerVisualIdx: number;
+  drawerVisualIdx: number | null;
   drawerKVs: Array<{ key: string; value: string }>;
   drawerLoading: boolean;
   drawerError: string | null;
