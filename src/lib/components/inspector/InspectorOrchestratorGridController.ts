@@ -2,28 +2,42 @@ import { devLog } from '$lib/utils/devLog';
 import type { GridControllerContext } from './InspectorControllerContext';
 
 export async function fetchVisibleSlice(ctx: GridControllerContext) {
-  console.error('[FETCH SLICE] Called, hasLoaded:', ctx.hasLoaded, 'isMergedView:', ctx.isMergedView);
-  if (!ctx.hasLoaded) {
-    console.error('[FETCH SLICE] Early return: hasLoaded =', ctx.hasLoaded);
-    devLog('FETCH SLICE', 'Skipped: hasLoaded =', ctx.hasLoaded);
-    return;
+  try {
+    console.error('★★★★★ ENTRY 1 ★★★★★');
+    const hasLoadedValue = ctx.hasLoaded;
+    console.error('★★★★★ ENTRY 2 - hasLoaded:', hasLoadedValue);
+    const isMergedViewValue = ctx.isMergedView;
+    console.error('★★★★★ ENTRY 3 - isMergedView:', isMergedViewValue);
+    
+    if (!hasLoadedValue) {
+      console.error('[FETCH SLICE] Early return - hasLoaded was:', hasLoadedValue);
+      return;
+    }
+    
+    console.error('[FETCH SLICE] After hasLoaded check, continuing...');
+    
+    const t0 = performance.now();
+  } catch (err) {
+    console.error('[FETCH SLICE] EXCEPTION:', err);
+    throw err;
   }
-  const t0 = performance.now();
   const token = ctx.sliceGate.nextToken();
   
   const s = Number.isFinite(ctx.startIdx) ? Math.max(0, ctx.startIdx) : 0;
   const e = Number.isFinite(ctx.endIdx) ? Math.max(s, ctx.endIdx) : s;
   const reqCols = ctx.visibleColIdxs;
 
+  console.error('[FETCH SLICE] Range:', s, '-', e, 'isMergedView:', ctx.isMergedView);
   devLog('FETCH SLICE', 'isMergedView:', ctx.isMergedView, 'mergedRowsAll.length:', ctx.mergedRowsAll?.length, 'range:', s, '-', e);
 
   try {
     if (ctx.isMergedView) {
+      console.error('[FETCH SLICE] Browser mode branch');
       const base = ctx.mergedRowsAll.slice(s, e);
       if (!ctx.sliceGate.isLatest(token)) return;
       // CRITICAL FIX: Use loadState directly to ensure reactivity
       if (reqCols.length === 0) {
-        console.log('[FETCH SLICE] Setting loadState.visibleRows, length:', base.length);
+        console.error('[FETCH SLICE] Setting loadState.visibleRows, length:', base.length);
         (ctx as any).loadState.visibleRows = base;
       } else {
         const sparse = base.map((r: string[]) => {

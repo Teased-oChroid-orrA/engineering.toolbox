@@ -230,6 +230,7 @@
   const loadStateId = Math.random().toString(36);  // Unique ID for debugging
   const loadState = $state({
     _id: loadStateId,  // Debug: track which loadState object this is
+    _version: 0,  // Counter to force reactivity
     headers: [] as string[],
     totalRowCount: 0,
     colTypes: [] as ColType[],
@@ -252,11 +253,15 @@
   let isMergedView = $derived(loadState.isMergedView);
   let mergedRowsAll = $derived(loadState.mergedRowsAll);
   let totalFilteredCount = $derived(loadState.totalFilteredCount);
-  let visibleRows = $derived(loadState.visibleRows);  // Derive from loadState
+  let visibleRows = $derived.by(() => {
+    // Track _version to force reactivity
+    const _ = loadState._version;
+    return loadState.visibleRows;
+  });
   
   // Debug: Log when visibleRows changes
   $effect(() => {
-    console.log('[ORCHESTRATOR] visibleRows changed, length:', visibleRows?.length, 'first row:', visibleRows?.[0]);
+    console.log('[ORCHESTRATOR] visibleRows changed, length:', visibleRows?.length, 'version:', loadState._version);
   });
   
   let loadedDatasets = $state<WorkspaceDataset[]>([]);
@@ -984,11 +989,13 @@
     });
   }
   async function fetchVisibleSlice() {
+    console.error('★★★ WRAPPER fetchVisibleSlice called ★★★');
     console.log('[WRAPPER] fetchVisibleSlice called, hasLoaded:', hasLoaded, 'loadState.hasLoaded:', loadState.hasLoaded);
     try {
       const ctx = gridControllerCtx();
-      console.log('[WRAPPER] Context built, calling controller...');
+      console.error('★★★ About to call controller ★★★');
       await fetchVisibleSliceController(ctx);
+      console.error('★★★ Controller returned ★★★');
       console.log('[WRAPPER] Controller returned, loadState.visibleRows.length:', loadState.visibleRows?.length);
     } catch (err) {
       console.error('[WRAPPER] fetchVisibleSlice error:', err);
