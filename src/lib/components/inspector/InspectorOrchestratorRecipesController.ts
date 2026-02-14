@@ -1,22 +1,24 @@
-export function loadRecipesForDataset(ctx: any, dsId: string) {
+import type { RecipesControllerContext } from './InspectorControllerContext';
+
+export function loadRecipesForDataset(ctx: RecipesControllerContext, dsId: string) {
   return ctx.loadRecipesForDatasetFromStore(ctx.RECIPES_STORE_KEY, ctx.LEGACY_RECIPES_STORE_KEYS, dsId);
 }
 
-export function persistRecipesForDataset(ctx: any, dsId: string, label: string, rs: any[]) {
+export function persistRecipesForDataset(ctx: RecipesControllerContext, dsId: string, label: string, rs: any[]) {
   ctx.persistRecipesForDatasetToStore(ctx.RECIPES_STORE_KEY, ctx.LEGACY_RECIPES_STORE_KEYS, dsId, label, rs);
 }
 
-export function loadLastStateForDataset(ctx: any, dsId: string) {
+export function loadLastStateForDataset(ctx: RecipesControllerContext, dsId: string) {
   const out = ctx.loadLastStateForDatasetFromStore(ctx.LAST_STATE_STORE_KEY, ctx.LEGACY_LAST_STATE_KEYS, dsId);
   if (out.state) ctx.autoRestoreEnabled = out.autoRestore;
   return out.state;
 }
 
-export function persistLastStateForDataset(ctx: any, dsId: string, st: any) {
+export function persistLastStateForDataset(ctx: RecipesControllerContext, dsId: string, st: any) {
   ctx.persistLastStateForDatasetToStore(ctx.LAST_STATE_STORE_KEY, ctx.LEGACY_LAST_STATE_KEYS, dsId, st, ctx.autoRestoreEnabled);
 }
 
-export async function exportRecipesCurrent(ctx: any) {
+export async function exportRecipesCurrent(ctx: RecipesControllerContext) {
   if (!ctx.datasetId) {
     ctx.recipeNotice = 'Load a dataset first.';
     return;
@@ -39,7 +41,7 @@ export async function exportRecipesCurrent(ctx: any) {
   }
 }
 
-export async function importRecipesFile(ctx: any, file: File, mode: 'current' | 'file') {
+export async function importRecipesFile(ctx: RecipesControllerContext, file: File, mode: 'current' | 'file') {
   try {
     const text = await file.text();
     const obj = JSON.parse(text);
@@ -64,7 +66,7 @@ export async function importRecipesFile(ctx: any, file: File, mode: 'current' | 
   }
 }
 
-export async function exportCsvPreset(ctx: any, mode: 'current_view' | 'filtered_rows' | 'selected_columns') {
+export async function exportCsvPreset(ctx: RecipesControllerContext, mode: 'current_view' | 'filtered_rows' | 'selected_columns') {
   if (!ctx.hasLoaded) return;
   try {
     let outHeaders = [...ctx.headers];
@@ -95,7 +97,7 @@ export async function exportCsvPreset(ctx: any, mode: 'current_view' | 'filtered
   }
 }
 
-export function exportAnalysisBundle(ctx: any) {
+export function exportAnalysisBundle(ctx: RecipesControllerContext) {
   if (!ctx.hasLoaded) return;
   const payload = {
     kind: 'inspector_analysis_bundle',
@@ -116,7 +118,7 @@ export function exportAnalysisBundle(ctx: any) {
   ctx.downloadText(JSON.stringify(payload, null, 2), `analysis_bundle_${ctx.datasetLabel.replace(/[^a-z0-9\-_]+/gi, '_')}.json`, 'application/json');
 }
 
-export function saveCurrentAsRecipe(ctx: any) {
+export function saveCurrentAsRecipe(ctx: RecipesControllerContext) {
   const name = (ctx.recipeName ?? '').trim();
   if (!name) {
     ctx.recipeNotice = 'Name required.';
@@ -145,7 +147,7 @@ export function saveCurrentAsRecipe(ctx: any) {
   ctx.recipeTags = '';
 }
 
-export async function applyRecipe(ctx: any, r: any) {
+export async function applyRecipe(ctx: RecipesControllerContext, r: any) {
   try {
     await ctx.applyState(r.state);
     ctx.recipeNotice = `Applied: ${r.name}`;
@@ -153,12 +155,12 @@ export async function applyRecipe(ctx: any, r: any) {
   } catch {}
 }
 
-export function deleteRecipe(ctx: any, id: string) {
+export function deleteRecipe(ctx: RecipesControllerContext, id: string) {
   ctx.recipes = (ctx.recipes ?? []).filter((x: any) => x.id !== id);
   ctx.persistRecipesForDataset(ctx.datasetId, ctx.datasetLabel, ctx.recipes);
 }
 
-export function toggleRecipeFavorite(ctx: any, id: string) {
+export function toggleRecipeFavorite(ctx: RecipesControllerContext, id: string) {
   ctx.recipes = (ctx.recipes ?? []).map((r: any) => (r.id === id ? { ...r, favorite: !r.favorite } : r));
   ctx.recipes = [...ctx.recipes].sort((a: any, b: any) => Number(!!b.favorite) - Number(!!a.favorite) || b.createdAt - a.createdAt);
   ctx.persistRecipesForDataset(ctx.datasetId, ctx.datasetLabel, ctx.recipes);

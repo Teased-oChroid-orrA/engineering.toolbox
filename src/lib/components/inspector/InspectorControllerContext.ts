@@ -351,6 +351,44 @@ export type LoadControllerContext = Omit<Pick<
   pinnedRight: number[];
 };
 
+export type RecipesControllerContext = Pick<
+  InspectorControllerContext,
+  | 'datasetId'
+  | 'datasetLabel'
+  | 'recipes'
+  | 'recipeNotice'
+  | 'recipeName'
+  | 'recipeTags'
+  | 'autoRestoreEnabled'
+  | 'hasLoaded'
+  | 'headers'
+  | 'totalRowCount'
+  | 'totalFilteredCount'
+  | 'visibleRows'
+  | 'visibleColIdxs'
+  | 'schemaStats'
+  | 'invoke'
+> & {
+  RECIPES_STORE_KEY: string;
+  LEGACY_RECIPES_STORE_KEYS: string[];
+  LAST_STATE_STORE_KEY: string;
+  LEGACY_LAST_STATE_KEYS: string[];
+  loadRecipesForDatasetFromStore: (key: string, legacyKeys: string[], dsId: string) => Recipe[];
+  persistRecipesForDatasetToStore: (key: string, legacyKeys: string[], dsId: string, label: string, recipes: Recipe[]) => void;
+  loadLastStateForDatasetFromStore: (key: string, legacyKeys: string[], dsId: string) => { state: any; autoRestore: boolean };
+  persistLastStateForDatasetToStore: (key: string, legacyKeys: string[], dsId: string, state: any, autoRestore: boolean) => void;
+  buildRecipeExportBlob: (data: { datasetId: string; datasetLabel: string; recipes: Recipe[] }) => any;
+  mergeImportedRecipes: (existing: Recipe[], imported: Recipe[]) => Recipe[];
+  newRecipeId: () => string;
+  captureState: () => any;
+  applyState: (state: any) => Promise<void>;
+  activeFilterHash: () => string;
+  toCsvText: (headers: string[], rows: string[][]) => string;
+  downloadText: (text: string, filename: string, mimeType: string) => void;
+  perf: { lastByOp: () => any };
+  persistRecipesForDataset: (dsId: string, label: string, recipes: Recipe[]) => void;
+};
+
 export type GridControllerContext = Pick<
   InspectorControllerContext,
   | 'loadState'
