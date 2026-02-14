@@ -159,7 +159,7 @@ export interface InspectorControllerContext {
   // Controller Action Functions
   // ============================================================================
   // These are functions that controllers can call
-  buildFilterSpecFromState: (ctx: InspectorControllerContext) => IFilterSet | null;
+  buildFilterSpecFromState: (ctx: any) => { spec: IFilterSet | null; queryError?: string; numericError?: string; dateError?: string };
   fetchVisibleSlice: () => Promise<void>;
   runFilterNow: (forceCurrent?: boolean) => Promise<void>;
   runCrossDatasetQuery: () => Promise<void>;
@@ -207,6 +207,9 @@ export type FilterControllerContext = Pick<
   | 'preMergedTotalFilteredCount'
   | 'loadedDatasets'
   | 'mergedRowsAll'
+  | 'queryError'
+  | 'loadError'
+  | 'visibleColIdxs'
   | 'FILTER_DEBOUNCE_MS'
   | 'invoke'
   | 'escapeRegExp'

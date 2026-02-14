@@ -1,5 +1,6 @@
 import type { IFilter, IFilterSet } from '@svar-ui/svelte-filter';
 import { devLog } from '$lib/utils/devLog';
+import type { FilterControllerContext } from './InspectorControllerContext';
 
 export function flattenSvarRules(set?: IFilterSet): IFilter[] {
   const out: IFilter[] = [];
@@ -22,7 +23,7 @@ export function toColIdx(field: unknown, headerCount: number): number | null {
   return idx >= 0 && idx < headerCount ? idx : null;
 }
 
-export function buildFilterSpec(ctx: any) {
+export function buildFilterSpec(ctx: FilterControllerContext) {
   ctx.queryError = null;
   ctx.loadError = null;
   ctx.numericF.error = null;
@@ -48,7 +49,7 @@ export function buildFilterSpec(ctx: any) {
   return out.spec;
 }
 
-export async function applyFilterSpec(ctx: any, spec: any): Promise<number> {
+export async function applyFilterSpec(ctx: FilterControllerContext, spec: any): Promise<number> {
   // Browser mode: filter client-side if we have mergedRowsAll
   if (ctx.loadState.isMergedView && ctx.loadState.mergedRowsAll) {
     if (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1') {
@@ -74,7 +75,7 @@ export async function applyFilterSpec(ctx: any, spec: any): Promise<number> {
   return typeof resp === 'number' ? resp : (resp?.filteredCount ?? ctx.totalRowCount);
 }
 
-export async function runFilterNow(ctx: any, forceCurrent = false) {
+export async function runFilterNow(ctx: FilterControllerContext, forceCurrent = false) {
   devLog('FILTER NOW CONTROLLER', 'Entry - hasLoaded:', ctx.hasLoaded, 'isMergedView:', ctx.isMergedView);
   
   ctx.queueDebugRate('runFilterNow', 150, 'runFilterNow', {
@@ -116,7 +117,7 @@ export async function runFilterNow(ctx: any, forceCurrent = false) {
   await drainFilterQueue(ctx);
 }
 
-export async function drainFilterQueue(ctx: any) {
+export async function drainFilterQueue(ctx: FilterControllerContext) {
   devLog('DRAIN FILTER QUEUE', 'Called - filterInFlight:', ctx.filterInFlight, 'hasLoaded:', ctx.hasLoaded);
   if (ctx.filterInFlight || !ctx.hasLoaded) return;
   ctx.filterInFlight = true;
@@ -131,7 +132,7 @@ export async function drainFilterQueue(ctx: any) {
   }
 }
 
-export async function runFilterPass(ctx: any) {
+export async function runFilterPass(ctx: FilterControllerContext) {
   const t0 = performance.now();
   const token = ctx.filterGate.nextToken();
   const spec = buildFilterSpec(ctx);
@@ -162,7 +163,7 @@ export async function runFilterPass(ctx: any) {
   }
 }
 
-export function scheduleFilter(ctx: any, reason = 'debounced-input') {
+export function scheduleFilter(ctx: FilterControllerContext, reason = 'debounced-input') {
   if (!ctx.hasLoaded || ctx.suspendReactiveFiltering) return;
   ctx.queueDebugRate(`schedule:${reason}`, 250, 'scheduleFilter', {
     reason,
@@ -177,7 +178,7 @@ export function scheduleFilter(ctx: any, reason = 'debounced-input') {
   }, ctx.FILTER_DEBOUNCE_MS);
 }
 
-export function scheduleCrossQuery(ctx: any, reason = 'debounced-cross-input') {
+export function scheduleCrossQuery(ctx: FilterControllerContext, reason = 'debounced-cross-input') {
   if (!ctx.hasLoaded || ctx.crossQueryBusy) return;
   if (ctx.queryScope === 'current') return;
   ctx.queueDebugRate(`scheduleCross:${reason}`, 250, 'scheduleCrossQuery', {
@@ -192,7 +193,7 @@ export function scheduleCrossQuery(ctx: any, reason = 'debounced-cross-input') {
   }, ctx.FILTER_DEBOUNCE_MS);
 }
 
-export function clearAllFilters(ctx: any) {
+export function clearAllFilters(ctx: FilterControllerContext) {
   ctx.query = '';
   ctx.matchMode = 'fuzzy';
   if ('multiQueryEnabled' in ctx) ctx.multiQueryEnabled = false;
@@ -205,7 +206,7 @@ export function clearAllFilters(ctx: any) {
   void runFilterNow(ctx);
 }
 
-export function onQueryScopeChange(ctx: any) {
+export function onQueryScopeChange(ctx: FilterControllerContext) {
   ctx.queueDebug('queryScopeChange', {
     queryScope: ctx.queryScope,
     hasLoaded: ctx.hasLoaded,
@@ -246,7 +247,7 @@ type SvarApplyState = {
   catApplied: boolean;
 };
 
-function applySvarTextRule(ctx: any, idx: number, filter: string, cleanVal: string): boolean {
+function applySvarTextRule(ctx: FilterControllerContext, idx: number, filter: string, cleanVal: string): boolean {
   ctx.targetColIdx = idx;
   if (filter === 'equal') {
     ctx.matchMode = 'exact';
@@ -271,7 +272,7 @@ function applySvarTextRule(ctx: any, idx: number, filter: string, cleanVal: stri
   return false;
 }
 
-function applySvarNumberRule(ctx: any, idx: number, filter: string, rule: any, cleanVal: string): boolean {
+function applySvarNumberRule(ctx: FilterControllerContext, idx: number, filter: string, rule: any, cleanVal: string): boolean {
   ctx.numericF.enabled = true;
   ctx.numericF.colIdx = idx;
   if (filter === 'between' && typeof rule.value === 'object' && rule.value != null) {
@@ -298,7 +299,7 @@ function applySvarNumberRule(ctx: any, idx: number, filter: string, rule: any, c
   return false;
 }
 
-function applySvarDateRule(ctx: any, idx: number, filter: string, rule: any): boolean {
+function applySvarDateRule(ctx: FilterControllerContext, idx: number, filter: string, rule: any): boolean {
   ctx.dateF.enabled = true;
   ctx.dateF.colIdx = idx;
   if (filter === 'between' && typeof rule.value === 'object' && rule.value != null) {
@@ -326,7 +327,7 @@ function applySvarDateRule(ctx: any, idx: number, filter: string, rule: any): bo
   return false;
 }
 
-function applySvarCategoryRule(ctx: any, idx: number, rule: any): boolean {
+function applySvarCategoryRule(ctx: FilterControllerContext, idx: number, rule: any): boolean {
   if (!Array.isArray(rule.includes) || rule.includes.length === 0) return false;
   ctx.catF.enabled = true;
   ctx.catF.colIdx = idx;
@@ -334,7 +335,7 @@ function applySvarCategoryRule(ctx: any, idx: number, rule: any): boolean {
   return true;
 }
 
-function applySingleSvarRule(ctx: any, state: SvarApplyState, rule: IFilter) {
+function applySingleSvarRule(ctx: FilterControllerContext, state: SvarApplyState, rule: IFilter) {
   const idx = toColIdx(rule.field, ctx.headers.length);
   if (idx == null) {
     state.unsupported++;
@@ -367,7 +368,7 @@ function applySingleSvarRule(ctx: any, state: SvarApplyState, rule: IFilter) {
   state.unsupported++;
 }
 
-export function applySvarBuilderToFilters(ctx: any) {
+export function applySvarBuilderToFilters(ctx: FilterControllerContext) {
   const rules = flattenSvarRules(ctx.svarFilterSet);
   if (!rules.length) {
     ctx.svarNotice = 'No rules to apply.';
