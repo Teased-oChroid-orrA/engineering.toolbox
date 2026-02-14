@@ -90,7 +90,7 @@ export async function loadCsvFromText(
     // Setting ctx.hasLoaded = true creates a new property due to TypeScript cast
     (ctx as any).loadState.hasLoaded = true;
     devLog('LOAD CSV', 'hasLoaded set to true, datasetId:', ctx.datasetId);
-    ctx.showDataControls = true;
+    // showDataControls removed - now always true in Orchestrator
     ctx.activeDatasetId = ctx.datasetId;
 
     if (trackWorkspace) {
@@ -184,7 +184,7 @@ export async function loadCsvFromPath(
     ctx.recipes = await ctx.loadRecipesForDataset(ctx.datasetId);
     ctx.pendingRestore = await ctx.loadLastStateForDataset(ctx.datasetId);
     ctx.hasLoaded = true;
-    ctx.showDataControls = true;
+    // showDataControls removed - now always true in Orchestrator
     ctx.activeDatasetId = ctx.datasetId;
 
     if (trackWorkspace) {
@@ -249,7 +249,7 @@ export async function unloadWorkspaceDataset(ctx: LoadControllerContext, id: str
     (ctx as any).loadState.totalRowCount = 0;
     (ctx as any).loadState.totalFilteredCount = 0;
     (ctx as any).loadState.hasLoaded = false;
-    ctx.showDataControls = false;
+    // showDataControls removed - now always true in Orchestrator
     (ctx as any).loadState.isMergedView = false;
     ctx.mergedHeaders = [];
     ctx.mergedRowsAll = [];
