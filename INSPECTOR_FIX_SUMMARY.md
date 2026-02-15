@@ -1,5 +1,8 @@
 # Inspector Infinite Loop Fix - Summary
 
+> **⚠️ UPDATE (2026-02-15):** This document describes the FIRST fix attempt. The infinite loop persisted due to a different root cause.  
+> **See `INSPECTOR_INFINITE_LOOP_FIX_FINAL.md` for the complete fix.**
+
 ## Problem Statement
 
 The Inspector component exhibited two critical issues:
