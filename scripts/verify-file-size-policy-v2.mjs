@@ -229,10 +229,12 @@ const IGNORE_DIRS = new Set([
 
 function matchesPattern(filePath, pattern) {
   // Convert glob pattern to regex
+  // Use placeholders to prevent interference between ** and * replacements
   const regexPattern = pattern
     .replace(/\./g, '\\.')
-    .replace(/\*\*/g, '.*')
-    .replace(/\*/g, '[^/]*')
+    .replace(/\*\*/g, '<!DOUBLESTAR!>')  // Temporary placeholder
+    .replace(/\*/g, '[^/]*')              // Single * matches within path segment
+    .replace(/<!DOUBLESTAR!>/g, '.*')    // ** matches across path segments
     .replace(/\?/g, '.');
   const regex = new RegExp(`^${regexPattern}$`);
   return regex.test(filePath);
