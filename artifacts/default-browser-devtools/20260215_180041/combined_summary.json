@@ -1,0 +1,28 @@
+{
+  "command": "smoke",
+  "url": "http://127.0.0.1:5173/#/inspector",
+  "engines": [
+    "chromium"
+  ],
+  "outRoot": "/home/runner/work/engineering.toolbox/engineering.toolbox/artifacts/default-browser-devtools/20260215_180041",
+  "ok": false,
+  "results": [
+    {
+      "command": "smoke",
+      "engine": "chromium",
+      "url": "http://127.0.0.1:5173/#/inspector",
+      "ready": {
+        "type": "text",
+        "value": "Inspector"
+      },
+      "summary": null,
+      "interactions": [],
+      "files": {
+        "baselineScreenshot": "/home/runner/work/engineering.toolbox/engineering.toolbox/artifacts/default-browser-devtools/20260215_180041/chromium/baseline.png",
+        "summary": "/home/runner/work/engineering.toolbox/engineering.toolbox/artifacts/default-browser-devtools/20260215_180041/chromium/summary.json"
+      },
+      "ok": false,
+      "error": "TypeError: Cannot read properties of undefined (reading 'snapshot')\n    at takeSnapshot (file:///home/runner/work/engineering.toolbox/engineering.toolbox/.github/skills/default-browser-dev-tools/runner.js:115:35)\n    at runOneEngine (file:///home/runner/work/engineering.toolbox/engineering.toolbox/.github/skills/default-browser-dev-tools/runner.js:225:32)\n    at async main (file:///home/runner/work/engineering.toolbox/engineering.toolbox/.github/skills/default-browser-dev-tools/runner.js:425:18)"
+    }
+  ]
+}
