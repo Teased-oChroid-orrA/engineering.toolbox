@@ -183,7 +183,9 @@ export async function loadCsvFromPath(
     if (forcedLabel) ctx.datasetLabel = forcedLabel;
     ctx.recipes = await ctx.loadRecipesForDataset(ctx.datasetId);
     ctx.pendingRestore = await ctx.loadLastStateForDataset(ctx.datasetId);
-    ctx.hasLoaded = true;
+    // CRITICAL FIX: Use loadState directly to ensure reactivity (same fix as loadCsvFromText)
+    (ctx as any).loadState.hasLoaded = true;
+    devLog('LOAD CSV PATH', 'hasLoaded set to true, datasetId:', ctx.datasetId);
     // showDataControls removed - now always true in Orchestrator
     ctx.activeDatasetId = ctx.datasetId;
 

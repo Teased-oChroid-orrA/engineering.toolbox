@@ -114,12 +114,15 @@ export async function runFilterNow(ctx: FilterControllerContext, forceCurrent = 
     if (ctx.queryScope === 'ask') {
       const doAll = window.confirm('Run this query across all loaded files?');
       if (!doAll) {
-        ctx.filterPending = true;
-        await drainFilterQueue(ctx);
+        // User cancelled - just run current dataset filter without setting pending flag
+        // to avoid potential infinite loop if state isn't fully initialized
+        devLog('FILTER NOW', 'User cancelled cross-query, running current dataset only');
+        // Don't set filterPending or call drainFilterQueue here - fall through to normal flow
+      } else {
+        await ctx.runCrossDatasetQuery();
         return;
       }
-    }
-    if (ctx.queryScope === 'all' || ctx.queryScope === 'ask') {
+    } else if (ctx.queryScope === 'all') {
       await ctx.runCrossDatasetQuery();
       return;
     }
