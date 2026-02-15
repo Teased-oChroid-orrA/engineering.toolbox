@@ -1,11 +1,36 @@
 {
   "version": "1.0",
-  "learned_smells": [],
+  "learned_smells": [
+    {
+      "type": "longMethod",
+      "severity": "medium",
+      "description": "Long method (>50 lines estimated)",
+      "occurrences": 1,
+      "first_seen": "2026-02-15T16:58:35.832Z",
+      "last_seen": "2026-02-15T16:58:35.832Z"
+    },
+    {
+      "type": "magicNumber",
+      "severity": "low",
+      "description": "Magic number (not in quotes, 3+ digits or hex)",
+      "occurrences": 1,
+      "first_seen": "2026-02-15T16:58:35.832Z",
+      "last_seen": "2026-02-15T16:58:35.832Z"
+    },
+    {
+      "type": "longParameterList",
+      "severity": "medium",
+      "description": "Long parameter list (>80 chars)",
+      "occurrences": 1,
+      "first_seen": "2026-02-15T16:58:35.832Z",
+      "last_seen": "2026-02-15T16:58:35.832Z"
+    }
+  ],
   "successful_refactorings": [],
   "refactoring_patterns": {
     "extract_method": {
       "success_count": 0,
-      "confidence": 0.70
+      "confidence": 0.7
     },
     "introduce_constant": {
       "success_count": 0,
@@ -13,11 +38,11 @@
     },
     "improve_naming": {
       "success_count": 0,
-      "confidence": 0.80
+      "confidence": 0.8
     },
     "reduce_nesting": {
       "success_count": 0,
-      "confidence": 0.70
+      "confidence": 0.7
     },
     "add_types": {
       "success_count": 0,
@@ -26,15 +51,27 @@
   },
   "threshold_calibration": {
     "minimal_mode": {
-      "baseline_score": 0.80,
+      "baseline_score": 0.8,
       "confidence_threshold": 0.75,
       "adjusted_from": []
     },
     "structural_mode": {
       "baseline_score": 0.75,
-      "confidence_threshold": 0.70,
+      "confidence_threshold": 0.7,
       "adjusted_from": []
     }
   },
-  "smell_clusters": []
+  "smell_clusters": [
+    {
+      "smell_signature": "longMethod+longParameterList+magicNumber",
+      "smells": [
+        "longMethod",
+        "magicNumber",
+        "longParameterList"
+      ],
+      "occurrences": 1,
+      "first_seen": "2026-02-15T16:58:35.832Z",
+      "last_seen": "2026-02-15T16:58:35.832Z"
+    }
+  ]
 }
