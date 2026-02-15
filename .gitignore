@@ -18,3 +18,7 @@ pnpm-debug.log*
 # macOS
 .DS_Store
 **/.DS_Store
+
+# file size policy reports
+violations.json
+report.html

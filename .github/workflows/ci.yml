@@ -37,6 +37,10 @@ jobs:
         run: npm run -s verify:file-size-policy
         continue-on-error: true
 
+      - name: Run file size policy V2 (warn mode)
+        run: npm run verify:file-size-policy:v2:warn
+        continue-on-error: true
+
       - name: Run unit tests
         run: npm run test:unit
         if: hashFiles('playwright.unit.config.ts') != ''
