@@ -175,11 +175,11 @@ export async function runFilterPass(ctx: FilterControllerContext) {
       visibleCols: ctx.visibleColIdxs.length
     });
 
-    // In merged/browser mode, don't fetch immediately if grid window not initialized yet
-    // The slice fetch effect will handle it once the grid calculates proper indices
-    devLog('FILTER PASS', 'About to call fetchVisibleSlice, totalFilteredCount:', ctx.loadState.totalFilteredCount);
-    await ctx.fetchVisibleSlice();
-    devLog('FILTER PASS', 'After fetchVisibleSlice, visibleRows.length:', ctx.visibleRows?.length);
+    // CRITICAL FIX: Don't call fetchVisibleSlice manually here - it causes infinite loop
+    // The slice fetch effect (setupSliceFetchEffect) will automatically trigger when
+    // totalFilteredCount changes, and it will use the proper grid window indices
+    // This fix prevents the infinite loop: runFilterPass → fetchVisibleSlice → updates visibleRows → triggers effect → runFilterPass
+    devLog('FILTER PASS', 'Filter complete. Slice fetch effect will handle fetching with proper grid indices.');
   } catch (err: any) {
     console.error('[FILTER PASS ERROR]', err);
     const msg = err?.message ?? String(err);
