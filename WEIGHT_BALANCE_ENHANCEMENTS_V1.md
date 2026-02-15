@@ -183,7 +183,7 @@ npm run verify:wb-audit
 - Include **all examples** from FAA-H-8083-1B Chapter 5
 - Add **extreme edge cases**:
   - Ultralight aircraft (<500 lbs)
-  - Heavy aircraft (>50,000 lbs)
+  - Heavy aircraft (>50,000 lbs) - e.g., Boeing C-17 Globemaster III
   - Aft-loaded configuration (test aft CG limit)
   - Forward-loaded configuration (test forward CG limit)
   - Zero fuel scenarios
@@ -225,6 +225,33 @@ npm run verify:wb-audit
       "source": "Custom edge case",
       "aircraft": { ... },
       "expected": { ... }
+    },
+    {
+      "id": "edge-c17-heavy",
+      "name": "Boeing C-17 Globemaster III - Heavy Military Cargo",
+      "source": "Custom edge case - large aircraft",
+      "aircraft": {
+        "name": "C-17 Tactical Airlift",
+        "model": "Boeing C-17 Globemaster III",
+        "basicEmptyWeight": 282000,
+        "basicEmptyWeightArm": 1020,
+        "maxTakeoffWeight": 585000,
+        "maxLandingWeight": 446923
+      },
+      "items": [
+        { "name": "Crew", "weight": 600, "arm": 180 },
+        { "name": "M1 Abrams Tank", "weight": 68000, "arm": 1050 },
+        { "name": "Support Vehicles", "weight": 12000, "arm": 950 },
+        { "name": "Cargo Pallets", "weight": 18000, "arm": 1100 },
+        { "name": "Fuel", "weight": 147400, "arm": 980 }
+      ],
+      "expected": {
+        "totalWeight": 528000,
+        "cgPosition": 1012.88,
+        "status": "safe",
+        "validations": []
+      },
+      "tolerance": 1.0
     },
     {
       "id": "negative-overweight",
@@ -507,7 +534,7 @@ Add these test cases throughout implementation:
 1. ✅ Empty aircraft (BEW only) - should warn?
 2. ✅ Single loading item - edge case for statistics
 3. ✅ Very light aircraft (<500 lbs) - ultralights
-4. ✅ Very heavy aircraft (>100,000 lbs) - jets
+4. ✅ Very heavy aircraft (>100,000 lbs) - jets, cargo aircraft (Boeing C-17: 528,000 lbs)
 5. ✅ Negative arms - nose-forward datum
 6. ✅ Zero fuel - all fuel burned
 7. ✅ Touching envelope boundary - exactly on line

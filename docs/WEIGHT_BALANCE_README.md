@@ -158,6 +158,51 @@ Click **Export PDF** to generate a professional W&B report including:
 - New total: 2,546 lbs ✅
 - New CG: 44.87 inches ✅ (within 35.0" to 47.3" envelope)
 
+### Boeing C-17 Globemaster III - Tactical Airlift Mission
+
+**Aircraft Data** (military cargo aircraft):
+- Basic Empty Weight: 282,000 lbs @ 1,020 in
+- MTOW: 585,000 lbs
+- MLW: 446,923 lbs
+- Datum: Nose of aircraft
+- Fuel Type: Jet-A (6.7 lbs/gal)
+
+**Mission**: Transport M1 Abrams tank and support equipment
+
+**Loading**:
+| Item | Weight | Arm | Moment |
+|------|--------|-----|--------|
+| Basic Empty Weight | 282,000 lbs | 1,020 in | 287,640,000 lb-in |
+| Crew (3) | 600 lbs | 180 in | 108,000 lb-in |
+| M1 Abrams Tank | 68,000 lbs | 1,050 in | 71,400,000 lb-in |
+| Support Vehicles (2 HMMWVs) | 12,000 lbs | 950 in | 11,400,000 lb-in |
+| Cargo Pallets (463L × 6) | 18,000 lbs | 1,100 in | 19,800,000 lb-in |
+| Fuel (22,000 gal) | 147,400 lbs | 980 in | 144,452,000 lb-in |
+| **TOTAL** | **528,000 lbs** | — | **534,800,000 lb-in** |
+
+**Calculation**:
+- Total Weight: 528,000 lbs
+- CG Position: 534,800,000 ÷ 528,000 = **1,012.88 inches**
+
+**Validation**:
+- ✅ Total Weight (528,000 lbs) < MTOW (585,000 lbs) - **57,000 lbs margin**
+- ✅ CG Position within forward limit (990 in) and aft limit (1,050 in)
+- ✅ Zero Fuel Weight: 380,600 lbs, ZFW CG: 1,025 in (safe after fuel burn)
+- ✅ Landing Weight: 528,000 lbs < MLW (446,923 lbs) **after fuel burn to 14,000 gal**
+
+**Mission Profile Considerations**:
+- Takeoff at max weight with full cargo and fuel
+- During flight: fuel consumption shifts CG forward (fuel tanks aft of cargo)
+- Landing CG verified safe after burning 8,000 gallons en route
+- Cargo must remain secured throughout flight to prevent CG shift
+
+**Key Differences from Light Aircraft**:
+- Much larger envelope (990-1,050 in vs. 35-47 in for C172)
+- Fuel burn significantly affects CG (147,000 lbs fuel vs. 240 lbs for C172)
+- Multiple cargo stations with different arms (88 ft cargo bay)
+- Requires loadmaster coordination and cargo tie-down verification
+- Military operations: tactical loading may prioritize mission over optimal CG
+
 ## Common Scenarios
 
 ### Scenario 1: Rear Seat Removal (Cargo Mission)

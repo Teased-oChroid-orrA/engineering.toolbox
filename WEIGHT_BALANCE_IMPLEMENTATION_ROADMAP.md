@@ -252,7 +252,8 @@ npm run verify:wb-lateral-cg
 
 **Gates 25-27**:
 - [ ] WB-025: Pre-filled Templates
-  - Common aircraft templates
+  - Common aircraft templates (Cessna 172, Piper PA-28, Boeing C-17, etc.)
+  - Range from light aircraft to heavy cargo
   - User can customize
   - Validate against POH data
   

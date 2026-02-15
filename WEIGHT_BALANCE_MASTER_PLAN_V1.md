@@ -716,20 +716,30 @@ npm run verify:wb-lateral-cg
 **Priority**: P2
 
 **Scope**:
-- Create templates for common aircraft (Cessna 172, Piper PA-28, etc.)
+- Create templates for common aircraft (Cessna 172, Piper PA-28, Boeing C-17, etc.)
 - Include BEW, arms, envelope data
 - User can start from template
-- Templates sourced from public POH data
+- Templates sourced from public POH data and military specifications
+- Range from light aircraft to heavy cargo aircraft
+
+**Template Aircraft**:
+1. Cessna 172S Skyhawk (light single-engine)
+2. Piper PA-28 Cherokee (light single-engine)
+3. Beechcraft Baron 58 (light twin-engine)
+4. Cirrus SR22 (high-performance single-engine)
+5. Boeing C-17 Globemaster III (military cargo)
+6. Gulfstream G650 (business jet) - optional
 
 **Target Files**:
 - `src/lib/core/weight-balance/templates.ts`
 - `data/weight-balance-templates.json`
 
 **Exit Criteria**:
-- At least 5 aircraft templates
-- Templates validated against POH data
+- At least 5 aircraft templates (including C-17 as heavy aircraft example)
+- Templates validated against POH data and public specifications
 - User can select and customize templates
 - Data properly attributed/licensed
+- Templates span light aircraft to heavy cargo (demonstrating range)
 
 **Verification**:
 ```bash

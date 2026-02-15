@@ -237,8 +237,8 @@ Users are solely responsible for ensuring safe aircraft operation.
 2. **Audit Trail**: Full calculation provenance for legal/safety review
 3. **Category Compliance**: Automatic validation for Normal/Utility/Acrobatic operations
 4. **Fuel Burn Analysis**: Validates CG after fuel consumption (often overlooked)
-5. **Template Library**: Pre-configured common aircraft for quick setup
-6. **Golden File Testing**: Validated against all FAA handbook examples
+5. **Template Library**: Pre-configured aircraft from light (Cessna 172) to heavy (Boeing C-17) for quick setup
+6. **Golden File Testing**: Validated against all FAA handbook examples plus edge cases
 
 ## Competitive Advantages
 

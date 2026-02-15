@@ -187,7 +187,7 @@ Every page must display:
 ❌ Not locking D3 version (updates can break rendering)
 ❌ Not validating envelope geometry (self-intersection, invalid polygons)
 ❌ Not handling NaN/Infinity in calculations
-❌ Not testing with extreme values (ultralight vs. heavy aircraft)
+❌ Not testing with extreme values (ultralight vs. heavy aircraft like C-17)
 
 ### UX Pitfalls
 ❌ Making disclaimers hard to see (must be PROMINENT)
