@@ -103,6 +103,11 @@ export async function loadCsvFromText(
     }
 
     if (!ctx.suspendReactiveFiltering) {
+      // CRITICAL FIX: Temporarily suspend reactive filtering while we batch state resets
+      // Without this, each assignment below triggers the reactive filter effect, causing 40+ calls
+      const wasSuspended = ctx.suspendReactiveFiltering;
+      ctx.suspendReactiveFiltering = true;
+      
       ctx.sortColIdx = null;
       ctx.sortDir = 'asc';
       ctx.sortSpecs = [];
@@ -115,6 +120,9 @@ export async function loadCsvFromText(
       if (ctx.numericF.colIdx != null && ctx.numericF.colIdx >= ctx.headers.length) ctx.numericF = { ...ctx.numericF, enabled: false, colIdx: null, error: null };
       if (ctx.dateF.colIdx != null && ctx.dateF.colIdx >= ctx.headers.length) ctx.dateF = { ...ctx.dateF, enabled: false, colIdx: null, error: null };
       if (ctx.catF.colIdx != null && ctx.catF.colIdx >= ctx.headers.length) ctx.catF = { enabled: false, colIdx: null, selected: new Set() };
+      
+      // Restore original suspend state
+      ctx.suspendReactiveFiltering = wasSuspended;
     }
 
     const preserveActiveQuery = (ctx.query ?? '').trim().length > 0 || ctx.matchMode !== 'fuzzy' || ctx.targetColIdx != null;
@@ -199,6 +207,11 @@ export async function loadCsvFromPath(
     }
 
     if (!ctx.suspendReactiveFiltering) {
+      // CRITICAL FIX: Temporarily suspend reactive filtering while we batch state resets
+      // Without this, each assignment below triggers the reactive filter effect, causing 40+ calls
+      const wasSuspended = ctx.suspendReactiveFiltering;
+      ctx.suspendReactiveFiltering = true;
+      
       ctx.sortColIdx = null;
       ctx.sortDir = 'asc';
       ctx.sortSpecs = [];
@@ -211,6 +224,9 @@ export async function loadCsvFromPath(
       if (ctx.numericF.colIdx != null && ctx.numericF.colIdx >= ctx.headers.length) ctx.numericF = { ...ctx.numericF, enabled: false, colIdx: null, error: null };
       if (ctx.dateF.colIdx != null && ctx.dateF.colIdx >= ctx.headers.length) ctx.dateF = { ...ctx.dateF, enabled: false, colIdx: null, error: null };
       if (ctx.catF.colIdx != null && ctx.catF.colIdx >= ctx.headers.length) ctx.catF = { enabled: false, colIdx: null, selected: new Set() };
+      
+      // Restore original suspend state
+      ctx.suspendReactiveFiltering = wasSuspended;
     }
 
     const preserveActiveQuery = (ctx.query ?? '').trim().length > 0 || ctx.matchMode !== 'fuzzy' || ctx.targetColIdx != null;
