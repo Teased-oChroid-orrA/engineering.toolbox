@@ -14,11 +14,11 @@ Why this definition is high leverage:
 
 - **Engine vs Browser**: Targets the real compatibility boundary: **Blink** vs **WebKit**.
 - **Svelte specifics**: Explicitly hunts issues around **reactive update correctness**, **layout thrashing**, and measurement loops (e.g., **ResizeObserver** churn).
-- **Tauri/Wails ready**: The âself-contained appâ model matches desktop WebViews. Playwright/WebDriver-style automation is the practical path to repeatable evidence.
+- **Tauri/Wails ready**: The “self-contained app” model matches desktop WebViews. Playwright/WebDriver-style automation is the practical path to repeatable evidence.
 
 This skill includes both:
 - **Definition** (this file): When/what to test and how to interpret results.
-- **Implementation** (runner.js): A Playwright-based âbridgeâ providing deterministic actions and workflows.
+- **Implementation** (runner.js): A Playwright-based “bridge” providing deterministic actions and workflows.
 
 ## Engine Targets
 
@@ -28,7 +28,7 @@ This skill includes both:
 | Windows / ChromeOS | Blink (Chromium/Edge family) | `chromium` |
 | Linux | varies by distro/toolkit; often WebKitGTK; sometimes Chromium | `webkit` (default), optional `chromium` |
 
-> Linux note: there is no single âdefault engineâ across distros. This skill treats Linux as **WebKit-first** (WebKitGTK-like environments), but supports **Chromium** if that matches your target.
+> Linux note: there is no single “default engine” across distros. This skill treats Linux as **WebKit-first** (WebKitGTK-like environments), but supports **Chromium** if that matches your target.
 
 ## Prerequisites
 
@@ -48,11 +48,11 @@ Directory layout:
 
 ```
 .github/skills/default-browser-devtools/
-âââ SKILL.md
-âââ runner.js
-âââ playwright.config.js
-âââ examples/
-    âââ README.md
+├── SKILL.md
+├── runner.js
+├── playwright.config.js
+└── examples/
+    └── README.md
 ```
 
 ### Quick Commands
@@ -118,7 +118,7 @@ The runner implements these conceptual actions (mapped to Playwright):
 
 ## Workflows
 
-### Workflow A â Smoke Test
+### Workflow A — Smoke Test
 
 Goal: verify load + hydration + basic interactions.
 
@@ -133,9 +133,9 @@ Run:
 node .github/skills/default-browser-devtools/runner.js smoke --url http://localhost:5173 --engines webkit,chromium
 ```
 
-### Workflow B â Triage
+### Workflow B — Triage
 
-Goal: fastest route to signal: âwhat broke?â
+Goal: fastest route to signal: “what broke?”
 
 - Loads app
 - Dumps console logs + request failures
@@ -146,18 +146,18 @@ Run:
 node .github/skills/default-browser-devtools/runner.js triage --url http://localhost:5173 --engine webkit
 ```
 
-### Workflow C â Golden Path
+### Workflow C — Golden Path
 
-Goal: deterministic âdonât lose featuresâ sequence.
+Goal: deterministic “don’t lose features” sequence.
 
-Edit the `steps` array inside `runner.js` to match your appâs invariants.
+Edit the `steps` array inside `runner.js` to match your app’s invariants.
 
 Run:
 ```bash
 node .github/skills/default-browser-devtools/runner.js golden --url http://localhost:5173 --engines webkit,chromium
 ```
 
-### Workflow D â Perf Trace
+### Workflow D — Perf Trace
 
 Goal: capture traces around load + short interaction window.
 

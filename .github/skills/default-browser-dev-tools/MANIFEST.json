@@ -1,0 +1,18 @@
+{
+  ".github/skills/default-browser-devtools/SKILL.md": {
+    "bytes": 5827,
+    "sha256": "b8b495a3574950e47f2959435d77614ac12da78f4e06d9b9c70dfd11100ad7aa"
+  },
+  ".github/skills/default-browser-devtools/runner.js": {
+    "bytes": 12339,
+    "sha256": "8b90317b4f8b0383cf695a7fa5b7a4242e6962dba3e7bc2e9f6827a203d5186d"
+  },
+  ".github/skills/default-browser-devtools/playwright.config.js": {
+    "bytes": 338,
+    "sha256": "18ed99472e5e30d009fc1da5897ef4d7e439bdb8cae409eff02efc751c8b8c0e"
+  },
+  ".github/skills/default-browser-devtools/examples/README.md": {
+    "bytes": 252,
+    "sha256": "d497f0a81841aa3112b5bf013f87c15776290f4542b51c9b65d6f0e0bc8a74ef"
+  }
+}
