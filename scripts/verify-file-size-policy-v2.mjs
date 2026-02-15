@@ -168,6 +168,24 @@ const DEFAULT_CONFIG = {
   }
 };
 
+function deepMerge(target, source) {
+  const output = { ...target };
+  
+  for (const key in source) {
+    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+      if (target[key] && typeof target[key] === 'object' && !Array.isArray(target[key])) {
+        output[key] = deepMerge(target[key], source[key]);
+      } else {
+        output[key] = source[key];
+      }
+    } else {
+      output[key] = source[key];
+    }
+  }
+  
+  return output;
+}
+
 function loadConfig(configPath) {
   const repoRoot = process.cwd();
   const fullPath = path.resolve(repoRoot, configPath);
@@ -182,8 +200,8 @@ function loadConfig(configPath) {
   try {
     const content = fs.readFileSync(fullPath, 'utf8');
     const config = JSON.parse(content);
-    // Merge with defaults
-    return { ...DEFAULT_CONFIG, ...config };
+    // Deep merge with defaults
+    return deepMerge(DEFAULT_CONFIG, config);
   } catch (error) {
     console.error(`Error loading config file: ${error.message}`);
     console.error('Using default configuration');
@@ -366,16 +384,34 @@ function parseExemptions(text) {
       exemptions.file = true;
     }
     
-    // Block-level exemption
+    // Block-level exemption - applies to next non-empty, non-comment line
     if (/@size-policy-exempt-block/i.test(line)) {
-      exemptions.blocks.add(i + 1);
+      // Find the next non-empty line
+      for (let j = i + 1; j < lines.length; j++) {
+        const nextLine = lines[j].trim();
+        if (nextLine && !nextLine.startsWith('//') && !nextLine.startsWith('/*')) {
+          exemptions.blocks.add(j + 1); // +1 for 1-based line numbers
+          break;
+        }
+      }
     }
     
-    // Custom limit override
+    // Custom limit override - applies to next non-empty, non-comment line
     const customMatch = line.match(/@size-policy-exempt\s+(function|class|interface|type|enum):(\d+)/i);
     if (customMatch) {
       const [, blockType, limit] = customMatch;
-      exemptions.customLimits[blockType.toLowerCase()] = parseInt(limit, 10);
+      // Find the next non-empty line
+      for (let j = i + 1; j < lines.length; j++) {
+        const nextLine = lines[j].trim();
+        if (nextLine && !nextLine.startsWith('//') && !nextLine.startsWith('/*')) {
+          // Store with line number as key
+          if (!exemptions.customLimits[j + 1]) {
+            exemptions.customLimits[j + 1] = {};
+          }
+          exemptions.customLimits[j + 1][blockType.toLowerCase()] = parseInt(limit, 10);
+          break;
+        }
+      }
     }
   }
   
@@ -589,17 +625,13 @@ function detectBlockViolations(fileRel, text, classification, exemptions) {
     }
   }
   
-  // Apply custom limits from exemption comments
-  if (exemptions.customLimits) {
-    blockLimits = { ...blockLimits, ...exemptions.customLimits };
-  }
-  
   // Check each block
   for (const block of blocks) {
     const startLine = block.line;
+    const lineNumber = startLine + 1; // 1-based line number
     
     // Check if block is exempted
-    if (exemptions.blocks.has(startLine + 1)) {
+    if (exemptions.blocks.has(lineNumber)) {
       continue;
     }
     
@@ -610,13 +642,18 @@ function detectBlockViolations(fileRel, text, classification, exemptions) {
     if (endLine === null) continue;
     
     const length = endLine - startLine + 1;
-    const limit = blockLimits[block.type] || 100;
+    
+    // Get limit for this block, checking for line-specific custom limits first
+    let limit = blockLimits[block.type] || 100;
+    if (exemptions.customLimits[lineNumber] && exemptions.customLimits[lineNumber][block.type]) {
+      limit = exemptions.customLimits[lineNumber][block.type];
+    }
     
     if (length > limit) {
       violations.push({
         kind: block.type,
         path: fileRel,
-        line: startLine + 1,
+        line: lineNumber,
         length,
         max: limit
       });

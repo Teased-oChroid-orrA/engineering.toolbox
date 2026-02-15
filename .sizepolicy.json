@@ -56,7 +56,9 @@
     "target/**",
     ".golden_build_cjs/**",
     "**/*.d.ts",
-    "**/generated/**"
+    "**/generated/**",
+    "report.html",
+    "violations.json"
   ],
   "contextOverrides": {
     "test": {
