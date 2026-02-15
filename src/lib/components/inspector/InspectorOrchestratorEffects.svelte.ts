@@ -78,9 +78,6 @@ export function setupSliceFetchEffect(deps: {
     const suspended = deps.suspendReactiveFiltering();
     if (!loaded || suspended) return;
     
-    const merged = deps.isMergedView();
-    if (merged) return;
-    
     const start = deps.startIdx();
     const end = deps.endIdx();
     const count = deps.totalFilteredCount();
