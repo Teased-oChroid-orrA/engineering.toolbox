@@ -7,7 +7,7 @@
     "dev": "node ./scripts/preflight-check.mjs && svelte-kit sync && vite dev --host 127.0.0.1 --port 5173 --strictPort",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "build": "node ./scripts/preflight-check.mjs && svelte-kit sync && vite build && node ./scripts/build-verify.mjs",
+    "build": "node ./scripts/preflight-check.mjs && vite build && node ./scripts/build-verify.mjs",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && node ./scripts/feature-contract-surface-toolbox.mjs && node ./scripts/verify-cross-tool-motion-depth.mjs && node ./scripts/verify-surface-architecture.mjs && node ./scripts/verify-bushing-architecture.mjs && node ./scripts/verify-dnd-integrity.mjs",
     "ci-check": "node ./scripts/ci-check.mjs",
