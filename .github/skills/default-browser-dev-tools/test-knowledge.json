@@ -3,12 +3,12 @@
   "learned_patterns": [],
   "optimized_selectors": {
     "interactive_elements": "button, a, [role='button'], summary",
-    "confidence": 0.70
+    "confidence": 0.72
   },
   "threshold_calibration": {
     "smoke_test": {
       "baseline_score": 0.85,
-      "confidence_threshold": 0.80,
+      "confidence_threshold": 0.8,
       "adjusted_from": []
     }
   },
