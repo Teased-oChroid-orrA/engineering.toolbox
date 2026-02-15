@@ -1179,13 +1179,15 @@
     return buildModalUiCtx({
       withViewTransition,
       modalPos,
+      setModalPos: (next) => { modalPos = next; },
       dragState,
-      recipeNotice,
-      showRecipeModal,
-      showShortcuts,
-      showSvarBuilder,
-      showRegexGenerator,
-      genTab,
+      setDragState: (next) => { dragState = next; },
+      setRecipeNotice: (v) => { recipeNotice = v; },
+      setShowRecipeModal: (v) => { showRecipeModal = v; },
+      setShowShortcuts: (v) => { showShortcuts = v; },
+      setShowSvarBuilder: (v) => { showSvarBuilder = v; },
+      setShowRegexGenerator: (v) => { showRegexGenerator = v; },
+      setGenTab: (v) => { genTab = v; },
     });
   }
   function floatingStyle(key: string): string {

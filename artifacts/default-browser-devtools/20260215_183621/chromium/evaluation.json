@@ -1,0 +1,35 @@
+{
+  "test_run_id": "chromium",
+  "overall_score": 0.515,
+  "dimensions": {
+    "completeness": 0.35,
+    "precision": 0.5,
+    "recall": 0.5,
+    "efficiency": 0.8
+  },
+  "confidence": 0.7528871606555023,
+  "feedback": [
+    {
+      "dimension": "completeness",
+      "severity": "medium",
+      "message": "Some expected artifacts are missing",
+      "action": "Check that all test steps completed successfully"
+    },
+    {
+      "dimension": "precision",
+      "severity": "low",
+      "message": "High false positive rate detected",
+      "action": "Consider filtering known benign issues (e.g., ResizeObserver loops)"
+    },
+    {
+      "dimension": "recall",
+      "severity": "high",
+      "message": "Critical errors may not be caught properly",
+      "action": "Review error detection logic and thresholds"
+    }
+  ],
+  "optimizations": [],
+  "patterns_detected": 0,
+  "patterns_learned": 0,
+  "knowledge_base_updated": false
+}
