@@ -40,10 +40,39 @@ Test Execution → Evidence Capture → Evaluation → Pattern Detection → Kno
 3. **Knowledge Base (test-knowledge.json)**: Persists learned patterns, optimized selectors, thresholds
 
 **Learning mechanisms:**
-- Pattern occurrence tracking (ResizeObserver loops, hydration errors, network timeouts)
+- Pattern occurrence tracking (ResizeObserver loops, hydration errors, network timeouts, **infinite loops**, **Svelte reactivity warnings**)
 - Selector confidence calibration based on interaction success rates
 - Failure clustering to identify common issue signatures
 - Threshold adjustment based on historical baseline scores
+- **Infinite loop detection** via repeated console message analysis
+- **Reactive dependency cycle detection** for Svelte/React frameworks
+
+### Enhanced Pattern Detection (v1.1)
+
+The evaluator has been enhanced to detect and provide actionable feedback for additional patterns learned from real-world debugging:
+
+**Critical Patterns:**
+- **Infinite Loops**: Detects repeated console messages in rapid succession (>20 occurrences, <100ms intervals)
+  - Example: `[SLICE FETCH EFFECT] Triggered` repeating infinitely
+  - Suggests checking for missing guards in reactive effects, circular dependencies
+  
+- **Reactive Dependency Cycles**: Identifies circular reactive chains
+  - Example: State A updates → triggers effect → updates State B → triggers effect → updates State A
+  - Provides actionable items for breaking the cycle with guards or untrack()
+
+**Code Quality Patterns:**
+- **Svelte 5 Reactivity Warnings**: Captures `state_referenced_locally` and similar compiler warnings
+  - Suggests using getter/setter pairs for proper reactivity
+  - Links to Svelte documentation for best practices
+  
+- **Hydration Mismatches**: Critical for SSR/Svelte apps
+  - Indicates SSR/CSR content differs
+  - High severity as it can cause UI inconsistencies
+
+**Performance Patterns:**
+- **ResizeObserver Loops**: Low severity, common false positive
+- **Network Timeouts**: Suggests retry logic or timeout adjustments
+- **Timing Issues**: Flags potential race conditions in async code
 
 ## Engine Targets
 
@@ -896,6 +925,163 @@ cp test-knowledge.json.template test-knowledge.json
 rm test-knowledge.json
 node runner.js smoke --url http://localhost:5173 --learn true
 ```
+
+### Issue: Infinite loop detected in console
+
+**Symptom:**
+```json
+{
+  "type": "infiniteLoop",
+  "count": 247,
+  "severity": "critical",
+  "description": "Infinite loop detected: '[SLICE FETCH EFFECT] Triggered...' repeated 247 times",
+  "avgIntervalMs": 15
+}
+```
+
+**Diagnosis:**
+- Message repeating >20 times with <100ms intervals = infinite loop
+- Typically caused by reactive dependency cycles or missing guards in effects
+
+**Fix:**
+1. **Check for missing guards in effects:**
+   ```javascript
+   $effect(() => {
+     if (!someCondition) return;  // Add guard
+     // ... rest of effect
+   });
+   ```
+
+2. **Verify state synchronization:**
+   - Svelte 5: Use getter/setter pairs instead of capturing initial values
+   - React: Check useEffect dependencies
+
+3. **Look for circular dependencies:**
+   ```javascript
+   // BAD: Circular update
+   $effect(() => {
+     stateA = stateB;  // Updates stateA
+   });
+   $effect(() => {
+     stateB = stateA;  // Updates stateB → triggers first effect → loop
+   });
+   
+   // GOOD: Add guard or use derived
+   let stateB = $derived(stateA);  // One-way dependency
+   ```
+
+4. **Add early return based on previous value:**
+   ```javascript
+   let lastValue = '';
+   $effect(() => {
+     if (value === lastValue) return;  // Skip if unchanged
+     lastValue = value;
+     // ... process value
+   });
+   ```
+
+**Real-world example:** Inspector toolbox fix
+- **Problem**: `loadState.isMergedView` captured initial value, stayed false
+- **Solution**: Used getters/setters for proper reactivity
+- **Result**: Guard check worked correctly, no infinite loop
+
+### Issue: Svelte reactivity warnings in dev console
+
+**Symptom:**
+```json
+{
+  "type": "svelteReactivityWarning",
+  "count": 17,
+  "severity": "medium",
+  "description": "Svelte 5 reactivity warning detected (state_referenced_locally)",
+  "examples": [
+    "This reference only captures the initial value of `isLoading`...",
+    "This reference only captures the initial value of `isMergedView`..."
+  ]
+}
+```
+
+**Diagnosis:**
+- Using shorthand initialization captures initial values, not reactive references
+- Example: `let obj = $state({ isLoading, headers })`  ← BAD
+
+**Fix:**
+Convert to getter/setter pairs:
+```javascript
+// BAD: Captures initial values
+let state = $state({
+  isLoading,
+  headers,
+  isMergedView
+});
+
+// GOOD: Uses reactive getters/setters
+let state = $state({
+  get isLoading() { return isLoading; },
+  set isLoading(v) { isLoading = v; },
+  get headers() { return headers; },
+  set headers(v) { headers = v; },
+  get isMergedView() { return isMergedView; },
+  set isMergedView(v) { isMergedView = v; }
+});
+```
+
+**Action items provided by evaluator:**
+1. Convert $state objects to use getter/setter pairs
+2. Use $derived for computed values
+3. Avoid capturing initial values in closures
+4. Review https://svelte.dev/docs/svelte/$state
+
+### Issue: Reactive loop causing performance problems
+
+**Symptom:**
+```json
+{
+  "type": "reactiveLoop",
+  "count": 3,
+  "severity": "critical",
+  "description": "Reactive dependency loop or circular dependency detected"
+}
+```
+
+**Diagnosis:**
+- Console shows messages about circular dependencies, infinite effects, or reactive loops
+- App becomes unresponsive due to constant re-rendering
+
+**Fix strategies provided by evaluator:**
+1. **Identify the reactive chain:**
+   - Use browser DevTools Performance tab
+   - Look for stack traces in console errors
+   - Add debug logging to track update sequence
+
+2. **Add conditional guards:**
+   ```javascript
+   $effect(() => {
+     if (updating) return;  // Guard against re-entry
+     updating = true;
+     // ... perform updates
+     updating = false;
+   });
+   ```
+
+3. **Use untrack() for non-reactive reads:**
+   ```javascript
+   import { untrack } from 'svelte';
+   
+   $effect(() => {
+     const currentValue = untrack(() => someState);  // Read without tracking
+     // ... use currentValue
+   });
+   ```
+
+4. **Extract shared state:**
+   ```javascript
+   // Instead of bidirectional updates between A ↔ B
+   // Use shared state: A → C ← B
+   let sharedState = $state({});
+   let derivedA = $derived(computeA(sharedState));
+   let derivedB = $derived(computeB(sharedState));
+   ```
 
 ## Integration with Agentic-Eval Framework
 
