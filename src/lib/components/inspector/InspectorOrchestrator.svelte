@@ -60,31 +60,55 @@
     const msg = err?.message ?? String(err); if (matchMode === 'regex') queryError = msg; else loadError = msg;
     }
   }
-  // Simplified: Direct $state object for controllers to mutate
+  // Reactive state object using getters to maintain Svelte 5 reactivity
+  // Controllers can read from and mutate this object
+  // Using getters ensures changes to component state are automatically reflected
   // NOTE: hiddenUploadInput excluded - it's a DOM binding, not reactive state
   let loadState = $state({
-    isLoading,
-    isMergedView,
-    loadError,
-    hasHeaders,
-    headerMode,
-    headerHeuristicReason,
-    pendingText,
-    pendingPath,
-    showHeaderPrompt,
-    headers,
-    totalRowCount,
-    totalFilteredCount,
-    visibleRows,
-    colTypes,
-    datasetId,
-    datasetLabel,
-    recipes,
-    pendingRestore,
-    hasLoaded,
-    showDataControls,
-    activeDatasetId,
-    mergedRowsAll
+    get isLoading() { return isLoading; },
+    set isLoading(v) { isLoading = v; },
+    get isMergedView() { return isMergedView; },
+    set isMergedView(v) { isMergedView = v; },
+    get loadError() { return loadError; },
+    set loadError(v) { loadError = v; },
+    get hasHeaders() { return hasHeaders; },
+    set hasHeaders(v) { hasHeaders = v; },
+    get headerMode() { return headerMode; },
+    set headerMode(v) { headerMode = v; },
+    get headerHeuristicReason() { return headerHeuristicReason; },
+    set headerHeuristicReason(v) { headerHeuristicReason = v; },
+    get pendingText() { return pendingText; },
+    set pendingText(v) { pendingText = v; },
+    get pendingPath() { return pendingPath; },
+    set pendingPath(v) { pendingPath = v; },
+    get showHeaderPrompt() { return showHeaderPrompt; },
+    set showHeaderPrompt(v) { showHeaderPrompt = v; },
+    get headers() { return headers; },
+    set headers(v) { headers = v; },
+    get totalRowCount() { return totalRowCount; },
+    set totalRowCount(v) { totalRowCount = v; },
+    get totalFilteredCount() { return totalFilteredCount; },
+    set totalFilteredCount(v) { totalFilteredCount = v; },
+    get visibleRows() { return visibleRows; },
+    set visibleRows(v) { visibleRows = v; },
+    get colTypes() { return colTypes; },
+    set colTypes(v) { colTypes = v; },
+    get datasetId() { return datasetId; },
+    set datasetId(v) { datasetId = v; },
+    get datasetLabel() { return datasetLabel; },
+    set datasetLabel(v) { datasetLabel = v; },
+    get recipes() { return recipes; },
+    set recipes(v) { recipes = v; },
+    get pendingRestore() { return pendingRestore; },
+    set pendingRestore(v) { pendingRestore = v; },
+    get hasLoaded() { return hasLoaded; },
+    set hasLoaded(v) { hasLoaded = v; },
+    get showDataControls() { return showDataControls; },
+    set showDataControls(v) { showDataControls = v; },
+    get activeDatasetId() { return activeDatasetId; },
+    set activeDatasetId(v) { activeDatasetId = v; },
+    get mergedRowsAll() { return mergedRowsAll; },
+    set mergedRowsAll(v) { mergedRowsAll = v; }
   });
 
   // Callback to update visibleRows - used by GridController in merged view
@@ -92,20 +116,6 @@
   function updateVisibleRows(rows: string[][]) {
     loadState.visibleRows = rows;
   }
-
-  // Sync loadState changes back to component variables
-  // Note: visibleRows is synced here but also can be updated via updateVisibleRows callback
-  $effect(() => {
-    isLoading = loadState.isLoading;
-    headers = loadState.headers;
-    totalRowCount = loadState.totalRowCount;
-    hasLoaded = loadState.hasLoaded;
-    visibleRows = loadState.visibleRows;
-    colTypes = loadState.colTypes;
-    datasetId = loadState.datasetId;
-    totalFilteredCount = loadState.totalFilteredCount;
-    isMergedView = loadState.isMergedView;  // CRITICAL: Sync isMergedView to prevent infinite loop
-  });
   
   function loadControllerCtx() { 
     return buildLoadControllerCtx({ loadState, invoke, debugLogger, dialogMod, fnv1a32, heuristicHasHeaders, computeDatasetIdentity, upsertWorkspaceDatasetInList, loadRecipesForDataset, loadLastStateForDataset, applyState, runFilterNow, buildFilterSpec, queueDebug, queueDebugRate, recordPerf, runCrossDatasetQuery, activateWorkspaceDataset, hiddenUploadInput, isLoading, isMergedView, loadError, hasHeaders, headerMode, headerHeuristicReason, pendingText, pendingPath, showHeaderPrompt, headers, totalRowCount, totalFilteredCount, visibleRows, colTypes, datasetId, datasetLabel, recipes, pendingRestore, hasLoaded, showDataControls, activeDatasetId, mergedRowsAll, loadedDatasets, query, matchMode, targetColIdx, numericF, dateF, catF, suspendReactiveFiltering, sortColIdx, sortDir, sortSpecs, visibleColumns, pinnedLeft, pinnedRight, hiddenColumns, columnWidths, crossQueryBusy, queryScope, crossQueryResults, mergedHeaders, preMergedHeaders, preMergedColTypes, preMergedTotalRowCount, preMergedTotalFilteredCount });

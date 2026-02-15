@@ -17,13 +17,15 @@ test('Inspector should not have infinite loop when loading CSV', async ({ page }
   
   // Navigate to inspector
   await page.goto('/#/inspector');
-  await page.waitForTimeout(1000);
   
-  // Click menu and upload
+  // Wait for Inspector menu button to be visible
   const menuButton = page.getByRole('button', { name: /^Inspector/i });
+  await expect(menuButton).toBeVisible({ timeout: 5000 });
   await menuButton.click();
   
+  // Wait for upload option to appear
   const uploadOption = page.getByRole('button', { name: /📤 Upload/i });
+  await expect(uploadOption).toBeVisible({ timeout: 2000 });
   await uploadOption.click();
   
   // Upload CSV
@@ -39,8 +41,12 @@ Charlie,35,Chicago`;
     buffer: Buffer.from(csvContent)
   });
   
-  // Wait for processing
-  await page.waitForTimeout(3000);
+  // Wait for data to be loaded by checking for the row count indicator
+  // This is more deterministic than a fixed timeout
+  await expect(page.locator('text=/Rows.*3/')).toBeVisible({ timeout: 5000 });
+  
+  // Allow a brief moment for any async effects to complete
+  await page.waitForTimeout(500);
   
   // Check console logs
   console.log(`Total console messages: ${consoleMessages.length}`);
