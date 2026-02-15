@@ -12,7 +12,7 @@ test.describe('Inspector overlay visibility', () => {
     await expect(shortcutsDialog).toBeHidden();
 
     await page.getByRole('button', { name: /Inspector/i }).first().click();
-    await page.getByRole('button', { name: 'Open Recipes' }).first().click();
+    await page.getByRole('button', { name: 'Recipes' }).first().click();
     const recipesDialog = page.getByRole('dialog', { name: 'Inspector recipes' });
     await expect(recipesDialog).toBeVisible();
     await expect(page.getByText('View Recipes')).toBeVisible();

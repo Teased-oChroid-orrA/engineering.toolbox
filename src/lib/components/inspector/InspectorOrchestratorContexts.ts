@@ -635,42 +635,28 @@ export function rowDrawerControllerCtx(state: {
 export function modalUiCtx(state: {
   withViewTransition: any;
   modalPos: Record<string, { x: number; y: number }>;
+  setModalPos: (next: Record<string, { x: number; y: number }>) => void;
   dragState: { key: string; sx: number; sy: number; ox: number; oy: number } | null;
-  recipeNotice: string | null;
-  showRecipeModal: boolean;
-  showShortcuts: boolean;
-  showSvarBuilder: boolean;
-  showRegexGenerator: boolean;
-  genTab: GenTab;
+  setDragState: (next: { key: string; sx: number; sy: number; ox: number; oy: number } | null) => void;
+  setRecipeNotice: (v: string | null) => void;
+  setShowRecipeModal: (v: boolean) => void;
+  setShowShortcuts: (v: boolean) => void;
+  setShowSvarBuilder: (v: boolean) => void;
+  setShowRegexGenerator: (v: boolean) => void;
+  setGenTab: (v: GenTab) => void;
 }) {
   return {
     withViewTransition: state.withViewTransition,
     modalPos: state.modalPos,
-    setModalPos: (next: typeof state.modalPos) => {
-      state.modalPos = next;
-    },
+    setModalPos: state.setModalPos,
     dragState: state.dragState,
-    setDragState: (next: typeof state.dragState) => {
-      state.dragState = next;
-    },
-    setRecipeNotice: (v: string | null) => {
-      state.recipeNotice = v;
-    },
-    setShowRecipeModal: (v: boolean) => {
-      state.showRecipeModal = v;
-    },
-    setShowShortcuts: (v: boolean) => {
-      state.showShortcuts = v;
-    },
-    setShowSvarBuilder: (v: boolean) => {
-      state.showSvarBuilder = v;
-    },
-    setShowRegexGenerator: (v: boolean) => {
-      state.showRegexGenerator = v;
-    },
-    setGenTab: (v: typeof state.genTab) => {
-      state.genTab = v;
-    }
+    setDragState: state.setDragState,
+    setRecipeNotice: state.setRecipeNotice,
+    setShowRecipeModal: state.setShowRecipeModal,
+    setShowShortcuts: state.setShowShortcuts,
+    setShowSvarBuilder: state.setShowSvarBuilder,
+    setShowRegexGenerator: state.setShowRegexGenerator,
+    setGenTab: state.setGenTab
   };
 }
 
