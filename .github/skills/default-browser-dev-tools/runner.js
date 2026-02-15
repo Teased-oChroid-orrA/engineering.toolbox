@@ -4,20 +4,23 @@
  * Cross-engine testing for self-contained Svelte apps using Playwright.
  *
  * Commands:
- *   smoke   - baseline load + conservative click sweep + artifacts
- *   triage  - console + request failures + screenshot
- *   golden  - deterministic steps (edit steps array)
+ *   smoke   - baseline load + conservative click sweep + artifacts + evaluation
+ *   triage  - console + request failures + screenshot + evaluation
+ *   golden  - deterministic steps (edit steps array) + evaluation
  *   perf    - tracing around load + small window
+ *   eval    - evaluate existing test artifacts (no test execution)
  *
  * Examples:
  *   node .github/skills/default-browser-devtools/runner.js smoke --url http://localhost:5173 --engines webkit,chromium
  *   node .github/skills/default-browser-devtools/runner.js triage --url http://localhost:5173 --engine webkit
+ *   node .github/skills/default-browser-devtools/runner.js eval --artifacts ./artifacts/... --learn true
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { chromium, webkit } from "playwright";
+import TestEvaluator from "./evaluator.js";
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -124,8 +127,14 @@ async function safeInnerText(locator) {
   }
 }
 
-async function conservativeClickSweep(page, opts) {
-  const selector = opts.sweepSelector || "button, a, [role='button'], summary";
+async function conservativeClickSweep(page, opts, knowledgeBase) {
+  // Use learned selector if available and confident
+  let selector = opts.sweepSelector || "button, a, [role='button'], summary";
+  if (knowledgeBase?.optimized_selectors?.interactive_elements && 
+      knowledgeBase.optimized_selectors.confidence >= 0.75) {
+    selector = knowledgeBase.optimized_selectors.interactive_elements;
+  }
+  
   const maxClicks = Number(opts.maxClicks || 30);
   const postClickWaitMs = Number(opts.postClickWaitMs || 120);
 
@@ -173,7 +182,7 @@ function summarizeFindings(consoleMessages, requestFailures) {
   };
 }
 
-async function runOneEngine(command, url, engineName, opts, outRoot) {
+async function runOneEngine(command, url, engineName, opts, outRoot, knowledgeBase) {
   const { engine } = pickEngine(engineName);
   const browser = await engine.launch({ headless: String(opts.headless || "true") !== "false" });
   const context = await makeContext(browser, opts);
@@ -221,7 +230,7 @@ async function runOneEngine(command, url, engineName, opts, outRoot) {
     if (command === "triage") {
       // no additional steps
     } else if (command === "smoke") {
-      result.interactions = await conservativeClickSweep(page, opts);
+      result.interactions = await conservativeClickSweep(page, opts, knowledgeBase);
 
       const postPng = path.join(engineOut, "post_interaction.png");
       await page.screenshot({ path: postPng, fullPage: true });
@@ -318,9 +327,91 @@ async function main() {
   const args = parseArgs(argv);
 
   const command = args._[0];
-  if (!command || !["smoke", "triage", "golden", "perf"].includes(command)) {
-    console.error("Usage: runner.js <smoke|triage|golden|perf> --url <http://...> [--engine webkit|chromium | --engines webkit,chromium] [--headless true|false]");
+  if (!command || !["smoke", "triage", "golden", "perf", "eval"].includes(command)) {
+    console.error("Usage: runner.js <smoke|triage|golden|perf|eval> --url <http://...> [options]");
+    console.error("\nCommands:");
+    console.error("  smoke   - Load + click sweep + artifacts + evaluation");
+    console.error("  triage  - Console + network + screenshot + evaluation");
+    console.error("  golden  - Deterministic feature sequence + evaluation");
+    console.error("  perf    - Performance trace + analysis");
+    console.error("  eval    - Evaluate existing test artifacts");
+    console.error("\nOptions:");
+    console.error("  --url <url>                   Target URL (default: http://localhost:5173)");
+    console.error("  --engine <webkit|chromium>    Single engine");
+    console.error("  --engines <list>              Comma-separated engines (default: webkit,chromium)");
+    console.error("  --learn <true|false>          Enable evaluation & learning (default: true)");
+    console.error("  --knowledge-base <path>       Path to knowledge base (default: ./test-knowledge.json)");
+    console.error("  --eval-only <true|false>      Only evaluate, don't run tests");
+    console.error("  --eval-consensus <n>          Number of evaluation passes for consensus (default: 1)");
+    console.error("  --artifacts <path>            Path to artifacts for eval-only mode");
+    console.error("  --headless <true|false>       Run in headless mode (default: true)");
     process.exit(2);
+  }
+
+  // Load knowledge base if learning is enabled
+  let knowledgeBase = null;
+  const knowledgeBasePath = args.knowledgeBase || path.join(path.dirname(new URL(import.meta.url).pathname), "test-knowledge.json");
+  if (args.learn !== "false" && fs.existsSync(knowledgeBasePath)) {
+    try {
+      knowledgeBase = JSON.parse(fs.readFileSync(knowledgeBasePath, "utf8"));
+    } catch (e) {
+      console.warn(`Failed to load knowledge base: ${e.message}`);
+    }
+  }
+
+  // Handle eval-only mode
+  if (args.evalOnly === "true" || command === "eval") {
+    const artifactsPath = args.artifacts || args.url;
+    if (!artifactsPath) {
+      console.error("Error: --artifacts path is required for eval-only mode");
+      process.exit(2);
+    }
+    
+    if (!fs.existsSync(artifactsPath)) {
+      console.error(`Error: Artifacts path does not exist: ${artifactsPath}`);
+      process.exit(2);
+    }
+
+    console.log("\n--- Evaluation-Only Mode ---\n");
+    const evaluator = new TestEvaluator(knowledgeBasePath);
+    
+    // Find engine directories
+    const engineDirs = fs.readdirSync(artifactsPath).filter(d => {
+      const fullPath = path.join(artifactsPath, d);
+      return fs.statSync(fullPath).isDirectory();
+    });
+    
+    if (engineDirs.length === 0) {
+      console.error("No engine directories found in artifacts path");
+      process.exit(2);
+    }
+
+    const evaluations = [];
+    for (const engineDir of engineDirs) {
+      const enginePath = path.join(artifactsPath, engineDir);
+      console.log(`Evaluating ${engineDir}...`);
+      
+      try {
+        const evaluation = evaluator.evaluate(enginePath);
+        evaluations.push(evaluation);
+        
+        console.log(JSON.stringify(evaluation, null, 2));
+        console.log();
+      } catch (e) {
+        console.error(`  Evaluation failed: ${e.message}`);
+      }
+    }
+
+    // Write combined evaluation
+    const combinedEvalPath = path.join(artifactsPath, "combined_evaluation.json");
+    fs.writeFileSync(combinedEvalPath, JSON.stringify({
+      timestamp: new Date().toISOString(),
+      knowledge_base: knowledgeBasePath,
+      evaluations,
+    }, null, 2));
+    
+    console.log(`\n✓ Evaluation complete. Results written to ${combinedEvalPath}\n`);
+    process.exit(0);
   }
 
   const url = String(args.url || "http://localhost:5173");
@@ -331,7 +422,7 @@ async function main() {
 
   const results = [];
   for (const eng of engines) {
-    results.push(await runOneEngine(command, url, eng, args, outRoot));
+    results.push(await runOneEngine(command, url, eng, args, outRoot, knowledgeBase));
   }
 
   const combined = {
@@ -359,6 +450,76 @@ async function main() {
       summaryFile: r.files?.summary ?? null,
     }))
   }, null, 2));
+
+  // Evaluation & Learning Phase
+  if (args.learn !== "false" && command !== "perf") {
+    console.log("\n--- Evaluation & Learning Phase ---\n");
+    
+    const evaluator = new TestEvaluator(knowledgeBasePath);
+    const consensus = Number(args.evalConsensus || 1);
+    
+    for (const result of results) {
+      const engineOut = path.join(outRoot, result.engine);
+      console.log(`Evaluating ${result.engine} test run...`);
+      
+      try {
+        const evaluations = [];
+        
+        // Run evaluation multiple times if consensus requested
+        for (let i = 0; i < consensus; i++) {
+          evaluations.push(evaluator.evaluate(engineOut));
+        }
+        
+        // Use first evaluation (or average for consensus)
+        const evaluation = evaluations[0];
+        
+        // If consensus > 1, compute average scores
+        if (consensus > 1) {
+          const avgScore = evaluations.reduce((sum, e) => sum + e.overall_score, 0) / evaluations.length;
+          const avgConfidence = evaluations.reduce((sum, e) => sum + e.confidence, 0) / evaluations.length;
+          
+          console.log(`  Score: ${avgScore.toFixed(2)} (consensus of ${consensus})`);
+          console.log(`  Confidence: ${avgConfidence.toFixed(2)}`);
+          
+          evaluation.consensus = {
+            runs: consensus,
+            average_score: avgScore,
+            average_confidence: avgConfidence,
+            variance: evaluations.reduce((sum, e) => sum + Math.pow(e.overall_score - avgScore, 2), 0) / evaluations.length,
+          };
+        } else {
+          console.log(`  Score: ${evaluation.overall_score.toFixed(2)}`);
+          console.log(`  Confidence: ${evaluation.confidence.toFixed(2)}`);
+        }
+        
+        console.log(`  Patterns detected: ${evaluation.patterns_detected}`);
+        console.log(`  Patterns learned: ${evaluation.patterns_learned}`);
+        
+        if (evaluation.optimizations.length > 0) {
+          console.log(`  Optimizations suggested: ${evaluation.optimizations.length}`);
+          evaluation.optimizations.slice(0, 3).forEach(opt => {
+            console.log(`    - [${opt.priority}] ${opt.suggestion}`);
+          });
+        }
+        
+        if (evaluation.feedback.length > 0) {
+          console.log(`  Feedback:`);
+          evaluation.feedback.forEach(fb => {
+            console.log(`    - [${fb.severity}] ${fb.message}`);
+          });
+        }
+        
+        // Write evaluation to file
+        const evalPath = path.join(engineOut, "evaluation.json");
+        fs.writeFileSync(evalPath, JSON.stringify(evaluation, null, 2));
+        
+      } catch (e) {
+        console.error(`  Evaluation failed: ${e.message}`);
+      }
+    }
+    
+    console.log("\n✓ Knowledge base updated\n");
+  }
 }
 
 main().catch((e) => {

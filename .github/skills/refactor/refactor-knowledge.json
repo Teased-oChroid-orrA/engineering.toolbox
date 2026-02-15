@@ -1,0 +1,40 @@
+{
+  "version": "1.0",
+  "learned_smells": [],
+  "successful_refactorings": [],
+  "refactoring_patterns": {
+    "extract_method": {
+      "success_count": 0,
+      "confidence": 0.70
+    },
+    "introduce_constant": {
+      "success_count": 0,
+      "confidence": 0.75
+    },
+    "improve_naming": {
+      "success_count": 0,
+      "confidence": 0.80
+    },
+    "reduce_nesting": {
+      "success_count": 0,
+      "confidence": 0.70
+    },
+    "add_types": {
+      "success_count": 0,
+      "confidence": 0.65
+    }
+  },
+  "threshold_calibration": {
+    "minimal_mode": {
+      "baseline_score": 0.80,
+      "confidence_threshold": 0.75,
+      "adjusted_from": []
+    },
+    "structural_mode": {
+      "baseline_score": 0.75,
+      "confidence_threshold": 0.70,
+      "adjusted_from": []
+    }
+  },
+  "smell_clusters": []
+}

@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "learned_patterns": [],
+  "optimized_selectors": {
+    "interactive_elements": "button, a, [role='button'], summary",
+    "confidence": 0.70
+  },
+  "threshold_calibration": {
+    "smoke_test": {
+      "baseline_score": 0.85,
+      "confidence_threshold": 0.80,
+      "adjusted_from": []
+    }
+  },
+  "failure_clusters": []
+}
