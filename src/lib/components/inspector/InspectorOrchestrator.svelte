@@ -164,13 +164,15 @@
     setupReactiveFilterEffect,
     setupCrossQueryEffect,
     setupPersistStateEffect,
+  } from "$lib/components/inspector/InspectorOrchestratorEffects.svelte";
+  import {
     setupUiAnimDurEffect,
     setupQuietBackendLogsEffect,
     setupContextMenuEffect,
     setupCategoryColumnChangeEffect,
     setupCategorySearchEffect,
     setupGridWindowInitEffect,
-  } from "$lib/components/inspector/InspectorOrchestratorEffects.svelte";
+  } from "$lib/components/inspector/InspectorOrchestratorEffectsUi.svelte";
   import {
     filterControllerCtx as buildFilterControllerCtx,
     loadControllerCtxCore as buildLoadControllerCtxCore,
