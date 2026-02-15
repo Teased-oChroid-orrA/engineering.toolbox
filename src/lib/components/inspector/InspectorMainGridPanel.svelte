@@ -98,7 +98,7 @@
 </div>
 
 <div class="order-50">
-  {#if isMergedView}
+  {#if isMergedView && mergedGroupedRows.length > 0}
     <InspectorMergedGrid
       {mergedDisplayHeaders}
       {mergedGroupedRows}
