@@ -31,6 +31,13 @@ const PATTERN_LIBRARY = {
   networkTimeout: /timeout|ETIMEDOUT|ECONNREFUSED/i,
   timingIssue: /racing|timing|async/i,
   platformSpecific: /webkit|chromium|blink|safari|chrome/i,
+  
+  // New patterns learned from Inspector infinite loop fix
+  infiniteLoop: /\[.*EFFECT.*\].*Triggered/i,  // Detect repeated effect triggers
+  reactiveLoop: /\$effect.*infinite|loop.*reactive|circular.*dependency/i,
+  stateReferencedLocally: /state_referenced_locally|captures.*initial value/i,
+  svelteReactivityWarning: /https:\/\/svelte\.dev\/e\//i,
+  repeatedConsolePattern: null,  // Dynamic detection - see detectRepeatedPatterns()
 };
 
 class TestEvaluator {
@@ -377,7 +384,98 @@ class TestEvaluator {
       });
     }
 
+    // NEW: Detect infinite loops via repeated console patterns
+    const infiniteLoopDetection = this.detectInfiniteLoop(consoleMessages);
+    if (infiniteLoopDetection) {
+      patterns.push(infiniteLoopDetection);
+    }
+
+    // NEW: Detect Svelte reactivity warnings
+    const reactivityWarnings = consoleMessages.filter(m =>
+      PATTERN_LIBRARY.stateReferencedLocally.test(m.text) ||
+      PATTERN_LIBRARY.svelteReactivityWarning.test(m.text)
+    );
+    if (reactivityWarnings.length > 0) {
+      patterns.push({
+        type: "svelteReactivityWarning",
+        count: reactivityWarnings.length,
+        severity: "medium",
+        description: "Svelte 5 reactivity warning detected (state_referenced_locally or similar)",
+        examples: reactivityWarnings.slice(0, 3).map(m => m.text),
+      });
+    }
+
+    // NEW: Detect reactive loop warnings
+    const reactiveLoopMatches = consoleMessages.filter(m =>
+      PATTERN_LIBRARY.reactiveLoop.test(m.text)
+    );
+    if (reactiveLoopMatches.length > 0) {
+      patterns.push({
+        type: "reactiveLoop",
+        count: reactiveLoopMatches.length,
+        severity: "critical",
+        description: "Reactive dependency loop or circular dependency detected",
+        examples: reactiveLoopMatches.slice(0, 2).map(m => m.text),
+      });
+    }
+
     return patterns;
+  }
+
+  /**
+   * Detect infinite loops by analyzing repeated console patterns
+   * @param {array} consoleMessages - Console messages
+   * @returns {object|null} Pattern if infinite loop detected, null otherwise
+   */
+  detectInfiniteLoop(consoleMessages) {
+    if (!consoleMessages || consoleMessages.length < 20) return null;
+
+    // Group messages by text content
+    const messageFrequency = new Map();
+    const timeWindows = new Map();  // Track when messages occur
+    
+    for (const msg of consoleMessages) {
+      const text = msg.text;
+      if (!messageFrequency.has(text)) {
+        messageFrequency.set(text, []);
+        timeWindows.set(text, []);
+      }
+      messageFrequency.get(text).push(msg);
+      timeWindows.get(text).push(msg.time);
+    }
+
+    // Look for patterns that repeat excessively
+    for (const [text, occurrences] of messageFrequency.entries()) {
+      const count = occurrences.length;
+      
+      // Threshold: More than 20 identical messages suggests a loop
+      if (count > 20) {
+        // Check if messages are clustered in time (rapid succession = loop)
+        const times = timeWindows.get(text);
+        if (times.length >= 3) {
+          const timeDeltas = [];
+          for (let i = 1; i < Math.min(times.length, 10); i++) {
+            timeDeltas.push(times[i] - times[i-1]);
+          }
+          const avgDelta = timeDeltas.reduce((sum, d) => sum + d, 0) / timeDeltas.length;
+          
+          // If average time between messages is < 100ms, likely an infinite loop
+          if (avgDelta < 100) {
+            return {
+              type: "infiniteLoop",
+              count: count,
+              severity: "critical",
+              description: `Infinite loop detected: "${text.substring(0, 80)}" repeated ${count} times`,
+              pattern: text,
+              avgIntervalMs: Math.round(avgDelta),
+              recommendation: "Check for reactive dependency cycles or missing guards in effects",
+            };
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -415,6 +513,62 @@ class TestEvaluator {
           priority: "medium",
           suggestion: "Increase network timeout or add retry logic",
           rationale: `${pattern.count} timeout(s) detected`,
+        });
+      }
+
+      // NEW: Infinite loop optimizations
+      if (pattern.type === "infiniteLoop") {
+        optimizations.push({
+          category: "critical-bug",
+          priority: "critical",
+          suggestion: "Fix infinite loop: Add guards to prevent reactive cycles",
+          rationale: pattern.description,
+          details: {
+            pattern: pattern.pattern,
+            count: pattern.count,
+            avgIntervalMs: pattern.avgIntervalMs,
+            recommendation: pattern.recommendation,
+          },
+          actionItems: [
+            "Check for missing guards in $effect blocks",
+            "Verify state synchronization uses getters/setters",
+            "Look for circular dependencies in reactive chains",
+            "Add early return conditions based on state flags",
+          ],
+        });
+      }
+
+      // NEW: Svelte reactivity warning optimizations
+      if (pattern.type === "svelteReactivityWarning") {
+        optimizations.push({
+          category: "code-quality",
+          priority: "medium",
+          suggestion: "Fix Svelte 5 reactivity patterns to use getters/setters",
+          rationale: `${pattern.count} reactivity warning(s) detected`,
+          actionItems: [
+            "Convert $state objects to use getter/setter pairs",
+            "Use $derived for computed values instead of $state snapshots",
+            "Avoid capturing initial values in closures",
+            "Review https://svelte.dev/docs/svelte/$state for best practices",
+          ],
+          examples: pattern.examples,
+        });
+      }
+
+      // NEW: Reactive loop optimizations
+      if (pattern.type === "reactiveLoop") {
+        optimizations.push({
+          category: "critical-bug",
+          priority: "critical",
+          suggestion: "Fix circular reactive dependency",
+          rationale: pattern.description,
+          actionItems: [
+            "Identify the reactive chain causing the loop",
+            "Add conditional guards to break the cycle",
+            "Use untrack() for non-reactive reads",
+            "Consider extracting shared state to avoid bidirectional updates",
+          ],
+          examples: pattern.examples,
         });
       }
     }

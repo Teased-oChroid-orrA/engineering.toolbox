@@ -60,50 +60,68 @@
     const msg = err?.message ?? String(err); if (matchMode === 'regex') queryError = msg; else loadError = msg;
     }
   }
-  // Simplified: Direct $state object for controllers to mutate
+  // Reactive state object using getters to maintain Svelte 5 reactivity
+  // Controllers can read from and mutate this object
+  // Using getters ensures changes to component state are automatically reflected
   // NOTE: hiddenUploadInput excluded - it's a DOM binding, not reactive state
   let loadState = $state({
-    isLoading,
-    isMergedView,
-    loadError,
-    hasHeaders,
-    headerMode,
-    headerHeuristicReason,
-    pendingText,
-    pendingPath,
-    showHeaderPrompt,
-    headers,
-    totalRowCount,
-    totalFilteredCount,
-    visibleRows,
-    colTypes,
-    datasetId,
-    datasetLabel,
-    recipes,
-    pendingRestore,
-    hasLoaded,
-    showDataControls,
-    activeDatasetId,
-    mergedRowsAll
+    get isLoading() { return isLoading; },
+    set isLoading(v) { isLoading = v; },
+    get isMergedView() { return isMergedView; },
+    set isMergedView(v) { isMergedView = v; },
+    get loadError() { return loadError; },
+    set loadError(v) { loadError = v; },
+    get hasHeaders() { return hasHeaders; },
+    set hasHeaders(v) { hasHeaders = v; },
+    get headerMode() { return headerMode; },
+    set headerMode(v) { headerMode = v; },
+    get headerHeuristicReason() { return headerHeuristicReason; },
+    set headerHeuristicReason(v) { headerHeuristicReason = v; },
+    get pendingText() { return pendingText; },
+    set pendingText(v) { pendingText = v; },
+    get pendingPath() { return pendingPath; },
+    set pendingPath(v) { pendingPath = v; },
+    get showHeaderPrompt() { return showHeaderPrompt; },
+    set showHeaderPrompt(v) { showHeaderPrompt = v; },
+    get headers() { return headers; },
+    set headers(v) { headers = v; },
+    get totalRowCount() { return totalRowCount; },
+    set totalRowCount(v) { totalRowCount = v; },
+    get totalFilteredCount() { return totalFilteredCount; },
+    set totalFilteredCount(v) { totalFilteredCount = v; },
+    get visibleRows() { return visibleRows; },
+    set visibleRows(v) { visibleRows = v; },
+    get colTypes() { return colTypes; },
+    set colTypes(v) { colTypes = v; },
+    get datasetId() { return datasetId; },
+    set datasetId(v) { datasetId = v; },
+    get datasetLabel() { return datasetLabel; },
+    set datasetLabel(v) { datasetLabel = v; },
+    get recipes() { return recipes; },
+    set recipes(v) { recipes = v; },
+    get pendingRestore() { return pendingRestore; },
+    set pendingRestore(v) { pendingRestore = v; },
+    get hasLoaded() { return hasLoaded; },
+    set hasLoaded(v) { hasLoaded = v; },
+    get showDataControls() { return showDataControls; },
+    set showDataControls(v) { showDataControls = v; },
+    get activeDatasetId() { return activeDatasetId; },
+    set activeDatasetId(v) { activeDatasetId = v; },
+    get mergedRowsAll() { return mergedRowsAll; },
+    set mergedRowsAll(v) { mergedRowsAll = v; }
   });
 
-  // Sync loadState changes back to component variables
-  $effect(() => {
-    isLoading = loadState.isLoading;
-    headers = loadState.headers;
-    totalRowCount = loadState.totalRowCount;
-    hasLoaded = loadState.hasLoaded;
-    visibleRows = loadState.visibleRows;
-    colTypes = loadState.colTypes;
-    datasetId = loadState.datasetId;
-    totalFilteredCount = loadState.totalFilteredCount;
-  });
+  // Callback to update visibleRows - used by GridController in merged view
+  // This helps manage reactivity when fetching slices
+  function updateVisibleRows(rows: string[][]) {
+    loadState.visibleRows = rows;
+  }
   
   function loadControllerCtx() { 
     return buildLoadControllerCtx({ loadState, invoke, debugLogger, dialogMod, fnv1a32, heuristicHasHeaders, computeDatasetIdentity, upsertWorkspaceDatasetInList, loadRecipesForDataset, loadLastStateForDataset, applyState, runFilterNow, buildFilterSpec, queueDebug, queueDebugRate, recordPerf, runCrossDatasetQuery, activateWorkspaceDataset, hiddenUploadInput, isLoading, isMergedView, loadError, hasHeaders, headerMode, headerHeuristicReason, pendingText, pendingPath, showHeaderPrompt, headers, totalRowCount, totalFilteredCount, visibleRows, colTypes, datasetId, datasetLabel, recipes, pendingRestore, hasLoaded, showDataControls, activeDatasetId, mergedRowsAll, loadedDatasets, query, matchMode, targetColIdx, numericF, dateF, catF, suspendReactiveFiltering, sortColIdx, sortDir, sortSpecs, visibleColumns, pinnedLeft, pinnedRight, hiddenColumns, columnWidths, crossQueryBusy, queryScope, crossQueryResults, mergedHeaders, preMergedHeaders, preMergedColTypes, preMergedTotalRowCount, preMergedTotalFilteredCount });
   }
     async function loadCsvFromText(text: string, hasHeadersOverride?: boolean, trackWorkspace = true, forcedLabel?: string, applyInitialFilter = true) { await loadCsvFromTextController(loadControllerCtx(), text, hasHeadersOverride, trackWorkspace, forcedLabel, applyInitialFilter); } async function loadCsvFromPath(path: string, hasHeadersOverride?: boolean, trackWorkspace = true, forcedLabel?: string, applyInitialFilter = true) { await loadCsvFromPathController(loadControllerCtx(), path, hasHeadersOverride, trackWorkspace, forcedLabel, applyInitialFilter); }
-  function gridControllerCtx() { return buildGridControllerCtx({ invoke, recordPerf, queueDebug, loadState, hasLoaded, sliceGate, startIdx: gridWindow.startIdx, endIdx: gridWindow.endIdx, visibleColIdxs, isMergedView, mergedRowsAll, visibleRows, loadError, totalFilteredCount, sliceTimer, headers, sortGate, sortColIdx, sortDir, sortSpecs, visibleColumns, columnPickerNotice, showColumnPicker, hiddenColumns, pinnedLeft, pinnedRight, columnWidths }); }
+  function gridControllerCtx() { return buildGridControllerCtx({ invoke, recordPerf, queueDebug, loadState, updateVisibleRows, hasLoaded, sliceGate, startIdx: gridWindow.startIdx, endIdx: gridWindow.endIdx, visibleColIdxs, isMergedView, mergedRowsAll, visibleRows, loadError, totalFilteredCount, sliceTimer, headers, sortGate, sortColIdx, sortDir, sortSpecs, visibleColumns, columnPickerNotice, showColumnPicker, hiddenColumns, pinnedLeft, pinnedRight, columnWidths }); }
   async function fetchVisibleSlice() { await fetchVisibleSliceController(gridControllerCtx()); }
   async function requestSort(colIdx: number, opts?: { multi?: boolean }) { await requestSortController(gridControllerCtx(), colIdx, opts); }
   function activeFilterHash(): string { return computeActiveFilterHash({ query, matchMode, targetColIdx, numericF, dateF, catF }); }
@@ -149,7 +167,7 @@
         }
       }, 
       onPath: (path) => { if (!debugLogPath) debugLogPath = path; } 
-    }); const queueDebug = (event: string, data?: Record<string, unknown>) => debugLogger.enqueue(event, data); const queueDebugRate = (key: string, minMs: number, event: string, data?: Record<string, unknown>) => debugLogger.enqueueRate(key, minMs, event, data); onMount(() => mountInspectorLifecycle({ invoke: (cmd, args) => invoke(cmd, args as any), queueDebug, debugLogger, setDebugLogPath: (path) => { debugLogPath = path; }, setIsTauri: (v) => { isTauri = v; }, setPrefersReducedMotion: (v) => { prefersReducedMotion = v; }, setUiAnimDur: (v) => { uiAnimDur = v; }, setDialogModule: (mod) => { dialogMod = mod as DialogMod; }, setCanOpenPath: (v) => { canOpenPath = v; }, getQuietBackendLogs: () => quietBackendLogs, getShowShortcuts: () => showShortcuts, setShowShortcuts: (v) => { showShortcuts = v; }, getShowRowDrawer: () => showRowDrawer, closeRowDrawer: () => closeRowDrawerController2(rowDrawerControllerCtx()), openShortcuts: () => openShortcutsModal(modalUiCtx()), openSchema, openRecipes: () => openRecipesModal(modalUiCtx()), openRegexGenerator: () => openRegexGeneratorModal(modalUiCtx()), openBuilder: () => openSvarBuilderModal(modalUiCtx()), openColumnPicker: () => openColumnPickerController(gridControllerCtx()), openStreamLoadFromMenu: async () => await openStreamLoadFromMenuController(loadControllerCtx()), openFallbackLoadFromMenu: () => openFallbackLoadFromMenuController(loadControllerCtx()), clearAllFilters: () => clearAllFiltersController(filterControllerCtx()), computeSchemaStats, exportAnalysisBundle: () => exportAnalysisBundleController(recipesControllerCtx()), exportCsvPreset, toggleRegexHelp: () => { showRegexHelp = !showRegexHelp; }, toggleQuietBackendLogs: () => { quietBackendLogs = !quietBackendLogs; }, toggleAutoRestoreEnabled: () => { autoRestoreEnabled = !autoRestoreEnabled; }, focusQueryInput: () => { const el = document.querySelector<HTMLInputElement>('[data-inspector-query-input="true"], input[placeholder="Type to filter…"], input[placeholder="Regex pattern…"]'); el?.focus(); } })); setupSliceFetchEffect({ hasLoaded: () => hasLoaded, suspendReactiveFiltering: () => suspendReactiveFiltering, isMergedView: () => isMergedView, startIdx: () => gridWindow.startIdx, endIdx: () => gridWindow.endIdx, totalFilteredCount: () => totalFilteredCount, visibleColIdxsLength: () => visibleColIdxs.length }, { scheduleSliceFetch: () => scheduleSliceFetchController(gridControllerCtx()) });
+    }); const queueDebug = (event: string, data?: Record<string, unknown>) => debugLogger.enqueue(event, data); const queueDebugRate = (key: string, minMs: number, event: string, data?: Record<string, unknown>) => debugLogger.enqueueRate(key, minMs, event, data); onMount(() => mountInspectorLifecycle({ invoke: (cmd, args) => invoke(cmd, args as any), queueDebug, debugLogger, setDebugLogPath: (path) => { debugLogPath = path; }, setIsTauri: (v) => { isTauri = v; }, setPrefersReducedMotion: (v) => { prefersReducedMotion = v; }, setUiAnimDur: (v) => { uiAnimDur = v; }, setDialogModule: (mod) => { dialogMod = mod as DialogMod; }, setCanOpenPath: (v) => { canOpenPath = v; }, getQuietBackendLogs: () => quietBackendLogs, getShowShortcuts: () => showShortcuts, setShowShortcuts: (v) => { showShortcuts = v; }, getShowRowDrawer: () => showRowDrawer, closeRowDrawer: () => closeRowDrawerController2(rowDrawerControllerCtx()), openShortcuts: () => openShortcutsModal(modalUiCtx()), openSchema, openRecipes: () => openRecipesModal(modalUiCtx()), openRegexGenerator: () => openRegexGeneratorModal(modalUiCtx()), openBuilder: () => openSvarBuilderModal(modalUiCtx()), openColumnPicker: () => openColumnPickerController(gridControllerCtx()), openStreamLoadFromMenu: async () => await openStreamLoadFromMenuController(loadControllerCtx()), openFallbackLoadFromMenu: () => openFallbackLoadFromMenuController(loadControllerCtx()), clearAllFilters: () => clearAllFiltersController(filterControllerCtx()), computeSchemaStats, exportAnalysisBundle: () => exportAnalysisBundleController(recipesControllerCtx()), exportCsvPreset, toggleRegexHelp: () => { showRegexHelp = !showRegexHelp; }, toggleQuietBackendLogs: () => { quietBackendLogs = !quietBackendLogs; }, toggleAutoRestoreEnabled: () => { autoRestoreEnabled = !autoRestoreEnabled; }, focusQueryInput: () => { const el = document.querySelector<HTMLInputElement>('[data-inspector-query-input="true"], input[placeholder="Type to filter…"], input[placeholder="Regex pattern…"]'); el?.focus(); } })); setupSliceFetchEffect({ hasLoaded: () => hasLoaded, suspendReactiveFiltering: () => suspendReactiveFiltering, isMergedView: () => loadState.isMergedView, startIdx: () => gridWindow.startIdx, endIdx: () => gridWindow.endIdx, totalFilteredCount: () => totalFilteredCount, visibleColIdxsLength: () => visibleColIdxs.length }, { scheduleSliceFetch: () => scheduleSliceFetchController(gridControllerCtx()) });
     setupReactiveFilterEffect({ hasLoaded: () => hasLoaded, suspendReactiveFiltering: () => suspendReactiveFiltering, queryScope: () => queryScope, query: () => query, matchMode: () => matchMode, targetColIdx: () => targetColIdx, maxRowsScanText: () => maxRowsScanText, numericF: () => numericF, dateF: () => dateF, catF: () => catF }, { scheduleFilter: (reason = 'debounced-input') => scheduleFilterController(filterControllerCtx(), reason) }); setupCrossQueryEffect({ hasLoaded: () => hasLoaded, queryScope: () => queryScope, loadedDatasets: () => loadedDatasets, query: () => query, matchMode: () => matchMode, targetColIdx: () => targetColIdx, maxRowsScanText: () => maxRowsScanText, numericF: () => numericF, dateF: () => dateF, catF: () => catF, multiQueryEnabled: () => multiQueryEnabled, multiQueryClauses: () => multiQueryClauses, lastCrossReactiveSig: () => lastCrossReactiveSig }, { scheduleCrossQuery: (reason = 'debounced-cross-input') => scheduleCrossQueryController(filterControllerCtx(), reason), setLastCrossReactiveSig: (sig) => { lastCrossReactiveSig = sig; } }); setupPersistStateEffect({ hasLoaded: () => hasLoaded, datasetId: () => datasetId, query: () => query, matchMode: () => matchMode, targetColIdx: () => targetColIdx, maxRowsScanText: () => maxRowsScanText, numericF: () => numericF, dateF: () => dateF, catF: () => catF, sortColIdx: () => sortColIdx, sortDir: () => sortDir, sortSpecs: () => sortSpecs, visibleColumns: () => visibleColumns, pinnedLeft: () => pinnedLeft, pinnedRight: () => pinnedRight, hiddenColumns: () => hiddenColumns, columnWidths: () => columnWidths, captureState }, { persistLastStateForDataset });
     setupUiAnimDurEffect({ prefersReducedMotion: () => prefersReducedMotion, crossQueryBusy: () => crossQueryBusy, totalFilteredCount: () => totalFilteredCount }, (value) => { uiAnimDur = value; }); setupQuietBackendLogsEffect({ quietBackendLogs: () => quietBackendLogs }); setupContextMenuEffect({ buildInspectorContextMenu, canOpenPath: () => canOpenPath, hasLoaded: () => hasLoaded, schemaLoading: () => schemaLoading, showRegexHelp: () => showRegexHelp, quietBackendLogs: () => quietBackendLogs, autoRestoreEnabled: () => autoRestoreEnabled }, { registerContextMenu });
     setupCategoryColumnChangeEffect({ hasLoaded: () => hasLoaded, catFColIdx: () => catF.colIdx }, { scheduleFetchCategory: (reset: boolean) => scheduleFetchCategoryController2(schemaControllerCtx(), reset) }); setupCategorySearchEffect({ hasLoaded: () => hasLoaded, catAvailSearch: () => catAvailSearch }, { scheduleFetchCategory: (reset: boolean) => scheduleFetchCategoryController2(schemaControllerCtx(), reset) }); let genTab = $state<GenTab>('builder'); let genBuildMode = $state<BuildMode>('inOrder'); let genFlagI = $state(true); let genFlagM = $state(false); let genFlagS = $state(false); let genClauses = $state<Clause[]>(defaultRegexClauses()); let genAddKind = $state<ClauseKind>('contains');
