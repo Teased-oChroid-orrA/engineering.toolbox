@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "File Size Policy V2 Configuration",
+  "mode": "strict",
+  "fileLimits": {
+    "svelte": {
+      "component": 300,
+      "orchestrator": 800,
+      "page": 500
+    },
+    "typescript": {
+      "controller": 400,
+      "stateManager": 500,
+      "utility": 200,
+      "test": 500,
+      "default": 300
+    },
+    "javascript": {
+      "config": 150,
+      "script": 300,
+      "default": 200
+    },
+    "rust": {
+      "module": 800,
+      "handler": 400,
+      "model": 300,
+      "service": 600,
+      "utility": 200,
+      "main": 200
+    },
+    "css": 300,
+    "scss": 400,
+    "html": {
+      "layout": 150,
+      "template": 200
+    },
+    "config": {
+      "json": 150,
+      "toml": 150
+    },
+    "store": 200
+  },
+  "blockLimits": {
+    "function": 100,
+    "class": 400,
+    "method": 80,
+    "interface": 200,
+    "type": 150,
+    "enum": 100
+  },
+  "exemptionPatterns": [
+    "node_modules/**",
+    ".svelte-kit/**",
+    "build/**",
+    "dist/**",
+    "target/**",
+    ".golden_build_cjs/**",
+    "**/*.d.ts",
+    "**/generated/**"
+  ],
+  "contextOverrides": {
+    "test": {
+      "patterns": [
+        "**/*.spec.ts",
+        "**/*.test.ts"
+      ],
+      "blockLimits": {
+        "function": 150
+      }
+    },
+    "solverEngine": {
+      "patterns": [
+        "**/solveEngine.ts",
+        "**/solve.ts"
+      ],
+      "blockLimits": {
+        "function": 150
+      }
+    },
+    "babylonRuntime": {
+      "patterns": [
+        "**/BushingBabylonRuntime.ts",
+        "**/babylon/**/*.ts"
+      ],
+      "blockLimits": {
+        "function": 150
+      }
+    }
+  }
+}
