@@ -1,5 +1,7 @@
 # File Size Policy Gated Plan (V1)
 
+> **Note**: File Size Policy V2 is now available with enhanced detection, flexible configuration, and multiple output formats. See `FILE_SIZE_POLICY_V2.md` for details and `FILE_SIZE_POLICY_MIGRATION.md` for migration guidance. This V1 plan remains valid but V2 is recommended for new projects.
+
 ## Trigger Phrase
 When you say any of:
 - `run file size policy`
@@ -7,7 +9,8 @@ When you say any of:
 - `enforce file size policy`
 
 I will run:
-- `npm run -s verify:file-size-policy`
+- `npm run -s verify:file-size-policy` (V1, legacy)
+- Or: `npm run verify:file-size-policy:v2` (V2, recommended)
 
 and then refactor every violating file until the policy passes.
 

@@ -59,7 +59,9 @@ npm run verify:inspector-scroll-smoothness
 # Architecture & Policies
 npm run verify:bushing-architecture      # Bushing module LOC limits
 npm run verify:surface-architecture      # Surface dependency graph + layer policy
-npm run verify:file-size-policy          # Universal file size limits
+npm run verify:file-size-policy          # Universal file size limits (V1)
+npm run verify:file-size-policy:v2       # Enhanced file size policy (V2, recommended)
+npm run verify:file-size-policy:v2:warn  # V2 in non-blocking warn mode
 npm run verify:motion-depth              # Cross-tool motion depth consistency
 npm run verify:dnd-integrity             # Drag-and-drop layout integrity (duplicate prevention)
 ```
@@ -143,8 +145,25 @@ Types (shared type definitions)
 
 ### File Size Policy
 
+**V2 (Recommended)** - Enhanced detection with flexible configuration:
+
+Run: `npm run verify:file-size-policy:v2` or `npm run verify:file-size-policy:v2:warn`
+
+**Features:**
+- **AST-aware detection**: Functions, classes, interfaces, types, enums
+- **Smart string handling**: No false positives from braces in strings
+- **Comment-based exemptions**: `@size-policy-exempt file`, `@size-policy-exempt-block`
+- **Custom limits**: `@size-policy-exempt function:150`
+- **Multiple outputs**: Terminal, JSON, HTML reports
+- **Context overrides**: Different limits for tests, solvers, runtime files
+- **Configuration**: `.sizepolicy.json` in repo root
+
+**Documentation:** See `FILE_SIZE_POLICY_V2.md` for complete reference.
+
+**V1 (Legacy)** - Basic enforcement with hardcoded limits:
+
 **Enforced LOC Limits** (via `verify:file-size-policy`):
-- Svelte components: **300 lines** (pages: **500 lines**)
+- Svelte components: **300 lines** (pages: **500 lines**, orchestrators: **800 lines**)
 - TypeScript modules: **Varies by manifest** (typically 200-400 lines)
 - Functions: **100 lines max**
 - Classes: **400 lines max**
