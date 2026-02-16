@@ -1,6 +1,7 @@
 import { devLog } from '$lib/utils/devLog';
 import { MAX_BROWSER_MODE_ROWS } from '$lib/components/inspector/InspectorGridConstants';
 import type { LoadControllerContext } from './InspectorControllerContext';
+import { resetBrowserModeOriginalRows } from './InspectorOrchestratorFilterController';
 
 export async function loadCsvFromText(
   ctx: LoadControllerContext,
@@ -13,6 +14,10 @@ export async function loadCsvFromText(
   console.error('★★★ LOAD CONTROLLER EXECUTING ★★★ text length:', text.length);
   console.log('[LOAD CTRL] loadCsvFromText called, text length:', text.length);
   console.log('[LOAD CTRL] hasHeadersOverride:', hasHeadersOverride, 'trackWorkspace:', trackWorkspace);
+  
+  // Reset browser mode original rows when loading new CSV
+  resetBrowserModeOriginalRows();
+  
   ctx.isLoading = true;
   // Don't reset isMergedView here - it will be set correctly based on browser/Tauri mode
   // ctx.isMergedView = false;  // REMOVED: This breaks browser mode which needs isMergedView=true
@@ -152,6 +157,9 @@ export async function loadCsvFromPath(
   forcedLabel?: string,
   applyInitialFilter = true
 ) {
+  // Reset browser mode original rows when loading new CSV
+  resetBrowserModeOriginalRows();
+  
   ctx.isLoading = true;
   // Don't unconditionally reset isMergedView - will be set based on mode
   // ctx.isMergedView = false;  // REMOVED
