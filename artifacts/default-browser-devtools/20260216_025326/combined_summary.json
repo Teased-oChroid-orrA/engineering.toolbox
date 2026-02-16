@@ -1,0 +1,28 @@
+{
+  "command": "smoke",
+  "url": "http://127.0.0.1:5173/#/weight-balance",
+  "engines": [
+    "chromium"
+  ],
+  "outRoot": "/home/runner/work/engineering.toolbox/engineering.toolbox/artifacts/default-browser-devtools/20260216_025326",
+  "ok": false,
+  "results": [
+    {
+      "command": "smoke",
+      "engine": "chromium",
+      "url": "http://127.0.0.1:5173/#/weight-balance",
+      "ready": {
+        "type": "text",
+        "value": "Weight"
+      },
+      "summary": null,
+      "interactions": [],
+      "files": {
+        "baselineScreenshot": "/home/runner/work/engineering.toolbox/engineering.toolbox/artifacts/default-browser-devtools/20260216_025326/chromium/baseline.png",
+        "summary": "/home/runner/work/engineering.toolbox/engineering.toolbox/artifacts/default-browser-devtools/20260216_025326/chromium/summary.json"
+      },
+      "ok": false,
+      "error": "TypeError: Cannot read properties of undefined (reading 'snapshot')\n    at takeSnapshot (file:///home/runner/work/engineering.toolbox/engineering.toolbox/.github/skills/default-browser-dev-tools/runner.js:354:35)\n    at runOneEngine (file:///home/runner/work/engineering.toolbox/engineering.toolbox/.github/skills/default-browser-dev-tools/runner.js:464:32)\n    at async main (file:///home/runner/work/engineering.toolbox/engineering.toolbox/.github/skills/default-browser-dev-tools/runner.js:694:18)"
+    }
+  ]
+}
