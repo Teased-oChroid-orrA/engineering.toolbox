@@ -100,6 +100,14 @@
     }
   }
   
+  function updateItemArm(itemId: string, newArm: number) {
+    const item = items.find(i => i.id === itemId);
+    if (item) {
+      item.arm = newArm;
+      recalculate();
+    }
+  }
+  
   function addBasicEmptyWeight() {
     const bewItem = items.find(i => i.id === 'bew');
     if (!bewItem) {
@@ -495,15 +503,44 @@
             </div>
             <div>
               <label class="text-sm text-gray-400">Basic Empty Weight</label>
-              <div class="text-white font-mono">{formatWeight(aircraft.basicEmptyWeight, displayUnits)}</div>
+              <input 
+                type="number"
+                value={displayWeight(aircraft.basicEmptyWeight, displayUnits).toFixed(displayUnits === 'metric' ? 1 : 0)}
+                oninput={(e) => {
+                  aircraft.basicEmptyWeight = Number(e.currentTarget.value);
+                  recalculate();
+                }}
+                class="w-full px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white font-mono text-sm focus:border-blue-500 focus:outline-none"
+                min="0"
+                step={displayUnits === 'metric' ? '0.1' : '1'}
+              />
             </div>
             <div>
               <label class="text-sm text-gray-400">BEW Arm</label>
-              <div class="text-white font-mono">{formatArm(aircraft.basicEmptyWeightArm, displayUnits)}</div>
+              <input 
+                type="number"
+                value={displayArm(aircraft.basicEmptyWeightArm, displayUnits).toFixed(1)}
+                oninput={(e) => {
+                  aircraft.basicEmptyWeightArm = Number(e.currentTarget.value);
+                  recalculate();
+                }}
+                class="w-full px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white font-mono text-sm focus:border-blue-500 focus:outline-none"
+                step="0.1"
+              />
             </div>
             <div>
               <label class="text-sm text-gray-400">Max Takeoff Weight</label>
-              <div class="text-white font-mono">{formatWeight(aircraft.maxTakeoffWeight, displayUnits)}</div>
+              <input 
+                type="number"
+                value={displayWeight(aircraft.maxTakeoffWeight, displayUnits).toFixed(displayUnits === 'metric' ? 1 : 0)}
+                oninput={(e) => {
+                  aircraft.maxTakeoffWeight = Number(e.currentTarget.value);
+                  recalculate();
+                }}
+                class="w-full px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white font-mono text-sm focus:border-blue-500 focus:outline-none"
+                min="0"
+                step={displayUnits === 'metric' ? '0.1' : '1'}
+              />
             </div>
             <div>
               <label class="text-sm text-gray-400">Datum</label>
@@ -578,7 +615,19 @@
                         <span class="font-mono">{displayWeight(item.weight, displayUnits).toFixed(displayUnits === 'metric' ? 1 : 0)}</span>
                       {/if}
                     </td>
-                    <td class="py-2 pr-4 text-right font-mono">{displayArm(item.arm, displayUnits).toFixed(1)}</td>
+                    <td class="py-2 pr-4 text-right">
+                      {#if item.editable}
+                        <input 
+                          type="number" 
+                          value={displayArm(item.arm, displayUnits).toFixed(1)}
+                          oninput={(e) => updateItemArm(item.id, Number(e.currentTarget.value))}
+                          class="w-24 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-right font-mono text-sm focus:border-blue-500 focus:outline-none"
+                          step="0.1"
+                        />
+                      {:else}
+                        <span class="font-mono">{displayArm(item.arm, displayUnits).toFixed(1)}</span>
+                      {/if}
+                    </td>
                     <td class="py-2 pr-4 text-right font-mono">{displayMoment(item.weight * item.arm, displayUnits).toFixed(0)}</td>
                     <td class="py-2 text-right">
                       <div class="flex gap-1 justify-end">
