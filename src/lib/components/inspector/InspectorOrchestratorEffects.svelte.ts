@@ -108,21 +108,48 @@ export function setupReactiveFilterEffect(deps: {
   numericF: () => NumericFilter;
   dateF: () => DateFilter;
   catF: () => CategoryFilter;
+  lastFilterReactiveSig: () => string;
 }, callbacks: {
   scheduleFilter: (source?: string) => void;
+  setLastFilterReactiveSig: (sig: string) => void;
 }) {
   $effect(() => {
     if (!deps.hasLoaded() || deps.suspendReactiveFiltering() || deps.queryScope() !== 'current') return;
-    deps.query(); 
-    deps.matchMode(); 
-    deps.targetColIdx(); 
-    deps.maxRowsScanText();
+    
+    // Create signature to detect actual changes and prevent redundant filters
     const nf = deps.numericF();
-    nf.enabled; nf.colIdx; nf.minText; nf.maxText;
     const df = deps.dateF();
-    df.enabled; df.colIdx; df.minIso; df.maxIso;
     const cf = deps.catF();
-    cf.enabled; cf.colIdx; (cf.selected?.size ?? 0);
+    const catSelected = [...(cf.selected ?? new Set())].sort();
+    
+    const sig = JSON.stringify({
+      q: deps.query() ?? '',
+      mm: deps.matchMode(),
+      tc: deps.targetColIdx(),
+      mrs: deps.maxRowsScanText() ?? '',
+      n: {
+        e: nf.enabled,
+        c: nf.colIdx,
+        min: nf.minText ?? '',
+        max: nf.maxText ?? ''
+      },
+      d: {
+        e: df.enabled,
+        c: df.colIdx,
+        min: df.minIso ?? '',
+        max: df.maxIso ?? ''
+      },
+      c: {
+        e: cf.enabled,
+        c: cf.colIdx,
+        s: catSelected
+      }
+    });
+    
+    // Skip if filter parameters haven't actually changed
+    if (sig === deps.lastFilterReactiveSig()) return;
+    callbacks.setLastFilterReactiveSig(sig);
+    
     callbacks.scheduleFilter('reactive-input');
   });
 }
