@@ -111,6 +111,7 @@ export function filterControllerCtx(state: {
     get isMergedView() { return state.loadState.isMergedView; },
     set isMergedView(v: boolean) { state.loadState.isMergedView = v; },
     get loadedDatasets() { return state.loadedDatasets; },
+    set loadedDatasets(v: WorkspaceDataset[]) { state.loadedDatasets = v; },
     get filterPending() { return state.filterPending; },
     set filterPending(v: boolean) { state.filterPending = v; },
     get filterInFlight() { return state.filterInFlight; },

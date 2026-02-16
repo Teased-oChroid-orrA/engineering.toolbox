@@ -1,0 +1,37 @@
+[
+  {
+    "type": "log",
+    "text": "[RO] ResizeObserver.observe patched (dev)",
+    "timestamp": 1771210458877
+  },
+  {
+    "type": "debug",
+    "text": "[vite] connecting...",
+    "timestamp": 1771210458987
+  },
+  {
+    "type": "debug",
+    "text": "[vite] connected.",
+    "timestamp": 1771210459001
+  },
+  {
+    "type": "startGroupCollapsed",
+    "text": "[RO] observe JSHandle@node",
+    "timestamp": 1771210459254
+  },
+  {
+    "type": "log",
+    "text": "tag: div class: relative w-full",
+    "timestamp": 1771210459255
+  },
+  {
+    "type": "log",
+    "text": "Error: ResizeObserver.observe called here\n    at RO.observe (http://127.0.0.1:5173/:29:25)\n    at http://127.0.0.1:5173/src/routes/+layout.svelte?t=1771210407652:143:26\n    at untrack (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:3674:12)\n    at $effect (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-5WFYUS7G.js?v=d86bec58:3422:23)\n    at update_reaction (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:3380:18)\n    at update_effect (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:3518:21)\n    at flush_queued_effects (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:2509:7)\n    at _Batch.process (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:2181:7)\n    at flush_effects (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:2468:13)\n    at _Batch.flush (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:2271:7)",
+    "timestamp": 1771210459255
+  },
+  {
+    "type": "endGroup",
+    "text": "console.groupEnd",
+    "timestamp": 1771210459255
+  }
+]

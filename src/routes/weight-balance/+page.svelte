@@ -3,13 +3,30 @@
   import { calculateWeightAndBalance, validateInput } from '$lib/core/weight-balance/solve';
   import { SAMPLE_CESSNA_172S, createSampleLoading } from '$lib/core/weight-balance/sampleData';
   import { renderCGEnvelope } from '$lib/drafting/weight-balance/envelopeRenderer';
-  import type { AircraftProfile, LoadingItem, LoadingResults } from '$lib/core/weight-balance/types';
+  import type { AircraftProfile, LoadingItem, LoadingResults, LoadingItemType } from '$lib/core/weight-balance/types';
+  import { 
+    saveConfigurationToFile,
+    loadConfigurationFromFile,
+    saveToLocalStorage,
+    loadFromLocalStorage,
+    addToRecentConfigurations,
+    type SavedConfiguration
+  } from '$lib/core/weight-balance/storage';
   
   let aircraft = $state<AircraftProfile>(SAMPLE_CESSNA_172S);
   let items = $state<LoadingItem[]>(createSampleLoading());
   let results = $state<LoadingResults | null>(null);
   let showDisclaimer = $state(true);
   let envelopeContainer = $state<HTMLElement | null>(null);
+  let fileInput = $state<HTMLInputElement | null>(null);
+  let showSaveDialog = $state(false);
+  let configName = $state('');
+  let showAddItemDialog = $state(false);
+  let newItemName = $state('');
+  let newItemType = $state<LoadingItemType>('occupant');
+  let newItemWeight = $state(0);
+  let newItemArm = $state(0);
+  let nextItemId = $state(100);
   
   function recalculate() {
     const validation = validateInput(aircraft, items);
@@ -20,6 +37,9 @@
     
     results = calculateWeightAndBalance(aircraft, items);
     updateEnvelopeChart();
+    
+    // Auto-save to localStorage
+    saveToLocalStorage(aircraft, items);
   }
   
   function updateEnvelopeChart() {
@@ -67,14 +87,123 @@
     recalculate();
   }
   
+  // Save/Load Functions
+  function handleSaveClick() {
+    configName = `${aircraft.registration || aircraft.name} - ${new Date().toLocaleDateString()}`;
+    showSaveDialog = true;
+  }
+  
+  function handleSaveConfirm() {
+    saveConfigurationToFile(aircraft, items, configName);
+    addToRecentConfigurations({
+      version: '1.0',
+      type: 'weight-balance-configuration',
+      name: configName,
+      timestamp: new Date().toISOString(),
+      aircraft,
+      items: items.filter(item => item.id !== 'bew')
+    });
+    showSaveDialog = false;
+  }
+  
+  function handleLoadClick() {
+    fileInput?.click();
+  }
+  
+  async function handleFileSelect(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    
+    try {
+      const config = await loadConfigurationFromFile(file);
+      aircraft = config.aircraft;
+      items = config.items;
+      addBasicEmptyWeight();
+      recalculate();
+      addToRecentConfigurations(config);
+    } catch (error) {
+      alert(`Error loading configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+    
+    // Reset file input
+    input.value = '';
+  }
+  
+  // Item Management Functions
+  function handleAddItemClick() {
+    newItemName = '';
+    newItemType = 'occupant';
+    newItemWeight = 0;
+    newItemArm = 0;
+    showAddItemDialog = true;
+  }
+  
+  function handleAddItemConfirm() {
+    if (!newItemName.trim()) {
+      alert('Please enter an item name');
+      return;
+    }
+    
+    const newItem: LoadingItem = {
+      id: `item-${nextItemId}`,
+      type: newItemType,
+      name: newItemName,
+      weight: newItemWeight,
+      arm: newItemArm,
+      editable: true
+    };
+    
+    items.push(newItem);
+    nextItemId++;
+    showAddItemDialog = false;
+    recalculate();
+  }
+  
+  function handleRemoveItem(itemId: string) {
+    if (itemId === 'bew') {
+      alert('Cannot remove Basic Empty Weight');
+      return;
+    }
+    
+    if (confirm('Remove this item?')) {
+      items = items.filter(item => item.id !== itemId);
+      recalculate();
+    }
+  }
+  
   onMount(() => {
+    // Try to load from localStorage
+    const saved = loadFromLocalStorage();
+    if (saved) {
+      aircraft = saved.aircraft;
+      items = saved.items;
+    }
+    
     addBasicEmptyWeight();
     recalculate();
     
     // Re-render on window resize
     const handleResize = () => updateEnvelopeChart();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    
+    // Keyboard shortcuts
+    const handleKeydown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSaveClick();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+        e.preventDefault();
+        handleLoadClick();
+      }
+    };
+    window.addEventListener('keydown', handleKeydown);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('keydown', handleKeydown);
+    };
   });
   
   const getSeverityColor = (severity: string) => {
@@ -100,12 +229,39 @@
   <div class="max-w-7xl mx-auto">
     <!-- Header -->
     <div class="mb-8">
-      <h1 class="text-4xl font-bold text-white mb-2">
-        ✈️ Aircraft Weight & Balance Calculator
-      </h1>
-      <p class="text-gray-400">
-        FAA-H-8083-1B Compliant • Tabular Method
-      </p>
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-4xl font-bold text-white mb-2">
+            ✈️ Aircraft Weight & Balance Calculator
+          </h1>
+          <p class="text-gray-400">
+            FAA-H-8083-1B Compliant • Tabular Method
+          </p>
+        </div>
+        <div class="flex gap-2">
+          <button 
+            onclick={handleSaveClick}
+            class="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500 text-green-300 rounded transition-colors flex items-center gap-2"
+            title="Save Configuration (Ctrl+S)"
+          >
+            💾 Save
+          </button>
+          <button 
+            onclick={handleLoadClick}
+            class="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500 text-blue-300 rounded transition-colors flex items-center gap-2"
+            title="Load Configuration (Ctrl+O)"
+          >
+            📁 Load
+          </button>
+          <input 
+            type="file" 
+            accept=".json"
+            bind:this={fileInput}
+            onchange={handleFileSelect}
+            class="hidden"
+          />
+        </div>
+      </div>
     </div>
     
     <!-- Disclaimer -->
@@ -169,12 +325,20 @@
         <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-xl font-semibold text-white">Loading Configuration</h2>
-            <button 
-              onclick={resetToSample}
-              class="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500 text-blue-300 rounded text-sm transition-colors"
-            >
-              Reset
-            </button>
+            <div class="flex gap-2">
+              <button 
+                onclick={handleAddItemClick}
+                class="px-3 py-1 bg-green-500/20 hover:bg-green-500/30 border border-green-500 text-green-300 rounded text-sm transition-colors"
+              >
+                + Add Item
+              </button>
+              <button 
+                onclick={resetToSample}
+                class="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500 text-blue-300 rounded text-sm transition-colors"
+              >
+                Reset
+              </button>
+            </div>
           </div>
           
           <div class="overflow-x-auto">
@@ -184,7 +348,8 @@
                   <th class="pb-2 pr-4">Item</th>
                   <th class="pb-2 pr-4 text-right">Weight (lbs)</th>
                   <th class="pb-2 pr-4 text-right">Arm (in)</th>
-                  <th class="pb-2 text-right">Moment (lb-in)</th>
+                  <th class="pb-2 pr-4 text-right">Moment (lb-in)</th>
+                  <th class="pb-2 text-right w-16">Actions</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-700">
@@ -211,7 +376,18 @@
                       {/if}
                     </td>
                     <td class="py-2 pr-4 text-right font-mono">{item.arm}</td>
-                    <td class="py-2 text-right font-mono">{(item.weight * item.arm).toFixed(1)}</td>
+                    <td class="py-2 pr-4 text-right font-mono">{(item.weight * item.arm).toFixed(1)}</td>
+                    <td class="py-2 text-right">
+                      {#if item.id !== 'bew' && item.editable}
+                        <button
+                          onclick={() => handleRemoveItem(item.id)}
+                          class="text-red-400 hover:text-red-300 text-xs px-2"
+                          title="Remove item"
+                        >
+                          ✕
+                        </button>
+                      {/if}
+                    </td>
                   </tr>
                 {/each}
               </tbody>
@@ -303,3 +479,108 @@
     {/if}
   </div>
 </div>
+
+<!-- Save Dialog -->
+{#if showSaveDialog}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showSaveDialog = false)}>
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+      <h2 class="text-xl font-semibold text-white mb-4">Save Configuration</h2>
+      <div class="mb-4">
+        <label class="block text-sm text-gray-400 mb-2">Configuration Name</label>
+        <input 
+          type="text"
+          bind:value={configName}
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+          placeholder="Enter configuration name"
+          autofocus
+        />
+      </div>
+      <div class="flex gap-2 justify-end">
+        <button
+          onclick={() => showSaveDialog = false}
+          class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onclick={handleSaveConfirm}
+          class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded transition-colors"
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Add Item Dialog -->
+{#if showAddItemDialog}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showAddItemDialog = false)}>
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+      <h2 class="text-xl font-semibold text-white mb-4">Add Custom Item</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-2">Item Name</label>
+          <input 
+            type="text"
+            bind:value={newItemName}
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+            placeholder="e.g., Extra Baggage"
+            autofocus
+          />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-2">Item Type</label>
+          <select 
+            bind:value={newItemType}
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+          >
+            <option value="occupant">Occupant</option>
+            <option value="fuel_main">Main Fuel</option>
+            <option value="fuel_auxiliary">Auxiliary Fuel</option>
+            <option value="baggage_nose">Nose Baggage</option>
+            <option value="baggage_aft">Aft Baggage</option>
+            <option value="baggage_external">External Baggage</option>
+            <option value="cargo">Cargo</option>
+            <option value="equipment_removable">Removable Equipment</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">Weight (lbs)</label>
+            <input 
+              type="number"
+              bind:value={newItemWeight}
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+              min="0"
+              step="1"
+            />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">Arm (in)</label>
+            <input 
+              type="number"
+              bind:value={newItemArm}
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+              step="0.1"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="flex gap-2 justify-end mt-6">
+        <button
+          onclick={() => showAddItemDialog = false}
+          class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onclick={handleAddItemConfirm}
+          class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded transition-colors"
+        >
+          Add Item
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}

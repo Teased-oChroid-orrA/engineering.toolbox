@@ -1,0 +1,59 @@
+{
+  "passed": [
+    "TEST 1: Initial load - W&B page loaded",
+    "TEST 1: Sample aircraft loaded",
+    "TEST 2: CG envelope chart rendered",
+    "TEST 3: Loading items displayed",
+    "TEST 4: Found 6 numeric inputs",
+    "TEST 4: Successfully modified weight input",
+    "TEST 5: Calculation results displayed",
+    "TEST 6: Reset/Sample button found",
+    "TEST 6: Reset button clicked successfully",
+    "TEST 9: No console errors",
+    "TEST 10: Content visible on mobile viewport"
+  ],
+  "failed": [],
+  "warnings": [
+    "TEST 7: Only 2 buttons found",
+    "TEST 8: Safety disclaimer not clearly visible"
+  ],
+  "screenshots": [
+    {
+      "name": "01-wb-initial-load",
+      "path": "artifacts/wb-tests/01-wb-initial-load.png"
+    },
+    {
+      "name": "02-wb-cg-envelope",
+      "path": "artifacts/wb-tests/02-wb-cg-envelope.png"
+    },
+    {
+      "name": "04-wb-after-input-change",
+      "path": "artifacts/wb-tests/04-wb-after-input-change.png"
+    },
+    {
+      "name": "06-wb-after-reset",
+      "path": "artifacts/wb-tests/06-wb-after-reset.png"
+    },
+    {
+      "name": "10-wb-mobile-view",
+      "path": "artifacts/wb-tests/10-wb-mobile-view.png"
+    },
+    {
+      "name": "11-wb-final-state",
+      "path": "artifacts/wb-tests/11-wb-final-state.png"
+    }
+  ],
+  "calculations": [
+    {
+      "test": "Sample calculation",
+      "numbers_found": 40,
+      "sample_values": [
+        "0",
+        "1",
+        "3.3",
+        "8083",
+        "1"
+      ]
+    }
+  ]
+}

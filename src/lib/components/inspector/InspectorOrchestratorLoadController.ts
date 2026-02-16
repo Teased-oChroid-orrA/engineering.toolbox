@@ -257,7 +257,13 @@ export async function loadCsvFromPath(
 }
 
 export function upsertWorkspaceDataset(ctx: LoadControllerContext, ds: any) {
-  ctx.loadedDatasets = ctx.upsertWorkspaceDatasetInList(ctx.loadedDatasets, ds);
+  const updated = ctx.upsertWorkspaceDatasetInList(ctx.loadedDatasets, ds);
+  
+  // Mutate array in place to preserve Svelte 5 reactivity
+  // (replacing the reference breaks reactivity in the context system)
+  ctx.loadedDatasets.length = 0;
+  ctx.loadedDatasets.push(...updated);
+  
   ctx.activeDatasetId = ds.id;
 }
 
