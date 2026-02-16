@@ -130,21 +130,22 @@ export async function applyFilterSpec(ctx: FilterControllerContext, spec: any): 
       for (const clause of spec.multiQueryClauses) {
         if (!clause.query || !clause.query.trim()) continue;
         
-        const clauseMatches = filteredRows.filter(row =>
-          matchesQuery(row, clause.query, clause.targetColIdx ?? null, clause.mode ?? 'fuzzy')
-        );
-        
         if (clause.logicalOp === 'OR') {
-          // Union: add rows that match this clause
-          const existingIds = new Set(filteredRows.map((_, i) => i));
-          for (let i = 0; i < allRows.length; i++) {
-            if (!existingIds.has(i) && matchesQuery(allRows[i], clause.query, clause.targetColIdx ?? null, clause.mode ?? 'fuzzy')) {
-              filteredRows.push(allRows[i]);
+          // Union: add rows from allRows that match this clause and aren't already included
+          // Use Set to track row content (join cells with delimiter) to avoid duplicates
+          const existingRowsSet = new Set(filteredRows.map(row => row.join('\x00')));
+          for (const row of allRows) {
+            const rowKey = row.join('\x00');
+            if (!existingRowsSet.has(rowKey) && matchesQuery(row, clause.query, clause.targetColIdx ?? null, clause.mode ?? 'fuzzy')) {
+              filteredRows.push(row);
+              existingRowsSet.add(rowKey);
             }
           }
         } else {
           // AND (default): intersect with existing results
-          filteredRows = clauseMatches;
+          filteredRows = filteredRows.filter(row =>
+            matchesQuery(row, clause.query, clause.targetColIdx ?? null, clause.mode ?? 'fuzzy')
+          );
         }
       }
       devLog('FILTER', 'After multi-query:', filteredRows.length, 'rows');

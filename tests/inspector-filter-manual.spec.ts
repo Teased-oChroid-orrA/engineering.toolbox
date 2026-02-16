@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 const TEST_CSV_DATA = `Name,Age,City,Department,Salary
 John Doe,30,New York,Engineering,75000
@@ -13,10 +15,16 @@ Frank Miller,33,San Diego,Engineering,78000
 Grace Lee,30,Dallas,Marketing,67000
 Henry Wilson,34,San Jose,Sales,71000`;
 
+// Use environment variable or default to localhost
+const BASE_URL = process.env.INSPECTOR_URL || 'http://127.0.0.1:5173';
+
+// Create cross-platform temp file path
+const getTempCsvPath = () => join(tmpdir(), 'test-data.csv');
+
 test.describe('Inspector Query Filtering', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to inspector
-    await page.goto('http://127.0.0.1:5173/#/inspector');
+    await page.goto(`${BASE_URL}/#/inspector`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000); // Give app time to initialize
   });
