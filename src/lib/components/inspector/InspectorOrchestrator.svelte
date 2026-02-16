@@ -330,6 +330,8 @@
     {drawerList}
     {drawerExplain}
     {headerHeuristicReason}
+    {headerConfidence}
+    {autoDecision}
     {visibleColumns}
     {columnPickerNotice}
     {svarFields}

@@ -250,7 +250,7 @@ export interface InspectorControllerContext {
   
   // Helper functions
   fnv1a32: (str: string) => number;
-  heuristicHasHeaders: (first: string[], second: string[]) => { value: boolean; decided: boolean; reason: string };
+  heuristicHasHeaders: (first: string[], second: string[]) => { value: boolean; decided: boolean; reason: string; confidence: number };
   computeDatasetIdentity: (source: string, hdrs: string[], rowCount: number, hashFn: (s: string) => number) => { id: string; label: string };
   upsertWorkspaceDatasetInList: (list: WorkspaceDataset[], ds: WorkspaceDataset) => WorkspaceDataset[];
   loadRecipesForDataset: (datasetId: string) => Promise<Recipe[]>;

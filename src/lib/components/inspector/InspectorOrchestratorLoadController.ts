@@ -25,22 +25,28 @@ export async function loadCsvFromText(
   try {
     if (hasHeadersOverride !== undefined) {
       ctx.hasHeaders = !!hasHeadersOverride;
-    } else if (ctx.headerMode === 'yes') ctx.hasHeaders = true;
-    else if (ctx.headerMode === 'no') ctx.hasHeaders = false;
-    else {
+    } else if (ctx.headerMode === 'yes') {
+      ctx.hasHeaders = true;
+    } else if (ctx.headerMode === 'no') {
+      ctx.hasHeaders = false;
+    } else {
+      // headerMode === 'auto': ALWAYS show prompt (per requirements)
       const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
       const first = (lines[0] ?? '').split(',');
       const second = (lines[1] ?? '').split(',');
       const h = ctx.heuristicHasHeaders(first, second);
       ctx.headerHeuristicReason = h.reason;
-      if (!h.decided) {
-        ctx.pendingText = text;
-        ctx.pendingPath = null;
-        ctx.showHeaderPrompt = true;
-        ctx.isLoading = false;
-        return;
-      }
-      ctx.hasHeaders = h.value;
+      
+      // Store heuristic results for display in modal
+      (ctx as any).headerConfidence = h.confidence;
+      (ctx as any).autoDecision = h.value;
+      
+      // ALWAYS show prompt when headerMode is 'auto' (not just when undecided)
+      ctx.pendingText = text;
+      ctx.pendingPath = null;
+      ctx.showHeaderPrompt = true;
+      ctx.isLoading = false;
+      return;
     }
 
     let resp;
@@ -167,23 +173,30 @@ export async function loadCsvFromPath(
   try {
     if (hasHeadersOverride !== undefined) {
       ctx.hasHeaders = !!hasHeadersOverride;
-    } else if (ctx.headerMode === 'yes') ctx.hasHeaders = true;
-    else if (ctx.headerMode === 'no') ctx.hasHeaders = false;
-    else {
+    } else if (ctx.headerMode === 'yes') {
+      ctx.hasHeaders = true;
+    } else if (ctx.headerMode === 'no') {
+      ctx.hasHeaders = false;
+    } else {
+      // headerMode === 'auto': Get heuristic and ALWAYS show prompt
       const sniff = (await ctx.invoke('inspector_sniff_has_headers_path', { path })) as {
         decided: boolean;
         hasHeaders: boolean;
         reason: string;
+        confidence?: number;
       };
       ctx.headerHeuristicReason = sniff.reason ?? '';
-      if (!sniff.decided) {
-        ctx.pendingPath = path;
-        ctx.pendingText = null;
-        ctx.showHeaderPrompt = true;
-        ctx.isLoading = false;
-        return;
-      }
-      ctx.hasHeaders = !!sniff.hasHeaders;
+      
+      // Store heuristic results for display in modal
+      (ctx as any).headerConfidence = sniff.confidence ?? 0.5;
+      (ctx as any).autoDecision = sniff.hasHeaders;
+      
+      // ALWAYS show prompt when headerMode is 'auto' (per requirements)
+      ctx.pendingPath = path;
+      ctx.pendingText = null;
+      ctx.showHeaderPrompt = true;
+      ctx.isLoading = false;
+      return;
     }
 
     const resp = (await ctx.invoke('inspector_load_csv_path', { path, hasHeaders: ctx.hasHeaders })) as any;
