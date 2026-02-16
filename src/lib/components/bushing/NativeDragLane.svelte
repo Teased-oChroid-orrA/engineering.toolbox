@@ -3,29 +3,43 @@
    * NativeDragLane - Pure HTML5 drag-and-drop without external dependencies.
    * Features: keyboard navigation, ARIA support, smooth animations, full accessibility.
    * Batch 4: Multi-column drag, enhanced animations, undo/redo support.
-   * Compatible with Svelte 5, no library issues.
+   * Upgraded to Svelte 5 runes for optimal performance.
    */
   import { createEventDispatcher } from 'svelte';
   import { flip } from 'svelte/animate';
   import { reorderItems, moveItemByOffset, getNextFocusableId } from './dragUtils';
+  import type { Snippet } from 'svelte';
 
-  export let items: Array<{ id: string }> = [];
-  export let listClass = '';
-  export let enabled = true;
-  export let flipDurationMs = 200;
-  export let allowCrossColumn = false; // Enable multi-column drag
-  export let columnId: string | null = null; // Identify this column
+  // Svelte 5 props destructuring
+  let {
+    items = [],
+    listClass = '',
+    enabled = true,
+    flipDurationMs = 200,
+    allowCrossColumn = false,
+    columnId = null,
+    children
+  }: {
+    items?: Array<{ id: string }>;
+    listClass?: string;
+    enabled?: boolean;
+    flipDurationMs?: number;
+    allowCrossColumn?: boolean;
+    columnId?: string | null;
+    children?: Snippet<[{ item: { id: string } }]>;
+  } = $props();
   
   const dispatch = createEventDispatcher<{
     finalize: { items: Array<{ id: string }> };
-    dragStart: { itemId: string; columnId: string | null }; // NEW: Cross-column drag start
-    dragEnter: { itemId: string; columnId: string | null }; // NEW: Cross-column drag enter
+    dragStart: { itemId: string; columnId: string | null };
+    dragEnter: { itemId: string; columnId: string | null };
   }>();
   
-  let draggedId: string | null = null;
-  let dragOverId: string | null = null;
-  let focusedId: string | null = null;
-  let isKeyboardMode = false;
+  // Svelte 5 $state runes for reactive local state
+  let draggedId = $state<string | null>(null);
+  let dragOverId = $state<string | null>(null);
+  let focusedId = $state<string | null>(null);
+  let isKeyboardMode = $state(false);
   
   // Mouse drag handlers
   function handleDragStart(e: DragEvent, item: { id: string }) {
@@ -160,8 +174,8 @@
 
 <div class={listClass} role="list" aria-label="Reorderable list">
   {#each items as item (item.id)}
-    <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
-    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
       animate:flip={{ duration: flipDurationMs }}
       role="listitem"
@@ -187,7 +201,9 @@
              transition: transform {flipDurationMs}ms cubic-bezier(0.4, 0, 0.2, 1), 
                          opacity 150ms cubic-bezier(0.4, 0, 0.2, 1),
                          box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);">
-      <slot {item} />
+      {#if children}
+        {@render children({ item })}
+      {/if}
     </div>
   {/each}
 </div>

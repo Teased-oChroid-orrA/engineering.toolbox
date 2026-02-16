@@ -2,10 +2,11 @@
   import type { BushingInputs, BushingOutput } from '$lib/core/bushing';
   import { makeFriendlyMessage, getQuickFix } from '$lib/core/bushing/errorMessageUtils';
 
-  export let form: BushingInputs;
-  export let results: BushingOutput;
+  // Svelte 5 props destructuring
+  let { form, results }: { form: BushingInputs; results: BushingOutput } = $props();
 
-  $: guidance = (() => {
+  // Svelte 5 $derived rune for computed state
+  let guidance = $derived.by(() => {
     if (results.warningCodes?.length) {
       // Get the most critical warning and make it user-friendly
       const primaryWarning = results.warningCodes[0];
@@ -47,7 +48,7 @@
       title: 'Core Flow',
       lines: ['Set Setup and Geometry first, then choose profile, then review results.', 'Use Drafting/Export once governing margin is positive.']
     };
-  })();
+  });
 </script>
 
 <div
