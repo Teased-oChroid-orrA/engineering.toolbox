@@ -1,0 +1,15 @@
+🧪 W&B Toolbox - Save/Load & Item Management Tests
+
+Test execution error: browserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome
+╔═════════════════════════════════════════════════════════════════════════╗
+║ Looks like Playwright Test or Playwright was just installed or updated. ║
+║ Please run the following command to download new browsers:              ║
+║                                                                         ║
+║     npx playwright install                                              ║
+║                                                                         ║
+║ <3 Playwright Team                                                      ║
+╚═════════════════════════════════════════════════════════════════════════╝
+    at runTests (/home/runner/work/engineering.toolbox/engineering.toolbox/test-wb-enhanced.mjs:13:34)
+    at /home/runner/work/engineering.toolbox/engineering.toolbox/test-wb-enhanced.mjs:375:1 {
+  name: 'Error'
+}
