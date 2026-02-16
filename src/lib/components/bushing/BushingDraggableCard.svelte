@@ -1,17 +1,31 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  export let column: 'left' | 'right';
-  export let cardId: string;
-  export let title = '';
-  export let collapseKey = '';
-  export let dragEnabled = true;
-  export let canMoveUp = false;
-  export let canMoveDown = false;
-  export let onMoveUp: (() => void) | null = null;
-  export let onMoveDown: (() => void) | null = null;
+  // Svelte 5 props destructuring
+  let {
+    column,
+    cardId,
+    title = '',
+    collapseKey = '',
+    dragEnabled = true,
+    canMoveUp = false,
+    canMoveDown = false,
+    onMoveUp = null,
+    onMoveDown = null
+  }: {
+    column: 'left' | 'right';
+    cardId: string;
+    title?: string;
+    collapseKey?: string;
+    dragEnabled?: boolean;
+    canMoveUp?: boolean;
+    canMoveDown?: boolean;
+    onMoveUp?: (() => void) | null;
+    onMoveDown?: (() => void) | null;
+  } = $props();
 
-  let collapsed = false;
+  // Svelte 5 $state rune for reactive local state
+  let collapsed = $state(false);
 
   function storageKey(): string {
     return collapseKey || `scd.bushing.collapse.${column}.${cardId}.v1`;
@@ -37,9 +51,9 @@
       <span>{title}</span>
     </div>
     <div class="flex items-center gap-1">
-      <button type="button" class="rounded border border-white/15 px-1 py-0.5 text-[10px] text-white/80 disabled:opacity-35" on:click={() => onMoveUp?.()} disabled={!canMoveUp} aria-label={`Move ${title} up`}>Up</button>
-      <button type="button" class="rounded border border-white/15 px-1 py-0.5 text-[10px] text-white/80 disabled:opacity-35" on:click={() => onMoveDown?.()} disabled={!canMoveDown} aria-label={`Move ${title} down`}>Down</button>
-      <button class="rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-white/80" on:click={toggleCollapsed}>
+      <button type="button" class="rounded border border-white/15 px-1 py-0.5 text-[10px] text-white/80 disabled:opacity-35" onclick={() => onMoveUp?.()} disabled={!canMoveUp} aria-label={`Move ${title} up`}>Up</button>
+      <button type="button" class="rounded border border-white/15 px-1 py-0.5 text-[10px] text-white/80 disabled:opacity-35" onclick={() => onMoveDown?.()} disabled={!canMoveDown} aria-label={`Move ${title} down`}>Down</button>
+      <button class="rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-white/80" onclick={toggleCollapsed}>
         {collapsed ? 'Expand' : 'Collapse'}
       </button>
     </div>

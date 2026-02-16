@@ -122,6 +122,12 @@ export function renderLoopMeshes(
       mesh.position.y = idx * 0.00045;
       mesh.isPickable = true;
       mesh.material = createSectionMaterial(B, scene, poly.loop.component, poly.loop.regionKind);
+      
+      // Performance optimization: freeze static meshes to reduce CPU overhead
+      mesh.freezeWorldMatrix();
+      if (mesh.material) {
+        (mesh.material as any).freeze();
+      }
 
       const wire = B.MeshBuilder.CreateLines(`bushing_wire_${idx}`, { points: [...shape, shape[0]] }, scene);
       if (poly.loop.regionKind === 'void') {
@@ -136,6 +142,9 @@ export function renderLoopMeshes(
       wire.alpha = poly.loop.regionKind === 'void' ? 0.75 : 0.9;
       wire.position.y = mesh.position.y + 0.0012;
       wire.isPickable = false;
+      
+      // Performance optimization: freeze wire meshes (no material to freeze)
+      wire.freezeWorldMatrix();
       return;
     }
 
@@ -144,6 +153,11 @@ export function renderLoopMeshes(
       const revolved = createRevolvedLoopMesh(B, scene, `bushing_solid_lathe_${idx}`, poly.points, 88);
       if (revolved) {
         revolved.material = createSolidMaterial(B, scene, poly.loop.component, poly.loop.regionKind);
+        // Performance optimization: freeze revolved meshes
+        revolved.freezeWorldMatrix();
+        if (revolved.material) {
+          (revolved.material as any).freeze();
+        }
       }
       return;
     }
@@ -152,18 +166,31 @@ export function renderLoopMeshes(
     top.position.y = solidDepth / 2;
     top.isPickable = true;
     top.material = createSolidMaterial(B, scene, poly.loop.component, poly.loop.regionKind);
+    // Performance optimization
+    top.freezeWorldMatrix();
+    if (top.material) {
+      (top.material as any).freeze();
+    }
 
     const bot = B.MeshBuilder.CreatePolygon(`bushing_solid_bot_${idx}`, { shape, sideOrientation: B.Mesh.DOUBLESIDE }, scene, earcut);
     bot.position.y = -solidDepth / 2;
     bot.rotation.x = Math.PI;
     bot.isPickable = true;
     bot.material = createSolidMaterial(B, scene, poly.loop.component, poly.loop.regionKind);
+    // Performance optimization
+    bot.freezeWorldMatrix();
+    if (bot.material) {
+      (bot.material as any).freeze();
+    }
 
     const wallPts = [...shape, shape[0]];
     const solidLines = B.MeshBuilder.CreateLines(`bushing_solid_wire_${idx}`, { points: wallPts }, scene);
     solidLines.color = poly.loop.regionKind === 'void' ? new B.Color3(0.7, 0.85, 0.95) : new B.Color3(0.1, 0.2, 0.25);
     solidLines.alpha = 0.6;
     solidLines.isPickable = false;
+    // Performance optimization
+    solidLines.freezeWorldMatrix();
+    
     for (let i = 0; i < shape.length; i++) {
       const p = shape[i];
       const seg = B.MeshBuilder.CreateLines(`bushing_solid_edge_${idx}_${i}`, {
@@ -175,6 +202,8 @@ export function renderLoopMeshes(
       seg.color = solidLines.color;
       seg.alpha = 0.4;
       seg.isPickable = false;
+      // Performance optimization
+      seg.freezeWorldMatrix();
     }
   });
 

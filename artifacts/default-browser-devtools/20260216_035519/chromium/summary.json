@@ -1,0 +1,16 @@
+{
+  "command": "smoke",
+  "engine": "chromium",
+  "url": "http://127.0.0.1:5173/#/bushing",
+  "ready": {
+    "type": "default",
+    "value": "networkidle+250ms"
+  },
+  "summary": null,
+  "interactions": [],
+  "files": {
+    "baselineScreenshot": "/home/runner/work/engineering.toolbox/engineering.toolbox/artifacts/default-browser-devtools/20260216_035519/chromium/baseline.png"
+  },
+  "ok": false,
+  "error": "TypeError: Cannot read properties of undefined (reading 'snapshot')\n    at takeSnapshot (file:///home/runner/work/engineering.toolbox/engineering.toolbox/.github/skills/default-browser-dev-tools/runner.js:354:35)\n    at runOneEngine (file:///home/runner/work/engineering.toolbox/engineering.toolbox/.github/skills/default-browser-dev-tools/runner.js:464:32)\n    at async main (file:///home/runner/work/engineering.toolbox/engineering.toolbox/.github/skills/default-browser-dev-tools/runner.js:694:18)"
+}

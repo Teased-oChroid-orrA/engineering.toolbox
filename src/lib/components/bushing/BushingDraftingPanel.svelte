@@ -5,22 +5,41 @@
   import type { BushingRenderMode } from '$lib/drafting/bushing/bushingSceneModel';
   import type { BabylonRenderDiagnostic } from '$lib/drafting/bushing/BushingBabylonRuntime';
 
-  export let draftingView: any;
-  export let useLegacyRenderer = false;
-  export let renderMode: BushingRenderMode = 'section';
-  export let traceEnabled = false;
-  export let cacheHits = 0;
-  export let cacheMisses = 0;
-  export let isInfinitePlate = false;
-  export let babylonInitNotice: string | null = null;
-  export let visualDiagnostics: Array<{ severity: 'error' | 'warning' | 'info'; message: string }> = [];
-  export let babylonDiagnostics: BabylonRenderDiagnostic[] = [];
-  export let onExportSvg: () => void = () => {};
-  export let onExportPdf: () => void = () => {};
-  export let onToggleRendererMode: () => void = () => {};
-  export let onToggleTraceMode: () => void = () => {};
-  export let onBabylonDiagnostics: (diag: BabylonRenderDiagnostic[]) => void = () => {};
-  export let onBabylonInitFailure: (reason: string) => void = () => {};
+  let {
+    draftingView,
+    useLegacyRenderer = false,
+    renderMode = 'section' as BushingRenderMode,
+    traceEnabled = false,
+    cacheHits = 0,
+    cacheMisses = 0,
+    isInfinitePlate = false,
+    babylonInitNotice = null,
+    visualDiagnostics = [],
+    babylonDiagnostics = [],
+    onExportSvg = () => {},
+    onExportPdf = () => {},
+    onToggleRendererMode = () => {},
+    onToggleTraceMode = () => {},
+    onBabylonDiagnostics = () => {},
+    onBabylonInitFailure = () => {}
+  }: {
+    draftingView: any;
+    useLegacyRenderer?: boolean;
+    renderMode?: BushingRenderMode;
+    traceEnabled?: boolean;
+    cacheHits?: number;
+    cacheMisses?: number;
+    isInfinitePlate?: boolean;
+    babylonInitNotice?: string | null;
+    visualDiagnostics?: Array<{ severity: 'error' | 'warning' | 'info'; message: string }>;
+    babylonDiagnostics?: BabylonRenderDiagnostic[];
+    onExportSvg?: () => void;
+    onExportPdf?: () => void;
+    onToggleRendererMode?: () => void;
+    onToggleTraceMode?: () => void;
+    onBabylonDiagnostics?: (diag: BabylonRenderDiagnostic[]) => void;
+    onBabylonInitFailure?: (reason: string) => void;
+  } = $props();
 </script>
 
 <Card class="min-h-[620px] flex flex-col overflow-hidden border-teal-500/20 bg-teal-500/10 backdrop-blur-sm relative group p-0 bushing-pop-card bushing-no-tilt bushing-depth-2">
@@ -32,9 +51,9 @@
       {/if}
     </div>
     <div class="flex items-center gap-2">
-      <button class="rounded-md border border-teal-200/10 bg-teal-500/5 px-2 py-1 text-[10px] font-mono text-teal-100/80 hover:bg-teal-500/10" on:click={onExportSvg}>Export SVG</button>
-      <button class="rounded-md border border-teal-200/10 bg-teal-500/5 px-2 py-1 text-[10px] font-mono text-teal-100/80 hover:bg-teal-500/10" on:click={onExportPdf}>Export PDF</button>
-      <button class="rounded-md border border-teal-200/10 bg-teal-500/5 px-2 py-1 text-[10px] font-mono text-teal-100/80 hover:bg-teal-500/10" on:click={onToggleRendererMode}>
+      <button class="rounded-md border border-teal-200/10 bg-teal-500/5 px-2 py-1 text-[10px] font-mono text-teal-100/80 hover:bg-teal-500/10" onclick={onExportSvg}>Export SVG</button>
+      <button class="rounded-md border border-teal-200/10 bg-teal-500/5 px-2 py-1 text-[10px] font-mono text-teal-100/80 hover:bg-teal-500/10" onclick={onExportPdf}>Export PDF</button>
+      <button class="rounded-md border border-teal-200/10 bg-teal-500/5 px-2 py-1 text-[10px] font-mono text-teal-100/80 hover:bg-teal-500/10" onclick={onToggleRendererMode}>
         {useLegacyRenderer ? 'Draft Renderer: Legacy' : 'Draft Renderer: Section'}
       </button>
       <Badge variant="outline" class="text-[10px] border-teal-500/30 text-teal-200">Draft Engine: Babylon</Badge>
@@ -45,7 +64,7 @@
             ? 'border-cyan-300/45 bg-cyan-500/15 text-cyan-100'
             : 'border-teal-200/10 bg-teal-500/5 text-teal-100/80'
         )}
-        on:click={onToggleTraceMode}>
+        onclick={onToggleTraceMode}>
         {traceEnabled ? 'Trace: On' : 'Trace: Off'}
       </button>
       {#if traceEnabled}

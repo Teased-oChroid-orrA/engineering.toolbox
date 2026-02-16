@@ -5,15 +5,22 @@
   import BushingLameStressPlot from './BushingLameStressPlot.svelte';
   import BushingEnforcementDetails from './BushingEnforcementDetails.svelte';
   import NativeDragLane from './NativeDragLane.svelte';
-  export let form: BushingInputs;
-  export let results: BushingOutput;
-  let infoDialog: 'safety' | 'fit' | null = null;
+
+  let {
+    form,
+    results
+  }: {
+    form: BushingInputs;
+    results: BushingOutput;
+  } = $props();
+
+  let infoDialog = $state<'safety' | 'fit' | null>(null);
 
   // Internal section ordering with persistence
   type SectionId = 'metrics' | 'lame';
   const SECTION_ORDER_KEY = 'scd.bushing.resultsSummary.sectionOrder.v1';
-  let sectionOrder: SectionId[] = ['metrics', 'lame'];
-  let sectionItems: Array<{ id: SectionId }> = [];
+  let sectionOrder = $state<SectionId[]>(['metrics', 'lame']);
+  let sectionItems = $derived(sectionOrder.map(id => ({ id })));
   
   onMount(() => {
     try {
@@ -27,10 +34,7 @@
     } catch (e) {
       console.warn('[BushingResultSummary] Failed to load section order:', e);
     }
-    sectionItems = sectionOrder.map(id => ({ id }));
   });
-  
-  $: sectionItems = sectionOrder.map(id => ({ id }));
   
   function handleReorder(ev: CustomEvent<{ items: Array<{ id: string }> }>) {
     const newOrder = ev.detail.items.map(i => i.id as SectionId);
@@ -60,18 +64,20 @@
   const valOk = 'text-emerald-300';
   const valFail = 'text-rose-300';
   const valInfo = 'text-cyan-200';
-  $: failed = results.governing.margin < 0 || results.physics.marginHousing < 0 || results.physics.marginBushing < 0;
-  $: fitFailed = results.warningCodes.some((w) => w.code === 'TOLERANCE_INFEASIBLE' || w.code === 'NET_CLEARANCE_FIT');
-  $: edgeFailed = results.warningCodes.some((w) => w.code.includes('EDGE_DISTANCE'));
-  $: wallFailed = results.warningCodes.some((w) => w.code.includes('WALL_BELOW_MIN'));
-  $: boreBandWidth = results.tolerance.bore.upper - results.tolerance.bore.lower;
-  $: targetBandWidth = results.tolerance.interferenceTarget.upper - results.tolerance.interferenceTarget.lower;
-  $: displayToleranceNotes = (results.tolerance.notes ?? []).filter((n) => !(results.tolerance.status === 'clamped' && n.includes('OD nominal was clamped')));
-  $: achievedWithinTarget =
+
+  let failed = $derived(results.governing.margin < 0 || results.physics.marginHousing < 0 || results.physics.marginBushing < 0);
+  let fitFailed = $derived(results.warningCodes.some((w) => w.code === 'TOLERANCE_INFEASIBLE' || w.code === 'NET_CLEARANCE_FIT'));
+  let edgeFailed = $derived(results.warningCodes.some((w) => w.code.includes('EDGE_DISTANCE')));
+  let wallFailed = $derived(results.warningCodes.some((w) => w.code.includes('WALL_BELOW_MIN')));
+  let boreBandWidth = $derived(results.tolerance.bore.upper - results.tolerance.bore.lower);
+  let targetBandWidth = $derived(results.tolerance.interferenceTarget.upper - results.tolerance.interferenceTarget.lower);
+  let displayToleranceNotes = $derived((results.tolerance.notes ?? []).filter((n) => !(results.tolerance.status === 'clamped' && n.includes('OD nominal was clamped'))));
+  let achievedWithinTarget = $derived(
     results.tolerance.achievedInterference.lower >= results.tolerance.interferenceTarget.lower - 1e-9 &&
-    results.tolerance.achievedInterference.upper <= results.tolerance.interferenceTarget.upper + 1e-9;
-  $: positiveInterference = results.physics.deltaEffective > 0;
-  $: odContained = results.tolerance.status !== 'infeasible';
+    results.tolerance.achievedInterference.upper <= results.tolerance.interferenceTarget.upper + 1e-9
+  );
+  let positiveInterference = $derived(results.physics.deltaEffective > 0);
+  let odContained = $derived(results.tolerance.status !== 'infeasible');
 
   function focusSection(id: string) {
     if (!id || id.trim() === '') return; // Guard against empty strings

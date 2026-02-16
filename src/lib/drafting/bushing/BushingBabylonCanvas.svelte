@@ -21,6 +21,8 @@
 
   onMount(() => {
     let mounted = true;
+    let resizeTimeout: number | null = null;
+    
     async function init() {
       if (!canvasEl) return;
       try {
@@ -28,7 +30,17 @@
           onDiagnostics: (diag) => onDiagnostics(diag)
         });
         if (!mounted) runtime?.dispose();
-        resizeObserver = new ResizeObserver(() => runtime?.updateViewport());
+        
+        // Debounced resize observer to prevent excessive updates
+        resizeObserver = new ResizeObserver(() => {
+          if (resizeTimeout !== null) {
+            window.clearTimeout(resizeTimeout);
+          }
+          resizeTimeout = window.setTimeout(() => {
+            runtime?.updateViewport();
+            resizeTimeout = null;
+          }, 100); // 100ms debounce
+        });
         resizeObserver.observe(canvasEl);
       } catch (err) {
         statusLabel = 'Babylon init failed';
@@ -40,6 +52,9 @@
     void init();
     return () => {
       mounted = false;
+      if (resizeTimeout !== null) {
+        window.clearTimeout(resizeTimeout);
+      }
       resizeObserver?.disconnect();
       resizeObserver = null;
       runtime?.dispose();
