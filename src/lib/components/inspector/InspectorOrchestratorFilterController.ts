@@ -56,23 +56,171 @@ export function buildFilterSpec(ctx: FilterControllerContext) {
   return out.spec;
 }
 
+// Store the original unfiltered rows for browser mode
+let browserModeOriginalRows: string[][] | null = null;
+
+export function resetBrowserModeOriginalRows() {
+  browserModeOriginalRows = null;
+}
+
 export async function applyFilterSpec(ctx: FilterControllerContext, spec: any): Promise<number> {
   // Browser mode: filter client-side if we have mergedRowsAll
   if (ctx.loadState.isMergedView && ctx.loadState.mergedRowsAll) {
-    if (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1') {
-      devLog('FILTER', 'Browser mode client-side, rows:', ctx.loadState.mergedRowsAll.length);
+    devLog('FILTER', 'Browser mode client-side, rows:', ctx.loadState.mergedRowsAll.length);
+    
+    // Store original rows on first filter (if not already stored)
+    if (!browserModeOriginalRows) {
+      browserModeOriginalRows = [...ctx.loadState.mergedRowsAll];
+      devLog('FILTER', 'Stored original rows:', browserModeOriginalRows.length);
     }
     
-    // Simple client-side filtering
+    const allRows = browserModeOriginalRows;
+    
+    // No filters - restore all data
     if (!spec || spec.empty) {
-      return ctx.loadState.totalRowCount ?? ctx.loadState.mergedRowsAll.length;
+      ctx.loadState.mergedRowsAll = [...allRows];
+      devLog('FILTER', 'No filter: restored all', allRows.length, 'rows');
+      return ctx.loadState.totalRowCount ?? allRows.length;
     }
     
-    // For now, return all rows (no actual filtering implemented)
-    // TODO: Implement client-side filtering logic
-    const count = ctx.loadState.mergedRowsAll.length;
+    // Apply client-side filtering logic
+    const headers = ctx.loadState.headers ?? [];
+    let filteredRows = allRows;
     
-    devLog('FILTER', 'Browser mode: returning', count, 'rows (no filtering applied)');
+    // Helper: match row against query
+    const matchesQuery = (row: string[], query: string, columnIdx: number | null, matchMode: string): boolean => {
+      if (!query) return true;
+      
+      const searchIn = columnIdx !== null && columnIdx >= 0 && columnIdx < row.length
+        ? [row[columnIdx] ?? '']
+        : row;
+      
+      const lowerQuery = query.toLowerCase();
+      
+      for (const cell of searchIn) {
+        const cellLower = (cell ?? '').toLowerCase();
+        
+        if (matchMode === 'fuzzy') {
+          if (cellLower.includes(lowerQuery)) return true;
+        } else if (matchMode === 'exact') {
+          if (cellLower === lowerQuery) return true;
+        } else if (matchMode === 'regex') {
+          try {
+            const regex = new RegExp(query, 'i');
+            if (regex.test(cell)) return true;
+          } catch {
+            return false;
+          }
+        }
+      }
+      
+      return false;
+    };
+    
+    // Apply main query filter
+    if (spec.query && spec.query.trim()) {
+      filteredRows = filteredRows.filter(row => 
+        matchesQuery(row, spec.query, spec.columnIdx, spec.matchMode)
+      );
+      devLog('FILTER', 'After query filter:', filteredRows.length, 'rows');
+    }
+    
+    // Apply multi-query clauses (if enabled)
+    if (spec.multiQueryEnabled && spec.multiQueryClauses && spec.multiQueryClauses.length > 0) {
+      for (const clause of spec.multiQueryClauses) {
+        if (!clause.query || !clause.query.trim()) continue;
+        
+        if (clause.logicalOp === 'OR') {
+          // Union: add rows from allRows that match this clause and aren't already included
+          // Use a simple hash to track row content and avoid duplicates
+          const hashRow = (row: string[]) => {
+            // Simple content-based hash: combine all cells with a delimiter unlikely to appear in CSV data
+            return row.map(cell => (cell ?? '').replace(/\|/g, '||')).join('|~|');
+          };
+          const existingRowsSet = new Set(filteredRows.map(hashRow));
+          for (const row of allRows) {
+            const rowHash = hashRow(row);
+            if (!existingRowsSet.has(rowHash) && matchesQuery(row, clause.query, clause.targetColIdx ?? null, clause.mode ?? 'fuzzy')) {
+              filteredRows.push(row);
+              existingRowsSet.add(rowHash);
+            }
+          }
+        } else {
+          // AND (default): intersect with existing results
+          filteredRows = filteredRows.filter(row =>
+            matchesQuery(row, clause.query, clause.targetColIdx ?? null, clause.mode ?? 'fuzzy')
+          );
+        }
+      }
+      devLog('FILTER', 'After multi-query:', filteredRows.length, 'rows');
+    }
+    
+    // Apply numeric filter
+    if (spec.numericFilter && spec.numericFilter.enabled && spec.numericFilter.colIdx !== null) {
+      const colIdx = spec.numericFilter.colIdx;
+      const min = spec.numericFilter.min ?? -1e308;
+      const max = spec.numericFilter.max ?? 1e308;
+      
+      filteredRows = filteredRows.filter(row => {
+        const cell = row[colIdx] ?? '';
+        const num = Number(cell);
+        return Number.isFinite(num) && num >= min && num <= max;
+      });
+      devLog('FILTER', 'After numeric filter:', filteredRows.length, 'rows');
+    }
+    
+    // Apply date filter
+    if (spec.dateFilter && spec.dateFilter.enabled && spec.dateFilter.colIdx !== null) {
+      const colIdx = spec.dateFilter.colIdx;
+      const minIso = spec.dateFilter.minIso || '1900-01-01';
+      const maxIso = spec.dateFilter.maxIso || '3000-01-01';
+      
+      filteredRows = filteredRows.filter(row => {
+        const cell = (row[colIdx] ?? '').trim();
+        if (!cell) return false;
+        
+        // Parse date (support ISO format and common formats)
+        let dateStr = cell;
+        if (cell.includes('/')) {
+          // Convert MM/DD/YYYY to YYYY-MM-DD
+          const parts = cell.split('/');
+          if (parts.length === 3) {
+            dateStr = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+          }
+        }
+        
+        return dateStr >= minIso && dateStr <= maxIso;
+      });
+      devLog('FILTER', 'After date filter:', filteredRows.length, 'rows');
+    }
+    
+    // Apply category filter
+    if (spec.categoryFilter && spec.categoryFilter.enabled && spec.categoryFilter.colIdx !== null) {
+      const colIdx = spec.categoryFilter.colIdx;
+      const selectedSet = new Set(spec.categoryFilter.selected ?? []);
+      
+      if (selectedSet.size > 0) {
+        filteredRows = filteredRows.filter(row => {
+          const cell = (row[colIdx] ?? '').trim();
+          return selectedSet.has(cell);
+        });
+        devLog('FILTER', 'After category filter:', filteredRows.length, 'rows');
+      }
+    }
+    
+    // Apply max rows scan limit
+    if (spec.maxRowsScan && spec.maxRowsScan > 0 && filteredRows.length > spec.maxRowsScan) {
+      filteredRows = filteredRows.slice(0, spec.maxRowsScan);
+      devLog('FILTER', 'After max scan limit:', filteredRows.length, 'rows');
+    }
+    
+    const count = filteredRows.length;
+    
+    // CRITICAL: Update mergedRowsAll with filtered results
+    // fetchVisibleSlice will slice from this array
+    ctx.loadState.mergedRowsAll = [...filteredRows];
+    
+    devLog('FILTER', 'Browser mode: filtered', count, 'of', allRows.length, 'rows');
     
     return count;
   }

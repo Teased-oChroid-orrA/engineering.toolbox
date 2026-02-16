@@ -87,13 +87,49 @@ The evaluator has been enhanced to detect and provide actionable feedback for ad
 ## Prerequisites
 
 - Node.js 18+
-- Playwright dev dependency
 
-### Setup
+### Automatic Setup (New!)
+
+The browser-dev-tools runner now **automatically handles all setup** on first run:
+
+✅ **Auto-detects missing dependencies** and installs them  
+✅ **Auto-installs Playwright browsers** if needed  
+✅ **Provides helpful error messages** if server isn't running  
+✅ **Optionally auto-starts dev server** with `--start-server` flag  
+
+**No manual setup required!** Just run any command and the tool will ensure everything is ready.
+
+### Manual Setup (Optional)
+
+If you prefer to install dependencies manually:
 
 ```bash
-npm i -D playwright
+npm install
 npx playwright install
+```
+
+### Quick Start
+
+**Option 1: Automatic (Recommended)**
+```bash
+# Tool automatically installs dependencies on first run
+node .github/skills/default-browser-devtools/runner.js smoke --url http://localhost:5173
+```
+
+**Option 2: With Auto-Start Server**
+```bash
+# Tool starts dev server for you
+node .github/skills/default-browser-devtools/runner.js smoke \
+  --url http://localhost:5173 \
+  --start-server
+```
+
+**Option 3: Skip Auto-Install**
+```bash
+# Skip dependency checks (if you've already installed manually)
+node .github/skills/default-browser-devtools/runner.js smoke \
+  --url http://localhost:5173 \
+  --skip-install
 ```
 
 ## Runner CLI Reference
@@ -196,25 +232,51 @@ node .github/skills/default-browser-devtools/runner.js eval \
 
 ### CLI Arguments
 
+#### Test Configuration
+
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
 | `--url` | string | `http://localhost:5173` | Target URL to test |
 | `--engine` | string | - | Single engine: `webkit` or `chromium` |
 | `--engines` | string | `webkit,chromium` | Comma-separated list of engines |
+| `--headless` | boolean | `true` | Run browser in headless mode |
+| `--readySelector` | string | - | Selector to wait for before proceeding |
+| `--readyText` | string | - | Text to wait for before proceeding |
+| `--timeoutMs` | number | `30000` | Timeout for ready checks (ms) |
+| `--viewportWidth` | number | `1280` | Viewport width (px) |
+| `--viewportHeight` | number | `720` | Viewport height (px) |
+
+#### Setup & Server Options (New!)
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--skip-install` | boolean | `false` | Skip automatic npm and Playwright installation |
+| `--start-server` | boolean | `false` | Automatically start dev server if not running |
+| `--server-command` | string | `npm run dev` | Command to start server |
+| `--server-wait-ms` | number | `10000` | Time to wait for server startup (ms) |
+
+#### Evaluation & Learning
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
 | `--learn` | boolean | `true` | Enable evaluation & learning phase |
 | `--knowledge-base` | string | `./test-knowledge.json` | Path to knowledge base JSON |
 | `--eval-only` | boolean | `false` | Only evaluate, don't run tests |
 | `--eval-consensus` | number | `1` | Run evaluation N times for consensus scoring |
 | `--artifacts` | string | - | Path to artifacts directory (for eval-only mode) |
-| `--headless` | boolean | `true` | Run browser in headless mode |
-| `--readySelector` | string | - | Selector to wait for before proceeding |
-| `--readyText` | string | - | Text to wait for before proceeding |
-| `--timeoutMs` | number | `30000` | Timeout for ready checks (ms) |
+
+#### Smoke Test Configuration
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
 | `--sweepSelector` | string | `button, a, [role='button'], summary` | Selector for click sweep |
 | `--maxClicks` | number | `30` | Max interactions in click sweep |
 | `--postClickWaitMs` | number | `120` | Wait time after each click (ms) |
-| `--viewportWidth` | number | `1280` | Viewport width (px) |
-| `--viewportHeight` | number | `720` | Viewport height (px) |
+
+#### Performance & Debugging
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
 | `--perfWindowMs` | number | `1500` | Performance capture window (ms) |
 | `--eval` | string | - | JavaScript expression to evaluate on page |
 
@@ -460,28 +522,40 @@ Based on detected patterns and scores, the evaluator suggests improvements:
 
 ## Workflows
 
-### Workflow 1 — Smoke Test with Learning
+### Workflow 1 — Smoke Test with Learning (Simplified!)
 
 **Goal:** Verify load + hydration + basic interactions, learn from results.
 
+**New simplified usage** (auto-installs everything on first run):
+```bash
+# That's it! No setup required - tool handles everything
+node .github/skills/default-browser-devtools/runner.js smoke \
+  --url http://localhost:5173 \
+  --engines webkit,chromium
+```
+
+**With auto-start server:**
 ```bash
 node .github/skills/default-browser-devtools/runner.js smoke \
   --url http://localhost:5173 \
   --engines webkit,chromium \
-  --learn true
+  --start-server
 ```
 
 **Process:**
-1. Launch webkit and chromium browsers
-2. Navigate to URL, wait for networkidle
-3. Capture baseline screenshot + accessibility snapshot
-4. Perform conservative click sweep (up to 30 interactions)
-5. Capture post-interaction screenshot + snapshot
-6. Log console messages + network failures
-7. **Evaluate** test quality (completeness, precision, recall, efficiency)
-8. **Detect patterns** (ResizeObserver, hydration, timing issues)
-9. **Suggest optimizations**
-10. **Update knowledge base** with learned patterns
+1. **✨ Auto-check dependencies** (installs if missing)
+2. **✨ Auto-install Playwright browsers** (if needed)
+3. **✨ Check server availability** (or start with --start-server)
+4. Launch webkit and chromium browsers
+5. Navigate to URL, wait for networkidle
+6. Capture baseline screenshot + accessibility snapshot
+7. Perform conservative click sweep (up to 30 interactions)
+8. Capture post-interaction screenshot + snapshot
+9. Log console messages + network failures
+10. **Evaluate** test quality (completeness, precision, recall, efficiency)
+11. **Detect patterns** (ResizeObserver, hydration, timing issues)
+12. **Suggest optimizations**
+13. **Update knowledge base** with learned patterns
 
 **Output:**
 ```
@@ -643,6 +717,73 @@ When testing Svelte apps for cross-platform compatibility:
 - [ ] Intersection observer thresholds (rounding differences)
 
 ## Troubleshooting
+
+### Issue: First time setup or missing dependencies
+
+**New in v2.0**: The runner now **automatically handles setup**! No manual intervention needed.
+
+**What happens automatically:**
+1. ✅ Checks for `node_modules` and runs `npm install` if missing
+2. ✅ Checks for Playwright browsers and installs them if missing
+3. ✅ Provides clear progress messages during installation
+4. ✅ Verifies server is running before tests start
+
+**If you want to skip automatic installation:**
+```bash
+node runner.js smoke --url http://localhost:5173 --skip-install
+```
+
+**If server isn't running:**
+```bash
+# Option 1: Auto-start server
+node runner.js smoke --url http://localhost:5173 --start-server
+
+# Option 2: Custom server command
+node runner.js smoke --url http://localhost:5173 \
+  --start-server \
+  --server-command "npm run dev" \
+  --server-wait-ms 15000
+```
+
+**Manual setup (if preferred):**
+```bash
+npm install
+npx playwright install
+npm run dev &
+node runner.js smoke --url http://localhost:5173
+```
+
+### Issue: "Cannot find package 'playwright'" error
+
+**This should no longer happen!** The runner now automatically installs Playwright before importing it.
+
+If you still see this error:
+1. Make sure you're using the updated runner (check git log)
+2. Try running with verbose output: `node runner.js smoke --url http://localhost:5173 2>&1 | tee output.log`
+3. Check if `node_modules` directory exists
+4. Try manual install: `npm install`
+
+### Issue: Server not responding
+
+**Symptom:**
+```
+✗ Server is not running at http://localhost:5173
+   Options:
+   1. Start server manually: npm run dev
+   2. Use --start-server flag to auto-start
+   3. Specify different URL with --url
+```
+
+**Fix:**
+```bash
+# Let the tool start it for you
+node runner.js smoke --url http://localhost:5173 --start-server
+
+# Or start manually in another terminal
+npm run dev
+# Then in original terminal:
+node runner.js smoke --url http://localhost:5173
+```
 
 ### Issue: Evaluation score is low despite test passing
 
