@@ -3,7 +3,7 @@
   "learned_patterns": [],
   "optimized_selectors": {
     "interactive_elements": "button, a, [role='button'], summary",
-    "confidence": 0.76
+    "confidence": 0.78
   },
   "threshold_calibration": {
     "smoke_test": {

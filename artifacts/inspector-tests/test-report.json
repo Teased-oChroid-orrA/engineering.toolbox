@@ -1,0 +1,43 @@
+{
+  "passed": [
+    "TEST 1: Initial load successful",
+    "TEST 2: Single CSV upload - file name displayed",
+    "TEST 2: Single CSV upload - correct file count",
+    "TEST 4: Multiple CSV upload - all file names displayed",
+    "TEST 4: Multiple CSV upload - correct file count (3)",
+    "TEST 5: Close button (×) exists",
+    "TEST 6: Menu system - 12 items found"
+  ],
+  "failed": [],
+  "warnings": [
+    "TEST 3: Moderate filter queue calls (6)",
+    "TEST 5: Close button clicked but file still visible",
+    "TEST 7: 26 console errors"
+  ],
+  "screenshots": [
+    {
+      "name": "01-initial-load",
+      "path": "artifacts/inspector-tests/01-initial-load.png"
+    },
+    {
+      "name": "02-single-csv-loaded",
+      "path": "artifacts/inspector-tests/02-single-csv-loaded.png"
+    },
+    {
+      "name": "04-multiple-csvs-loaded",
+      "path": "artifacts/inspector-tests/04-multiple-csvs-loaded.png"
+    },
+    {
+      "name": "05-after-close-button",
+      "path": "artifacts/inspector-tests/05-after-close-button.png"
+    },
+    {
+      "name": "06-menu-open",
+      "path": "artifacts/inspector-tests/06-menu-open.png"
+    },
+    {
+      "name": "07-final-state",
+      "path": "artifacts/inspector-tests/07-final-state.png"
+    }
+  ]
+}

@@ -1,0 +1,1202 @@
+[
+  {
+    "type": "log",
+    "text": "[RO] ResizeObserver.observe patched (dev)",
+    "timestamp": 1771210111850
+  },
+  {
+    "type": "debug",
+    "text": "[vite] connecting...",
+    "timestamp": 1771210111938
+  },
+  {
+    "type": "debug",
+    "text": "[vite] connected.",
+    "timestamp": 1771210111956
+  },
+  {
+    "type": "startGroupCollapsed",
+    "text": "[RO] observe JSHandle@node",
+    "timestamp": 1771210112230
+  },
+  {
+    "type": "log",
+    "text": "tag: html class: dark",
+    "timestamp": 1771210112230
+  },
+  {
+    "type": "log",
+    "text": "Error: ResizeObserver.observe called here\n    at RO.observe (http://127.0.0.1:5173/:29:25)\n    at http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:104:10",
+    "timestamp": 1771210112230
+  },
+  {
+    "type": "endGroup",
+    "text": "console.groupEnd",
+    "timestamp": 1771210112230
+  },
+  {
+    "type": "startGroupCollapsed",
+    "text": "[RO] observe JSHandle@node",
+    "timestamp": 1771210112328
+  },
+  {
+    "type": "log",
+    "text": "tag: div class: ",
+    "timestamp": 1771210112328
+  },
+  {
+    "type": "log",
+    "text": "Error: ResizeObserver.observe called here\n    at RO.observe (http://127.0.0.1:5173/:29:25)\n    at http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:457:104\n    at http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:233:35\n    at Array.forEach (<anonymous>)\n    at forEach (http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:233:13)\n    at autoAnimate (http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:457:7)\n    at safeAutoAnimate (http://127.0.0.1:5173/src/lib/utils/safeAutoAnimate.ts:14:12)\n    at aa (http://127.0.0.1:5173/src/lib/components/inspector/InspectorTopControls.svelte:114:15)\n    at http://127.0.0.1:5173/src/lib/components/inspector/InspectorTopControls.svelte:696:34\n    at http://127.0.0.1:5173/node_modules/.vite/deps/chunk-5WFYUS7G.js?v=d86bec58:1933:33",
+    "timestamp": 1771210112328
+  },
+  {
+    "type": "endGroup",
+    "text": "console.groupEnd",
+    "timestamp": 1771210112329
+  },
+  {
+    "type": "startGroupCollapsed",
+    "text": "[RO] observe JSHandle@node",
+    "timestamp": 1771210112330
+  },
+  {
+    "type": "log",
+    "text": "tag: div class: grid grid-cols-12 gap-3",
+    "timestamp": 1771210112330
+  },
+  {
+    "type": "log",
+    "text": "Error: ResizeObserver.observe called here\n    at RO.observe (http://127.0.0.1:5173/:29:25)\n    at http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:457:104\n    at http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:237:39\n    at Array.forEach (<anonymous>)\n    at forEach (http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:237:17)\n    at autoAnimate (http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:457:7)\n    at safeAutoAnimate (http://127.0.0.1:5173/src/lib/utils/safeAutoAnimate.ts:14:12)\n    at aa (http://127.0.0.1:5173/src/lib/components/inspector/InspectorTopControls.svelte:114:15)\n    at http://127.0.0.1:5173/src/lib/components/inspector/InspectorTopControls.svelte:696:34\n    at http://127.0.0.1:5173/node_modules/.vite/deps/chunk-5WFYUS7G.js?v=d86bec58:1933:33",
+    "timestamp": 1771210112330
+  },
+  {
+    "type": "endGroup",
+    "text": "console.groupEnd",
+    "timestamp": 1771210112330
+  },
+  {
+    "type": "startGroupCollapsed",
+    "text": "[RO] observe JSHandle@node",
+    "timestamp": 1771210112337
+  },
+  {
+    "type": "log",
+    "text": "tag: div class: glass-panel rounded-2xl border border-white/10 overflow-auto relative focus:outline-none inspector-panel-slide inspector-pop-card",
+    "timestamp": 1771210112337
+  },
+  {
+    "type": "log",
+    "text": "Error: ResizeObserver.observe called here\n    at RO.observe (http://127.0.0.1:5173/:29:25)\n    at http://127.0.0.1:5173/src/lib/components/inspector/InspectorVirtualGrid.svelte:229:6\n    at run (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:39:10)\n    at Array.map (<anonymous>)\n    at http://127.0.0.1:5173/node_modules/.vite/deps/chunk-5WFYUS7G.js?v=d86bec58:3300:43\n    at untrack (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:3674:12)\n    at $effect (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-5WFYUS7G.js?v=d86bec58:3300:17)\n    at update_reaction (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:3380:18)\n    at update_effect (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:3518:21)\n    at flush_queued_effects (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:2509:7)",
+    "timestamp": 1771210112337
+  },
+  {
+    "type": "endGroup",
+    "text": "console.groupEnd",
+    "timestamp": 1771210112337
+  },
+  {
+    "type": "log",
+    "text": "[Inspector Menu] Event listener attached for: sc:context-menu-command",
+    "timestamp": 1771210112339
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Context menu effect running...",
+    "timestamp": 1771210112339
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Built menu: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210112339
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] registerContextMenu called with: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210112339
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Dispatching event: sc:context-menu-register",
+    "timestamp": 1771210112339
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Event dispatched successfully",
+    "timestamp": 1771210112339
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Registration complete",
+    "timestamp": 1771210112339
+  },
+  {
+    "type": "startGroupCollapsed",
+    "text": "[RO] observe JSHandle@node",
+    "timestamp": 1771210112340
+  },
+  {
+    "type": "log",
+    "text": "tag: div class: relative w-full",
+    "timestamp": 1771210112340
+  },
+  {
+    "type": "log",
+    "text": "Error: ResizeObserver.observe called here\n    at RO.observe (http://127.0.0.1:5173/:29:25)\n    at http://127.0.0.1:5173/src/routes/+layout.svelte?t=1771210051367:143:26\n    at untrack (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:3674:12)\n    at $effect (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-5WFYUS7G.js?v=d86bec58:3422:23)\n    at update_reaction (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:3380:18)\n    at update_effect (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:3518:21)\n    at flush_queued_effects (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:2509:7)\n    at _Batch.process (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:2181:7)\n    at flush_effects (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:2468:13)\n    at _Batch.flush (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:2271:7)",
+    "timestamp": 1771210112340
+  },
+  {
+    "type": "endGroup",
+    "text": "console.groupEnd",
+    "timestamp": 1771210112340
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Context menu effect running...",
+    "timestamp": 1771210112455
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Built menu: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210112455
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] registerContextMenu called with: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210112455
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Dispatching event: sc:context-menu-register",
+    "timestamp": 1771210112455
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Event dispatched successfully",
+    "timestamp": 1771210112458
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Registration complete",
+    "timestamp": 1771210112458
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Context menu effect running...",
+    "timestamp": 1771210112458
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Built menu: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210112458
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] registerContextMenu called with: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210112458
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Dispatching event: sc:context-menu-register",
+    "timestamp": 1771210112458
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Event dispatched successfully",
+    "timestamp": 1771210112458
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Registration complete",
+    "timestamp": 1771210112459
+  },
+  {
+    "type": "error",
+    "text": "★★★ LOAD CONTROLLER EXECUTING ★★★ text length: 172",
+    "timestamp": 1771210115562
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CTRL] loadCsvFromText called, text length: 172",
+    "timestamp": 1771210115562
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CTRL] hasHeadersOverride: undefined trackWorkspace: true",
+    "timestamp": 1771210115563
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CSV] Browser mode: stored 5 rows",
+    "timestamp": 1771210115569
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CSV] hasLoaded set to true, datasetId: ds_102fc34c",
+    "timestamp": 1771210115581
+  },
+  {
+    "type": "error",
+    "text": "★★★ RUN FILTER NOW CALLED ★★★",
+    "timestamp": 1771210115582
+  },
+  {
+    "type": "error",
+    "text": "[FILTER NOW] loadState._id: undefined",
+    "timestamp": 1771210115582
+  },
+  {
+    "type": "error",
+    "text": "[FILTER NOW] loadState.hasLoaded: true",
+    "timestamp": 1771210115583
+  },
+  {
+    "type": "error",
+    "text": "[FILTER NOW] ctx.hasLoaded: true",
+    "timestamp": 1771210115583
+  },
+  {
+    "type": "log",
+    "text": "[FILTER NOW CONTROLLER] Entry - hasLoaded: true isMergedView: true",
+    "timestamp": 1771210115583
+  },
+  {
+    "type": "log",
+    "text": "[FILTER NOW] Passed early checks",
+    "timestamp": 1771210115584
+  },
+  {
+    "type": "log",
+    "text": "[FILTER NOW] Setting filterPending, calling drainFilterQueue",
+    "timestamp": 1771210115584
+  },
+  {
+    "type": "error",
+    "text": "★★★ DRAIN FILTER QUEUE CALLED ★★★",
+    "timestamp": 1771210115584
+  },
+  {
+    "type": "log",
+    "text": "[DRAIN FILTER QUEUE] Called - filterInFlight: false hasLoaded: true",
+    "timestamp": 1771210115584
+  },
+  {
+    "type": "log",
+    "text": "[DRAIN FILTER QUEUE] Calling runFilterPass",
+    "timestamp": 1771210115584
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Browser mode client-side, rows: 5",
+    "timestamp": 1771210115585
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Stored original rows: 5",
+    "timestamp": 1771210115585
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Browser mode: filtered 5 of 5 rows",
+    "timestamp": 1771210115585
+  },
+  {
+    "type": "log",
+    "text": "[[SLICE FETCH EFFECT] Triggered - start:] 0 end: 0 count: 0 colsLen: 4",
+    "timestamp": 1771210115592
+  },
+  {
+    "type": "log",
+    "text": "[FETCH SLICE] isMergedView: true mergedRowsAll.length: 5 range: 0 - 0",
+    "timestamp": 1771210115593
+  },
+  {
+    "type": "log",
+    "text": "[FETCH SLICE] Set visibleRows to 0 rows",
+    "timestamp": 1771210115594
+  },
+  {
+    "type": "log",
+    "text": "[SC][Inspector][perf] {op: slice, ms: 0.7, p95: 0.7, slo: 60, status: ok}",
+    "timestamp": 1771210115594
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Context menu effect running...",
+    "timestamp": 1771210115594
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Built menu: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210115594
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] registerContextMenu called with: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210115595
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Dispatching event: sc:context-menu-register",
+    "timestamp": 1771210115595
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Event dispatched successfully",
+    "timestamp": 1771210115595
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Registration complete",
+    "timestamp": 1771210115595
+  },
+  {
+    "type": "log",
+    "text": "[[SLICE FETCH EFFECT] Skipped - params unchanged:] 0|0|0|4",
+    "timestamp": 1771210115596
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Context menu effect running...",
+    "timestamp": 1771210115596
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Built menu: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210115596
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] registerContextMenu called with: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210115597
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Dispatching event: sc:context-menu-register",
+    "timestamp": 1771210115597
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Event dispatched successfully",
+    "timestamp": 1771210115597
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Registration complete",
+    "timestamp": 1771210115597
+  },
+  {
+    "type": "log",
+    "text": "[FILTER PASS] Set totalFilteredCount to 5 on loadState",
+    "timestamp": 1771210115598
+  },
+  {
+    "type": "log",
+    "text": "[SC][Inspector][perf] {op: filter, ms: 13.8, p95: 13.8, slo: 180, status: ok}",
+    "timestamp": 1771210115598
+  },
+  {
+    "type": "log",
+    "text": "[FILTER PASS] Filter complete. Slice fetch effect will handle fetching with proper grid indices.",
+    "timestamp": 1771210115598
+  },
+  {
+    "type": "log",
+    "text": "[[SLICE FETCH EFFECT] Triggered - start:] 0 end: 5 count: 5 colsLen: 4",
+    "timestamp": 1771210115602
+  },
+  {
+    "type": "log",
+    "text": "[FETCH SLICE] isMergedView: true mergedRowsAll.length: 5 range: 0 - 5",
+    "timestamp": 1771210115603
+  },
+  {
+    "type": "log",
+    "text": "[FETCH SLICE] Set visibleRows to 5 rows",
+    "timestamp": 1771210115603
+  },
+  {
+    "type": "log",
+    "text": "[SC][Inspector][perf] {op: slice, ms: 0.6, p95: 0.6, slo: 60, status: ok}",
+    "timestamp": 1771210115603
+  },
+  {
+    "type": "log",
+    "text": "[[SLICE FETCH EFFECT] Skipped - params unchanged:] 0|5|5|4",
+    "timestamp": 1771210115618
+  },
+  {
+    "type": "error",
+    "text": "★★★ DRAIN FILTER QUEUE CALLED ★★★",
+    "timestamp": 1771210115741
+  },
+  {
+    "type": "log",
+    "text": "[DRAIN FILTER QUEUE] Called - filterInFlight: false hasLoaded: true",
+    "timestamp": 1771210115741
+  },
+  {
+    "type": "log",
+    "text": "[DRAIN FILTER QUEUE] Calling runFilterPass",
+    "timestamp": 1771210115741
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Browser mode client-side, rows: 5",
+    "timestamp": 1771210115743
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Browser mode: filtered 5 of 5 rows",
+    "timestamp": 1771210115743
+  },
+  {
+    "type": "log",
+    "text": "[FILTER PASS] Set totalFilteredCount to 5 on loadState",
+    "timestamp": 1771210115743
+  },
+  {
+    "type": "log",
+    "text": "[SC][Inspector][perf] {op: filter, ms: 1.9, p95: 1.9, slo: 180, status: ok}",
+    "timestamp": 1771210115743
+  },
+  {
+    "type": "log",
+    "text": "[FILTER PASS] Filter complete. Slice fetch effect will handle fetching with proper grid indices.",
+    "timestamp": 1771210115743
+  },
+  {
+    "type": "log",
+    "text": "[RO] ResizeObserver.observe patched (dev)",
+    "timestamp": 1771210119263
+  },
+  {
+    "type": "debug",
+    "text": "[vite] connecting...",
+    "timestamp": 1771210119284
+  },
+  {
+    "type": "debug",
+    "text": "[vite] connected.",
+    "timestamp": 1771210119297
+  },
+  {
+    "type": "startGroupCollapsed",
+    "text": "[RO] observe JSHandle@node",
+    "timestamp": 1771210119406
+  },
+  {
+    "type": "log",
+    "text": "tag: html class: dark",
+    "timestamp": 1771210119406
+  },
+  {
+    "type": "log",
+    "text": "Error: ResizeObserver.observe called here\n    at RO.observe (http://127.0.0.1:5173/:29:25)\n    at http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:104:10",
+    "timestamp": 1771210119406
+  },
+  {
+    "type": "endGroup",
+    "text": "console.groupEnd",
+    "timestamp": 1771210119406
+  },
+  {
+    "type": "startGroupCollapsed",
+    "text": "[RO] observe JSHandle@node",
+    "timestamp": 1771210119450
+  },
+  {
+    "type": "log",
+    "text": "tag: div class: ",
+    "timestamp": 1771210119451
+  },
+  {
+    "type": "log",
+    "text": "Error: ResizeObserver.observe called here\n    at RO.observe (http://127.0.0.1:5173/:29:25)\n    at http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:457:104\n    at http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:233:35\n    at Array.forEach (<anonymous>)\n    at forEach (http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:233:13)\n    at autoAnimate (http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:457:7)\n    at safeAutoAnimate (http://127.0.0.1:5173/src/lib/utils/safeAutoAnimate.ts:14:12)\n    at aa (http://127.0.0.1:5173/src/lib/components/inspector/InspectorTopControls.svelte:114:15)\n    at http://127.0.0.1:5173/src/lib/components/inspector/InspectorTopControls.svelte:696:34\n    at http://127.0.0.1:5173/node_modules/.vite/deps/chunk-5WFYUS7G.js?v=d86bec58:1933:33",
+    "timestamp": 1771210119451
+  },
+  {
+    "type": "endGroup",
+    "text": "console.groupEnd",
+    "timestamp": 1771210119451
+  },
+  {
+    "type": "startGroupCollapsed",
+    "text": "[RO] observe JSHandle@node",
+    "timestamp": 1771210119451
+  },
+  {
+    "type": "log",
+    "text": "tag: div class: grid grid-cols-12 gap-3",
+    "timestamp": 1771210119452
+  },
+  {
+    "type": "log",
+    "text": "Error: ResizeObserver.observe called here\n    at RO.observe (http://127.0.0.1:5173/:29:25)\n    at http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:457:104\n    at http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:237:39\n    at Array.forEach (<anonymous>)\n    at forEach (http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:237:17)\n    at autoAnimate (http://127.0.0.1:5173/node_modules/.vite/deps/@formkit_auto-animate.js?v=50861547:457:7)\n    at safeAutoAnimate (http://127.0.0.1:5173/src/lib/utils/safeAutoAnimate.ts:14:12)\n    at aa (http://127.0.0.1:5173/src/lib/components/inspector/InspectorTopControls.svelte:114:15)\n    at http://127.0.0.1:5173/src/lib/components/inspector/InspectorTopControls.svelte:696:34\n    at http://127.0.0.1:5173/node_modules/.vite/deps/chunk-5WFYUS7G.js?v=d86bec58:1933:33",
+    "timestamp": 1771210119452
+  },
+  {
+    "type": "endGroup",
+    "text": "console.groupEnd",
+    "timestamp": 1771210119452
+  },
+  {
+    "type": "startGroupCollapsed",
+    "text": "[RO] observe JSHandle@node",
+    "timestamp": 1771210119452
+  },
+  {
+    "type": "log",
+    "text": "tag: div class: glass-panel rounded-2xl border border-white/10 overflow-auto relative focus:outline-none inspector-panel-slide inspector-pop-card",
+    "timestamp": 1771210119453
+  },
+  {
+    "type": "log",
+    "text": "Error: ResizeObserver.observe called here\n    at RO.observe (http://127.0.0.1:5173/:29:25)\n    at http://127.0.0.1:5173/src/lib/components/inspector/InspectorVirtualGrid.svelte:229:6\n    at run (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:39:10)\n    at Array.map (<anonymous>)\n    at http://127.0.0.1:5173/node_modules/.vite/deps/chunk-5WFYUS7G.js?v=d86bec58:3300:43\n    at untrack (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:3674:12)\n    at $effect (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-5WFYUS7G.js?v=d86bec58:3300:17)\n    at update_reaction (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:3380:18)\n    at update_effect (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:3518:21)\n    at flush_queued_effects (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:2509:7)",
+    "timestamp": 1771210119453
+  },
+  {
+    "type": "endGroup",
+    "text": "console.groupEnd",
+    "timestamp": 1771210119453
+  },
+  {
+    "type": "log",
+    "text": "[Inspector Menu] Event listener attached for: sc:context-menu-command",
+    "timestamp": 1771210119454
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Context menu effect running...",
+    "timestamp": 1771210119454
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Built menu: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210119455
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] registerContextMenu called with: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210119455
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Dispatching event: sc:context-menu-register",
+    "timestamp": 1771210119455
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Event dispatched successfully",
+    "timestamp": 1771210119455
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Registration complete",
+    "timestamp": 1771210119455
+  },
+  {
+    "type": "startGroupCollapsed",
+    "text": "[RO] observe JSHandle@node",
+    "timestamp": 1771210119455
+  },
+  {
+    "type": "log",
+    "text": "tag: div class: relative w-full",
+    "timestamp": 1771210119455
+  },
+  {
+    "type": "log",
+    "text": "Error: ResizeObserver.observe called here\n    at RO.observe (http://127.0.0.1:5173/:29:25)\n    at http://127.0.0.1:5173/src/routes/+layout.svelte?t=1771210051367:143:26\n    at untrack (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:3674:12)\n    at $effect (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-5WFYUS7G.js?v=d86bec58:3422:23)\n    at update_reaction (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:3380:18)\n    at update_effect (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:3518:21)\n    at flush_queued_effects (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:2509:7)\n    at _Batch.process (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:2181:7)\n    at flush_effects (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:2468:13)\n    at _Batch.flush (http://127.0.0.1:5173/node_modules/.vite/deps/chunk-UTYDR3E7.js?v=d86bec58:2271:7)",
+    "timestamp": 1771210119456
+  },
+  {
+    "type": "endGroup",
+    "text": "console.groupEnd",
+    "timestamp": 1771210119456
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Context menu effect running...",
+    "timestamp": 1771210119508
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Built menu: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210119508
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] registerContextMenu called with: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210119508
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Dispatching event: sc:context-menu-register",
+    "timestamp": 1771210119508
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Event dispatched successfully",
+    "timestamp": 1771210119508
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Registration complete",
+    "timestamp": 1771210119509
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Context menu effect running...",
+    "timestamp": 1771210119512
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Built menu: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210119512
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] registerContextMenu called with: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210119512
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Dispatching event: sc:context-menu-register",
+    "timestamp": 1771210119512
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Event dispatched successfully",
+    "timestamp": 1771210119514
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Registration complete",
+    "timestamp": 1771210119514
+  },
+  {
+    "type": "error",
+    "text": "★★★ LOAD CONTROLLER EXECUTING ★★★ text length: 172",
+    "timestamp": 1771210121256
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CTRL] loadCsvFromText called, text length: 172",
+    "timestamp": 1771210121256
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CTRL] hasHeadersOverride: undefined trackWorkspace: true",
+    "timestamp": 1771210121256
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CSV] Browser mode: stored 5 rows",
+    "timestamp": 1771210121258
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CSV] hasLoaded set to true, datasetId: ds_102fc34c",
+    "timestamp": 1771210121266
+  },
+  {
+    "type": "error",
+    "text": "★★★ RUN FILTER NOW CALLED ★★★",
+    "timestamp": 1771210121266
+  },
+  {
+    "type": "error",
+    "text": "[FILTER NOW] loadState._id: undefined",
+    "timestamp": 1771210121266
+  },
+  {
+    "type": "error",
+    "text": "[FILTER NOW] loadState.hasLoaded: true",
+    "timestamp": 1771210121266
+  },
+  {
+    "type": "error",
+    "text": "[FILTER NOW] ctx.hasLoaded: true",
+    "timestamp": 1771210121267
+  },
+  {
+    "type": "log",
+    "text": "[FILTER NOW CONTROLLER] Entry - hasLoaded: true isMergedView: true",
+    "timestamp": 1771210121267
+  },
+  {
+    "type": "log",
+    "text": "[FILTER NOW] Passed early checks",
+    "timestamp": 1771210121267
+  },
+  {
+    "type": "log",
+    "text": "[FILTER NOW] Setting filterPending, calling drainFilterQueue",
+    "timestamp": 1771210121267
+  },
+  {
+    "type": "error",
+    "text": "★★★ DRAIN FILTER QUEUE CALLED ★★★",
+    "timestamp": 1771210121267
+  },
+  {
+    "type": "log",
+    "text": "[DRAIN FILTER QUEUE] Called - filterInFlight: false hasLoaded: true",
+    "timestamp": 1771210121267
+  },
+  {
+    "type": "log",
+    "text": "[DRAIN FILTER QUEUE] Calling runFilterPass",
+    "timestamp": 1771210121267
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Browser mode client-side, rows: 5",
+    "timestamp": 1771210121267
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Stored original rows: 5",
+    "timestamp": 1771210121267
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Browser mode: filtered 5 of 5 rows",
+    "timestamp": 1771210121267
+  },
+  {
+    "type": "log",
+    "text": "[[SLICE FETCH EFFECT] Triggered - start:] 0 end: 0 count: 0 colsLen: 4",
+    "timestamp": 1771210121272
+  },
+  {
+    "type": "log",
+    "text": "[FETCH SLICE] isMergedView: true mergedRowsAll.length: 5 range: 0 - 0",
+    "timestamp": 1771210121276
+  },
+  {
+    "type": "log",
+    "text": "[FETCH SLICE] Set visibleRows to 0 rows",
+    "timestamp": 1771210121276
+  },
+  {
+    "type": "log",
+    "text": "[SC][Inspector][perf] {op: slice, ms: 0.3, p95: 0.3, slo: 60, status: ok}",
+    "timestamp": 1771210121277
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Context menu effect running...",
+    "timestamp": 1771210121277
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Built menu: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210121278
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] registerContextMenu called with: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210121278
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Dispatching event: sc:context-menu-register",
+    "timestamp": 1771210121278
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Event dispatched successfully",
+    "timestamp": 1771210121278
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Registration complete",
+    "timestamp": 1771210121278
+  },
+  {
+    "type": "log",
+    "text": "[[SLICE FETCH EFFECT] Skipped - params unchanged:] 0|0|0|4",
+    "timestamp": 1771210121278
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Context menu effect running...",
+    "timestamp": 1771210121278
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Built menu: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210121278
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] registerContextMenu called with: {scope: inspector, label: Inspector, sections: Array(5)}",
+    "timestamp": 1771210121279
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Dispatching event: sc:context-menu-register",
+    "timestamp": 1771210121279
+  },
+  {
+    "type": "log",
+    "text": "[MENU DEBUG] Event dispatched successfully",
+    "timestamp": 1771210121279
+  },
+  {
+    "type": "log",
+    "text": "[MENU EFFECT] Registration complete",
+    "timestamp": 1771210121279
+  },
+  {
+    "type": "log",
+    "text": "[FILTER PASS] Set totalFilteredCount to 5 on loadState",
+    "timestamp": 1771210121279
+  },
+  {
+    "type": "log",
+    "text": "[SC][Inspector][perf] {op: filter, ms: 9.2, p95: 9.2, slo: 180, status: ok}",
+    "timestamp": 1771210121279
+  },
+  {
+    "type": "log",
+    "text": "[FILTER PASS] Filter complete. Slice fetch effect will handle fetching with proper grid indices.",
+    "timestamp": 1771210121279
+  },
+  {
+    "type": "log",
+    "text": "[[SLICE FETCH EFFECT] Triggered - start:] 0 end: 5 count: 5 colsLen: 4",
+    "timestamp": 1771210121291
+  },
+  {
+    "type": "log",
+    "text": "[FETCH SLICE] isMergedView: true mergedRowsAll.length: 5 range: 0 - 5",
+    "timestamp": 1771210121291
+  },
+  {
+    "type": "log",
+    "text": "[FETCH SLICE] Set visibleRows to 5 rows",
+    "timestamp": 1771210121291
+  },
+  {
+    "type": "log",
+    "text": "[SC][Inspector][perf] {op: slice, ms: 0.4, p95: 0.3, slo: 60, status: ok}",
+    "timestamp": 1771210121291
+  },
+  {
+    "type": "log",
+    "text": "[[SLICE FETCH EFFECT] Skipped - params unchanged:] 0|5|5|4",
+    "timestamp": 1771210121305
+  },
+  {
+    "type": "error",
+    "text": "★★★ LOAD CONTROLLER EXECUTING ★★★ text length: 134",
+    "timestamp": 1771210121316
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CTRL] loadCsvFromText called, text length: 134",
+    "timestamp": 1771210121316
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CTRL] hasHeadersOverride: undefined trackWorkspace: true",
+    "timestamp": 1771210121316
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CSV] Browser mode: stored 4 rows",
+    "timestamp": 1771210121373
+  },
+  {
+    "type": "log",
+    "text": "[[SLICE FETCH EFFECT] Skipped - params unchanged:] 0|5|5|4",
+    "timestamp": 1771210121381
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CSV] hasLoaded set to true, datasetId: ds_c3ff40ee",
+    "timestamp": 1771210121381
+  },
+  {
+    "type": "error",
+    "text": "★★★ RUN FILTER NOW CALLED ★★★",
+    "timestamp": 1771210121382
+  },
+  {
+    "type": "error",
+    "text": "[FILTER NOW] loadState._id: undefined",
+    "timestamp": 1771210121382
+  },
+  {
+    "type": "error",
+    "text": "[FILTER NOW] loadState.hasLoaded: true",
+    "timestamp": 1771210121382
+  },
+  {
+    "type": "error",
+    "text": "[FILTER NOW] ctx.hasLoaded: true",
+    "timestamp": 1771210121382
+  },
+  {
+    "type": "log",
+    "text": "[FILTER NOW CONTROLLER] Entry - hasLoaded: true isMergedView: true",
+    "timestamp": 1771210121382
+  },
+  {
+    "type": "log",
+    "text": "[FILTER NOW] Passed early checks",
+    "timestamp": 1771210121382
+  },
+  {
+    "type": "log",
+    "text": "[FILTER NOW] Setting filterPending, calling drainFilterQueue",
+    "timestamp": 1771210121382
+  },
+  {
+    "type": "error",
+    "text": "★★★ DRAIN FILTER QUEUE CALLED ★★★",
+    "timestamp": 1771210121383
+  },
+  {
+    "type": "log",
+    "text": "[DRAIN FILTER QUEUE] Called - filterInFlight: false hasLoaded: true",
+    "timestamp": 1771210121383
+  },
+  {
+    "type": "log",
+    "text": "[DRAIN FILTER QUEUE] Calling runFilterPass",
+    "timestamp": 1771210121383
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Browser mode client-side, rows: 4",
+    "timestamp": 1771210121384
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Stored original rows: 4",
+    "timestamp": 1771210121384
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Browser mode: filtered 4 of 4 rows",
+    "timestamp": 1771210121384
+  },
+  {
+    "type": "log",
+    "text": "[FILTER PASS] Set totalFilteredCount to 4 on loadState",
+    "timestamp": 1771210121384
+  },
+  {
+    "type": "log",
+    "text": "[SC][Inspector][perf] {op: filter, ms: 0.9, p95: 0.9, slo: 180, status: ok}",
+    "timestamp": 1771210121384
+  },
+  {
+    "type": "log",
+    "text": "[FILTER PASS] Filter complete. Slice fetch effect will handle fetching with proper grid indices.",
+    "timestamp": 1771210121384
+  },
+  {
+    "type": "log",
+    "text": "[[SLICE FETCH EFFECT] Triggered - start:] 0 end: 4 count: 4 colsLen: 4",
+    "timestamp": 1771210121390
+  },
+  {
+    "type": "log",
+    "text": "[FETCH SLICE] isMergedView: true mergedRowsAll.length: 4 range: 0 - 4",
+    "timestamp": 1771210121394
+  },
+  {
+    "type": "log",
+    "text": "[FETCH SLICE] Set visibleRows to 4 rows",
+    "timestamp": 1771210121395
+  },
+  {
+    "type": "log",
+    "text": "[SC][Inspector][perf] {op: slice, ms: 0.4, p95: 0.4, slo: 60, status: ok}",
+    "timestamp": 1771210121395
+  },
+  {
+    "type": "log",
+    "text": "[[SLICE FETCH EFFECT] Skipped - params unchanged:] 0|4|4|4",
+    "timestamp": 1771210121397
+  },
+  {
+    "type": "error",
+    "text": "★★★ DRAIN FILTER QUEUE CALLED ★★★",
+    "timestamp": 1771210121397
+  },
+  {
+    "type": "log",
+    "text": "[DRAIN FILTER QUEUE] Called - filterInFlight: false hasLoaded: true",
+    "timestamp": 1771210121398
+  },
+  {
+    "type": "log",
+    "text": "[DRAIN FILTER QUEUE] Calling runFilterPass",
+    "timestamp": 1771210121398
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Browser mode client-side, rows: 4",
+    "timestamp": 1771210121398
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Browser mode: filtered 4 of 4 rows",
+    "timestamp": 1771210121399
+  },
+  {
+    "type": "log",
+    "text": "[FILTER PASS] Set totalFilteredCount to 4 on loadState",
+    "timestamp": 1771210121400
+  },
+  {
+    "type": "log",
+    "text": "[SC][Inspector][perf] {op: filter, ms: 0.5, p95: 0.9, slo: 180, status: ok}",
+    "timestamp": 1771210121400
+  },
+  {
+    "type": "log",
+    "text": "[FILTER PASS] Filter complete. Slice fetch effect will handle fetching with proper grid indices.",
+    "timestamp": 1771210121400
+  },
+  {
+    "type": "error",
+    "text": "★★★ LOAD CONTROLLER EXECUTING ★★★ text length: 109",
+    "timestamp": 1771210121400
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CTRL] loadCsvFromText called, text length: 109",
+    "timestamp": 1771210121400
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CTRL] hasHeadersOverride: undefined trackWorkspace: true",
+    "timestamp": 1771210121400
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CSV] Browser mode: stored 3 rows",
+    "timestamp": 1771210121400
+  },
+  {
+    "type": "log",
+    "text": "[[SLICE FETCH EFFECT] Skipped - params unchanged:] 0|4|4|4",
+    "timestamp": 1771210121406
+  },
+  {
+    "type": "log",
+    "text": "[LOAD CSV] hasLoaded set to true, datasetId: ds_8b7eb07f",
+    "timestamp": 1771210121406
+  },
+  {
+    "type": "error",
+    "text": "★★★ RUN FILTER NOW CALLED ★★★",
+    "timestamp": 1771210121407
+  },
+  {
+    "type": "error",
+    "text": "[FILTER NOW] loadState._id: undefined",
+    "timestamp": 1771210121407
+  },
+  {
+    "type": "error",
+    "text": "[FILTER NOW] loadState.hasLoaded: true",
+    "timestamp": 1771210121407
+  },
+  {
+    "type": "error",
+    "text": "[FILTER NOW] ctx.hasLoaded: true",
+    "timestamp": 1771210121407
+  },
+  {
+    "type": "log",
+    "text": "[FILTER NOW CONTROLLER] Entry - hasLoaded: true isMergedView: true",
+    "timestamp": 1771210121407
+  },
+  {
+    "type": "log",
+    "text": "[FILTER NOW] Passed early checks",
+    "timestamp": 1771210121407
+  },
+  {
+    "type": "log",
+    "text": "[FILTER NOW] Setting filterPending, calling drainFilterQueue",
+    "timestamp": 1771210121407
+  },
+  {
+    "type": "error",
+    "text": "★★★ DRAIN FILTER QUEUE CALLED ★★★",
+    "timestamp": 1771210121408
+  },
+  {
+    "type": "log",
+    "text": "[DRAIN FILTER QUEUE] Called - filterInFlight: false hasLoaded: true",
+    "timestamp": 1771210121408
+  },
+  {
+    "type": "log",
+    "text": "[DRAIN FILTER QUEUE] Calling runFilterPass",
+    "timestamp": 1771210121409
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Browser mode client-side, rows: 3",
+    "timestamp": 1771210121409
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Stored original rows: 3",
+    "timestamp": 1771210121409
+  },
+  {
+    "type": "log",
+    "text": "[FILTER] Browser mode: filtered 3 of 3 rows",
+    "timestamp": 1771210121409
+  },
+  {
+    "type": "log",
+    "text": "[FILTER PASS] Set totalFilteredCount to 3 on loadState",
+    "timestamp": 1771210121409
+  },
+  {
+    "type": "log",
+    "text": "[SC][Inspector][perf] {op: filter, ms: 0.8, p95: 0.9, slo: 180, status: ok}",
+    "timestamp": 1771210121409
+  },
+  {
+    "type": "log",
+    "text": "[FILTER PASS] Filter complete. Slice fetch effect will handle fetching with proper grid indices.",
+    "timestamp": 1771210121409
+  },
+  {
+    "type": "log",
+    "text": "[[SLICE FETCH EFFECT] Triggered - start:] 0 end: 3 count: 3 colsLen: 4",
+    "timestamp": 1771210121412
+  },
+  {
+    "type": "log",
+    "text": "[FETCH SLICE] isMergedView: true mergedRowsAll.length: 3 range: 0 - 3",
+    "timestamp": 1771210121412
+  },
+  {
+    "type": "log",
+    "text": "[FETCH SLICE] Set visibleRows to 3 rows",
+    "timestamp": 1771210121412
+  },
+  {
+    "type": "log",
+    "text": "[SC][Inspector][perf] {op: slice, ms: 0.5, p95: 0.4, slo: 60, status: ok}",
+    "timestamp": 1771210121412
+  },
+  {
+    "type": "log",
+    "text": "[[SLICE FETCH EFFECT] Skipped - params unchanged:] 0|3|3|4",
+    "timestamp": 1771210121418
+  }
+]
