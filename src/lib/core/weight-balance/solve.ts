@@ -11,8 +11,20 @@ import type {
   CGEnvelope
 } from './types';
 
+// Constants
+const ENVELOPE_MARGIN_THRESHOLD = 0.5; // inches
+const MIN_POLYGON_VERTICES = 3;
+
 interface ItemWithMoment extends LoadingItem {
   moment: number;
+}
+
+/**
+ * Format weight value with appropriate units
+ */
+function formatWeightWithUnits(weight: number, units: 'imperial' | 'metric'): string {
+  const unitLabel = units === 'imperial' ? 'lbs' : 'kg';
+  return `${weight.toFixed(1)} ${unitLabel}`;
 }
 
 /**
@@ -91,7 +103,7 @@ function runValidations(
     validations.push({
       code: 'MTOW_EXCEEDED',
       severity: 'error',
-      message: `Total weight (${totalWeight.toFixed(1)} ${aircraft.units === 'imperial' ? 'lbs' : 'kg'}) exceeds Maximum Takeoff Weight`,
+      message: `Total weight (${formatWeightWithUnits(totalWeight, aircraft.units)}) exceeds Maximum Takeoff Weight`,
       value: totalWeight,
       limit: aircraft.maxTakeoffWeight
     });
@@ -102,7 +114,7 @@ function runValidations(
     validations.push({
       code: 'MLW_EXCEEDED',
       severity: 'warning',
-      message: `Total weight (${totalWeight.toFixed(1)} ${aircraft.units === 'imperial' ? 'lbs' : 'kg'}) exceeds Maximum Landing Weight`,
+      message: `Total weight (${formatWeightWithUnits(totalWeight, aircraft.units)}) exceeds Maximum Landing Weight`,
       value: totalWeight,
       limit: aircraft.maxLandingWeight
     });
@@ -113,7 +125,7 @@ function runValidations(
     validations.push({
       code: 'MZFW_EXCEEDED',
       severity: 'error',
-      message: `Zero fuel weight (${zeroFuelWeight.toFixed(1)} ${aircraft.units === 'imperial' ? 'lbs' : 'kg'}) exceeds Maximum Zero Fuel Weight`,
+      message: `Zero fuel weight (${formatWeightWithUnits(zeroFuelWeight, aircraft.units)}) exceeds Maximum Zero Fuel Weight`,
       value: zeroFuelWeight,
       limit: aircraft.maxZeroFuelWeight
     });
@@ -130,14 +142,14 @@ function runValidations(
     });
   }
   
-  // Validation 5: Near envelope boundary warning (0.5" margin)
+  // Validation 5: Near envelope boundary warning
   if (categoryResult.valid && categoryResult.category) {
     const margin = checkEnvelopeMargin(aircraft, cgPosition, totalWeight, categoryResult.category);
-    if (margin < 0.5) {
+    if (margin < ENVELOPE_MARGIN_THRESHOLD) {
       validations.push({
         code: 'CG_NEAR_BOUNDARY',
         severity: 'warning',
-        message: `CG position is within 0.5" of ${categoryResult.category} envelope boundary`,
+        message: `CG position is within ${ENVELOPE_MARGIN_THRESHOLD}" of ${categoryResult.category} envelope boundary`,
         category: categoryResult.category
       });
     }
@@ -192,7 +204,7 @@ export function isPointInEnvelope(
   }
   
   // Use point-in-polygon (ray casting algorithm)
-  if (!envelope.vertices || envelope.vertices.length < 3) return false;
+  if (!envelope.vertices || envelope.vertices.length < MIN_POLYGON_VERTICES) return false;
   
   const point = { x: cgPosition, y: weight };
   const vertices = envelope.vertices;
