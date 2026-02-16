@@ -548,9 +548,9 @@
               <thead class="border-b border-slate-600">
                 <tr class="text-left text-gray-400">
                   <th class="pb-2 pr-4">Item</th>
-                  <th class="pb-2 pr-4 text-right">Weight (lbs)</th>
-                  <th class="pb-2 pr-4 text-right">Arm (in)</th>
-                  <th class="pb-2 pr-4 text-right">Moment (lb-in)</th>
+                  <th class="pb-2 pr-4 text-right">Weight ({getWeightUnit(displayUnits)})</th>
+                  <th class="pb-2 pr-4 text-right">Arm ({getArmUnit(displayUnits)})</th>
+                  <th class="pb-2 pr-4 text-right">Moment ({displayUnits === 'imperial' ? 'lb-in' : 'kg-cm'})</th>
                   <th class="pb-2 text-right w-16">Actions</th>
                 </tr>
               </thead>
@@ -567,18 +567,18 @@
                       {#if item.editable}
                         <input 
                           type="number" 
-                          value={item.weight}
+                          value={displayWeight(item.weight, displayUnits).toFixed(displayUnits === 'metric' ? 1 : 0)}
                           oninput={(e) => updateItemWeight(item.id, Number(e.currentTarget.value))}
                           class="w-24 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-right font-mono text-sm focus:border-blue-500 focus:outline-none"
                           min="0"
-                          step="1"
+                          step={displayUnits === 'metric' ? '0.1' : '1'}
                         />
                       {:else}
-                        <span class="font-mono">{item.weight}</span>
+                        <span class="font-mono">{displayWeight(item.weight, displayUnits).toFixed(displayUnits === 'metric' ? 1 : 0)}</span>
                       {/if}
                     </td>
-                    <td class="py-2 pr-4 text-right font-mono">{item.arm}</td>
-                    <td class="py-2 pr-4 text-right font-mono">{(item.weight * item.arm).toFixed(1)}</td>
+                    <td class="py-2 pr-4 text-right font-mono">{displayArm(item.arm, displayUnits).toFixed(1)}</td>
+                    <td class="py-2 pr-4 text-right font-mono">{displayMoment(item.weight * item.arm, displayUnits).toFixed(0)}</td>
                     <td class="py-2 text-right">
                       <div class="flex gap-1 justify-end">
                         {#if item.id !== 'bew' && item.editable}
@@ -627,11 +627,11 @@
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <div class="text-xs text-gray-400 mb-1">Total Weight</div>
-                  <div class="text-lg font-mono text-white">{results.totalWeight.toFixed(1)} lbs</div>
+                  <div class="text-lg font-mono text-white">{formatWeight(results.totalWeight, displayUnits, 1)}</div>
                 </div>
                 <div>
                   <div class="text-xs text-gray-400 mb-1">CG Position</div>
-                  <div class="text-lg font-mono text-white">{results.cgPosition.toFixed(2)}"</div>
+                  <div class="text-lg font-mono text-white">{formatArm(results.cgPosition, displayUnits, 2)}</div>
                 </div>
               </div>
               
@@ -639,11 +639,11 @@
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <div class="text-xs text-gray-400 mb-1">Zero Fuel Wt</div>
-                  <div class="text-sm font-mono text-white">{results.zeroFuelWeight.toFixed(1)} lbs</div>
+                  <div class="text-sm font-mono text-white">{formatWeight(results.zeroFuelWeight, displayUnits, 1)}</div>
                 </div>
                 <div>
                   <div class="text-xs text-gray-400 mb-1">Zero Fuel CG</div>
-                  <div class="text-sm font-mono text-white">{results.zeroFuelCG.toFixed(2)}"</div>
+                  <div class="text-sm font-mono text-white">{formatArm(results.zeroFuelCG, displayUnits, 2)}</div>
                 </div>
               </div>
               
@@ -658,7 +658,7 @@
               <!-- Total Moment -->
               <div>
                 <div class="text-xs text-gray-400 mb-1">Total Moment</div>
-                <div class="text-sm font-mono text-white">{results.totalMoment.toFixed(1)} lb-in</div>
+                <div class="text-sm font-mono text-white">{formatMoment(results.totalMoment, displayUnits, 1)}</div>
               </div>
             </div>
           </div>
@@ -758,17 +758,17 @@
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm text-gray-400 mb-2">Weight (lbs)</label>
+            <label class="block text-sm text-gray-400 mb-2">Weight ({getWeightUnit(displayUnits)})</label>
             <input 
               type="number"
               bind:value={newItemWeight}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
               min="0"
-              step="1"
+              step={displayUnits === 'metric' ? '0.1' : '1'}
             />
           </div>
           <div>
-            <label class="block text-sm text-gray-400 mb-2">Arm (in)</label>
+            <label class="block text-sm text-gray-400 mb-2">Arm ({getArmUnit(displayUnits)})</label>
             <input 
               type="number"
               bind:value={newItemArm}
