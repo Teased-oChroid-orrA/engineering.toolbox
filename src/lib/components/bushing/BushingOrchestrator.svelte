@@ -26,28 +26,34 @@
   const FREE_POSITIONING_KEY = 'scd.bushing.freePositioning.enabled';
   const LEGACY_RENDERER_KEY = 'scd.bushing.legacyRenderer';
   const TRACE_MODE_KEY = 'scd.bushing.traceEnabled';
-  let leftCardOrder: LeftCardId[] = [...LEFT_DEFAULT_ORDER];
-  let rightCardOrder: RightCardId[] = [...RIGHT_DEFAULT_ORDER];
-  let dndEnabled = true;
-  let useFreePositioning = false;
+  
+  // Svelte 5: Convert local state to $state runes
+  let leftCardOrder = $state<LeftCardId[]>([...LEFT_DEFAULT_ORDER]);
+  let rightCardOrder = $state<RightCardId[]>([...RIGHT_DEFAULT_ORDER]);
+  let dndEnabled = $state(true);
+  let useFreePositioning = $state(false);
   
   type LayoutState = { left: LeftCardId[]; right: RightCardId[] };
   const layoutHistory = new DragDropHistory<LayoutState>(50);
-  let canUndo = false;
-  let canRedo = false;
+  let canUndo = $state(false);
+  let canRedo = $state(false);
   
-  $: if (typeof window !== 'undefined' && layoutHistory.size() === 0) {
-    layoutHistory.push({ left: [...leftCardOrder], right: [...rightCardOrder] });
-    canUndo = layoutHistory.canUndo();
-    canRedo = layoutHistory.canRedo();
-  }
+  // Svelte 5: Convert reactive statement to $effect
+  $effect(() => {
+    if (typeof window !== 'undefined' && layoutHistory.size() === 0) {
+      layoutHistory.push({ left: [...leftCardOrder], right: [...rightCardOrder] });
+      canUndo = layoutHistory.canUndo();
+      canRedo = layoutHistory.canRedo();
+    }
+  });
   
   function pushHistory() { layoutHistory.push({ left: [...leftCardOrder], right: [...rightCardOrder] }); canUndo = layoutHistory.canUndo(); canRedo = layoutHistory.canRedo(); }
   function handleUndo() { const prev = layoutHistory.undo(); if (prev) { leftCardOrder = [...prev.left]; rightCardOrder = [...prev.right]; canUndo = layoutHistory.canUndo(); canRedo = layoutHistory.canRedo(); } }
   function handleRedo() { const next = layoutHistory.redo(); if (next) { leftCardOrder = [...next.left]; rightCardOrder = [...next.right]; canUndo = layoutHistory.canUndo(); canRedo = layoutHistory.canRedo(); } }
   
-  $: leftLaneItems = leftCardOrder.map((id) => ({ id }));
-  $: rightLaneItems = rightCardOrder.map((id) => ({ id }));
+  // Svelte 5: Convert reactive statements to $derived
+  let leftLaneItems = $derived(leftCardOrder.map((id) => ({ id })));
+  let rightLaneItems = $derived(rightCardOrder.map((id) => ({ id })));
   
   const commitLane = (items: Array<{ id: string }>, isLeft: boolean) => {
     if (isLeft) {
@@ -91,9 +97,24 @@
   const moveLeftCard = (cardId: LeftCardId, direction: -1 | 1) => moveCard(cardId, direction, true);
   const moveRightCard = (cardId: RightCardId, direction: -1 | 1) => moveCard(cardId, direction, false);
 
-  const leftMoveProps = (cardId: LeftCardId) => ({ dragEnabled: dndEnabled, canMoveUp: canMoveInList(leftCardOrder, cardId, -1), canMoveDown: canMoveInList(leftCardOrder, cardId, 1), onMoveUp: () => moveLeftCard(cardId, -1), onMoveDown: () => moveLeftCard(cardId, 1) });
-  const rightMoveProps = (cardId: RightCardId) => ({ dragEnabled: dndEnabled, canMoveUp: canMoveInList(rightCardOrder, cardId, -1), canMoveDown: canMoveInList(rightCardOrder, cardId, 1), onMoveUp: () => moveRightCard(cardId, -1), onMoveDown: () => moveRightCard(cardId, 1) });
-  let form: BushingInputs = {
+  // Svelte 5: Convert reactive statements to $derived for move props
+  let leftMoveProps = $derived.by(() => (cardId: LeftCardId) => ({ 
+    dragEnabled: dndEnabled, 
+    canMoveUp: canMoveInList(leftCardOrder, cardId, -1), 
+    canMoveDown: canMoveInList(leftCardOrder, cardId, 1), 
+    onMoveUp: () => moveLeftCard(cardId, -1), 
+    onMoveDown: () => moveLeftCard(cardId, 1) 
+  }));
+  let rightMoveProps = $derived.by(() => (cardId: RightCardId) => ({ 
+    dragEnabled: dndEnabled, 
+    canMoveUp: canMoveInList(rightCardOrder, cardId, -1), 
+    canMoveDown: canMoveInList(rightCardOrder, cardId, 1), 
+    onMoveUp: () => moveRightCard(cardId, -1), 
+    onMoveDown: () => moveRightCard(cardId, 1) 
+  }));
+  
+  // Svelte 5: Convert form to $state
+  let form = $state<BushingInputs>({
     units: 'imperial', boreDia: 0.5, interference: 0.0015, boreTolMode: 'nominal_tol',
     boreNominal: 0.5, boreTolPlus: 0, boreTolMinus: 0, boreLower: 0.5, boreUpper: 0.5,
     interferenceTolMode: 'nominal_tol', interferenceNominal: 0.0015, interferenceTolPlus: 0,
@@ -106,15 +127,16 @@
     extCsMode: 'depth_angle', extCsDia: 0.625, extCsDepth: 0.125, extCsAngle: 100,
     matHousing: MATERIALS[0].id, matBushing: 'bronze', friction: 0.15, dT: 0,
     minWallStraight: 0.05, minWallNeck: 0.04, endConstraint: 'free'
-  };
+  });
 
-  let initError: string | null = null;
-  let useLegacyRenderer = false;
-  let renderMode: 'section' | 'legacy' = 'section';
-  let traceEnabled = false;
-  let babylonInitNotice: string | null = null;
-  let babylonDiagnostics: any[] = [];
-  let showInformationView = false;
+  // Svelte 5: Convert remaining state variables to $state
+  let initError = $state<string | null>(null);
+  let useLegacyRenderer = $state(false);
+  let renderMode = $state<'section' | 'legacy'>('section');
+  let traceEnabled = $state(false);
+  let babylonInitNotice = $state<string | null>(null);
+  let babylonDiagnostics = $state<any[]>([]);
+  let showInformationView = $state(false);
   
   if (typeof window !== 'undefined') {
     try {
@@ -131,7 +153,9 @@
       initError = `Init error: ${e instanceof Error ? e.message : String(e)}`;
     }
   }
-  $: {
+  
+  // Svelte 5: Convert reactive statement to $effect for policy synchronization
+  $effect(() => {
     const p = form.interferencePolicy || (form.interferencePolicy = { enabled: Boolean(form.enforceInterferenceTolerance), lockBore: Boolean(form.lockBoreForInterference), preserveBoreNominal: true, allowBoreNominalShift: false });
     if (!form.boreCapability) form.boreCapability = { mode: 'unspecified' };
     if (form.boreCapability.mode === 'reamer_fixed') p.lockBore = true;
@@ -144,19 +168,41 @@
     if (form.lockBoreForInterference !== policyLock) form.lockBoreForInterference = policyLock;
     if (p.enabled !== form.enforceInterferenceTolerance) p.enabled = Boolean(form.enforceInterferenceTolerance);
     if (p.lockBore !== form.lockBoreForInterference) p.lockBore = Boolean(form.lockBoreForInterference);
-  }
+  });
   
-  $: safeSetItem(KEY, JSON.stringify(form));
-  $: if (typeof window !== 'undefined') { try { persistTopLevelLayout(leftCardOrder, rightCardOrder); } catch (e) { console.error('[Bushing] Failed to save layout:', e); } }
-  $: pipeline = evaluateBushingPipeline(form);
-  $: results = pipeline.results;
-  $: draftingView = pipeline.draftingView;
-  $: scene = pipeline.scene;
-  $: cacheStats = getBushingPipelineCacheStats();
-  $: visualDiagnostics = runBushingVisualDiagnostics(scene, results);
-  $: isFailed = results.governing.margin < 0 || results.physics.marginHousing < 0 || results.physics.marginBushing < 0;
-  $: updateBushingContextMenu(useLegacyRenderer, traceEnabled);
-  $: if (typeof window !== 'undefined' && traceEnabled) emitBushingTrace(buildBushingTraceRecord({ rawInput: form, solved: results, scene, source: 'BushingOrchestrator' }));
+  // Svelte 5: Convert reactive statements to $effect for side effects
+  $effect(() => {
+    safeSetItem(KEY, JSON.stringify(form));
+  });
+  
+  $effect(() => {
+    if (typeof window !== 'undefined') { 
+      try { 
+        persistTopLevelLayout(leftCardOrder, rightCardOrder); 
+      } catch (e) { 
+        console.error('[Bushing] Failed to save layout:', e); 
+      } 
+    }
+  });
+  
+  // Svelte 5: Convert reactive statements to $derived for computed values
+  let pipeline = $derived(evaluateBushingPipeline(form));
+  let results = $derived(pipeline.results);
+  let draftingView = $derived(pipeline.draftingView);
+  let scene = $derived(pipeline.scene);
+  let cacheStats = $derived(getBushingPipelineCacheStats());
+  let visualDiagnostics = $derived(runBushingVisualDiagnostics(scene, results));
+  let isFailed = $derived(results.governing.margin < 0 || results.physics.marginHousing < 0 || results.physics.marginBushing < 0);
+  
+  $effect(() => {
+    updateBushingContextMenu(useLegacyRenderer, traceEnabled);
+  });
+  
+  $effect(() => {
+    if (typeof window !== 'undefined' && traceEnabled) {
+      emitBushingTrace(buildBushingTraceRecord({ rawInput: form, solved: results, scene, source: 'BushingOrchestrator' }));
+    }
+  });
   if (typeof window !== 'undefined' && import.meta.env.DEV) {
     const runtimeSentinel = (globalThis as any).__SCD_BUSHING_SCENE_SENTINEL__;
     if (runtimeSentinel !== BUSHING_SCENE_MODULE_SENTINEL) console.error('[SC][Bushing][path-integrity]', { expected: BUSHING_SCENE_MODULE_SENTINEL, actual: runtimeSentinel });
@@ -180,11 +226,6 @@
     }
   }
 
-  $: if (typeof window !== 'undefined' && traceEnabled) {
-    const trace = buildBushingTraceRecord({ rawInput: form, solved: results, scene, source: 'BushingOrchestrator' });
-    emitBushingTrace(trace);
-  }
-
   onMount(() => {
     console.log('[Bushing] Mounted', { initError, units: form.units, cards: leftCardOrder.length + rightCardOrder.length });
     mountBushingContextMenu({ onExportSvg: () => { void onExportSvg(); }, onExportPdf: () => { void onExportPdf(); }, toggleRendererMode, toggleTraceMode });
@@ -197,8 +238,6 @@
       (window as any).__DISABLE_FREE_POSITIONING__ = () => { localStorage.setItem(FREE_POSITIONING_KEY, '0'); window.location.reload(); };
     }
   });
-
-  $: updateBushingContextMenu(useLegacyRenderer, traceEnabled);
 
 </script>
 
