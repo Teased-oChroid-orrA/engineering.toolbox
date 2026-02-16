@@ -10,15 +10,22 @@
  *   perf    - tracing around load + small window
  *   eval    - evaluate existing test artifacts (no test execution)
  *
+ * New Features:
+ *   --skip-install     - Skip automatic dependency installation
+ *   --start-server     - Automatically start dev server before tests
+ *   --server-command   - Custom server command (default: "npm run dev")
+ *   --server-wait-ms   - Time to wait for server startup (default: 10000)
+ *
  * Examples:
  *   node .github/skills/default-browser-devtools/runner.js smoke --url http://localhost:5173 --engines webkit,chromium
- *   node .github/skills/default-browser-devtools/runner.js triage --url http://localhost:5173 --engine webkit
+ *   node .github/skills/default-browser-devtools/runner.js triage --url http://localhost:5173 --engine webkit --start-server
  *   node .github/skills/default-browser-devtools/runner.js eval --artifacts ./artifacts/... --learn true
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { spawn, execSync } from "node:child_process";
 import { chromium, webkit } from "playwright";
 import TestEvaluator from "./evaluator.js";
 
@@ -56,6 +63,221 @@ function pickEngine(name) {
   if (name === "chromium") return { name, engine: chromium };
   throw new Error(`Unsupported engine "${name}". Use "webkit" or "chromium".`);
 }
+
+// ============================================================================
+// Dependency & Server Management
+// ============================================================================
+
+/**
+ * Check if node_modules directory exists in project root
+ */
+function hasNodeModules() {
+  const nodeModulesPath = path.join(process.cwd(), "node_modules");
+  return fs.existsSync(nodeModulesPath);
+}
+
+/**
+ * Check if Playwright browsers are installed
+ */
+function hasPlaywrightBrowsers() {
+  try {
+    // Try to get playwright browsers path
+    const playwrightPath = path.join(process.cwd(), "node_modules", "playwright");
+    if (!fs.existsSync(playwrightPath)) return false;
+    
+    // Check if browsers are installed by looking for the .local-browsers directory
+    // or the standard browsers cache location
+    const homeDir = process.env.HOME || process.env.USERPROFILE || "";
+    const browsersPath = path.join(homeDir, ".cache", "ms-playwright");
+    
+    if (fs.existsSync(browsersPath)) {
+      const browsers = fs.readdirSync(browsersPath);
+      return browsers.length > 0;
+    }
+    
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Install npm dependencies
+ */
+function installDependencies() {
+  console.log("📦 Installing npm dependencies...");
+  try {
+    execSync("npm install", { stdio: "inherit", cwd: process.cwd() });
+    console.log("✓ Dependencies installed\n");
+    return true;
+  } catch (e) {
+    console.error("✗ Failed to install dependencies:", e.message);
+    return false;
+  }
+}
+
+/**
+ * Install Playwright browsers
+ */
+function installPlaywrightBrowsers() {
+  console.log("🎭 Installing Playwright browsers...");
+  try {
+    execSync("npx playwright install chromium webkit", { stdio: "inherit", cwd: process.cwd() });
+    console.log("✓ Playwright browsers installed\n");
+    return true;
+  } catch (e) {
+    console.error("✗ Failed to install Playwright browsers:", e.message);
+    return false;
+  }
+}
+
+/**
+ * Check if a server is responding at the given URL
+ */
+async function isServerRunning(url) {
+  return new Promise((resolve) => {
+    try {
+      const urlObj = new URL(url);
+      const protocol = urlObj.protocol === "https:" ? 
+        (async () => (await import("node:https")).default)() : 
+        (async () => (await import("node:http")).default)();
+      
+      protocol.then(http => {
+        const req = http.get(url, { timeout: 2000 }, (res) => {
+          resolve(res.statusCode < 500);
+        });
+        
+        req.on("error", () => resolve(false));
+        req.on("timeout", () => {
+          req.destroy();
+          resolve(false);
+        });
+      }).catch(() => resolve(false));
+    } catch (e) {
+      resolve(false);
+    }
+  });
+}
+
+/**
+ * Start the dev server
+ */
+async function startDevServer(command, waitMs) {
+  console.log(`🚀 Starting dev server with command: ${command}`);
+  
+  const serverProcess = spawn(command, {
+    shell: true,
+    stdio: "pipe",
+    detached: false,
+    cwd: process.cwd(),
+  });
+  
+  let serverOutput = "";
+  serverProcess.stdout?.on("data", (data) => {
+    serverOutput += data.toString();
+    // Show first few lines of output
+    if (serverOutput.split("\n").length <= 10) {
+      process.stdout.write(data);
+    }
+  });
+  
+  serverProcess.stderr?.on("data", (data) => {
+    serverOutput += data.toString();
+    if (serverOutput.split("\n").length <= 10) {
+      process.stderr.write(data);
+    }
+  });
+  
+  serverProcess.on("error", (err) => {
+    console.error("✗ Server process error:", err.message);
+  });
+  
+  // Wait for server to be ready
+  console.log(`⏳ Waiting ${waitMs}ms for server to start...`);
+  await new Promise(resolve => setTimeout(resolve, waitMs));
+  
+  return serverProcess;
+}
+
+/**
+ * Ensure all prerequisites are met (dependencies, browsers, server)
+ */
+async function ensurePrerequisites(args) {
+  const skipInstall = args.skipInstall === "true";
+  const startServer = args.startServer === "true";
+  const serverCommand = args.serverCommand || "npm run dev";
+  const serverWaitMs = Number(args.serverWaitMs || 10000);
+  const url = String(args.url || "http://localhost:5173");
+  
+  let serverProcess = null;
+  
+  // Skip installation check for eval command (doesn't need server/dependencies)
+  if (args._[0] === "eval") {
+    return { serverProcess: null };
+  }
+  
+  console.log("🔍 Checking prerequisites...\n");
+  
+  // Check and install dependencies
+  if (!skipInstall) {
+    if (!hasNodeModules()) {
+      console.log("⚠️  node_modules not found");
+      if (!installDependencies()) {
+        throw new Error("Failed to install dependencies. Run 'npm install' manually.");
+      }
+    } else {
+      console.log("✓ node_modules found");
+    }
+    
+    // Check and install Playwright browsers
+    if (!hasPlaywrightBrowsers()) {
+      console.log("⚠️  Playwright browsers not found");
+      if (!installPlaywrightBrowsers()) {
+        throw new Error("Failed to install Playwright browsers. Run 'npx playwright install' manually.");
+      }
+    } else {
+      console.log("✓ Playwright browsers found");
+    }
+  } else {
+    console.log("⏭️  Skipping dependency installation (--skip-install)");
+  }
+  
+  // Check server and optionally start it
+  console.log(`\n🌐 Checking server at ${url}...`);
+  const serverRunning = await isServerRunning(url);
+  
+  if (serverRunning) {
+    console.log("✓ Server is already running");
+  } else if (startServer) {
+    console.log("⚠️  Server not running, starting it now...");
+    serverProcess = await startDevServer(serverCommand, serverWaitMs);
+    
+    // Verify server started successfully
+    const serverNowRunning = await isServerRunning(url);
+    if (!serverNowRunning) {
+      console.error(`✗ Server failed to start or is not responding at ${url}`);
+      console.error("   Try starting it manually with: " + serverCommand);
+      if (serverProcess) {
+        serverProcess.kill();
+      }
+      throw new Error("Server not responding");
+    }
+    console.log("✓ Server started successfully");
+  } else {
+    console.error(`✗ Server is not running at ${url}`);
+    console.error("   Options:");
+    console.error("   1. Start server manually: npm run dev");
+    console.error("   2. Use --start-server flag to auto-start");
+    console.error("   3. Specify different URL with --url");
+    throw new Error("Server not available");
+  }
+  
+  console.log("\n✅ All prerequisites met\n");
+  
+  return { serverProcess };
+}
+
+// ============================================================================
 
 async function makeContext(browser, opts) {
   const viewport = { width: Number(opts.viewportWidth || 1280), height: Number(opts.viewportHeight || 720) };
@@ -345,8 +567,35 @@ async function main() {
     console.error("  --eval-consensus <n>          Number of evaluation passes for consensus (default: 1)");
     console.error("  --artifacts <path>            Path to artifacts for eval-only mode");
     console.error("  --headless <true|false>       Run in headless mode (default: true)");
+    console.error("\nSetup & Server Options:");
+    console.error("  --skip-install                Skip automatic npm and Playwright installation");
+    console.error("  --start-server                Automatically start dev server if not running");
+    console.error("  --server-command <cmd>        Command to start server (default: 'npm run dev')");
+    console.error("  --server-wait-ms <ms>         Time to wait for server startup (default: 10000)");
     process.exit(2);
   }
+
+  // Ensure prerequisites (dependencies, browsers, server)
+  let serverProcess = null;
+  try {
+    const result = await ensurePrerequisites(args);
+    serverProcess = result.serverProcess;
+  } catch (e) {
+    console.error(`\n❌ Prerequisites check failed: ${e.message}\n`);
+    process.exit(1);
+  }
+
+  // Setup cleanup handler for server
+  const cleanup = () => {
+    if (serverProcess) {
+      console.log("\n🛑 Stopping dev server...");
+      serverProcess.kill();
+    }
+  };
+  
+  process.on("SIGINT", cleanup);
+  process.on("SIGTERM", cleanup);
+  process.on("exit", cleanup);
 
   // Load knowledge base if learning is enabled
   let knowledgeBase = null;
