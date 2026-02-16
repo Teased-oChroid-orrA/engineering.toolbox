@@ -17,6 +17,10 @@ export interface AircraftProfile {
   datumLocation: DatumLocation;
   datumDescription?: string;
   
+  // Mean Aerodynamic Chord (MAC) reference (optional)
+  lemac?: number; // Leading Edge MAC position (inches from datum)
+  mac?: number;   // MAC length (inches)
+  
   // Operating Limits
   maxTakeoffWeight: number;
   maxLandingWeight: number;

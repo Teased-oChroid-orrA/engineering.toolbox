@@ -24,6 +24,13 @@
     displayArm,
     displayMoment
   } from '$lib/core/weight-balance/units';
+  import { 
+    stationToPercentMAC, 
+    percentMACToStation, 
+    formatPercentMAC, 
+    hasMACData 
+  } from '$lib/core/weight-balance/mac';
+  import { calculateBallast, type BallastSolution } from '$lib/core/weight-balance/ballast';
   import type { AircraftProfile, LoadingItem, LoadingResults, LoadingItemType, CGEnvelope } from '$lib/core/weight-balance/types';
   import { 
     saveConfigurationToFile,
@@ -48,6 +55,8 @@
   let showItemLibraryDialog = $state(false);
   let showTemplatesDialog = $state(false);
   let showSaveTemplateDialog = $state(false);
+  let showBallastDialog = $state(false);
+  let showMACDialog = $state(false);
   let selectedCategory = $state<'occupants' | 'fuel' | 'baggage' | 'equipment' | 'cargo'>('occupants');
   let newItemName = $state('');
   let newItemType = $state<LoadingItemType>('occupant');
@@ -62,6 +71,8 @@
   let templateDescription = $state('');
   let templateCategory = $state<ItemTemplate['category']>('custom');
   let displayUnits = $state<UnitSystem>('imperial');
+  let useMACDisplay = $state(false);
+  let ballastSolution = $state<BallastSolution | null>(null);
   
   function recalculate() {
     const validation = validateInput(aircraft, items);
@@ -343,6 +354,55 @@
     }
   }
   
+  // Ballast calculation functions
+  function handleCalculateBallast() {
+    if (!results) return;
+    
+    const envelope = aircraft.envelopes[0]; // Use first envelope
+    if (!envelope) return;
+    
+    ballastSolution = calculateBallast({
+      currentWeight: results.totalWeight,
+      currentCG: results.cgPosition,
+      maxWeight: aircraft.maxTakeoffWeight,
+      forwardLimit: envelope.forwardLimit,
+      aftLimit: envelope.aftLimit,
+      envelopes: aircraft.envelopes
+    });
+    
+    showBallastDialog = true;
+  }
+  
+  function handleAddBallast() {
+    if (!ballastSolution || !ballastSolution.feasible) return;
+    
+    const ballastItem: LoadingItem = {
+      id: `ballast-${nextItemId}`,
+      type: 'equipment_removable',
+      name: 'Ballast (Auto-calculated)',
+      weight: ballastSolution.weight,
+      arm: ballastSolution.arm,
+      editable: true
+    };
+    
+    items.push(ballastItem);
+    nextItemId++;
+    showBallastDialog = false;
+    recalculate();
+  }
+  
+  // MAC configuration functions
+  function handleEditMAC() {
+    showMACDialog = true;
+  }
+  
+  function handleSaveMAC(lemac: number, mac: number) {
+    aircraft.lemac = lemac;
+    aircraft.mac = mac;
+    showMACDialog = false;
+    recalculate();
+  }
+  
   onMount(() => {
     // Try to load from localStorage
     const saved = loadFromLocalStorage();
@@ -412,7 +472,32 @@
             FAA-H-8083-1B Compliant • Tabular Method
           </p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap">
+          {#if hasMACData(aircraft.lemac, aircraft.mac)}
+            <button 
+              onclick={() => useMACDisplay = !useMACDisplay}
+              class="px-4 py-2 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500 text-indigo-300 rounded transition-colors flex items-center gap-2"
+              title="Toggle Station/%MAC Display"
+            >
+              {useMACDisplay ? '📐 %MAC' : '📏 Station'}
+            </button>
+          {/if}
+          <button 
+            onclick={handleEditMAC}
+            class="px-3 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500 text-cyan-300 rounded transition-colors text-sm"
+            title="Configure MAC Reference"
+          >
+            ⚙️ MAC
+          </button>
+          {#if results && results.overallStatus !== 'safe'}
+            <button 
+              onclick={handleCalculateBallast}
+              class="px-3 py-2 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500 text-orange-300 rounded transition-colors text-sm animate-pulse"
+              title="Calculate Required Ballast"
+            >
+              ⚖️ Ballast
+            </button>
+          {/if}
           <button 
             onclick={() => displayUnits = displayUnits === 'imperial' ? 'metric' : 'imperial'}
             class="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500 text-purple-300 rounded transition-colors flex items-center gap-2"
@@ -1225,6 +1310,137 @@
           class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
         >
           Save Template
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Ballast Calculation Dialog -->
+{#if showBallastDialog && ballastSolution}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showBallastDialog = false)}>
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-lg w-full mx-4">
+      <h2 class="text-xl font-semibold text-white mb-4">⚖️ Ballast Calculation</h2>
+      
+      <div class="mb-6 p-4 rounded-lg {ballastSolution.feasible ? 'bg-green-500/10 border border-green-500' : 'bg-red-500/10 border border-red-500'}">
+        <div class="text-sm text-white font-semibold mb-2">
+          {ballastSolution.feasible ? '✅ Solution Found' : '❌ Cannot Add Ballast'}
+        </div>
+        <div class="text-sm {ballastSolution.feasible ? 'text-green-200' : 'text-red-200'}">
+          {ballastSolution.description}
+        </div>
+        {#if ballastSolution.reason}
+          <div class="text-xs {ballastSolution.feasible ? 'text-green-300' : 'text-red-300'} mt-2">
+            Reason: {ballastSolution.reason}
+          </div>
+        {/if}
+      </div>
+      
+      {#if ballastSolution.feasible && ballastSolution.weight > 0}
+        <div class="space-y-3 mb-6">
+          <div class="flex justify-between">
+            <span class="text-sm text-gray-400">Ballast Weight:</span>
+            <span class="text-white font-mono">{formatWeight(ballastSolution.weight, displayUnits)}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-sm text-gray-400">Ballast Arm:</span>
+            <span class="text-white font-mono">{formatArm(ballastSolution.arm, displayUnits)}</span>
+          </div>
+        </div>
+      {/if}
+      
+      <div class="flex gap-2 justify-end">
+        <button
+          onclick={() => showBallastDialog = false}
+          class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
+        >
+          Cancel
+        </button>
+        {#if ballastSolution.feasible && ballastSolution.weight > 0}
+          <button
+            onclick={handleAddBallast}
+            class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded transition-colors"
+          >
+            Add Ballast Item
+          </button>
+        {/if}
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- MAC Configuration Dialog -->
+{#if showMACDialog}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showMACDialog = false)}>
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+      <h2 class="text-xl font-semibold text-white mb-4">⚙️ MAC Reference Configuration</h2>
+      
+      <div class="mb-4 p-3 bg-blue-500/10 border border-blue-500 rounded text-xs text-blue-200">
+        <strong>What is MAC?</strong><br/>
+        Mean Aerodynamic Chord (MAC) is a reference chord used for CG calculations.
+        %MAC = ((STATION - LEMAC) / MAC) × 100
+      </div>
+      
+      <div class="space-y-4 mb-6">
+        <div>
+          <label class="block text-sm text-gray-400 mb-2">
+            LEMAC - Leading Edge MAC (inches from datum)
+          </label>
+          <input 
+            type="number"
+            value={aircraft.lemac || 0}
+            oninput={(e) => {
+              const val = Number(e.currentTarget.value);
+              if (!isNaN(val)) aircraft.lemac = val;
+            }}
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none font-mono"
+            step="0.1"
+            placeholder="e.g., 35.5"
+          />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-2">
+            MAC Length (inches)
+          </label>
+          <input 
+            type="number"
+            value={aircraft.mac || 0}
+            oninput={(e) => {
+              const val = Number(e.currentTarget.value);
+              if (!isNaN(val)) aircraft.mac = val;
+            }}
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none font-mono"
+            step="0.1"
+            min="0.1"
+            placeholder="e.g., 59.5"
+          />
+        </div>
+        
+        {#if hasMACData(aircraft.lemac, aircraft.mac) && results}
+          <div class="p-3 bg-slate-700/50 rounded">
+            <div class="text-xs text-gray-400 mb-1">Current CG Position:</div>
+            <div class="text-sm text-white font-mono">
+              {results.cgPosition.toFixed(2)}" = {formatPercentMAC(stationToPercentMAC(results.cgPosition, aircraft.lemac!, aircraft.mac!))}
+            </div>
+          </div>
+        {/if}
+      </div>
+      
+      <div class="flex gap-2 justify-end">
+        <button
+          onclick={() => showMACDialog = false}
+          class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onclick={() => {
+            showMACDialog = false;
+            recalculate();
+          }}
+          class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded transition-colors"
+        >
+          Save MAC Config
         </button>
       </div>
     </div>
