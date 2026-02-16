@@ -11,17 +11,32 @@
   import BushingPageHeader from './BushingPageHeader.svelte';
   import BushingUndoRedoControls from './BushingUndoRedoControls.svelte';
 
-  export let itemId: string;
-  export let form: BushingInputs;
-  export let results: BushingPipelineState['results'];
-  export let isFailed: boolean;
-  export let dndEnabled: boolean;
-  export let canUndo: boolean;
-  export let canRedo: boolean;
-  export let onUndo: () => void;
-  export let onRedo: () => void;
-  export let onShowInformation: () => void;
-  export let moveProps: any;
+  // Svelte 5: Convert props to $props()
+  let {
+    itemId,
+    form = $bindable(),
+    results,
+    isFailed,
+    dndEnabled,
+    canUndo,
+    canRedo,
+    onUndo,
+    onRedo,
+    onShowInformation,
+    moveProps
+  }: {
+    itemId: string;
+    form: BushingInputs;
+    results: BushingPipelineState['results'];
+    isFailed: boolean;
+    dndEnabled: boolean;
+    canUndo: boolean;
+    canRedo: boolean;
+    onUndo: () => void;
+    onRedo: () => void;
+    onShowInformation: () => void;
+    moveProps: any;
+  } = $props();
 
   const TOL_MODE_ITEMS = [
     { value: 'nominal_tol', label: 'Nominal +/- Tol' },

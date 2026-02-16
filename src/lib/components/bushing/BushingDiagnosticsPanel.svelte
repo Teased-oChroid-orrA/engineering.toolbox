@@ -6,26 +6,50 @@
   import { loadNestedDiagnosticsLayout, persistNestedDiagnosticsLayout } from './BushingLayoutPersistence';
   import NativeDragLane from './NativeDragLane.svelte';
 
-  export let results: BushingOutput;
-  export let dndEnabled = true;
-  let infoDialog: 'diagnostics' | 'edge' | 'wall' | null = null;
+  // Svelte 5: Convert props to $props()
+  let {
+    results,
+    dndEnabled = true
+  }: {
+    results: BushingOutput;
+    dndEnabled?: boolean;
+  } = $props();
+  
+  // Svelte 5: Convert local state to $state
+  let infoDialog = $state<'diagnostics' | 'edge' | 'wall' | null>(null);
 
   const DEFAULT_DIAG_ORDER = ['edge', 'wall', 'warnings'] as const;
 
   const fmt = (n: number | null | undefined, d = 4) => (!Number.isFinite(Number(n)) ? '---' : Number(n).toFixed(d));
-  $: edgeFailed = results.warningCodes.some((w) => w.code.includes('EDGE_DISTANCE'));
-  $: wallFailed = results.warningCodes.some((w) => w.code.includes('WALL_BELOW_MIN'));
-  $: hasWarnings = Boolean(results.warnings?.length);
-  $: activeDiagIds = (hasWarnings ? [...DEFAULT_DIAG_ORDER] : DEFAULT_DIAG_ORDER.filter((v) => v !== 'warnings')) as string[];
+  
+  // Svelte 5: Convert reactive statements to $derived
+  let edgeFailed = $derived(results.warningCodes.some((w) => w.code.includes('EDGE_DISTANCE')));
+  let wallFailed = $derived(results.warningCodes.some((w) => w.code.includes('WALL_BELOW_MIN')));
+  let hasWarnings = $derived(Boolean(results.warnings?.length));
+  let activeDiagIds = $derived((hasWarnings ? [...DEFAULT_DIAG_ORDER] : DEFAULT_DIAG_ORDER.filter((v) => v !== 'warnings')) as string[]);
 
-  let diagOrder: string[] = [...DEFAULT_DIAG_ORDER];
-  let diagLaneItems: Array<{ id: string }> = [];
-  $: diagLaneItems = diagOrder.map((id) => ({ id }));
+  // Svelte 5: Convert state to $state
+  let diagOrder = $state<string[]>([...DEFAULT_DIAG_ORDER]);
+  
+  // Svelte 5: Convert reactive statement to $derived
+  let diagLaneItems = $derived(diagOrder.map((id) => ({ id })));
 
   if (typeof window !== 'undefined') diagOrder = loadNestedDiagnosticsLayout([...DEFAULT_DIAG_ORDER]);
 
-  $: diagOrder = normalizeOrder(diagOrder, activeDiagIds);
-  $: if (typeof window !== 'undefined') persistNestedDiagnosticsLayout(diagOrder);
+  // Svelte 5: Watch for changes to activeDiagIds and normalize diagOrder
+  $effect(() => {
+    const normalized = normalizeOrder(diagOrder, activeDiagIds);
+    if (JSON.stringify(diagOrder) !== JSON.stringify(normalized)) {
+      diagOrder = normalized;
+    }
+  });
+  
+  // Svelte 5: Persist layout changes
+  $effect(() => {
+    if (typeof window !== 'undefined') {
+      persistNestedDiagnosticsLayout(diagOrder);
+    }
+  });
 
   onMount(() => {
     if (typeof window === 'undefined') return;
@@ -55,6 +79,11 @@
     setTimeout(() => el.classList.remove('ring-2', 'ring-amber-300/80'), 1500);
     infoDialog = null;
   }
+  
+  function handleInfoClick(e: MouseEvent, type: 'diagnostics' | 'edge' | 'wall') {
+    e.stopPropagation();
+    infoDialog = type;
+  }
 </script>
 
 <div class="space-y-4">
@@ -64,7 +93,7 @@
       <button
         type="button"
         class="ml-2 rounded border border-cyan-300/35 bg-cyan-500/10 px-1.5 py-0.5 text-[10px] text-cyan-100 hover:bg-cyan-500/20"
-        on:click|stopPropagation={() => (infoDialog = 'diagnostics')}>
+        onclick={(e) => handleInfoClick(e, 'diagnostics')}>
         ?
       </button>
     </summary>
@@ -77,15 +106,15 @@
       {#if item.id === 'edge'}
         <div class="rounded-md" data-diag-card="edge">
           <div class="mb-1 flex justify-end gap-1 text-[10px]">
-            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" on:click={() => move('edge', -1)} disabled={!canMove('edge', -1)}>Up</button>
-            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" on:click={() => move('edge', 1)} disabled={!canMove('edge', 1)}>Down</button>
+            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" onclick={() => move('edge', -1)} disabled={!canMove('edge', -1)}>Up</button>
+            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" onclick={() => move('edge', 1)} disabled={!canMove('edge', 1)}>Down</button>
           </div>
           <div
             class="cursor-pointer"
             role="button"
             tabindex="0"
-            on:click={() => (infoDialog = 'edge')}
-            on:keydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (infoDialog = 'edge')}>
+            onclick={() => (infoDialog = 'edge')}
+            onkeydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (infoDialog = 'edge')}>
             <Card
               id="bushing-edge-distance-card"
               class={`bushing-results-card bushing-pop-card bushing-depth-1 ${edgeFailed ? 'border border-amber-300/55' : ''}`}>
@@ -102,15 +131,15 @@
       {:else if item.id === 'wall'}
         <div class="rounded-md" data-diag-card="wall">
           <div class="mb-1 flex justify-end gap-1 text-[10px]">
-            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" on:click={() => move('wall', -1)} disabled={!canMove('wall', -1)}>Up</button>
-            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" on:click={() => move('wall', 1)} disabled={!canMove('wall', 1)}>Down</button>
+            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" onclick={() => move('wall', -1)} disabled={!canMove('wall', -1)}>Up</button>
+            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" onclick={() => move('wall', 1)} disabled={!canMove('wall', 1)}>Down</button>
           </div>
           <div
             class="cursor-pointer"
             role="button"
             tabindex="0"
-            on:click={() => (infoDialog = 'wall')}
-            on:keydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (infoDialog = 'wall')}>
+            onclick={() => (infoDialog = 'wall')}
+            onkeydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (infoDialog = 'wall')}>
             <Card
               id="bushing-wall-thickness-card"
               class={`bushing-results-card bushing-pop-card bushing-depth-1 ${wallFailed ? 'border border-amber-300/55' : ''}`}>
@@ -126,8 +155,8 @@
       {:else if item.id === 'warnings' && results.warnings?.length}
         <div class="rounded-md md:col-span-2" data-diag-card="warnings">
           <div class="mb-1 flex justify-end gap-1 text-[10px]">
-            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" on:click={() => move('warnings', -1)} disabled={!canMove('warnings', -1)}>Up</button>
-            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" on:click={() => move('warnings', 1)} disabled={!canMove('warnings', 1)}>Down</button>
+            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" onclick={() => move('warnings', -1)} disabled={!canMove('warnings', -1)}>Up</button>
+            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" onclick={() => move('warnings', 1)} disabled={!canMove('warnings', 1)}>Down</button>
           </div>
           <Card id="bushing-warnings-card" class="border border-amber-300/55 bg-amber-500/15 bushing-pop-card bushing-depth-1">
             <CardContent class="pt-4 text-sm space-y-2">
@@ -151,7 +180,7 @@
       type="button"
       aria-label="Close dialog backdrop"
       class="absolute inset-0 bg-black/65"
-      on:click={() => (infoDialog = null)}>
+      onclick={() => (infoDialog = null)}>
     </button>
     <div class="relative z-10 w-full max-w-[760px]">
     <Card class="border-cyan-300/35 bg-slate-950/95 text-slate-100 shadow-2xl">
@@ -170,7 +199,7 @@
           {#if edgeFailed}
             <div class="rounded-md border border-amber-300/50 bg-amber-500/15 p-2 text-[12px] text-amber-100">
               Edge distance checks are currently failing.
-              <button class="ml-1 underline underline-offset-2" on:click={() => focusSection('bushing-geometry-card')}>Jump to Geometry</button>
+              <button class="ml-1 underline underline-offset-2" onclick={() => focusSection('bushing-geometry-card')}>Jump to Geometry</button>
             </div>
           {/if}
         {:else}
@@ -181,12 +210,12 @@
           {#if wallFailed}
             <div class="rounded-md border border-amber-300/50 bg-amber-500/15 p-2 text-[12px] text-amber-100">
               Wall checks are currently failing.
-              <button class="ml-1 underline underline-offset-2" on:click={() => focusSection('bushing-profile-card')}>Jump to Profile + Settings</button>
+              <button class="ml-1 underline underline-offset-2" onclick={() => focusSection('bushing-profile-card')}>Jump to Profile + Settings</button>
             </div>
           {/if}
         {/if}
         <div class="pt-2">
-          <button class="rounded-md border border-cyan-300/40 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20" on:click={() => (infoDialog = null)}>
+          <button class="rounded-md border border-cyan-300/40 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20" onclick={() => (infoDialog = null)}>
             Close
           </button>
         </div>
