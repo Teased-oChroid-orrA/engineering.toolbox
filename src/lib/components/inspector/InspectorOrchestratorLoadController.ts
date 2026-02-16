@@ -257,8 +257,12 @@ export async function loadCsvFromPath(
 }
 
 export function upsertWorkspaceDataset(ctx: LoadControllerContext, ds: any) {
-  ctx.loadedDatasets = ctx.upsertWorkspaceDatasetInList(ctx.loadedDatasets, ds);
+  const updated = ctx.upsertWorkspaceDatasetInList(ctx.loadedDatasets, ds);
+  console.log('[UPSERT WORKSPACE] Before:', ctx.loadedDatasets.length, 'After:', updated.length);
+  console.log('[UPSERT WORKSPACE] Dataset:', { id: ds.id, label: ds.label });
+  ctx.loadedDatasets = updated;
   ctx.activeDatasetId = ds.id;
+  console.log('[UPSERT WORKSPACE] ctx.loadedDatasets now has', ctx.loadedDatasets.length, 'items');
 }
 
 export async function unloadWorkspaceDataset(ctx: LoadControllerContext, id: string) {
