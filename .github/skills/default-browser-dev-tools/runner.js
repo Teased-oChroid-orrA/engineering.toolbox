@@ -26,8 +26,25 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { spawn, execSync } from "node:child_process";
-import { chromium, webkit } from "playwright";
-import TestEvaluator from "./evaluator.js";
+
+// Playwright will be imported lazily after ensuring it's installed
+let chromium, webkit;
+let TestEvaluator;
+
+/**
+ * Dynamically import Playwright and TestEvaluator after dependencies are ready
+ */
+async function importDependencies() {
+  if (!chromium || !webkit) {
+    const playwright = await import("playwright");
+    chromium = playwright.chromium;
+    webkit = playwright.webkit;
+  }
+  if (!TestEvaluator) {
+    const evaluatorModule = await import("./evaluator.js");
+    TestEvaluator = evaluatorModule.default;
+  }
+}
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -580,6 +597,9 @@ async function main() {
   try {
     const result = await ensurePrerequisites(args);
     serverProcess = result.serverProcess;
+    
+    // Import Playwright and evaluator now that dependencies are ready
+    await importDependencies();
   } catch (e) {
     console.error(`\n❌ Prerequisites check failed: ${e.message}\n`);
     process.exit(1);
