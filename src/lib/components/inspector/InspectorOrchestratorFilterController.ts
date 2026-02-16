@@ -132,13 +132,17 @@ export async function applyFilterSpec(ctx: FilterControllerContext, spec: any): 
         
         if (clause.logicalOp === 'OR') {
           // Union: add rows from allRows that match this clause and aren't already included
-          // Use Set to track row content (join cells with delimiter) to avoid duplicates
-          const existingRowsSet = new Set(filteredRows.map(row => row.join('\x00')));
+          // Use a simple hash to track row content and avoid duplicates
+          const hashRow = (row: string[]) => {
+            // Simple content-based hash: combine all cells with a delimiter unlikely to appear in CSV data
+            return row.map(cell => (cell ?? '').replace(/\|/g, '||')).join('|~|');
+          };
+          const existingRowsSet = new Set(filteredRows.map(hashRow));
           for (const row of allRows) {
-            const rowKey = row.join('\x00');
-            if (!existingRowsSet.has(rowKey) && matchesQuery(row, clause.query, clause.targetColIdx ?? null, clause.mode ?? 'fuzzy')) {
+            const rowHash = hashRow(row);
+            if (!existingRowsSet.has(rowHash) && matchesQuery(row, clause.query, clause.targetColIdx ?? null, clause.mode ?? 'fuzzy')) {
               filteredRows.push(row);
-              existingRowsSet.add(rowKey);
+              existingRowsSet.add(rowHash);
             }
           }
         } else {

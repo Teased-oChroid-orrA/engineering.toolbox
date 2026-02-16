@@ -37,7 +37,7 @@ test.describe('Inspector Query Filtering', () => {
     
     // Find the file input (hidden) and set files using setInputFiles with a buffer
     // Since we can't directly paste text, we'll need to create a temp file
-    const tempCsvPath = '/tmp/test-data.csv';
+    const tempCsvPath = getTempCsvPath();
     writeFileSync(tempCsvPath, TEST_CSV_DATA);
     
     // Look for the file input element
@@ -57,7 +57,7 @@ test.describe('Inspector Query Filtering', () => {
     console.log('Testing fuzzy query filtering...');
     
     // Load CSV first
-    const tempCsvPath = '/tmp/test-data.csv';
+    const tempCsvPath = getTempCsvPath();
     writeFileSync(tempCsvPath, TEST_CSV_DATA);
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(tempCsvPath);
@@ -82,7 +82,7 @@ test.describe('Inspector Query Filtering', () => {
     console.log('Testing exact query filtering...');
     
     // Load CSV
-    const tempCsvPath = '/tmp/test-data.csv';
+    const tempCsvPath = getTempCsvPath();
     writeFileSync(tempCsvPath, TEST_CSV_DATA);
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(tempCsvPath);
@@ -108,7 +108,7 @@ test.describe('Inspector Query Filtering', () => {
     console.log('Testing clear query...');
     
     // Load CSV
-    const tempCsvPath = '/tmp/test-data.csv';
+    const tempCsvPath = getTempCsvPath();
     writeFileSync(tempCsvPath, TEST_CSV_DATA);
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(tempCsvPath);
@@ -134,23 +134,23 @@ test.describe('Inspector Query Filtering', () => {
     console.log('Capturing inspector screenshots...');
     
     // Initial state
-    await page.screenshot({ path: '/tmp/inspector-initial.png', fullPage: true });
+    await page.screenshot({ path: join(tmpdir(), 'inspector-initial.png'), fullPage: true });
     
     // Load CSV
-    const tempCsvPath = '/tmp/test-data.csv';
+    const tempCsvPath = getTempCsvPath();
     writeFileSync(tempCsvPath, TEST_CSV_DATA);
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(tempCsvPath);
     await page.waitForTimeout(2000);
     
     // Data loaded state
-    await page.screenshot({ path: '/tmp/inspector-loaded.png', fullPage: true });
+    await page.screenshot({ path: join(tmpdir(), 'inspector-loaded.png'), fullPage: true });
     
     // Filter applied state
     const queryInput = page.locator('input[placeholder*="query" i]').first();
     await queryInput.fill('Engineering');
     await page.waitForTimeout(1500);
-    await page.screenshot({ path: '/tmp/inspector-filtered.png', fullPage: true });
+    await page.screenshot({ path: join(tmpdir(), 'inspector-filtered.png'), fullPage: true });
     
     console.log('Screenshots captured');
   });
