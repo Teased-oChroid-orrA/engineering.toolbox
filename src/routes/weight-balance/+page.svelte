@@ -13,6 +13,17 @@
     getTemplatesByCategory,
     type ItemTemplate 
   } from '$lib/core/weight-balance/templates';
+  import {
+    type UnitSystem,
+    formatWeight,
+    formatArm,
+    formatMoment,
+    getWeightUnit,
+    getArmUnit,
+    displayWeight,
+    displayArm,
+    displayMoment
+  } from '$lib/core/weight-balance/units';
   import type { AircraftProfile, LoadingItem, LoadingResults, LoadingItemType, CGEnvelope } from '$lib/core/weight-balance/types';
   import { 
     saveConfigurationToFile,
@@ -50,6 +61,7 @@
   let templateName = $state('');
   let templateDescription = $state('');
   let templateCategory = $state<ItemTemplate['category']>('custom');
+  let displayUnits = $state<UnitSystem>('imperial');
   
   function recalculate() {
     const validation = validateInput(aircraft, items);
@@ -393,6 +405,13 @@
         </div>
         <div class="flex gap-2">
           <button 
+            onclick={() => displayUnits = displayUnits === 'imperial' ? 'metric' : 'imperial'}
+            class="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500 text-purple-300 rounded transition-colors flex items-center gap-2"
+            title="Toggle Units"
+          >
+            {displayUnits === 'imperial' ? '🇺🇸 lbs/in' : '🌍 kg/cm'}
+          </button>
+          <button 
             onclick={handleSaveClick}
             class="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500 text-green-300 rounded transition-colors flex items-center gap-2"
             title="Save Configuration (Ctrl+S)"
@@ -475,15 +494,15 @@
             </div>
             <div>
               <label class="text-sm text-gray-400">Basic Empty Weight</label>
-              <div class="text-white font-mono">{aircraft.basicEmptyWeight} lbs</div>
+              <div class="text-white font-mono">{formatWeight(aircraft.basicEmptyWeight, displayUnits)}</div>
             </div>
             <div>
               <label class="text-sm text-gray-400">BEW Arm</label>
-              <div class="text-white font-mono">{aircraft.basicEmptyWeightArm}"</div>
+              <div class="text-white font-mono">{formatArm(aircraft.basicEmptyWeightArm, displayUnits)}</div>
             </div>
             <div>
               <label class="text-sm text-gray-400">Max Takeoff Weight</label>
-              <div class="text-white font-mono">{aircraft.maxTakeoffWeight} lbs</div>
+              <div class="text-white font-mono">{formatWeight(aircraft.maxTakeoffWeight, displayUnits)}</div>
             </div>
             <div>
               <label class="text-sm text-gray-400">Datum</label>
