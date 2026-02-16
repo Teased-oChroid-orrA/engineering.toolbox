@@ -24,6 +24,7 @@
     { href: '#/profile', label: 'Profile', path: '/profile' },
     { href: '#/properties', label: 'Properties', path: '/properties' },
     { href: '#/buckling', label: 'Buckling', path: '/buckling' },
+    { href: '#/weight-balance', label: 'W&B', path: '/weight-balance' },
 	{ href: '#/inspector', label: 'Inspector', path: '/inspector' },
 	{ href: '#/surface', label: 'Surface', path: '/surface' }
   ];
