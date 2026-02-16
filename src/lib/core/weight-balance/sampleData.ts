@@ -172,12 +172,111 @@ export const SAMPLE_BEECHCRAFT_BONANZA: AircraftProfile = {
   notes: 'Sample data only. Always verify with actual aircraft POH.'
 };
 
+export const SAMPLE_CIRRUS_SR22: AircraftProfile = {
+  id: 'sample-sr22-001',
+  name: 'N22SR - Cirrus SR22',
+  model: 'Cirrus SR22 G6',
+  registration: 'N22SR',
+  
+  basicEmptyWeight: 2348,
+  basicEmptyWeightArm: 44.3,
+  
+  datumLocation: {
+    type: 'firewall',
+    customDescription: 'Forward face of firewall'
+  },
+  
+  maxTakeoffWeight: 3600,
+  maxLandingWeight: 3600,
+  maxZeroFuelWeight: 3400,
+  
+  units: 'imperial',
+  
+  envelopes: [
+    {
+      category: 'normal',
+      maxWeight: 3600,
+      forwardLimit: 40.0,
+      aftLimit: 47.3,
+      vertices: [
+        { weight: 2200, cgPosition: 40.0 },
+        { weight: 2900, cgPosition: 40.0 },
+        { weight: 3600, cgPosition: 42.8 },
+        { weight: 3600, cgPosition: 47.3 },
+        { weight: 2200, cgPosition: 47.3 },
+        { weight: 2200, cgPosition: 40.0 }
+      ]
+    },
+    {
+      category: 'utility',
+      maxWeight: 3400,
+      forwardLimit: 41.0,
+      aftLimit: 45.5,
+      vertices: [
+        { weight: 2200, cgPosition: 41.0 },
+        { weight: 3400, cgPosition: 43.0 },
+        { weight: 3400, cgPosition: 45.5 },
+        { weight: 2200, cgPosition: 45.5 },
+        { weight: 2200, cgPosition: 41.0 }
+      ]
+    }
+  ],
+  
+  lastWeighing: new Date('2025-01-10'),
+  logbookReference: 'Logbook Entry: Jan 10, 2025',
+  notes: 'Sample data only. Features CAPS parachute system. Always verify with actual aircraft POH.'
+};
+
+export const SAMPLE_KING_AIR_350: AircraftProfile = {
+  id: 'sample-ka350-001',
+  name: 'N350KA - King Air 350',
+  model: 'Beechcraft King Air 350',
+  registration: 'N350KA',
+  
+  basicEmptyWeight: 9150,
+  basicEmptyWeightArm: 305.0,
+  
+  datumLocation: {
+    type: 'nose',
+    customDescription: 'Front of nose at fuselage station 0'
+  },
+  
+  maxTakeoffWeight: 15000,
+  maxLandingWeight: 14600,
+  maxZeroFuelWeight: 11500,
+  
+  units: 'imperial',
+  
+  envelopes: [
+    {
+      category: 'normal',
+      maxWeight: 15000,
+      forwardLimit: 290.0,
+      aftLimit: 309.0,
+      vertices: [
+        { weight: 9150, cgPosition: 290.0 },
+        { weight: 11500, cgPosition: 290.0 },
+        { weight: 15000, cgPosition: 299.0 },
+        { weight: 15000, cgPosition: 309.0 },
+        { weight: 9150, cgPosition: 309.0 },
+        { weight: 9150, cgPosition: 290.0 }
+      ]
+    }
+  ],
+  
+  lastWeighing: new Date('2025-02-01'),
+  logbookReference: 'Logbook Entry: Feb 1, 2025',
+  notes: 'Sample data only. Twin turboprop. Always verify with actual aircraft POH.'
+};
+
 // All available aircraft profiles
 export const AIRCRAFT_PROFILES: Record<string, AircraftProfile> = {
   'c172s': SAMPLE_CESSNA_172S,
   'c17': SAMPLE_C17_GLOBEMASTER,
   'pa28': SAMPLE_PIPER_CHEROKEE,
-  'be36': SAMPLE_BEECHCRAFT_BONANZA
+  'be36': SAMPLE_BEECHCRAFT_BONANZA,
+  'sr22': SAMPLE_CIRRUS_SR22,
+  'ka350': SAMPLE_KING_AIR_350
 };
 
 /**
@@ -191,6 +290,10 @@ export function createSampleLoading(aircraftType: string = 'c172s'): LoadingItem
       return createPiperSampleLoading();
     case 'be36':
       return createBonanzaSampleLoading();
+    case 'sr22':
+      return createSR22SampleLoading();
+    case 'ka350':
+      return createKingAir350SampleLoading();
     case 'c172s':
     default:
       return createCessna172SampleLoading();
@@ -399,6 +502,114 @@ function createBonanzaSampleLoading(): LoadingItem[] {
       weight: 444,  // 74 gallons × 6.0 lbs/gal
       arm: 94.0,
       editable: true
+    }
+  ];
+}
+
+function createSR22SampleLoading(): LoadingItem[] {
+  return [
+    {
+      id: 'item-1',
+      type: 'occupant' as const,
+      name: 'Pilot',
+      weight: 180,
+      arm: 42.0,
+      editable: true
+    },
+    {
+      id: 'item-2',
+      type: 'occupant' as const,
+      name: 'Front Right Passenger',
+      weight: 0,
+      arm: 42.0,
+      editable: true
+    },
+    {
+      id: 'item-3',
+      type: 'occupant' as const,
+      name: 'Rear Left Passenger',
+      weight: 0,
+      arm: 72.0,
+      editable: true
+    },
+    {
+      id: 'item-4',
+      type: 'occupant' as const,
+      name: 'Rear Right Passenger',
+      weight: 0,
+      arm: 72.0,
+      editable: true
+    },
+    {
+      id: 'item-5',
+      type: 'baggage_aft' as const,
+      name: 'Baggage',
+      weight: 0,
+      arm: 94.0,
+      editable: true
+    },
+    {
+      id: 'item-6',
+      type: 'fuel_main' as const,
+      name: 'Main Fuel',
+      weight: 552,  // 92 gallons × 6.0 lbs/gal
+      arm: 43.0,
+      editable: true,
+      notes: 'Full fuel: 92 usable gallons'
+    }
+  ];
+}
+
+function createKingAir350SampleLoading(): LoadingItem[] {
+  return [
+    {
+      id: 'item-1',
+      type: 'occupant' as const,
+      name: 'Pilot',
+      weight: 180,
+      arm: 140.0,
+      editable: true
+    },
+    {
+      id: 'item-2',
+      type: 'occupant' as const,
+      name: 'Co-Pilot',
+      weight: 180,
+      arm: 140.0,
+      editable: true
+    },
+    {
+      id: 'item-3',
+      type: 'occupant' as const,
+      name: 'Passengers (6)',
+      weight: 0,
+      arm: 230.0,
+      editable: true
+    },
+    {
+      id: 'item-4',
+      type: 'baggage_aft' as const,
+      name: 'Nose Baggage',
+      weight: 0,
+      arm: 65.0,
+      editable: true
+    },
+    {
+      id: 'item-5',
+      type: 'baggage_aft' as const,
+      name: 'Aft Baggage',
+      weight: 0,
+      arm: 360.0,
+      editable: true
+    },
+    {
+      id: 'item-6',
+      type: 'fuel_main' as const,
+      name: 'Main Fuel',
+      weight: 2340,  // 384 gallons × 6.1 lbs/gal (Jet-A)
+      arm: 300.0,
+      editable: true,
+      notes: 'Full fuel: 384 usable gallons of Jet-A'
     }
   ];
 }
