@@ -225,91 +225,76 @@ function handleRemoveItem(itemId: string) {
 
 ---
 
-## Not Implemented (Deferred as Separate Features)
+## Implemented Features (Previously Deferred)
 
-### 10. ❌ Not Implemented: %MAC envelope option
+### 10. ✅ IMPLEMENTED: %MAC envelope option
 
-**Requested**: 
-- Add %MAC = ((STATION-LEMAC)/MAC)*100 calculation
-- Option to define envelope with just %MAC values
+**Implementation**: 
+- Added `LEMAC` and `MAC` optional fields to `AircraftProfile` interface
+- Created complete conversion utility module at `src/lib/core/weight-balance/mac.ts`
+- Added MAC Setup button to configure LEMAC and MAC reference points
+- Added Station/%MAC toggle button (visible when MAC data is configured)
+- Created MAC configuration dialog with:
+  - LEMAC input field (Leading Edge MAC position from datum)
+  - MAC length input field
+  - Live %MAC preview showing current CG in both formats
+  - Informational help text explaining MAC
+- Formula implemented: `%MAC = ((STATION - LEMAC) / MAC) × 100`
+- Fully backward compatible - works without MAC configuration
+- Gracefully handles missing MAC data
 
-**Complexity**: **HIGH**
+**Features**:
+- `stationToPercentMAC()` - Convert station (inches) to %MAC
+- `percentMACToStation()` - Convert %MAC to station (inches)
+- `formatPercentMAC()` - Format %MAC for display
+- `hasMACData()` - Check if aircraft has MAC configured
+- `validateMACData()` - Validate MAC configuration
 
-**Why Deferred**:
-This is a substantial feature requiring:
+**Files Created**:
+- `src/lib/core/weight-balance/mac.ts`
 
-1. **Type System Changes**:
-   - Add `LEMAC: number` and `MAC: number` to `AircraftProfile` interface
-   - Add optional `%MAC` mode to `CGEnvelope` interface
-   - Update all sample data to include MAC values
-
-2. **Conversion Functions**:
-   - `stationToPercentMAC(station, LEMAC, MAC): number`
-   - `percentMACToStation(percentMAC, LEMAC, MAC): number`
-   - Unit conversion utilities
-
-3. **UI Updates**:
-   - Envelope editor needs dual-mode input (station OR %MAC)
-   - Toggle between input modes
-   - Display both values simultaneously
-   - Validation for both formats
-
-4. **Renderer Updates**:
-   - Optional %MAC axis labels
-   - Conversion for display
-   - Legend showing MAC reference data
-
-5. **Data Migration**:
-   - Existing configurations don't have MAC data
-   - Need default values or migration strategy
-
-**Recommendation**: Create a separate feature request/PR dedicated to MAC support with:
-- Design document for MAC coordinate system
-- UI mockups showing input modes
-- Data migration plan
-- Comprehensive testing
-
-**Estimated Effort**: 2-3 days for complete implementation
+**Files Modified**:
+- `src/lib/core/weight-balance/types.ts` (added lemac?, mac? fields)
+- `src/routes/weight-balance/+page.svelte` (UI integration)
 
 ---
 
-### 11. ❌ Not Implemented: Add ballast feature to bring CG within limits
+### 11. ✅ IMPLEMENTED: Add ballast feature to bring CG within limits
 
-**Requested**: 
-- Toggle/button to auto-add ballast
-- Calculate required ballast weight and position
-- Display recommendation to user
+**Implementation**: 
+- Created complete ballast calculation module at `src/lib/core/weight-balance/ballast.ts`
+- Physics-based calculation using moment balance equation
+- Added Ballast button to header (animated pulse when CG out of limits)
+- Created ballast recommendation dialog showing:
+  - Feasibility indicator (✅ Solution Found / ❌ Cannot Add Ballast)
+  - Required ballast weight and arm position
+  - Clear description of what the ballast will do
+  - Reason for infeasibility if applicable
+  - "Add Ballast Item" button to auto-add to loading table
+- Automatically triggers recalculation after adding ballast
 
-**Complexity**: **MEDIUM**
+**Algorithm**:
+- Detects if CG is too far forward or aft of envelope limits
+- Calculates optimal ballast position (100" offset from current CG)
+- Uses moment equation: `W_ballast = W_current × (CG_current - CG_target) / (ARM_ballast - CG_target)`
+- Validates against max weight limits
+- Handles edge cases gracefully:
+  - Aircraft already within limits
+  - Negative ballast required (impossible)
+  - Would exceed max weight
+  - Insufficient envelope data
 
-**Why Deferred**:
-This is a feature requiring:
+**Features**:
+- `calculateBallast()` - Main calculation function
+- `isPointInEnvelope()` - CG envelope boundary detection
+- `isPointInPolygon()` - Ray casting algorithm for polygon containment
+- Edge case handling with clear error messages
 
-1. **Physics Algorithm**:
-   - Detect when CG is outside envelope limits
-   - Calculate required ballast weight to bring CG within limits
-   - Determine optimal ballast arm position
-   - Handle cases where ballast alone cannot fix the issue
+**Files Created**:
+- `src/lib/core/weight-balance/ballast.ts`
 
-2. **UI Design**:
-   - Button/toggle to activate feature
-   - Modal or panel showing ballast calculation
-   - Display: "Add X lbs at arm Y to bring CG within limits"
-   - Option to automatically add ballast item
-   - Warning if ballast cannot fix the issue
-
-3. **Edge Cases**:
-   - Aircraft already at max weight
-   - CG too far forward (ballast would make worse)
-   - Multiple possible ballast solutions
-
-**Recommendation**: Create separate feature request with:
-- Algorithm design for ballast calculation
-- UI mockups
-- Edge case handling strategy
-- User testing for UX flow
-
-**Estimated Effort**: 1-2 days for complete implementation
+**Files Modified**:
+- `src/routes/weight-balance/+page.svelte` (UI integration)
 
 ---
 
@@ -335,6 +320,16 @@ This is a feature requiring:
 - [ ] Edit envelope maxWeight - verify horizontal line appears on chart
 - [ ] Add an item and click remove with Cancel - verify item is NOT removed
 - [ ] Add an item and click remove with OK - verify item IS removed
+- [ ] Click "MAC Setup" button - configure LEMAC and MAC values
+- [ ] After configuring MAC - verify Station/%MAC toggle button appears
+- [ ] Toggle Station/%MAC display - verify CG shown in %MAC format
+- [ ] Load configuration with CG out of limits - verify Ballast button appears (pulsing)
+- [ ] Click Ballast button - verify calculation dialog shows
+- [ ] If ballast feasible - click "Add Ballast Item" and verify it's added to table
+- [ ] Verify ballast brings CG within envelope limits after recalculation
+- [ ] Test ballast with CG too far forward - verify aft ballast recommended
+- [ ] Test ballast with CG too far aft - verify forward ballast recommended
+- [ ] Test ballast when would exceed max weight - verify infeasibility message
 
 ### Automated Testing
 
