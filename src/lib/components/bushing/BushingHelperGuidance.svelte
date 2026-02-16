@@ -1,18 +1,38 @@
 <script lang="ts">
   import type { BushingInputs, BushingOutput } from '$lib/core/bushing';
+  import { makeFriendlyMessage, getQuickFix } from '$lib/core/bushing/errorMessageUtils';
 
   export let form: BushingInputs;
   export let results: BushingOutput;
 
   $: guidance = (() => {
     if (results.warningCodes?.length) {
+      // Get the most critical warning and make it user-friendly
+      const primaryWarning = results.warningCodes[0];
+      const friendly = makeFriendlyMessage(primaryWarning.code, {
+        units: form.units === 'imperial' ? 'in' : 'mm'
+      });
+      
+      const lines: string[] = [
+        `⚠️ ${friendly.title}`,
+        friendly.description,
+        `💡 ${friendly.suggestion}`
+      ];
+      
+      // Add governing check info
+      const marginStr = Number(results.governing.margin).toFixed(3);
+      lines.push(`Governing check: ${results.governing.name} (margin ${marginStr})`);
+      
+      // Add quick fix if available
+      const quickFix = getQuickFix(primaryWarning.code);
+      if (quickFix) {
+        lines.push(`🔧 Quick fix: ${quickFix}`);
+      }
+      
       return {
         tone: 'warning',
         title: 'Attention Required',
-        lines: [
-          ...results.warningCodes.map((w) => `${w.code}: ${w.message}`).slice(0, 4),
-          `Governing check: ${results.governing.name} (margin ${Number(results.governing.margin).toFixed(3)})`
-        ]
+        lines
       };
     }
     if (form.idType === 'countersink' || form.bushingType === 'countersink') {

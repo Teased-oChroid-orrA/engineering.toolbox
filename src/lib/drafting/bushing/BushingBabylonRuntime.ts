@@ -27,8 +27,10 @@ export async function mountBushingBabylonCanvas(
 
   const engine = new B.Engine(canvas, true, {
     antialias: true,
-    preserveDrawingBuffer: true,
-    stencil: true
+    preserveDrawingBuffer: false, // Disable to reduce ReadPixels operations
+    stencil: true,
+    powerPreference: 'high-performance', // Request high-performance GPU
+    doNotHandleContextLost: true // Reduce overhead
   });
 
   const scene = new B.Scene(engine);
