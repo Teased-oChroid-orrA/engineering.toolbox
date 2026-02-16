@@ -49,7 +49,35 @@ export function heuristicHasHeaders(first: string[], second: string[]): { decide
 export function computeDatasetIdentity(source: string, hdrs: string[], rowCount: number, hashFn: (s: string) => string) {
   const base = `${source}\n${rowCount}\n${(hdrs ?? []).join('|')}`;
   const id = `ds_${hashFn(base)}`;
-  const label = source.length > 80 ? source.slice(0, 77) + '…' : source;
+  
+  // Extract a meaningful label from the source
+  let label = source || 'Unknown File';
+  
+  // If source is a path, extract filename
+  if (label.includes('/')) {
+    label = label.split('/').pop() || label;
+  }
+  if (label.includes('\\')) {
+    label = label.split('\\').pop() || label;
+  }
+  
+  // If source starts with "text:", use row count as identifier
+  if (source.startsWith('text:')) {
+    label = `CSV Data (${rowCount} rows)`;
+  }
+  
+  // If source starts with "path:", extract filename
+  if (source.startsWith('path:')) {
+    const pathPart = source.replace('path:', '');
+    const parts = pathPart.split(/[/\\]/);
+    label = parts[parts.length - 1] || `File (${rowCount} rows)`;
+  }
+  
+  // Truncate if too long
+  if (label.length > 80) {
+    label = label.slice(0, 77) + '…';
+  }
+  
   return { id, label };
 }
 

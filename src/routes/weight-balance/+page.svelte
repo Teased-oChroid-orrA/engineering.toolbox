@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { calculateWeightAndBalance, validateInput } from '$lib/core/weight-balance/solve';
-  import { SAMPLE_CESSNA_172S, createSampleLoading } from '$lib/core/weight-balance/sampleData';
+  import { SAMPLE_CESSNA_172S, SAMPLE_C17_GLOBEMASTER, SAMPLE_PIPER_CHEROKEE, SAMPLE_BEECHCRAFT_BONANZA, AIRCRAFT_PROFILES, createSampleLoading, ITEM_LIBRARY } from '$lib/core/weight-balance/sampleData';
   import { renderCGEnvelope } from '$lib/drafting/weight-balance/envelopeRenderer';
-  import type { AircraftProfile, LoadingItem, LoadingResults, LoadingItemType } from '$lib/core/weight-balance/types';
+  import type { AircraftProfile, LoadingItem, LoadingResults, LoadingItemType, CGEnvelope } from '$lib/core/weight-balance/types';
   import { 
     saveConfigurationToFile,
     loadConfigurationFromFile,
@@ -14,7 +14,7 @@
   } from '$lib/core/weight-balance/storage';
   
   let aircraft = $state<AircraftProfile>(SAMPLE_CESSNA_172S);
-  let items = $state<LoadingItem[]>(createSampleLoading());
+  let items = $state<LoadingItem[]>(createSampleLoading('c172s'));
   let results = $state<LoadingResults | null>(null);
   let showDisclaimer = $state(true);
   let envelopeContainer = $state<HTMLElement | null>(null);
@@ -22,11 +22,16 @@
   let showSaveDialog = $state(false);
   let configName = $state('');
   let showAddItemDialog = $state(false);
+  let showAircraftDialog = $state(false);
+  let showEnvelopeDialog = $state(false);
+  let showItemLibraryDialog = $state(false);
+  let selectedCategory = $state<'occupants' | 'fuel' | 'baggage' | 'equipment' | 'cargo'>('occupants');
   let newItemName = $state('');
   let newItemType = $state<LoadingItemType>('occupant');
   let newItemWeight = $state(0);
   let newItemArm = $state(0);
   let nextItemId = $state(100);
+  let editingEnvelope = $state<CGEnvelope | null>(null);
   
   function recalculate() {
     const validation = validateInput(aircraft, items);
@@ -82,9 +87,73 @@
   
   function resetToSample() {
     aircraft = SAMPLE_CESSNA_172S;
-    items = createSampleLoading();
+    items = createSampleLoading('c172s');
     addBasicEmptyWeight();
     recalculate();
+  }
+  
+  // Aircraft selection functions
+  function handleAircraftSelect(profileKey: string) {
+    const profile = AIRCRAFT_PROFILES[profileKey];
+    if (profile) {
+      aircraft = profile;
+      items = createSampleLoading(profileKey);
+      addBasicEmptyWeight();
+      recalculate();
+      showAircraftDialog = false;
+    }
+  }
+  
+  // Envelope editing functions
+  function handleEditEnvelope(envelope: CGEnvelope) {
+    editingEnvelope = JSON.parse(JSON.stringify(envelope)); // Deep copy
+    showEnvelopeDialog = true;
+  }
+  
+  function handleSaveEnvelope() {
+    if (!editingEnvelope) return;
+    
+    const envelopeIndex = aircraft.envelopes.findIndex(e => e.category === editingEnvelope.category);
+    if (envelopeIndex >= 0) {
+      aircraft.envelopes[envelopeIndex] = editingEnvelope;
+    } else {
+      aircraft.envelopes.push(editingEnvelope);
+    }
+    
+    showEnvelopeDialog = false;
+    editingEnvelope = null;
+    recalculate();
+  }
+  
+  function addEnvelopeVertex() {
+    if (!editingEnvelope) return;
+    editingEnvelope.vertices.push({ weight: 0, cgPosition: 0 });
+  }
+  
+  function removeEnvelopeVertex(index: number) {
+    if (!editingEnvelope) return;
+    editingEnvelope.vertices.splice(index, 1);
+  }
+  
+  // Item library functions
+  function handleItemLibrarySelect(category: typeof selectedCategory, index: number) {
+    const libraryItem = ITEM_LIBRARY[category][index];
+    newItemName = libraryItem.name;
+    newItemWeight = libraryItem.defaultWeight;
+    newItemArm = libraryItem.defaultArm;
+    
+    // Set appropriate type based on category
+    const typeMap: Record<typeof category, LoadingItemType> = {
+      occupants: 'occupant',
+      fuel: 'fuel_main',
+      baggage: 'baggage_aft',
+      equipment: 'equipment_removable',
+      cargo: 'cargo'
+    };
+    newItemType = typeMap[category];
+    
+    showItemLibraryDialog = false;
+    showAddItemDialog = true;
   }
   
   // Save/Load Functions
@@ -292,7 +361,25 @@
       <div class="lg:col-span-2 space-y-6">
         <!-- Aircraft Info Card -->
         <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-          <h2 class="text-xl font-semibold text-white mb-4">Aircraft Profile</h2>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold text-white">Aircraft Profile</h2>
+            <div class="flex gap-2">
+              <button 
+                onclick={() => showAircraftDialog = true}
+                class="px-3 py-1 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500 text-purple-300 rounded text-sm transition-colors"
+                title="Change Aircraft"
+              >
+                ✈️ Change Aircraft
+              </button>
+              <button 
+                onclick={() => handleEditEnvelope(aircraft.envelopes[0])}
+                class="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500 text-blue-300 rounded text-sm transition-colors"
+                title="Edit W&B Envelope"
+              >
+                📊 Edit Envelope
+              </button>
+            </div>
+          </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="text-sm text-gray-400">Aircraft</label>
@@ -327,10 +414,17 @@
             <h2 class="text-xl font-semibold text-white">Loading Configuration</h2>
             <div class="flex gap-2">
               <button 
+                onclick={() => showItemLibraryDialog = true}
+                class="px-3 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500 text-indigo-300 rounded text-sm transition-colors"
+              >
+                📚 Item Library
+              </button>
+              <button 
                 onclick={handleAddItemClick}
                 class="px-3 py-1 bg-green-500/20 hover:bg-green-500/30 border border-green-500 text-green-300 rounded text-sm transition-colors"
               >
-                + Add Item
+                + Add Custom
+              </button>
               </button>
               <button 
                 onclick={resetToSample}
@@ -579,6 +673,228 @@
           class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded transition-colors"
         >
           Add Item
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Aircraft Selection Dialog -->
+{#if showAircraftDialog}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showAircraftDialog = false)}>
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-2xl w-full mx-4">
+      <h2 class="text-xl font-semibold text-white mb-4">Select Aircraft</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <button
+          onclick={() => handleAircraftSelect('c172s')}
+          class="p-4 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg text-left transition-colors"
+        >
+          <div class="text-white font-semibold mb-1">Cessna 172S Skyhawk</div>
+          <div class="text-xs text-gray-400">Light Single-Engine • 2,550 lbs MTOW</div>
+        </button>
+        <button
+          onclick={() => handleAircraftSelect('pa28')}
+          class="p-4 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg text-left transition-colors"
+        >
+          <div class="text-white font-semibold mb-1">Piper PA-28 Cherokee</div>
+          <div class="text-xs text-gray-400">Light Single-Engine • 2,400 lbs MTOW</div>
+        </button>
+        <button
+          onclick={() => handleAircraftSelect('be36')}
+          class="p-4 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg text-left transition-colors"
+        >
+          <div class="text-white font-semibold mb-1">Beechcraft A36 Bonanza</div>
+          <div class="text-xs text-gray-400">High-Performance Single • 3,650 lbs MTOW</div>
+        </button>
+        <button
+          onclick={() => handleAircraftSelect('c17')}
+          class="p-4 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg text-left transition-colors"
+        >
+          <div class="text-white font-semibold mb-1">Boeing C-17 Globemaster III</div>
+          <div class="text-xs text-gray-400">Military Cargo • 585,000 lbs MTOW</div>
+        </button>
+      </div>
+      <div class="flex justify-end mt-6">
+        <button
+          onclick={() => showAircraftDialog = false}
+          class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Envelope Editor Dialog -->
+{#if showEnvelopeDialog && editingEnvelope}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showEnvelopeDialog = false)}>
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <h2 class="text-xl font-semibold text-white mb-4">Edit W&B Envelope</h2>
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">Category</label>
+            <select 
+              bind:value={editingEnvelope.category}
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+            >
+              <option value="normal">Normal</option>
+              <option value="utility">Utility</option>
+              <option value="acrobatic">Acrobatic</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">Max Weight (lbs)</label>
+            <input 
+              type="number"
+              bind:value={editingEnvelope.maxWeight}
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+              min="0"
+              step="1"
+            />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">Forward Limit (in)</label>
+            <input 
+              type="number"
+              bind:value={editingEnvelope.forwardLimit}
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+              step="0.1"
+            />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">Aft Limit (in)</label>
+            <input 
+              type="number"
+              bind:value={editingEnvelope.aftLimit}
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+              step="0.1"
+            />
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-sm text-gray-400">Envelope Vertices</label>
+            <button
+              onclick={addEnvelopeVertex}
+              class="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500 text-blue-300 rounded text-xs transition-colors"
+            >
+              + Add Vertex
+            </button>
+          </div>
+          <div class="space-y-2 max-h-60 overflow-y-auto">
+            {#each editingEnvelope.vertices as vertex, idx}
+              <div class="flex gap-2 items-center bg-slate-700/50 p-2 rounded">
+                <div class="flex-1">
+                  <input 
+                    type="number"
+                    bind:value={vertex.weight}
+                    class="w-full px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:border-blue-500 focus:outline-none"
+                    placeholder="Weight (lbs)"
+                    min="0"
+                    step="1"
+                  />
+                </div>
+                <div class="flex-1">
+                  <input 
+                    type="number"
+                    bind:value={vertex.cgPosition}
+                    class="w-full px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:border-blue-500 focus:outline-none"
+                    placeholder="CG Position (in)"
+                    step="0.1"
+                  />
+                </div>
+                <button
+                  onclick={() => removeEnvelopeVertex(idx)}
+                  class="text-red-400 hover:text-red-300 text-sm px-2"
+                  title="Remove vertex"
+                >
+                  ✕
+                </button>
+              </div>
+            {/each}
+          </div>
+        </div>
+      </div>
+      <div class="flex gap-2 justify-end mt-6">
+        <button
+          onclick={() => { showEnvelopeDialog = false; editingEnvelope = null; }}
+          class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onclick={handleSaveEnvelope}
+          class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+        >
+          Save Envelope
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Item Library Dialog -->
+{#if showItemLibraryDialog}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showItemLibraryDialog = false)}>
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <h2 class="text-xl font-semibold text-white mb-4">Item Library</h2>
+      <div class="mb-4">
+        <div class="flex gap-2 flex-wrap">
+          <button
+            onclick={() => selectedCategory = 'occupants'}
+            class={`px-3 py-1 rounded text-sm transition-colors ${selectedCategory === 'occupants' ? 'bg-blue-500 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+          >
+            👤 Occupants
+          </button>
+          <button
+            onclick={() => selectedCategory = 'fuel'}
+            class={`px-3 py-1 rounded text-sm transition-colors ${selectedCategory === 'fuel' ? 'bg-blue-500 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+          >
+            ⛽ Fuel
+          </button>
+          <button
+            onclick={() => selectedCategory = 'baggage'}
+            class={`px-3 py-1 rounded text-sm transition-colors ${selectedCategory === 'baggage' ? 'bg-blue-500 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+          >
+            🧳 Baggage
+          </button>
+          <button
+            onclick={() => selectedCategory = 'equipment'}
+            class={`px-3 py-1 rounded text-sm transition-colors ${selectedCategory === 'equipment' ? 'bg-blue-500 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+          >
+            🔧 Equipment
+          </button>
+          <button
+            onclick={() => selectedCategory = 'cargo'}
+            class={`px-3 py-1 rounded text-sm transition-colors ${selectedCategory === 'cargo' ? 'bg-blue-500 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+          >
+            📦 Cargo
+          </button>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {#each ITEM_LIBRARY[selectedCategory] as item, idx}
+          <button
+            onclick={() => handleItemLibrarySelect(selectedCategory, idx)}
+            class="p-3 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg text-left transition-colors"
+          >
+            <div class="text-white font-medium mb-1">{item.name}</div>
+            <div class="text-xs text-gray-400">
+              Weight: {item.defaultWeight} lbs • Arm: {item.defaultArm}"
+            </div>
+          </button>
+        {/each}
+      </div>
+      <div class="flex justify-end mt-6">
+        <button
+          onclick={() => showItemLibraryDialog = false}
+          class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
+        >
+          Cancel
         </button>
       </div>
     </div>

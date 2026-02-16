@@ -29,7 +29,7 @@
 <div class="glass-panel rounded-2xl p-3 border border-white/10 inspector-panel-slide inspector-pop-card" data-testid="inspector-loaded-files">
   <div class="flex items-center justify-between gap-2">
     <div class="text-[10px] uppercase tracking-widest text-white/50">Loaded files</div>
-    <div></div>
+    <div class="text-[10px] text-white/40">Click filename to unload</div>
   </div>
   <div class="mt-2 flex flex-wrap gap-2">
     {#if (loadedDatasets?.length ?? 0) === 0}
@@ -39,17 +39,10 @@
         <div class={`inline-flex items-center rounded-lg border inspector-pop-sub ${activeDatasetId === ds.id ? 'border-emerald-300/40 bg-emerald-500/15' : 'border-white/10 bg-white/5'}`}>
           <button
             class={`btn btn-xs border-0 ${activeDatasetId === ds.id ? 'variant-filled' : 'variant-soft'}`}
-            onclick={() => dispatch('activate', { id: ds.id })}
-            title={ds.label}
-          >
-            {ds.label}
-          </button>
-          <button
-            class="px-2 py-1 text-[11px] text-white/60 hover:text-white/90"
-            title="Unload file"
             onclick={() => dispatch('unload', { id: ds.id })}
+            title={`Click to unload: ${ds.label}`}
           >
-            ×
+            {ds.label || 'Unknown File'}
           </button>
         </div>
       {/each}
