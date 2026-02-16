@@ -3,6 +3,7 @@
   import { calculateWeightAndBalance, validateInput } from '$lib/core/weight-balance/solve';
   import { SAMPLE_CESSNA_172S, SAMPLE_C17_GLOBEMASTER, SAMPLE_PIPER_CHEROKEE, SAMPLE_BEECHCRAFT_BONANZA, AIRCRAFT_PROFILES, createSampleLoading, ITEM_LIBRARY } from '$lib/core/weight-balance/sampleData';
   import { renderCGEnvelope } from '$lib/drafting/weight-balance/envelopeRenderer';
+  import { validateEnvelope, getValidationSummary, type ValidationError } from '$lib/core/weight-balance/validation';
   import type { AircraftProfile, LoadingItem, LoadingResults, LoadingItemType, CGEnvelope } from '$lib/core/weight-balance/types';
   import { 
     saveConfigurationToFile,
@@ -32,6 +33,7 @@
   let newItemArm = $state(0);
   let nextItemId = $state(100);
   let editingEnvelope = $state<CGEnvelope | null>(null);
+  let envelopeValidationErrors = $state<ValidationError[]>([]);
   
   function recalculate() {
     const validation = validateInput(aircraft, items);
@@ -107,11 +109,23 @@
   // Envelope editing functions
   function handleEditEnvelope(envelope: CGEnvelope) {
     editingEnvelope = JSON.parse(JSON.stringify(envelope)); // Deep copy
+    envelopeValidationErrors = validateEnvelope(editingEnvelope);
     showEnvelopeDialog = true;
   }
   
   function handleSaveEnvelope() {
     if (!editingEnvelope) return;
+    
+    // Validate envelope before saving
+    const errors = validateEnvelope(editingEnvelope);
+    const summary = getValidationSummary(errors);
+    
+    if (!summary.isValid) {
+      // Still allow saving but show warning
+      if (!confirm(`Envelope has validation errors:\n${summary.message}\n\nDo you want to save anyway?`)) {
+        return;
+      }
+    }
     
     const envelopeIndex = aircraft.envelopes.findIndex(e => e.category === editingEnvelope.category);
     if (envelopeIndex >= 0) {
@@ -122,17 +136,25 @@
     
     showEnvelopeDialog = false;
     editingEnvelope = null;
+    envelopeValidationErrors = [];
     recalculate();
   }
   
   function addEnvelopeVertex() {
     if (!editingEnvelope) return;
     editingEnvelope.vertices.push({ weight: 0, cgPosition: 0 });
+    envelopeValidationErrors = validateEnvelope(editingEnvelope);
   }
   
   function removeEnvelopeVertex(index: number) {
     if (!editingEnvelope) return;
     editingEnvelope.vertices.splice(index, 1);
+    envelopeValidationErrors = validateEnvelope(editingEnvelope);
+  }
+  
+  function validateCurrentEnvelope() {
+    if (!editingEnvelope) return;
+    envelopeValidationErrors = validateEnvelope(editingEnvelope);
   }
   
   // Item library functions
@@ -832,20 +854,48 @@
             {/each}
           </div>
         </div>
+        
+        <!-- Validation Results -->
+        {#if envelopeValidationErrors.length > 0}
+          <div class="mt-4 p-4 bg-slate-700/50 rounded-lg border-l-4 {getValidationSummary(envelopeValidationErrors).errorCount > 0 ? 'border-red-500' : 'border-yellow-500'}">
+            <h3 class="text-sm font-semibold text-white mb-2">Validation Results</h3>
+            <div class="space-y-2">
+              {#each envelopeValidationErrors as error}
+                <div class="text-xs">
+                  <span class={`font-semibold ${error.severity === 'error' ? 'text-red-400' : error.severity === 'warning' ? 'text-yellow-400' : 'text-blue-400'}`}>
+                    {error.severity.toUpperCase()}:
+                  </span>
+                  <span class="text-gray-300 ml-2">{error.message}</span>
+                  {#if error.suggestion}
+                    <div class="ml-6 mt-1 text-gray-400 italic">💡 {error.suggestion}</div>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/if}
       </div>
-      <div class="flex gap-2 justify-end mt-6">
+      <div class="flex gap-2 justify-between mt-6">
         <button
-          onclick={() => { showEnvelopeDialog = false; editingEnvelope = null; }}
-          class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
+          onclick={validateCurrentEnvelope}
+          class="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500 text-green-300 rounded transition-colors"
         >
-          Cancel
+          ✓ Validate
         </button>
-        <button
-          onclick={handleSaveEnvelope}
-          class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
-        >
-          Save Envelope
-        </button>
+        <div class="flex gap-2">
+          <button
+            onclick={() => { showEnvelopeDialog = false; editingEnvelope = null; envelopeValidationErrors = []; }}
+            class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onclick={handleSaveEnvelope}
+            class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+          >
+            Save Envelope
+          </button>
+        </div>
       </div>
     </div>
   </div>
