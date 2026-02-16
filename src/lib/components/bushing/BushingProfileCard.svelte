@@ -4,8 +4,13 @@
   import { solveCountersink, type BushingInputs } from '$lib/core/bushing';
   import BushingCsInput from './BushingCsInput.svelte';
 
-  export let form: BushingInputs;
-  export let odInstalled = 0;
+  let {
+    form = $bindable(),
+    odInstalled = 0
+  }: {
+    form: BushingInputs;
+    odInstalled?: number;
+  } = $props();
 
   const CS_MODES = [
     { value: 'depth_angle', label: 'Depth & Angle' },
@@ -14,36 +19,48 @@
   ];
   const CS_SYNC_EPSILON = 1e-9;
 
-  let internalCsMode: BushingInputs['csMode'] = form.csMode;
-  let externalCsMode: BushingInputs['extCsMode'] = form.extCsMode;
+  let internalCsMode = $state<BushingInputs['csMode']>(form.csMode);
+  let externalCsMode = $state<BushingInputs['extCsMode']>(form.extCsMode);
 
-  $: setCountersinkMode('csMode', internalCsMode);
-  $: setCountersinkMode('extCsMode', externalCsMode);
-  $: internalCsBlocked = form.idType !== 'countersink';
-  $: internalCsDiaDisabled = internalCsBlocked || form.csMode === 'depth_angle';
-  $: internalCsDepthDisabled = internalCsBlocked || form.csMode === 'dia_angle';
-  $: internalCsAngleDisabled = internalCsBlocked || form.csMode === 'dia_depth';
-  $: externalCsBlocked = form.bushingType !== 'countersink';
-  $: externalCsDiaDisabled = externalCsBlocked || form.extCsMode === 'depth_angle';
-  $: externalCsDepthDisabled = externalCsBlocked || form.extCsMode === 'dia_angle';
-  $: externalCsAngleDisabled = externalCsBlocked || form.extCsMode === 'dia_depth';
-  $: internalComputedLabel = computedFieldLabel(form.csMode, false);
-  $: externalComputedLabel = computedFieldLabel(form.extCsMode, true);
-  $: if (form.idType === 'countersink') {
-    const solved = solveCountersink(form.csMode, form.csDia, form.csDepth, form.csAngle, form.idBushing);
-    const derived = getDerivedField(form.csMode);
-    if (derived === 'dia') setNumericField('csDia', solved.dia);
-    else if (derived === 'depth') setNumericField('csDepth', solved.depth);
-    else setNumericField('csAngle', solved.angleDeg);
-  }
-  $: if (form.bushingType === 'countersink') {
-    const baseOd = Number.isFinite(odInstalled) ? odInstalled : (form.boreDia + form.interference);
-    const solved = solveCountersink(form.extCsMode, form.extCsDia, form.extCsDepth, form.extCsAngle, baseOd);
-    const derived = getDerivedField(form.extCsMode);
-    if (derived === 'dia') setNumericField('extCsDia', solved.dia);
-    else if (derived === 'depth') setNumericField('extCsDepth', solved.depth);
-    else setNumericField('extCsAngle', solved.angleDeg);
-  }
+  let internalCsBlocked = $derived(form.idType !== 'countersink');
+  let internalCsDiaDisabled = $derived(internalCsBlocked || form.csMode === 'depth_angle');
+  let internalCsDepthDisabled = $derived(internalCsBlocked || form.csMode === 'dia_angle');
+  let internalCsAngleDisabled = $derived(internalCsBlocked || form.csMode === 'dia_depth');
+  let externalCsBlocked = $derived(form.bushingType !== 'countersink');
+  let externalCsDiaDisabled = $derived(externalCsBlocked || form.extCsMode === 'depth_angle');
+  let externalCsDepthDisabled = $derived(externalCsBlocked || form.extCsMode === 'dia_angle');
+  let externalCsAngleDisabled = $derived(externalCsBlocked || form.extCsMode === 'dia_depth');
+  let internalComputedLabel = $derived(computedFieldLabel(form.csMode, false));
+  let externalComputedLabel = $derived(computedFieldLabel(form.extCsMode, true));
+
+  $effect(() => {
+    setCountersinkMode('csMode', internalCsMode);
+  });
+
+  $effect(() => {
+    setCountersinkMode('extCsMode', externalCsMode);
+  });
+
+  $effect(() => {
+    if (form.idType === 'countersink') {
+      const solved = solveCountersink(form.csMode, form.csDia, form.csDepth, form.csAngle, form.idBushing);
+      const derived = getDerivedField(form.csMode);
+      if (derived === 'dia') setNumericField('csDia', solved.dia);
+      else if (derived === 'depth') setNumericField('csDepth', solved.depth);
+      else setNumericField('csAngle', solved.angleDeg);
+    }
+  });
+
+  $effect(() => {
+    if (form.bushingType === 'countersink') {
+      const baseOd = Number.isFinite(odInstalled) ? odInstalled : (form.boreDia + form.interference);
+      const solved = solveCountersink(form.extCsMode, form.extCsDia, form.extCsDepth, form.extCsAngle, baseOd);
+      const derived = getDerivedField(form.extCsMode);
+      if (derived === 'dia') setNumericField('extCsDia', solved.dia);
+      else if (derived === 'depth') setNumericField('extCsDepth', solved.depth);
+      else setNumericField('extCsAngle', solved.angleDeg);
+    }
+  });
 
   function getDerivedField(mode: BushingInputs['csMode']): 'dia' | 'depth' | 'angle' {
     if (mode === 'depth_angle') return 'dia';
@@ -88,9 +105,9 @@
       <div class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-indigo-200/90">External Profile + Settings</div>
       <div class="rounded-lg border border-white/10 bg-black/30 p-1 text-xs font-medium bushing-pop-sub bushing-depth-0">
         <div class="flex gap-1">
-          <button class={cn('flex-1 rounded-md py-1 transition-all', form.bushingType === 'straight' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.bushingType = 'straight')}>Straight</button>
-          <button class={cn('flex-1 rounded-md py-1 transition-all', form.bushingType === 'flanged' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.bushingType = 'flanged')}>Flanged</button>
-          <button class={cn('flex-1 rounded-md py-1 transition-all', form.bushingType === 'countersink' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.bushingType = 'countersink')}>C'Sink</button>
+          <button class={cn('flex-1 rounded-md py-1 transition-all', form.bushingType === 'straight' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} onclick={() => (form.bushingType = 'straight')}>Straight</button>
+          <button class={cn('flex-1 rounded-md py-1 transition-all', form.bushingType === 'flanged' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} onclick={() => (form.bushingType = 'flanged')}>Flanged</button>
+          <button class={cn('flex-1 rounded-md py-1 transition-all', form.bushingType === 'countersink' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} onclick={() => (form.bushingType = 'countersink')}>C'Sink</button>
         </div>
       </div>
       {#if form.bushingType === 'flanged'}
@@ -119,8 +136,8 @@
       <div class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-indigo-200/90">Internal Profile + Settings</div>
       <div class="rounded-lg border border-white/10 bg-black/30 p-1 text-xs font-medium bushing-pop-sub bushing-depth-0">
         <div class="flex gap-1">
-          <button class={cn('flex-1 rounded-md py-1 transition-all', form.idType === 'straight' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.idType = 'straight')}>Straight</button>
-          <button class={cn('flex-1 rounded-md py-1 transition-all', form.idType === 'countersink' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} on:click={() => (form.idType = 'countersink')}>C'Sink</button>
+          <button class={cn('flex-1 rounded-md py-1 transition-all', form.idType === 'straight' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} onclick={() => (form.idType = 'straight')}>Straight</button>
+          <button class={cn('flex-1 rounded-md py-1 transition-all', form.idType === 'countersink' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70')} onclick={() => (form.idType = 'countersink')}>C'Sink</button>
         </div>
       </div>
       <div class="mt-3 grid grid-cols-1 gap-3">

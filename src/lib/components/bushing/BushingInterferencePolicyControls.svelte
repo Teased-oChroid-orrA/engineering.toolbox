@@ -2,8 +2,13 @@
   import { Input, Label, Select } from '$lib/components/ui';
   import type { BushingInputs, BushingOutput } from '$lib/core/bushing';
 
-  export let form: BushingInputs;
-  export let results: BushingOutput;
+  let {
+    form = $bindable(),
+    results
+  }: {
+    form: BushingInputs;
+    results: BushingOutput;
+  } = $props();
 
   const CAPABILITY_MODE_ITEMS = [
     { value: 'unspecified', label: 'Unspecified' },
@@ -19,16 +24,14 @@
   };
   const DEFAULT_BORE_CAPABILITY: NonNullable<BushingInputs['boreCapability']> = { mode: 'unspecified' };
 
-  function ensurePolicyObjects() {
+  $effect(() => {
     if (!form.interferencePolicy) {
       form = { ...form, interferencePolicy: { ...DEFAULT_INTERFERENCE_POLICY } };
     }
     if (!form.boreCapability) {
       form = { ...form, boreCapability: { ...DEFAULT_BORE_CAPABILITY } };
     }
-  }
-
-  $: ensurePolicyObjects();
+  });
 </script>
 
 <div class="space-y-2">
