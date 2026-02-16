@@ -156,37 +156,34 @@ export function renderCGEnvelope(
         .text(`Aft: ${envelope.aftLimit.toFixed(1)}`);
     }
     
+    // Draw max weight line
+    if (envelope.maxWeight) {
+      g.append('line')
+        .attr('x1', 0)
+        .attr('y1', yScale(envelope.maxWeight))
+        .attr('x2', innerWidth)
+        .attr('y2', yScale(envelope.maxWeight))
+        .attr('stroke', color)
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '5,5')
+        .attr('stroke-opacity', 0.6);
+      
+      // Add label for max weight
+      g.append('text')
+        .attr('x', innerWidth - 5)
+        .attr('y', yScale(envelope.maxWeight) - 5)
+        .attr('text-anchor', 'end')
+        .attr('fill', color)
+        .attr('font-size', '10px')
+        .text(`Max: ${envelope.maxWeight.toFixed(0)} lbs`);
+    }
+    
     // Add envelope category label
     const centroid = envelope.vertices.reduce((acc, v) => ({
       cgPosition: acc.cgPosition + v.cgPosition / envelope.vertices.length,
       weight: acc.weight + v.weight / envelope.vertices.length
     }), { cgPosition: 0, weight: 0 });
     
-    g.append('text')
-      .attr('x', xScale(centroid.cgPosition))
-      .attr('y', yScale(centroid.weight))
-      .attr('text-anchor', 'middle')
-      .attr('fill', color)
-      .attr('font-size', '12px')
-      .attr('font-weight', 'bold')
-      .text(envelope.category.toUpperCase());
-  });
-      .curve(d3.curveLinearClosed);
-    
-    const color = categoryColors[envelope.category] || '#64748b';
-    
-    // Fill
-    g.append('path')
-      .datum(envelope.vertices)
-      .attr('d', line)
-      .attr('fill', color)
-      .attr('fill-opacity', 0.15)
-      .attr('stroke', color)
-      .attr('stroke-width', 2)
-      .attr('stroke-opacity', 0.8);
-    
-    // Label
-    const centroid = getCentroid(envelope.vertices);
     g.append('text')
       .attr('x', xScale(centroid.cgPosition))
       .attr('y', yScale(centroid.weight))
