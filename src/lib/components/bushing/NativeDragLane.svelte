@@ -8,7 +8,6 @@
   import { createEventDispatcher } from 'svelte';
   import { flip } from 'svelte/animate';
   import { reorderItems, moveItemByOffset, getNextFocusableId } from './dragUtils';
-  import type { Snippet } from 'svelte';
 
   // Svelte 5 props destructuring
   let {
@@ -17,8 +16,7 @@
     enabled = true,
     flipDurationMs = 200,
     allowCrossColumn = false,
-    columnId = null,
-    children
+    columnId = null
   }: {
     items?: Array<{ id: string }>;
     listClass?: string;
@@ -26,7 +24,6 @@
     flipDurationMs?: number;
     allowCrossColumn?: boolean;
     columnId?: string | null;
-    children?: Snippet<[{ item: { id: string } }]>;
   } = $props();
   
   const dispatch = createEventDispatcher<{
@@ -201,9 +198,7 @@
              transition: transform {flipDurationMs}ms cubic-bezier(0.4, 0, 0.2, 1), 
                          opacity 150ms cubic-bezier(0.4, 0, 0.2, 1),
                          box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);">
-      {#if children}
-        {@render children({ item })}
-      {/if}
+      <slot {item} />
     </div>
   {/each}
 </div>

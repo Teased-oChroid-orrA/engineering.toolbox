@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Snippet } from 'svelte';
 
   // Svelte 5 props destructuring
   let {
@@ -12,8 +11,7 @@
     canMoveUp = false,
     canMoveDown = false,
     onMoveUp = null,
-    onMoveDown = null,
-    children
+    onMoveDown = null
   }: {
     column: 'left' | 'right';
     cardId: string;
@@ -24,7 +22,6 @@
     canMoveDown?: boolean;
     onMoveUp?: (() => void) | null;
     onMoveDown?: (() => void) | null;
-    children?: Snippet;
   } = $props();
 
   // Svelte 5 $state rune for reactive local state
@@ -62,8 +59,6 @@
     </div>
   </div>
   {#if !collapsed}
-    {#if children}
-      {@render children()}
-    {/if}
+    <slot />
   {/if}
 </div>
