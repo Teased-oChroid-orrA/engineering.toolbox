@@ -135,9 +135,10 @@
   }
   
   // Envelope editing functions
-  function handleEditEnvelope(envelope: CGEnvelope) {
+  function handleEditEnvelope(envelope: CGEnvelope | null) {
+    if (!envelope) return;
     editingEnvelope = JSON.parse(JSON.stringify(envelope)); // Deep copy
-    envelopeValidationErrors = validateEnvelope(editingEnvelope);
+    envelopeValidationErrors = validateEnvelope(editingEnvelope!);
     showEnvelopeDialog = true;
   }
   
@@ -155,7 +156,7 @@
       }
     }
     
-    const envelopeIndex = aircraft.envelopes.findIndex(e => e.category === editingEnvelope.category);
+    const envelopeIndex = aircraft.envelopes.findIndex(e => e.category === editingEnvelope!.category);
     if (envelopeIndex >= 0) {
       aircraft.envelopes[envelopeIndex] = editingEnvelope;
     } else {
