@@ -98,6 +98,79 @@ export function renderCGEnvelope(
     const line = d3.line<EnvelopePoint>()
       .x(d => xScale(d.cgPosition))
       .y(d => yScale(d.weight))
+      .curve(d3.curveLinear);
+    
+    const color = categoryColors[envelope.category] || '#64748b';
+    
+    // Draw envelope polygon
+    g.append('path')
+      .datum([...envelope.vertices, envelope.vertices[0]]) // Close the path
+      .attr('d', line)
+      .attr('fill', color)
+      .attr('fill-opacity', 0.1)
+      .attr('stroke', color)
+      .attr('stroke-width', 2)
+      .attr('stroke-opacity', 0.8);
+    
+    // Draw forward limit line if defined
+    if (envelope.forwardLimit !== undefined && envelope.forwardLimit !== null) {
+      g.append('line')
+        .attr('x1', xScale(envelope.forwardLimit))
+        .attr('y1', 0)
+        .attr('x2', xScale(envelope.forwardLimit))
+        .attr('y2', innerHeight)
+        .attr('stroke', color)
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '5,5')
+        .attr('stroke-opacity', 0.6);
+      
+      // Add label for forward limit
+      g.append('text')
+        .attr('x', xScale(envelope.forwardLimit))
+        .attr('y', -5)
+        .attr('text-anchor', 'middle')
+        .attr('fill', color)
+        .attr('font-size', '10px')
+        .text(`Fwd: ${envelope.forwardLimit.toFixed(1)}`);
+    }
+    
+    // Draw aft limit line if defined
+    if (envelope.aftLimit !== undefined && envelope.aftLimit !== null) {
+      g.append('line')
+        .attr('x1', xScale(envelope.aftLimit))
+        .attr('y1', 0)
+        .attr('x2', xScale(envelope.aftLimit))
+        .attr('y2', innerHeight)
+        .attr('stroke', color)
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '5,5')
+        .attr('stroke-opacity', 0.6);
+      
+      // Add label for aft limit
+      g.append('text')
+        .attr('x', xScale(envelope.aftLimit))
+        .attr('y', -5)
+        .attr('text-anchor', 'middle')
+        .attr('fill', color)
+        .attr('font-size', '10px')
+        .text(`Aft: ${envelope.aftLimit.toFixed(1)}`);
+    }
+    
+    // Add envelope category label
+    const centroid = envelope.vertices.reduce((acc, v) => ({
+      cgPosition: acc.cgPosition + v.cgPosition / envelope.vertices.length,
+      weight: acc.weight + v.weight / envelope.vertices.length
+    }), { cgPosition: 0, weight: 0 });
+    
+    g.append('text')
+      .attr('x', xScale(centroid.cgPosition))
+      .attr('y', yScale(centroid.weight))
+      .attr('text-anchor', 'middle')
+      .attr('fill', color)
+      .attr('font-size', '12px')
+      .attr('font-weight', 'bold')
+      .text(envelope.category.toUpperCase());
+  });
       .curve(d3.curveLinearClosed);
     
     const color = categoryColors[envelope.category] || '#64748b';
