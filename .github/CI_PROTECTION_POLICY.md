@@ -29,6 +29,50 @@ npm run test:unit      # Unit tests (if applicable)
 - All dependencies must be properly cached
 - Build artifacts must be generated and uploaded
 
+## Caching Strategy
+
+To optimize build times and reduce redundant work, both CI and Tauri workflows implement comprehensive caching:
+
+### npm Dependencies
+- **Cache Location**: Managed by `actions/setup-node@v4` with `cache: npm`
+- **Cache Key**: Based on `package-lock.json` hash
+- **Benefit**: Avoids re-downloading npm packages on every run
+
+### Playwright Browsers
+- **Cache Location**: `~/.cache/ms-playwright`
+- **Cache Key**: `${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}`
+- **Benefit**: Avoids re-downloading ~200MB of browser binaries
+- **Restoration**: Falls back to `${{ runner.os }}-playwright-` if exact match not found
+
+### SvelteKit Build Artifacts
+- **Cache Location**: `.svelte-kit/` and `build/` directories
+- **Cache Key**: `${{ runner.os }}-svelte-build-${{ hashFiles('src/**', 'static/**', 'svelte.config.js', 'vite.config.ts', 'package-lock.json') }}`
+- **Benefit**: Reuses compiled output when source files haven't changed
+- **Restoration**: Falls back to `${{ runner.os }}-svelte-build-` for partial reuse
+- **Note**: Cache invalidates when source files, config, or dependencies change
+
+### Rust/Cargo Dependencies (Tauri only)
+- **Cache Location**: `~/.cargo/` and `src-tauri/target/`
+- **Cache Key**: `${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}`
+- **Benefit**: Avoids recompiling Rust dependencies and intermediate build artifacts
+- **Restoration**: Falls back to `${{ runner.os }}-cargo-` for incremental builds
+
+### Cache Invalidation
+Caches are automatically invalidated when:
+- Lock files change (package-lock.json, Cargo.lock)
+- Source files change (for build artifact caches)
+- Configuration files change (svelte.config.js, vite.config.ts)
+- Manual cache clearing via GitHub Actions UI
+
+### Cache Performance
+Expected time savings per workflow run:
+- npm dependencies: ~30-60 seconds
+- Playwright browsers: ~45-90 seconds
+- SvelteKit build: ~20-40 seconds (when cache hit)
+- Rust dependencies: ~3-5 minutes (Tauri workflow)
+
+Total expected savings: 1-3 minutes per CI run, 4-7 minutes per Tauri build
+
 ## Pre-commit Hooks (Recommended)
 
 Install husky for git hooks:
@@ -76,4 +120,4 @@ If CI breaks:
 ## Review and Updates
 This policy should be reviewed quarterly and updated as needed.
 
-Last Updated: 2026-02-17
+Last Updated: 2026-02-17 (Added comprehensive caching strategy)

@@ -24,8 +24,29 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Cache SvelteKit build output
+        uses: actions/cache@v4
+        with:
+          path: |
+            .svelte-kit
+            build
+          key: ${{ runner.os }}-svelte-build-${{ hashFiles('src/**', 'static/**', 'svelte.config.js', 'vite.config.ts', 'package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-svelte-build-
 
       - name: Type and feature checks
         run: npm run check
