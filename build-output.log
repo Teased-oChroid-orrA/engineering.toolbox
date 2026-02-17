@@ -1,0 +1,771 @@
+
+> structural-companion-desktop@0.1.0 build
+> node ./scripts/preflight-check.mjs && vite build && node ./scripts/build-verify.mjs
+
+🔍 Running pre-flight checks...
+
+2️⃣ Checking dependencies...
+   ✅ Dependencies installed
+
+3️⃣ Checking project structure...
+   ✅ Project structure valid
+
+4️⃣ Running type checks...
+   🔄 Running svelte-kit sync to generate .svelte-kit directory...
+   ✅ .svelte-kit directory generated
+   ✅ No TypeScript errors
+
+✅ Pre-flight checks PASSED
+
+[36mvite v7.3.1 [32mbuilding ssr environment for production...[36m[39m
+transforming...
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:595:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+593:           <div class="grid grid-cols-2 gap-4">
+594:             <div>
+595:               <label class="text-sm text-gray-400">Aircraft</label>
+                                                                        ^
+596:               <div class="text-white font-mono">{aircraft.name}</div>
+597:             </div>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:599:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+597:             </div>
+598:             <div>
+599:               <label class="text-sm text-gray-400">Model</label>
+                                                                     ^
+600:               <div class="text-white font-mono">{aircraft.model}</div>
+601:             </div>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:603:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+601:             </div>
+602:             <div>
+603:               <label class="text-sm text-gray-400">Basic Empty Weight</label>
+                                                                                  ^
+604:               <input 
+605:                 type="number"
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:617:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+615:             </div>
+616:             <div>
+617:               <label class="text-sm text-gray-400">BEW Arm</label>
+                                                                       ^
+618:               <input 
+619:                 type="number"
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:630:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+628:             </div>
+629:             <div>
+630:               <label class="text-sm text-gray-400">Max Takeoff Weight</label>
+                                                                                  ^
+631:               <input 
+632:                 type="number"
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:644:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+642:             </div>
+643:             <div>
+644:               <label class="text-sm text-gray-400">Datum</label>
+                                                                     ^
+645:               <div class="text-white font-mono capitalize">{aircraft.datumLocation.type.replace('_', ' ')}</div>
+646:             </div>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:844:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+842: <!-- Save Dialog -->
+843: {#if showSaveDialog}
+844:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showSaveDialog = false)}>
+             ^
+845:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+846:       <h2 class="text-xl font-semibold text-white mb-4">Save Configuration</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:844:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+842: <!-- Save Dialog -->
+843: {#if showSaveDialog}
+844:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showSaveDialog = false)}>
+             ^
+845:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+846:       <h2 class="text-xl font-semibold text-white mb-4">Save Configuration</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:848:8 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+846:       <h2 class="text-xl font-semibold text-white mb-4">Save Configuration</h2>
+847:       <div class="mb-4">
+848:         <label class="block text-sm text-gray-400 mb-2">Configuration Name</label>
+                                                                                       ^
+849:         <input 
+850:           type="text"
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:854:10 Avoid using autofocus
+https://svelte.dev/e/a11y_autofocus
+852:           class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+853:           placeholder="Enter configuration name"
+854:           autofocus
+                        ^
+855:         />
+856:       </div>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:877:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+875: <!-- Add Item Dialog -->
+876: {#if showAddItemDialog}
+877:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showAddItemDialog = false)}>
+             ^
+878:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+879:       <h2 class="text-xl font-semibold text-white mb-4">Add Custom Item</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:877:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+875: <!-- Add Item Dialog -->
+876: {#if showAddItemDialog}
+877:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showAddItemDialog = false)}>
+             ^
+878:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+879:       <h2 class="text-xl font-semibold text-white mb-4">Add Custom Item</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:882:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+880:       <div class="space-y-4">
+881:         <div>
+882:           <label class="block text-sm text-gray-400 mb-2">Item Name</label>
+                                                                                ^
+883:           <input 
+884:             type="text"
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:888:12 Avoid using autofocus
+https://svelte.dev/e/a11y_autofocus
+886:             class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+887:             placeholder="e.g., Extra Baggage"
+888:             autofocus
+                          ^
+889:           />
+890:         </div>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:892:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+890:         </div>
+891:         <div>
+892:           <label class="block text-sm text-gray-400 mb-2">Item Type</label>
+                                                                                ^
+893:           <select 
+894:             bind:value={newItemType}
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:909:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+907:         <div class="grid grid-cols-2 gap-4">
+908:           <div>
+909:             <label class="block text-sm text-gray-400 mb-2">Weight ({getWeightUnit(displayUnits)})</label>
+                                                                                                               ^
+910:             <input 
+911:               type="number"
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:919:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+917:           </div>
+918:           <div>
+919:             <label class="block text-sm text-gray-400 mb-2">Arm ({getArmUnit(displayUnits)})</label>
+                                                                                                         ^
+920:             <input 
+921:               type="number"
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:949:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+947: <!-- Aircraft Selection Dialog -->
+948: {#if showAircraftDialog}
+949:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showAircraftDialog = false)}>
+             ^
+950:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+951:       <h2 class="text-xl font-semibold text-white mb-4">Select Aircraft</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:949:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+947: <!-- Aircraft Selection Dialog -->
+948: {#if showAircraftDialog}
+949:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showAircraftDialog = false)}>
+             ^
+950:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+951:       <h2 class="text-xl font-semibold text-white mb-4">Select Aircraft</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1010:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+1008: <!-- Envelope Editor Dialog -->
+1009: {#if showEnvelopeDialog && editingEnvelope}
+1010:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showEnvelopeDialog = false)}>
+              ^
+1011:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+1012:       <h2 class="text-xl font-semibold text-white mb-4">Edit W&B Envelope</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1010:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+1008: <!-- Envelope Editor Dialog -->
+1009: {#if showEnvelopeDialog && editingEnvelope}
+1010:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showEnvelopeDialog = false)}>
+              ^
+1011:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+1012:       <h2 class="text-xl font-semibold text-white mb-4">Edit W&B Envelope</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1021:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1019:         <div class="grid grid-cols-2 gap-4">
+1020:           <div>
+1021:             <label class="block text-sm text-gray-400 mb-2">Category</label>
+                                                                                  ^
+1022:             <select 
+1023:               bind:value={editingEnvelope.category}
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1032:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1030:           </div>
+1031:           <div>
+1032:             <label class="block text-sm text-gray-400 mb-2">Max Weight (lbs)</label>
+                                                                                          ^
+1033:             <input 
+1034:               type="number"
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1044:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1042:         <div class="grid grid-cols-2 gap-4">
+1043:           <div>
+1044:             <label class="block text-sm text-gray-400 mb-2">
+                          ^
+1045:               Forward Limit ({getCGPositionLabel(useMACDisplay)})
+1046:             </label>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1060:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1058:           </div>
+1059:           <div>
+1060:             <label class="block text-sm text-gray-400 mb-2">
+                          ^
+1061:               Aft Limit ({getCGPositionLabel(useMACDisplay)})
+1062:             </label>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1078:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1076:         <div>
+1077:           <div class="flex items-center justify-between mb-2">
+1078:             <label class="text-sm text-gray-400">Envelope Vertices</label>
+                                                                                ^
+1079:             <button
+1080:               onclick={addEnvelopeVertex}
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1173:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+1171: <!-- Item Library Dialog -->
+1172: {#if showItemLibraryDialog}
+1173:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showItemLibraryDialog = false)}>
+              ^
+1174:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+1175:       <h2 class="text-xl font-semibold text-white mb-4">Item Library</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1173:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+1171: <!-- Item Library Dialog -->
+1172: {#if showItemLibraryDialog}
+1173:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showItemLibraryDialog = false)}>
+              ^
+1174:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+1175:       <h2 class="text-xl font-semibold text-white mb-4">Item Library</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1237:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+1235: <!-- My Templates Dialog -->
+1236: {#if showTemplatesDialog}
+1237:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showTemplatesDialog = false)}>
+              ^
+1238:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+1239:       <h2 class="text-xl font-semibold text-white mb-4">My Templates</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1237:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+1235: <!-- My Templates Dialog -->
+1236: {#if showTemplatesDialog}
+1237:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showTemplatesDialog = false)}>
+              ^
+1238:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+1239:       <h2 class="text-xl font-semibold text-white mb-4">My Templates</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1296:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+1294: <!-- Save Template Dialog -->
+1295: {#if showSaveTemplateDialog && selectedItemForTemplate}
+1296:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showSaveTemplateDialog = false)}>
+              ^
+1297:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+1298:       <h2 class="text-xl font-semibold text-white mb-4">Save as Template</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1296:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+1294: <!-- Save Template Dialog -->
+1295: {#if showSaveTemplateDialog && selectedItemForTemplate}
+1296:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showSaveTemplateDialog = false)}>
+              ^
+1297:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+1298:       <h2 class="text-xl font-semibold text-white mb-4">Save as Template</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1301:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1299:       <div class="space-y-4">
+1300:         <div>
+1301:           <label class="block text-sm text-gray-400 mb-2">Template Name</label>
+                                                                                     ^
+1302:           <input 
+1303:             type="text"
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1310:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1308:         </div>
+1309:         <div>
+1310:           <label class="block text-sm text-gray-400 mb-2">Description (optional)</label>
+                                                                                              ^
+1311:           <textarea 
+1312:             bind:value={templateDescription}
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1319:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1317:         </div>
+1318:         <div>
+1319:           <label class="block text-sm text-gray-400 mb-2">Category</label>
+                                                                                ^
+1320:           <select 
+1321:             bind:value={templateCategory}
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1358:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+1356: <!-- Ballast Calculation Dialog -->
+1357: {#if showBallastDialog && ballastSolution}
+1358:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showBallastDialog = false)}>
+              ^
+1359:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-lg w-full mx-4">
+1360:       <h2 class="text-xl font-semibold text-white mb-4">⚖️ Ballast Calculation</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1358:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+1356: <!-- Ballast Calculation Dialog -->
+1357: {#if showBallastDialog && ballastSolution}
+1358:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showBallastDialog = false)}>
+              ^
+1359:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-lg w-full mx-4">
+1360:       <h2 class="text-xl font-semibold text-white mb-4">⚖️ Ballast Calculation</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1411:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+1409: <!-- MAC Configuration Dialog -->
+1410: {#if showMACDialog}
+1411:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showMACDialog = false)}>
+              ^
+1412:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+1413:       <h2 class="text-xl font-semibold text-white mb-4">⚙️ MAC Reference Configuration</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1411:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+1409: <!-- MAC Configuration Dialog -->
+1410: {#if showMACDialog}
+1411:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showMACDialog = false)}>
+              ^
+1412:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+1413:       <h2 class="text-xl font-semibold text-white mb-4">⚙️ MAC Reference Configuration</h2>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1423:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1421:       <div class="space-y-4 mb-6">
+1422:         <div>
+1423:           <label class="block text-sm text-gray-400 mb-2">
+                        ^
+1424:             LEMAC - Leading Edge MAC (inches from datum)
+1425:           </label>
+8:51:11 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1439:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1437:         </div>
+1438:         <div>
+1439:           <label class="block text-sm text-gray-400 mb-2">
+                        ^
+1440:             MAC Length (inches)
+1441:           </label>
+8:51:12 PM [vite-plugin-svelte] src/lib/components/inspector/InspectorTopControlsPanel.svelte:29:13 Component has unused export property 'canOpenPath'. If it is for external reference only, please consider using `export const canOpenPath`
+https://svelte.dev/e/export_let_unused
+27:   export let datasetId = '';
+28:   export let totalRowCount = 0;
+29:   export let canOpenPath = false;
+                            ^
+30:   export let showRegexHelp = false;
+31:   export let uiAnimDur = 160;
+[33msrc/lib/components/inspector/InspectorOrchestratorEffects.svelte.ts (12:1): Error when using sourcemap for reporting an error: Can't resolve original location of error.[39m
+[33msrc/lib/components/inspector/InspectorOrchestratorEffects.svelte.ts (12:1): A comment
+
+"/* @__PURE__ */"
+
+in "src/lib/components/inspector/InspectorOrchestratorEffects.svelte.ts" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.[39m
+[33msrc/lib/components/inspector/InspectorOrchestratorEffects.svelte.ts (16:1): Error when using sourcemap for reporting an error: Can't resolve original location of error.[39m
+[33msrc/lib/components/inspector/InspectorOrchestratorEffects.svelte.ts (16:1): A comment
+
+"/* @__PURE__ */"
+
+in "src/lib/components/inspector/InspectorOrchestratorEffects.svelte.ts" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.[39m
+[33m"isEqual" is imported from external module "@zag-js/utils" but never used in "node_modules/@zag-js/svelte/dist/track.svelte.js".[39m
+[33m"autoUpdate" is imported from external module "@floating-ui/dom" but never used in "src/lib/components/inspector/QueryToolsDropdown.svelte".[39m
+[33m"clickOutside", "delegateClick" and "hotkeys" are imported from external module "@svar-ui/lib-dom" but never used in "node_modules/@svar-ui/svelte-core/src/components/Popup.svelte", "node_modules/@svar-ui/svelte-core/src/components/Dropdown.svelte", "node_modules/@svar-ui/svelte-core/src/components/SideArea.svelte", "node_modules/@svar-ui/svelte-menu/src/components/Menu.svelte", "node_modules/@svar-ui/svelte-core/src/components/calendar/Month.svelte", "node_modules/@svar-ui/svelte-filter/src/components/editor/List.svelte", "node_modules/@svar-ui/svelte-core/src/components/calendar/Duodecade.svelte", "node_modules/@svar-ui/svelte-core/src/components/calendar/Year.svelte" and "node_modules/@svar-ui/svelte-core/src/components/Fullscreen.svelte".[39m
+[32m✓[39m 1018 modules transformed.
+[33mGenerated an empty chunk: "entries/pages/_layout.ts".[39m
+rendering chunks...
+[36mvite v7.3.1 [32mbuilding client environment for production...[36m[39m
+transforming...
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:595:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+593:           <div class="grid grid-cols-2 gap-4">
+594:             <div>
+595:               <label class="text-sm text-gray-400">Aircraft</label>
+                                                                        ^
+596:               <div class="text-white font-mono">{aircraft.name}</div>
+597:             </div>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:599:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+597:             </div>
+598:             <div>
+599:               <label class="text-sm text-gray-400">Model</label>
+                                                                     ^
+600:               <div class="text-white font-mono">{aircraft.model}</div>
+601:             </div>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:603:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+601:             </div>
+602:             <div>
+603:               <label class="text-sm text-gray-400">Basic Empty Weight</label>
+                                                                                  ^
+604:               <input 
+605:                 type="number"
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:617:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+615:             </div>
+616:             <div>
+617:               <label class="text-sm text-gray-400">BEW Arm</label>
+                                                                       ^
+618:               <input 
+619:                 type="number"
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:630:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+628:             </div>
+629:             <div>
+630:               <label class="text-sm text-gray-400">Max Takeoff Weight</label>
+                                                                                  ^
+631:               <input 
+632:                 type="number"
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:644:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+642:             </div>
+643:             <div>
+644:               <label class="text-sm text-gray-400">Datum</label>
+                                                                     ^
+645:               <div class="text-white font-mono capitalize">{aircraft.datumLocation.type.replace('_', ' ')}</div>
+646:             </div>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:844:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+842: <!-- Save Dialog -->
+843: {#if showSaveDialog}
+844:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showSaveDialog = false)}>
+             ^
+845:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+846:       <h2 class="text-xl font-semibold text-white mb-4">Save Configuration</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:844:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+842: <!-- Save Dialog -->
+843: {#if showSaveDialog}
+844:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showSaveDialog = false)}>
+             ^
+845:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+846:       <h2 class="text-xl font-semibold text-white mb-4">Save Configuration</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:848:8 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+846:       <h2 class="text-xl font-semibold text-white mb-4">Save Configuration</h2>
+847:       <div class="mb-4">
+848:         <label class="block text-sm text-gray-400 mb-2">Configuration Name</label>
+                                                                                       ^
+849:         <input 
+850:           type="text"
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:854:10 Avoid using autofocus
+https://svelte.dev/e/a11y_autofocus
+852:           class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+853:           placeholder="Enter configuration name"
+854:           autofocus
+                        ^
+855:         />
+856:       </div>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:877:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+875: <!-- Add Item Dialog -->
+876: {#if showAddItemDialog}
+877:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showAddItemDialog = false)}>
+             ^
+878:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+879:       <h2 class="text-xl font-semibold text-white mb-4">Add Custom Item</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:877:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+875: <!-- Add Item Dialog -->
+876: {#if showAddItemDialog}
+877:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showAddItemDialog = false)}>
+             ^
+878:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+879:       <h2 class="text-xl font-semibold text-white mb-4">Add Custom Item</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:882:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+880:       <div class="space-y-4">
+881:         <div>
+882:           <label class="block text-sm text-gray-400 mb-2">Item Name</label>
+                                                                                ^
+883:           <input 
+884:             type="text"
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:888:12 Avoid using autofocus
+https://svelte.dev/e/a11y_autofocus
+886:             class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+887:             placeholder="e.g., Extra Baggage"
+888:             autofocus
+                          ^
+889:           />
+890:         </div>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:892:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+890:         </div>
+891:         <div>
+892:           <label class="block text-sm text-gray-400 mb-2">Item Type</label>
+                                                                                ^
+893:           <select 
+894:             bind:value={newItemType}
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:909:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+907:         <div class="grid grid-cols-2 gap-4">
+908:           <div>
+909:             <label class="block text-sm text-gray-400 mb-2">Weight ({getWeightUnit(displayUnits)})</label>
+                                                                                                               ^
+910:             <input 
+911:               type="number"
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:919:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+917:           </div>
+918:           <div>
+919:             <label class="block text-sm text-gray-400 mb-2">Arm ({getArmUnit(displayUnits)})</label>
+                                                                                                         ^
+920:             <input 
+921:               type="number"
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:949:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+947: <!-- Aircraft Selection Dialog -->
+948: {#if showAircraftDialog}
+949:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showAircraftDialog = false)}>
+             ^
+950:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+951:       <h2 class="text-xl font-semibold text-white mb-4">Select Aircraft</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:949:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+947: <!-- Aircraft Selection Dialog -->
+948: {#if showAircraftDialog}
+949:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showAircraftDialog = false)}>
+             ^
+950:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+951:       <h2 class="text-xl font-semibold text-white mb-4">Select Aircraft</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1010:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+1008: <!-- Envelope Editor Dialog -->
+1009: {#if showEnvelopeDialog && editingEnvelope}
+1010:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showEnvelopeDialog = false)}>
+              ^
+1011:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+1012:       <h2 class="text-xl font-semibold text-white mb-4">Edit W&B Envelope</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1010:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+1008: <!-- Envelope Editor Dialog -->
+1009: {#if showEnvelopeDialog && editingEnvelope}
+1010:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showEnvelopeDialog = false)}>
+              ^
+1011:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+1012:       <h2 class="text-xl font-semibold text-white mb-4">Edit W&B Envelope</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1021:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1019:         <div class="grid grid-cols-2 gap-4">
+1020:           <div>
+1021:             <label class="block text-sm text-gray-400 mb-2">Category</label>
+                                                                                  ^
+1022:             <select 
+1023:               bind:value={editingEnvelope.category}
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1032:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1030:           </div>
+1031:           <div>
+1032:             <label class="block text-sm text-gray-400 mb-2">Max Weight (lbs)</label>
+                                                                                          ^
+1033:             <input 
+1034:               type="number"
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1044:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1042:         <div class="grid grid-cols-2 gap-4">
+1043:           <div>
+1044:             <label class="block text-sm text-gray-400 mb-2">
+                          ^
+1045:               Forward Limit ({getCGPositionLabel(useMACDisplay)})
+1046:             </label>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1060:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1058:           </div>
+1059:           <div>
+1060:             <label class="block text-sm text-gray-400 mb-2">
+                          ^
+1061:               Aft Limit ({getCGPositionLabel(useMACDisplay)})
+1062:             </label>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1078:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1076:         <div>
+1077:           <div class="flex items-center justify-between mb-2">
+1078:             <label class="text-sm text-gray-400">Envelope Vertices</label>
+                                                                                ^
+1079:             <button
+1080:               onclick={addEnvelopeVertex}
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1173:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+1171: <!-- Item Library Dialog -->
+1172: {#if showItemLibraryDialog}
+1173:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showItemLibraryDialog = false)}>
+              ^
+1174:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+1175:       <h2 class="text-xl font-semibold text-white mb-4">Item Library</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1173:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+1171: <!-- Item Library Dialog -->
+1172: {#if showItemLibraryDialog}
+1173:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showItemLibraryDialog = false)}>
+              ^
+1174:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+1175:       <h2 class="text-xl font-semibold text-white mb-4">Item Library</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1237:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+1235: <!-- My Templates Dialog -->
+1236: {#if showTemplatesDialog}
+1237:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showTemplatesDialog = false)}>
+              ^
+1238:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+1239:       <h2 class="text-xl font-semibold text-white mb-4">My Templates</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1237:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+1235: <!-- My Templates Dialog -->
+1236: {#if showTemplatesDialog}
+1237:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showTemplatesDialog = false)}>
+              ^
+1238:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+1239:       <h2 class="text-xl font-semibold text-white mb-4">My Templates</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1296:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+1294: <!-- Save Template Dialog -->
+1295: {#if showSaveTemplateDialog && selectedItemForTemplate}
+1296:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showSaveTemplateDialog = false)}>
+              ^
+1297:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+1298:       <h2 class="text-xl font-semibold text-white mb-4">Save as Template</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1296:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+1294: <!-- Save Template Dialog -->
+1295: {#if showSaveTemplateDialog && selectedItemForTemplate}
+1296:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showSaveTemplateDialog = false)}>
+              ^
+1297:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+1298:       <h2 class="text-xl font-semibold text-white mb-4">Save as Template</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1301:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1299:       <div class="space-y-4">
+1300:         <div>
+1301:           <label class="block text-sm text-gray-400 mb-2">Template Name</label>
+                                                                                     ^
+1302:           <input 
+1303:             type="text"
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1310:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1308:         </div>
+1309:         <div>
+1310:           <label class="block text-sm text-gray-400 mb-2">Description (optional)</label>
+                                                                                              ^
+1311:           <textarea 
+1312:             bind:value={templateDescription}
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1319:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1317:         </div>
+1318:         <div>
+1319:           <label class="block text-sm text-gray-400 mb-2">Category</label>
+                                                                                ^
+1320:           <select 
+1321:             bind:value={templateCategory}
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1358:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+1356: <!-- Ballast Calculation Dialog -->
+1357: {#if showBallastDialog && ballastSolution}
+1358:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showBallastDialog = false)}>
+              ^
+1359:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-lg w-full mx-4">
+1360:       <h2 class="text-xl font-semibold text-white mb-4">⚖️ Ballast Calculation</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1358:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+1356: <!-- Ballast Calculation Dialog -->
+1357: {#if showBallastDialog && ballastSolution}
+1358:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showBallastDialog = false)}>
+              ^
+1359:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-lg w-full mx-4">
+1360:       <h2 class="text-xl font-semibold text-white mb-4">⚖️ Ballast Calculation</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1411:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+1409: <!-- MAC Configuration Dialog -->
+1410: {#if showMACDialog}
+1411:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showMACDialog = false)}>
+              ^
+1412:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+1413:       <h2 class="text-xl font-semibold text-white mb-4">⚙️ MAC Reference Configuration</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1411:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+1409: <!-- MAC Configuration Dialog -->
+1410: {#if showMACDialog}
+1411:   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showMACDialog = false)}>
+              ^
+1412:     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
+1413:       <h2 class="text-xl font-semibold text-white mb-4">⚙️ MAC Reference Configuration</h2>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1423:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1421:       <div class="space-y-4 mb-6">
+1422:         <div>
+1423:           <label class="block text-sm text-gray-400 mb-2">
+                        ^
+1424:             LEMAC - Leading Edge MAC (inches from datum)
+1425:           </label>
+8:51:17 PM [vite-plugin-svelte] src/routes/weight-balance/+page.svelte:1439:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1437:         </div>
+1438:         <div>
+1439:           <label class="block text-sm text-gray-400 mb-2">
+                        ^
+1440:             MAC Length (inches)
+1441:           </label>
+8:51:19 PM [vite-plugin-svelte] src/lib/components/inspector/InspectorTopControlsPanel.svelte:29:13 Component has unused export property 'canOpenPath'. If it is for external reference only, please consider using `export const canOpenPath`
+https://svelte.dev/e/export_let_unused
+27:   export let datasetId = '';
+28:   export let totalRowCount = 0;
+29:   export let canOpenPath = false;
+                            ^
+30:   export let showRegexHelp = false;
+31:   export let uiAnimDur = 160;
+[32m✓[39m 3915 modules transformed.
+rendering chunks...
+computing gzip size...
+[2m.svelte-kit/output/client/[22m[32m_app/version.json                         [39m[1m[2m    0.03 kB[22m[1m[22m[2m │ gzip:     0.05 kB[22m
+[2m.svelte-kit/output/client/[22m[32m.vite/manifest.json                       [39m[1m[2m    0.33 kB[22m[1m[22m[2m │ gzip:     0.19 kB[22m
+[2m.svelte-kit/output/client/[22m[35m_app/immutable/assets/style.CSGuzNQx.css  [39m[1m[2m1,632.19 kB[22m[1m[22m[2m │ gzip:   971.42 kB[22m
+[2m.svelte-kit/output/client/[22m[36m_app/immutable/bundle.BZJNBgXn.js         [39m[1m[33m8,490.75 kB[39m[22m[2m │ gzip: 1,965.36 kB[22m
+[33m
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+[32m✓ built in 27.38s[39m
+[2m.svelte-kit/output/server/[22m[32m.vite/manifest.json                           [39m[1m[2m    7.36 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[35m_app/immutable/assets/style.CAKU4N6F.css      [39m[1m[2m1,626.34 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/_layout.ts.js                   [39m[1m[2m    0.00 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/false.js                               [39m[1m[2m    0.04 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/html.js                                [39m[1m[2m    0.14 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/utils2.js                              [39m[1m[2m    0.15 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36minternal.js                                   [39m[1m[2m    0.33 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/state.svelte.js                        [39m[1m[2m    0.39 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/profile/_page.svelte.js         [39m[1m[2m    0.51 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/properties/_page.svelte.js      [39m[1m[2m    0.54 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/environment.js                         [39m[1m[2m    0.62 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/themeStore.js                          [39m[1m[2m    0.65 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/ProfileToolbox.js                      [39m[1m[2m    0.77 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/fallbacks/error.svelte.js             [39m[1m[2m    1.10 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/utils.js                               [39m[1m[2m    1.15 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/suite/_page.svelte.js           [39m[1m[2m    1.35 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/CardContent.js                         [39m[1m[2m    1.38 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/csvParser.js                           [39m[1m[2m    1.38 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/buckling/_page.svelte.js        [39m[1m[2m    1.75 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/index2.js                              [39m[1m[2m    2.65 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/_page.svelte.js                 [39m[1m[2m    3.79 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/index3.js                              [39m[1m[2m    4.49 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/exports.js                             [39m[1m[2m    5.59 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/_layout.svelte.js               [39m[1m[2m   11.75 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/weight-balance/_page.svelte.js  [39m[1m[2m   17.12 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mremote-entry.js                               [39m[1m[2m   18.28 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/shared.js                              [39m[1m[2m   18.45 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/index.js                               [39m[1m[2m   30.00 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/internal.js                            [39m[1m[2m   31.95 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/bearing.js                             [39m[1m[2m   32.86 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/shear/_page.svelte.js           [39m[1m[2m   50.00 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mchunks/context.js                             [39m[1m[2m   53.66 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mindex.js                                      [39m[1m[2m  126.91 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/bushing/_page.svelte.js         [39m[1m[2m  184.30 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/surface/_page.svelte.js         [39m[1m[2m  330.73 kB[22m[1m[22m
+[2m.svelte-kit/output/server/[22m[36mentries/pages/inspector/_page.svelte.js       [39m[1m[2m  375.36 kB[22m[1m[22m
+[32m✓ built in 35.46s[39m
+
+Run npm run preview to preview your production build locally.
+
+> Using @sveltejs/adapter-static
+Overwriting build/index.html with fallback page. Consider using a different name for the fallback.
+  Wrote site to "build"
+  ✔ done
+[build-verify] ✅ build/index.html looks file://-robust (no absolute asset paths; no non-hash internal links).
