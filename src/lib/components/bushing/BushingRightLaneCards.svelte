@@ -55,60 +55,67 @@
   listClass="flex flex-col gap-4"
   {items}
   enabled={dndEnabled}
-  on:finalize={handleFinalize}
-  let:item>
-  {#if item.id === 'drafting'}
-    <BushingDraggableCard 
-      column="right" 
-      cardId="drafting" 
-      title="Drafting View" 
-      dragEnabled={dndEnabled} 
-      canMoveUp={canMove('drafting', -1)} 
-      canMoveDown={canMove('drafting', 1)} 
-      onMoveUp={() => move('drafting', -1)} 
-      onMoveDown={() => move('drafting', 1)}>
-      <BushingDraftingPanel
-        {draftingView}
-        {useLegacyRenderer}
-        {renderMode}
-        {traceEnabled}
-        {cacheHits}
-        {cacheMisses}
-        {isInfinitePlate}
-        {babylonInitNotice}
-        {visualDiagnostics}
-        {babylonDiagnostics}
-        {onExportSvg}
-        {onExportPdf}
-        {onToggleRendererMode}
-        {onToggleTraceMode}
-        {onBabylonDiagnostics}
-        {onBabylonInitFailure}
-      />
-    </BushingDraggableCard>
-  {:else if item.id === 'summary'}
-    <BushingDraggableCard 
-      column="right" 
-      cardId="summary" 
-      title="Results Panel" 
-      dragEnabled={dndEnabled} 
-      canMoveUp={canMove('summary', -1)} 
-      canMoveDown={canMove('summary', 1)} 
-      onMoveUp={() => move('summary', -1)} 
-      onMoveDown={() => move('summary', 1)}>
-      <BushingResultSummary {form} {results} />
-    </BushingDraggableCard>
-  {:else if item.id === 'diagnostics'}
-    <BushingDraggableCard 
-      column="right" 
-      cardId="diagnostics" 
-      title="Diagnostics" 
-      dragEnabled={dndEnabled} 
-      canMoveUp={canMove('diagnostics', -1)} 
-      canMoveDown={canMove('diagnostics', 1)} 
-      onMoveUp={() => move('diagnostics', -1)} 
-      onMoveDown={() => move('diagnostics', 1)}>
-      <BushingDiagnosticsPanel {results} dndEnabled={dndEnabled} />
-    </BushingDraggableCard>
-  {/if}
+  on:finalize={handleFinalize}>
+  {#snippet children(item)}
+    {#if item.id === 'drafting'}
+      <BushingDraggableCard 
+        column="right" 
+        cardId="drafting" 
+        title="Drafting View" 
+        dragEnabled={dndEnabled} 
+        canMoveUp={canMove('drafting', -1)} 
+        canMoveDown={canMove('drafting', 1)} 
+        onMoveUp={() => move('drafting', -1)} 
+        onMoveDown={() => move('drafting', 1)}>
+        {#snippet children()}
+          <BushingDraftingPanel
+            {draftingView}
+            {useLegacyRenderer}
+            {renderMode}
+            {traceEnabled}
+            {cacheHits}
+            {cacheMisses}
+            {isInfinitePlate}
+            {babylonInitNotice}
+            {visualDiagnostics}
+            {babylonDiagnostics}
+            {onExportSvg}
+            {onExportPdf}
+            {onToggleRendererMode}
+            {onToggleTraceMode}
+            {onBabylonDiagnostics}
+            {onBabylonInitFailure}
+          />
+        {/snippet}
+      </BushingDraggableCard>
+    {:else if item.id === 'summary'}
+      <BushingDraggableCard 
+        column="right" 
+        cardId="summary" 
+        title="Results Panel" 
+        dragEnabled={dndEnabled} 
+        canMoveUp={canMove('summary', -1)} 
+        canMoveDown={canMove('summary', 1)} 
+        onMoveUp={() => move('summary', -1)} 
+        onMoveDown={() => move('summary', 1)}>
+        {#snippet children()}
+          <BushingResultSummary {form} {results} />
+        {/snippet}
+      </BushingDraggableCard>
+    {:else if item.id === 'diagnostics'}
+      <BushingDraggableCard 
+        column="right" 
+        cardId="diagnostics" 
+        title="Diagnostics" 
+        dragEnabled={dndEnabled} 
+        canMoveUp={canMove('diagnostics', -1)} 
+        canMoveDown={canMove('diagnostics', 1)} 
+        onMoveUp={() => move('diagnostics', -1)} 
+        onMoveDown={() => move('diagnostics', 1)}>
+        {#snippet children()}
+          <BushingDiagnosticsPanel {results} dndEnabled={dndEnabled} />
+        {/snippet}
+      </BushingDraggableCard>
+    {/if}
+  {/snippet}
 </NativeDragLane>

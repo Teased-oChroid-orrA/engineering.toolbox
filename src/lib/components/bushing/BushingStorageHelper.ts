@@ -1,13 +1,14 @@
 /**
  * Helper functions for localStorage access with error handling for Tauri environment
  */
+import { storageLogger } from '$lib/utils/loggers';
 
 export function safeGetItem(key: string): string | null {
   if (typeof window === 'undefined') return null;
   try {
     return localStorage.getItem(key);
   } catch (e) {
-    console.error(`[Storage] Failed to get ${key}:`, e);
+    storageLogger.error(`Failed to get ${key}`, e);
     return null;
   }
 }
@@ -17,7 +18,7 @@ export function safeSetItem(key: string, value: string): void {
   try {
     localStorage.setItem(key, value);
   } catch (e) {
-    console.error(`[Storage] Failed to set ${key}:`, e);
+    storageLogger.error(`Failed to set ${key}`, e);
   }
 }
 
@@ -26,7 +27,7 @@ export function safeParseJSON<T>(raw: string | null, fallback: T): T {
   try {
     return JSON.parse(raw);
   } catch (e) {
-    console.error('[Storage] Failed to parse JSON:', e);
+    storageLogger.error('Failed to parse JSON', e);
     return fallback;
   }
 }

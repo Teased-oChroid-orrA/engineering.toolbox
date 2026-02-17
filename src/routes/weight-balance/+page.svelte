@@ -46,6 +46,7 @@
     addToRecentConfigurations,
     type SavedConfiguration
   } from '$lib/core/weight-balance/storage';
+  import { wbLogger } from '$lib/utils/loggers';
   
   let aircraft = $state<AircraftProfile>(SAMPLE_CESSNA_172S);
   let items = $state<LoadingItem[]>(createSampleLoading('c172s'));
@@ -83,7 +84,7 @@
   function recalculate() {
     const validation = validateInput(aircraft, items);
     if (!validation.valid) {
-      console.error('Validation errors:', validation.errors);
+      wbLogger.error('Validation errors', { errors: validation.errors });
       return;
     }
     
@@ -592,16 +593,17 @@
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="text-sm text-gray-400">Aircraft</label>
+              <div class="text-sm text-gray-400">Aircraft</div>
               <div class="text-white font-mono">{aircraft.name}</div>
             </div>
             <div>
-              <label class="text-sm text-gray-400">Model</label>
+              <div class="text-sm text-gray-400">Model</div>
               <div class="text-white font-mono">{aircraft.model}</div>
             </div>
             <div>
-              <label class="text-sm text-gray-400">Basic Empty Weight</label>
+              <label for="basic-empty-weight" class="text-sm text-gray-400">Basic Empty Weight</label>
               <input 
+                id="basic-empty-weight"
                 type="number"
                 value={displayWeight(aircraft.basicEmptyWeight, displayUnits).toFixed(displayUnits === 'metric' ? 1 : 0)}
                 oninput={(e) => {
@@ -614,8 +616,9 @@
               />
             </div>
             <div>
-              <label class="text-sm text-gray-400">BEW Arm</label>
+              <label for="bew-arm" class="text-sm text-gray-400">BEW Arm</label>
               <input 
+                id="bew-arm"
                 type="number"
                 value={displayArm(aircraft.basicEmptyWeightArm, displayUnits).toFixed(1)}
                 oninput={(e) => {
@@ -627,8 +630,9 @@
               />
             </div>
             <div>
-              <label class="text-sm text-gray-400">Max Takeoff Weight</label>
+              <label for="max-takeoff-weight" class="text-sm text-gray-400">Max Takeoff Weight</label>
               <input 
+                id="max-takeoff-weight"
                 type="number"
                 value={displayWeight(aircraft.maxTakeoffWeight, displayUnits).toFixed(displayUnits === 'metric' ? 1 : 0)}
                 oninput={(e) => {
@@ -641,7 +645,7 @@
               />
             </div>
             <div>
-              <label class="text-sm text-gray-400">Datum</label>
+              <div class="text-sm text-gray-400">Datum</div>
               <div class="text-white font-mono capitalize">{aircraft.datumLocation.type.replace('_', ' ')}</div>
             </div>
           </div>
@@ -841,17 +845,23 @@
 
 <!-- Save Dialog -->
 {#if showSaveDialog}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showSaveDialog = false)}>
+  <div 
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" 
+    role="button"
+    tabindex="0"
+    onclick={(e) => e.target === e.currentTarget && (showSaveDialog = false)}
+    onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showSaveDialog = false)}
+    aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
       <h2 class="text-xl font-semibold text-white mb-4">Save Configuration</h2>
       <div class="mb-4">
-        <label class="block text-sm text-gray-400 mb-2">Configuration Name</label>
+        <label for="config-name" class="block text-sm text-gray-400 mb-2">Configuration Name</label>
         <input 
+          id="config-name"
           type="text"
           bind:value={configName}
           class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
           placeholder="Enter configuration name"
-          autofocus
         />
       </div>
       <div class="flex gap-2 justify-end">
@@ -874,23 +884,30 @@
 
 <!-- Add Item Dialog -->
 {#if showAddItemDialog}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showAddItemDialog = false)}>
+  <div 
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" 
+    role="button"
+    tabindex="0"
+    onclick={(e) => e.target === e.currentTarget && (showAddItemDialog = false)}
+    onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showAddItemDialog = false)}
+    aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
       <h2 class="text-xl font-semibold text-white mb-4">Add Custom Item</h2>
       <div class="space-y-4">
         <div>
-          <label class="block text-sm text-gray-400 mb-2">Item Name</label>
+          <label for="item-name" class="block text-sm text-gray-400 mb-2">Item Name</label>
           <input 
+            id="item-name"
             type="text"
             bind:value={newItemName}
             class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
             placeholder="e.g., Extra Baggage"
-            autofocus
           />
         </div>
         <div>
-          <label class="block text-sm text-gray-400 mb-2">Item Type</label>
+          <label for="item-type" class="block text-sm text-gray-400 mb-2">Item Type</label>
           <select 
+            id="item-type"
             bind:value={newItemType}
             class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
           >
@@ -906,8 +923,9 @@
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm text-gray-400 mb-2">Weight ({getWeightUnit(displayUnits)})</label>
+            <label for="item-weight" class="block text-sm text-gray-400 mb-2">Weight ({getWeightUnit(displayUnits)})</label>
             <input 
+              id="item-weight"
               type="number"
               bind:value={newItemWeight}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
@@ -916,8 +934,9 @@
             />
           </div>
           <div>
-            <label class="block text-sm text-gray-400 mb-2">Arm ({getArmUnit(displayUnits)})</label>
+            <label for="item-arm" class="block text-sm text-gray-400 mb-2">Arm ({getArmUnit(displayUnits)})</label>
             <input 
+              id="item-arm"
               type="number"
               bind:value={newItemArm}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
@@ -946,7 +965,7 @@
 
 <!-- Aircraft Selection Dialog -->
 {#if showAircraftDialog}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showAircraftDialog = false)}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="button" tabindex="0" onclick={(e) => e.target === e.currentTarget && (showAircraftDialog = false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showAircraftDialog = false)} aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <h2 class="text-xl font-semibold text-white mb-4">Select Aircraft</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1007,7 +1026,7 @@
 
 <!-- Envelope Editor Dialog -->
 {#if showEnvelopeDialog && editingEnvelope}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showEnvelopeDialog = false)}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="button" tabindex="0" onclick={(e) => e.target === e.currentTarget && (showEnvelopeDialog = false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showEnvelopeDialog = false)} aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <h2 class="text-xl font-semibold text-white mb-4">Edit W&B Envelope</h2>
       {#if useMACDisplay && hasMACData(aircraft.lemac, aircraft.mac)}
@@ -1018,8 +1037,9 @@
       <div class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm text-gray-400 mb-2">Category</label>
+            <label for="envelope-category" class="block text-sm text-gray-400 mb-2">Category</label>
             <select 
+              id="envelope-category"
               bind:value={editingEnvelope.category}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
             >
@@ -1029,8 +1049,9 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm text-gray-400 mb-2">Max Weight (lbs)</label>
+            <label for="envelope-max-weight" class="block text-sm text-gray-400 mb-2">Max Weight (lbs)</label>
             <input 
+              id="envelope-max-weight"
               type="number"
               bind:value={editingEnvelope.maxWeight}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
@@ -1041,10 +1062,11 @@
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm text-gray-400 mb-2">
+            <label for="envelope-forward-limit" class="block text-sm text-gray-400 mb-2">
               Forward Limit ({getCGPositionLabel(useMACDisplay)})
             </label>
             <input 
+              id="envelope-forward-limit"
               type="number"
               bind:value={editingEnvelope.forwardLimit}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
@@ -1057,10 +1079,11 @@
             {/if}
           </div>
           <div>
-            <label class="block text-sm text-gray-400 mb-2">
+            <label for="envelope-aft-limit" class="block text-sm text-gray-400 mb-2">
               Aft Limit ({getCGPositionLabel(useMACDisplay)})
             </label>
             <input 
+              id="envelope-aft-limit"
               type="number"
               bind:value={editingEnvelope.aftLimit}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
@@ -1075,7 +1098,7 @@
         </div>
         <div>
           <div class="flex items-center justify-between mb-2">
-            <label class="text-sm text-gray-400">Envelope Vertices</label>
+            <div class="text-sm text-gray-400">Envelope Vertices</div>
             <button
               onclick={addEnvelopeVertex}
               class="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500 text-blue-300 rounded text-xs transition-colors"
@@ -1170,7 +1193,7 @@
 
 <!-- Item Library Dialog -->
 {#if showItemLibraryDialog}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showItemLibraryDialog = false)}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="button" tabindex="0" onclick={(e) => e.target === e.currentTarget && (showItemLibraryDialog = false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showItemLibraryDialog = false)} aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <h2 class="text-xl font-semibold text-white mb-4">Item Library</h2>
       <div class="mb-4">
@@ -1234,7 +1257,7 @@
 
 <!-- My Templates Dialog -->
 {#if showTemplatesDialog}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showTemplatesDialog = false)}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="button" tabindex="0" onclick={(e) => e.target === e.currentTarget && (showTemplatesDialog = false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showTemplatesDialog = false)} aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <h2 class="text-xl font-semibold text-white mb-4">My Templates</h2>
       {#if userTemplates.length === 0}
@@ -1293,13 +1316,14 @@
 
 <!-- Save Template Dialog -->
 {#if showSaveTemplateDialog && selectedItemForTemplate}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showSaveTemplateDialog = false)}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="button" tabindex="0" onclick={(e) => e.target === e.currentTarget && (showSaveTemplateDialog = false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showSaveTemplateDialog = false)} aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
       <h2 class="text-xl font-semibold text-white mb-4">Save as Template</h2>
       <div class="space-y-4">
         <div>
-          <label class="block text-sm text-gray-400 mb-2">Template Name</label>
+          <label for="template-name" class="block text-sm text-gray-400 mb-2">Template Name</label>
           <input 
+            id="template-name"
             type="text"
             bind:value={templateName}
             class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
@@ -1307,8 +1331,9 @@
           />
         </div>
         <div>
-          <label class="block text-sm text-gray-400 mb-2">Description (optional)</label>
+          <label for="template-description" class="block text-sm text-gray-400 mb-2">Description (optional)</label>
           <textarea 
+            id="template-description"
             bind:value={templateDescription}
             class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
             rows="2"
@@ -1316,8 +1341,9 @@
           ></textarea>
         </div>
         <div>
-          <label class="block text-sm text-gray-400 mb-2">Category</label>
+          <label for="template-category" class="block text-sm text-gray-400 mb-2">Category</label>
           <select 
+            id="template-category"
             bind:value={templateCategory}
             class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
           >
@@ -1355,7 +1381,7 @@
 
 <!-- Ballast Calculation Dialog -->
 {#if showBallastDialog && ballastSolution}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showBallastDialog = false)}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="button" tabindex="0" onclick={(e) => e.target === e.currentTarget && (showBallastDialog = false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showBallastDialog = false)} aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-lg w-full mx-4">
       <h2 class="text-xl font-semibold text-white mb-4">⚖️ Ballast Calculation</h2>
       
@@ -1408,7 +1434,7 @@
 
 <!-- MAC Configuration Dialog -->
 {#if showMACDialog}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showMACDialog = false)}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="button" tabindex="0" onclick={(e) => e.target === e.currentTarget && (showMACDialog = false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showMACDialog = false)} aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
       <h2 class="text-xl font-semibold text-white mb-4">⚙️ MAC Reference Configuration</h2>
       
@@ -1420,10 +1446,11 @@
       
       <div class="space-y-4 mb-6">
         <div>
-          <label class="block text-sm text-gray-400 mb-2">
+          <label for="mac-lemac" class="block text-sm text-gray-400 mb-2">
             LEMAC - Leading Edge MAC (inches from datum)
           </label>
           <input 
+            id="mac-lemac"
             type="number"
             value={aircraft.lemac || 0}
             oninput={(e) => {
@@ -1436,10 +1463,11 @@
           />
         </div>
         <div>
-          <label class="block text-sm text-gray-400 mb-2">
+          <label for="mac-length" class="block text-sm text-gray-400 mb-2">
             MAC Length (inches)
           </label>
           <input 
+            id="mac-length"
             type="number"
             value={aircraft.mac || 0}
             oninput={(e) => {

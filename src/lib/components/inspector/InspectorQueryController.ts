@@ -1,5 +1,4 @@
-export type QueryScope = 'current' | 'all' | 'ask';
-export type MatchMode = 'fuzzy' | 'exact' | 'regex';
+import type { MatchMode, QueryScope } from './InspectorStateTypes';
 import type { 
   CategoryFilterState, 
   DateFilterState, 

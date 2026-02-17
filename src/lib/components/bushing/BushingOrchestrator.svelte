@@ -21,6 +21,7 @@
   import { safeGetItem, safeSetItem, safeParseJSON } from './BushingStorageHelper';
   import { DragDropHistory } from './dragHistory';
   import { MATERIALS } from '$lib/core/bushing/materials';
+  import { bushingLogger, bushingExportLogger } from '$lib/utils/loggers';
 
   const KEY = 'scd.bushing.inputs.v15';
   const FREE_POSITIONING_KEY = 'scd.bushing.freePositioning.enabled';
@@ -137,22 +138,28 @@
   let babylonInitNotice = $state<string | null>(null);
   let babylonDiagnostics = $state<any[]>([]);
   let showInformationView = $state(false);
+  let initialized = $state(false);
   
-  if (typeof window !== 'undefined') {
-    try {
-      form = { ...form, ...safeParseJSON(safeGetItem(KEY), {}) };
-      ({ leftCardOrder, rightCardOrder } = loadTopLevelLayout());
-      dndEnabled = readBushingDndEnabled();
-      useLegacyRenderer = safeGetItem(LEGACY_RENDERER_KEY) === '1';
-      renderMode = useLegacyRenderer ? 'legacy' : 'section';
-      traceEnabled = safeGetItem(TRACE_MODE_KEY) === '1';
-      const stored = safeGetItem(FREE_POSITIONING_KEY);
-      useFreePositioning = stored === '1' || stored === 'true';
-    } catch (e) {
-      console.error('[Bushing] Init error:', e);
-      initError = `Init error: ${e instanceof Error ? e.message : String(e)}`;
+  // Svelte 5: Use $effect for initialization to ensure proper reactivity
+  $effect(() => {
+    if (!initialized && typeof window !== 'undefined') {
+      try {
+        form = { ...form, ...safeParseJSON(safeGetItem(KEY), {}) };
+        ({ leftCardOrder, rightCardOrder } = loadTopLevelLayout());
+        dndEnabled = readBushingDndEnabled();
+        useLegacyRenderer = safeGetItem(LEGACY_RENDERER_KEY) === '1';
+        renderMode = useLegacyRenderer ? 'legacy' : 'section';
+        traceEnabled = safeGetItem(TRACE_MODE_KEY) === '1';
+        const stored = safeGetItem(FREE_POSITIONING_KEY);
+        useFreePositioning = stored === '1' || stored === 'true';
+        initialized = true;
+      } catch (e) {
+        bushingLogger.error('Init error', e);
+        initError = `Init error: ${e instanceof Error ? e.message : String(e)}`;
+        initialized = true;
+      }
     }
-  }
+  });
   
   // Svelte 5: Convert reactive statement to $effect for policy synchronization
   $effect(() => {
@@ -180,7 +187,7 @@
       try { 
         persistTopLevelLayout(leftCardOrder, rightCardOrder); 
       } catch (e) { 
-        console.error('[Bushing] Failed to save layout:', e); 
+        bushingLogger.error('Failed to save layout', e); 
       } 
     }
   });
@@ -205,13 +212,13 @@
   });
   if (typeof window !== 'undefined' && import.meta.env.DEV) {
     const runtimeSentinel = (globalThis as any).__SCD_BUSHING_SCENE_SENTINEL__;
-    if (runtimeSentinel !== BUSHING_SCENE_MODULE_SENTINEL) console.error('[SC][Bushing][path-integrity]', { expected: BUSHING_SCENE_MODULE_SENTINEL, actual: runtimeSentinel });
+    if (runtimeSentinel !== BUSHING_SCENE_MODULE_SENTINEL) bushingLogger.error('Path integrity check failed', { expected: BUSHING_SCENE_MODULE_SENTINEL, actual: runtimeSentinel });
   }
 
   function toggleRendererMode() { useLegacyRenderer = !useLegacyRenderer; renderMode = useLegacyRenderer ? 'legacy' : 'section'; safeSetItem(LEGACY_RENDERER_KEY, useLegacyRenderer ? '1' : '0'); }
   function toggleTraceMode() { traceEnabled = !traceEnabled; safeSetItem(TRACE_MODE_KEY, traceEnabled ? '1' : '0'); }
   async function onExportSvg() { await exportBushingSvg({ form, results, draftingView }); }
-  async function onExportPdf() { try { await exportBushingPdf({ form, results, draftingView }); } catch (err) { console.warn('[Bushing][Export][PDF] failed', err); } }
+  async function onExportPdf() { try { await exportBushingPdf({ form, results, draftingView }); } catch (err) { bushingExportLogger.warn('PDF export failed', err); } }
   
   function handleBabylonInitFailure(reason: string) {
     babylonInitNotice = reason || 'Babylon initialization failed.';
@@ -222,12 +229,12 @@
         safeSetItem('scd.bushing.babylonInitFailCount', String(prior + 1));
         safeSetItem('scd.bushing.babylonInitLast', JSON.stringify(payload));
       } catch {}
-      console.warn('[Bushing][Babylon][init-failed]', payload);
+      bushingLogger.warn('Babylon init failed', payload);
     }
   }
 
   onMount(() => {
-    console.log('[Bushing] Mounted', { initError, units: form.units, cards: leftCardOrder.length + rightCardOrder.length });
+    bushingLogger.debug('Mounted', { initError, units: form.units, cards: leftCardOrder.length + rightCardOrder.length });
     mountBushingContextMenu({ onExportSvg: () => { void onExportSvg(); }, onExportPdf: () => { void onExportPdf(); }, toggleRendererMode, toggleTraceMode });
     if (typeof window !== 'undefined') {
       (window as any).__SCD_BUSHING_TEST_REORDER__ = (lane: 'left' | 'right', sourceId: string, targetId: string) => {
@@ -281,21 +288,22 @@
       items={leftLaneItems}
       columnId="left"
       allowCrossColumn={true}
-      on:finalize={(ev) => commitLeftLane(ev.detail.items)}
-      let:item>
-      <BushingLeftLaneCards 
-        itemId={item.id}
-        bind:form
-        {results}
-        {isFailed}
-        {dndEnabled}
-        {canUndo}
-        {canRedo}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onShowInformation={() => (showInformationView = true)}
-        moveProps={leftMoveProps(item.id as LeftCardId)}
-      />
+      on:finalize={(ev) => commitLeftLane(ev.detail.items)}>
+      {#snippet children(item)}
+        <BushingLeftLaneCards 
+          itemId={item.id}
+          bind:form
+          {results}
+          {isFailed}
+          {dndEnabled}
+          {canUndo}
+          {canRedo}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onShowInformation={() => (showInformationView = true)}
+          moveProps={leftMoveProps(item.id as LeftCardId)}
+        />
+      {/snippet}
     </NativeDragLane>
   </div>
 
@@ -306,38 +314,45 @@
       items={rightLaneItems}
       columnId="right"
       allowCrossColumn={true}
-      on:finalize={(ev) => commitRightLane(ev.detail.items)}
-      let:item>
-      {#if item.id === 'drafting'}
-        <BushingDraggableCard column="right" cardId="drafting" title="Drafting View" {...rightMoveProps('drafting')}>
-          <BushingDraftingPanel
-            {draftingView}
-            {useLegacyRenderer}
-            {renderMode}
-            {traceEnabled}
-            cacheHits={cacheStats.hits}
-            cacheMisses={cacheStats.misses}
-            isInfinitePlate={Boolean(results.geometry?.isSaturationActive)}
-            {babylonInitNotice}
-            {visualDiagnostics}
-            {babylonDiagnostics}
-            onExportSvg={onExportSvg}
-            onExportPdf={onExportPdf}
-            onToggleRendererMode={toggleRendererMode}
-            onToggleTraceMode={toggleTraceMode}
-            onBabylonDiagnostics={(diag) => { babylonDiagnostics = diag; }}
-            onBabylonInitFailure={handleBabylonInitFailure}
-          />
-        </BushingDraggableCard>
-      {:else if item.id === 'summary'}
-        <BushingDraggableCard column="right" cardId="summary" title="Results Panel" {...rightMoveProps('summary')}>
-          <BushingResultSummary {form} {results} />
-        </BushingDraggableCard>
-      {:else if item.id === 'diagnostics'}
-        <BushingDraggableCard column="right" cardId="diagnostics" title="Diagnostics" {...rightMoveProps('diagnostics')}>
-          <BushingDiagnosticsPanel {results} {dndEnabled} />
-        </BushingDraggableCard>
-      {/if}
+      on:finalize={(ev) => commitRightLane(ev.detail.items)}>
+      {#snippet children(item)}
+        {#if item.id === 'drafting'}
+          <BushingDraggableCard column="right" cardId="drafting" title="Drafting View" {...rightMoveProps('drafting')}>
+            {#snippet children()}
+              <BushingDraftingPanel
+                {draftingView}
+                {useLegacyRenderer}
+                {renderMode}
+                {traceEnabled}
+                cacheHits={cacheStats.hits}
+                cacheMisses={cacheStats.misses}
+                isInfinitePlate={Boolean(results.geometry?.isSaturationActive)}
+                {babylonInitNotice}
+                {visualDiagnostics}
+                {babylonDiagnostics}
+                onExportSvg={onExportSvg}
+                onExportPdf={onExportPdf}
+                onToggleRendererMode={toggleRendererMode}
+                onToggleTraceMode={toggleTraceMode}
+                onBabylonDiagnostics={(diag) => { babylonDiagnostics = diag; }}
+                onBabylonInitFailure={handleBabylonInitFailure}
+              />
+            {/snippet}
+          </BushingDraggableCard>
+        {:else if item.id === 'summary'}
+          <BushingDraggableCard column="right" cardId="summary" title="Results Panel" {...rightMoveProps('summary')}>
+            {#snippet children()}
+              <BushingResultSummary {form} {results} />
+            {/snippet}
+          </BushingDraggableCard>
+        {:else if item.id === 'diagnostics'}
+          <BushingDraggableCard column="right" cardId="diagnostics" title="Diagnostics" {...rightMoveProps('diagnostics')}>
+            {#snippet children()}
+              <BushingDiagnosticsPanel {results} {dndEnabled} />
+            {/snippet}
+          </BushingDraggableCard>
+        {/if}
+      {/snippet}
     </NativeDragLane>
   </div>
 </div>

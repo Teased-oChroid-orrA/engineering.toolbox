@@ -4,6 +4,7 @@
  */
 
 import type { AircraftProfile, LoadingItem, LoadingConfiguration } from './types';
+import { wbLogger } from '$lib/utils/loggers';
 
 export interface SavedConfiguration {
   version: string;
@@ -114,7 +115,7 @@ export function saveToLocalStorage(
     
     localStorage.setItem('wb.current', JSON.stringify(config));
   } catch (error) {
-    console.error('Failed to save to localStorage:', error);
+    wbLogger.error('Failed to save to localStorage', error);
   }
 }
 
@@ -135,7 +136,7 @@ export function loadFromLocalStorage(): SavedConfiguration | null {
     
     return config;
   } catch (error) {
-    console.error('Failed to load from localStorage:', error);
+    wbLogger.error('Failed to load from localStorage', error);
     return null;
   }
 }
@@ -147,7 +148,7 @@ export function clearLocalStorage(): void {
   try {
     localStorage.removeItem('wb.current');
   } catch (error) {
-    console.error('Failed to clear localStorage:', error);
+    wbLogger.error('Failed to clear localStorage', error);
   }
 }
 
@@ -166,7 +167,7 @@ export function addToRecentConfigurations(config: SavedConfiguration): void {
     
     localStorage.setItem('wb.recent', JSON.stringify(limited));
   } catch (error) {
-    console.error('Failed to add to recent configurations:', error);
+    wbLogger.error('Failed to add to recent configurations', error);
   }
 }
 
@@ -191,7 +192,7 @@ export function getRecentConfigurations(): SavedConfiguration[] {
       }
     }));
   } catch (error) {
-    console.error('Failed to load recent configurations:', error);
+    wbLogger.error('Failed to load recent configurations', error);
     return [];
   }
 }
@@ -203,6 +204,6 @@ export function clearRecentConfigurations(): void {
   try {
     localStorage.removeItem('wb.recent');
   } catch (error) {
-    console.error('Failed to clear recent configurations:', error);
+    wbLogger.error('Failed to clear recent configurations', error);
   }
 }

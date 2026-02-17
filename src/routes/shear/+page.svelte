@@ -7,6 +7,7 @@
   import type { ShearInputs } from '$lib/core/shear/types';
   import { MATERIALS } from '$lib/core/bushing';
   import { cn } from '$lib/utils';
+  import { shearLogger } from '$lib/utils/loggers';
 
   const KEY = 'scd.shear.inputs.v9';
 
@@ -27,7 +28,7 @@
 
   if (typeof window !== 'undefined') {
     const raw = localStorage.getItem(KEY);
-    if (raw) { try { form = { ...form, ...JSON.parse(raw) }; } catch (e) { console.error(e); } }
+    if (raw) { try { form = { ...form, ...JSON.parse(raw) }; } catch (e) { shearLogger.error('Failed to parse stored form', e); } }
   }
   $: if (typeof window !== 'undefined') localStorage.setItem(KEY, JSON.stringify(form));
 

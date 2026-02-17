@@ -8,6 +8,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { DEFAULT_GRID_WINDOW_SIZE } from '$lib/components/inspector/InspectorGridConstants';
 import { devLog } from '$lib/utils/devLog';
+import { inspectorLogger } from '$lib/utils/loggers';
 
 // ========================= Effect 1: uiAnimDur effect =========================
 export function setupUiAnimDurEffect(deps: {
@@ -69,7 +70,7 @@ export function setupContextMenuEffect(deps: {
   registerContextMenu: (menu: any) => void;
 }) {
   $effect(() => {
-    console.log('[MENU EFFECT] Context menu effect running...');
+    inspectorLogger.debug('[MENU EFFECT] Context menu effect running...');
     const menu = deps.buildInspectorContextMenu({
       canOpenPath: deps.canOpenPath(),
       hasLoaded: deps.hasLoaded(),
@@ -78,9 +79,9 @@ export function setupContextMenuEffect(deps: {
       quietBackendLogs: deps.quietBackendLogs(),
       autoRestoreEnabled: deps.autoRestoreEnabled()
     });
-    console.log('[MENU EFFECT] Built menu:', menu);
+    inspectorLogger.debug('[MENU EFFECT] Built menu:', menu);
     callbacks.registerContextMenu(menu);
-    console.log('[MENU EFFECT] Registration complete');
+    inspectorLogger.debug('[MENU EFFECT] Registration complete');
   });
 }
 

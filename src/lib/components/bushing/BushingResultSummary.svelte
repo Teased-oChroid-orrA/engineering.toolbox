@@ -5,6 +5,7 @@
   import BushingLameStressPlot from './BushingLameStressPlot.svelte';
   import BushingEnforcementDetails from './BushingEnforcementDetails.svelte';
   import NativeDragLane from './NativeDragLane.svelte';
+  import { bushingLogger } from '$lib/utils/loggers';
 
   let {
     form,
@@ -32,7 +33,7 @@
         }
       }
     } catch (e) {
-      console.warn('[BushingResultSummary] Failed to load section order:', e);
+      bushingLogger.warn('Failed to load section order', e);
     }
   });
   
@@ -43,7 +44,7 @@
       try {
         localStorage.setItem(SECTION_ORDER_KEY, JSON.stringify(newOrder));
       } catch (e) {
-        console.warn('[BushingResultSummary] Failed to save section order:', e);
+        bushingLogger.warn('Failed to save section order', e);
       }
     }
   }
@@ -103,9 +104,9 @@
     items={sectionItems}
     enabled={true}
     flipDurationMs={200}
-    on:finalize={handleReorder}
-    let:item>
-    {#if item.id === 'metrics'}
+    on:finalize={handleReorder}>
+    {#snippet children(item)}
+      {#if item.id === 'metrics'}
       <div class="grid grid-cols-1 gap-4 md:grid-cols-[0.78fr_1.22fr]">
         <div
           class="cursor-pointer"
@@ -212,6 +213,7 @@
         </CardContent>
       </Card>
     {/if}
+    {/snippet}
   </NativeDragLane>
 </div>
 

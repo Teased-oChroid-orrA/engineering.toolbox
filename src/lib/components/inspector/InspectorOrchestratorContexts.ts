@@ -1,42 +1,17 @@
 import type { IFilterSet } from '@svar-ui/svelte-filter';
+import { inspectorLogger } from '$lib/utils/loggers';
 import type { GenTab, MultiQueryClause, Recipe, RecipeState } from '$lib/components/inspector/InspectorOrchestratorDeps';
-import type { SchemaColStat } from '$lib/components/inspector/InspectorStateTypes';
+import type { 
+  SchemaColStat, 
+  ColType, 
+  MatchMode, 
+  NumericFilterState, 
+  DateFilterState, 
+  CategoryFilterState,
+  DatasetSource,
+  WorkspaceDataset
+} from '$lib/components/inspector/InspectorStateTypes';
 
-type ColType = 'numeric' | 'date' | 'string';
-type MatchMode = 'fuzzy' | 'regex' | 'exact';
-
-type NumericFilterState = {
-  enabled: boolean;
-  colIdx: number | null;
-  minText: string;
-  maxText: string;
-  error: string | null;
-};
-
-type DateFilterState = {
-  enabled: boolean;
-  colIdx: number | null;
-  minIso: string;
-  maxIso: string;
-  error: string | null;
-};
-
-type CategoryFilterState = {
-  enabled: boolean;
-  colIdx: number | null;
-  selected: Set<string>;
-};
-
-type DatasetSource =
-  | { kind: 'text'; text: string }
-  | { kind: 'path'; path: string };
-
-type WorkspaceDataset = {
-  id: string;
-  label: string;
-  hasHeaders: boolean;
-  source: DatasetSource;
-};
 
 type DialogMod = typeof import('@tauri-apps/plugin-dialog');
 
@@ -289,9 +264,9 @@ export function loadControllerCtxStateMain(state: {
     set pendingRestore(v: RecipeState | null) { state.pendingRestore = v; },
     get hasLoaded() { return state.loadState.hasLoaded; },
     set hasLoaded(v: boolean) { 
-      console.error('★★★ SET hasLoaded to:', v);
+      inspectorLogger.error('★★★ SET hasLoaded to:', v);
       state.loadState.hasLoaded = v;
-      console.error('★★★ loadState.hasLoaded is now:', state.loadState.hasLoaded);
+      inspectorLogger.error('★★★ loadState.hasLoaded is now:', state.loadState.hasLoaded);
     },
     get showDataControls() { return state.showDataControls; },
     set showDataControls(v: boolean) { state.showDataControls = v; },
@@ -517,7 +492,7 @@ export function gridControllerCtx(state: {
     set mergedRowsAll(v: string[][]) { state.loadState.mergedRowsAll = v; },
     get visibleRows() { return state.loadState.visibleRows; },
     set visibleRows(v: string[][]) { 
-      console.log('[GRID CTX] Setting visibleRows, length:', v?.length, 'first row:', v?.[0]);
+      inspectorLogger.debug('[GRID CTX] Setting visibleRows, length:', v?.length, 'first row:', v?.[0]);
       state.loadState.visibleRows = v;
       state.loadState._version++;  // Increment version to force reactivity
     },

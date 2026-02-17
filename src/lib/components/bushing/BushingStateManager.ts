@@ -6,6 +6,7 @@ import { MATERIALS } from '$lib/core/bushing/materials';
 import { evaluateBushingPipeline, getBushingPipelineCacheStats } from './BushingComputeController';
 import { runBushingVisualDiagnostics } from './BushingVisualDiagnostics';
 import { safeGetItem, safeSetItem, safeParseJSON } from './BushingStorageHelper';
+import { bushingLogger } from '$lib/utils/loggers';
 
 const KEY = 'scd.bushing.inputs.v15';
 const LEGACY_RENDERER_KEY = 'scd.bushing.legacyRenderer';
@@ -96,7 +97,7 @@ export function createBushingStateManager() {
         s.renderMode = s.useLegacyRenderer ? 'legacy' : 'section';
         s.traceEnabled = safeGetItem(TRACE_MODE_KEY) === '1';
       } catch (e) {
-        console.error('[Bushing] Failed to load state:', e);
+        bushingLogger.error('Failed to load state', e);
       }
       return s;
     });
@@ -155,7 +156,7 @@ export function createBushingStateManager() {
           safeSetItem('scd.bushing.babylonInitFailCount', String(prior + 1));
           safeSetItem('scd.bushing.babylonInitLast', JSON.stringify(payload));
         } catch {}
-        console.warn('[Bushing][Babylon][init-failed]', payload);
+        bushingLogger.warn('Babylon init failed', payload);
       }
       return s;
     });

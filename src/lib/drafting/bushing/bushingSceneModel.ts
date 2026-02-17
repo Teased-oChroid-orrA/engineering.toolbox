@@ -1,6 +1,7 @@
 import { buildLinePath } from '../core/d3Primitives';
 import { buildBushingSectionProfile } from './bushingSectionProfileBuilder';
 import type { SectionProfile } from './sectionProfile';
+import { bushingLogger } from '$lib/utils/loggers';
 
 export const BUSHING_SCENE_MODULE_ID = 'scd/bushing/scene-model';
 export const BUSHING_SCENE_MODULE_VERSION = '2026-02-10.v2';
@@ -13,7 +14,7 @@ declare global {
 if (typeof globalThis !== 'undefined') {
   const previous = globalThis.__SCD_BUSHING_SCENE_SENTINEL__;
   if (previous && previous !== BUSHING_SCENE_MODULE_SENTINEL) {
-    console.error('[SC][Bushing][stale-module]', { previous, next: BUSHING_SCENE_MODULE_SENTINEL });
+    bushingLogger.error('Stale module detected', { previous, next: BUSHING_SCENE_MODULE_SENTINEL });
   }
   globalThis.__SCD_BUSHING_SCENE_SENTINEL__ = BUSHING_SCENE_MODULE_SENTINEL;
 }

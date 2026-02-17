@@ -1,3 +1,5 @@
+import { bushingLogger } from '$lib/utils/loggers';
+
 export type LeftCardId = 'header' | 'guidance' | 'setup' | 'geometry' | 'profile' | 'process';
 export type RightCardId = 'drafting' | 'summary' | 'diagnostics';
 
@@ -36,7 +38,7 @@ export function normalizeOrder<T extends string>(raw: unknown, defaults: T[]): T
   
   // Final failsafe: if deduplication failed, return defaults
   if (deduped.length !== new Set(deduped).size) {
-    console.warn('[BushingCardLayout] Detected duplicates after normalization, returning defaults');
+    bushingLogger.warn('Detected duplicates after normalization, returning defaults');
     return [...defaults];
   }
   

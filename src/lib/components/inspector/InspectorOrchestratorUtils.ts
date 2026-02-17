@@ -1,4 +1,5 @@
 import { safeAutoAnimate, isWebKitRuntime } from '$lib/utils/safeAutoAnimate';
+import { inspectorLogger } from '$lib/utils/loggers';
 import { PerfRecorder } from '$lib/components/inspector/InspectorOrchestratorDeps';
 
 export function aa(node: HTMLElement, opts?: { duration?: number }, autoAnimateDuration = 160) {
@@ -41,7 +42,7 @@ export function recordPerf(
   const p95 = perf.summary(op).p95;
   const sloVal = slo[op];
   const status = p95 <= sloVal ? 'ok' : 'slo_violation';
-  console.log('[SC][Inspector][perf]', { op, ms: Number(ms.toFixed(1)), p95: Number(p95.toFixed(1)), slo: sloVal, status, ...(meta ?? {}) });
+  inspectorLogger.debug('[SC][Inspector][perf]', { op, ms: Number(ms.toFixed(1)), p95: Number(p95.toFixed(1)), slo: sloVal, status, ...(meta ?? {}) });
 }
 
 export function clamp(v: number, lo: number, hi: number) {

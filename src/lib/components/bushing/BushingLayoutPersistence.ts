@@ -5,6 +5,7 @@ import {
   type LeftCardId,
   type RightCardId
 } from './BushingCardLayoutController';
+import { bushingLogger } from '$lib/utils/loggers';
 
 export const LAYOUT_KEY_V2 = 'scd.bushing.layout.v2';
 export const LAYOUT_KEY_V3 = 'scd.bushing.layout.v3';
@@ -35,7 +36,7 @@ export function loadTopLevelLayout(): { leftCardOrder: LeftCardId[]; rightCardOr
       // Failsafe: detect duplicates and clear corrupted data
       if (leftCardOrder.length !== new Set(leftCardOrder).size || 
           rightCardOrder.length !== new Set(rightCardOrder).size) {
-        console.warn('[BushingLayout] Detected duplicate keys in layout, clearing corrupted data');
+        bushingLogger.warn('Detected duplicate keys in layout, clearing corrupted data');
         localStorage.removeItem(LAYOUT_KEY_V3);
         return { leftCardOrder: [...LEFT_DEFAULT_ORDER], rightCardOrder: [...RIGHT_DEFAULT_ORDER] };
       }
@@ -55,11 +56,11 @@ export function loadTopLevelLayout(): { leftCardOrder: LeftCardId[]; rightCardOr
       localStorage.setItem(LAYOUT_KEY_V3, JSON.stringify(migrated));
       return migrated;
     } else {
-      console.warn('[BushingLayout] Detected duplicates during migration, using defaults');
+      bushingLogger.warn('Detected duplicates during migration, using defaults');
       return { leftCardOrder: [...LEFT_DEFAULT_ORDER], rightCardOrder: [...RIGHT_DEFAULT_ORDER] };
     }
   } catch (err) {
-    console.error('[BushingLayout] Error loading layout, using defaults:', err);
+    bushingLogger.error('Error loading layout, using defaults', err);
     return { leftCardOrder: [...LEFT_DEFAULT_ORDER], rightCardOrder: [...RIGHT_DEFAULT_ORDER] };
   }
 }
@@ -69,18 +70,18 @@ export function persistTopLevelLayout(leftCardOrder: LeftCardId[], rightCardOrde
   
   // Failsafe: validate before persisting to prevent corruption
   if (leftCardOrder.length !== new Set(leftCardOrder).size) {
-    console.error('[BushingLayout] Attempted to persist duplicate left card order, aborting');
+    bushingLogger.error('Attempted to persist duplicate left card order, aborting');
     return;
   }
   if (rightCardOrder.length !== new Set(rightCardOrder).size) {
-    console.error('[BushingLayout] Attempted to persist duplicate right card order, aborting');
+    bushingLogger.error('Attempted to persist duplicate right card order, aborting');
     return;
   }
   
   try {
     localStorage.setItem(LAYOUT_KEY_V3, JSON.stringify({ leftCardOrder, rightCardOrder }));
   } catch (err) {
-    console.error('[BushingLayout] Error persisting layout:', err);
+    bushingLogger.error('Error persisting layout', err);
   }
 }
 

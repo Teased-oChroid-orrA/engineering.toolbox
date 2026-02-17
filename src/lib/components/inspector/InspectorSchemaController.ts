@@ -1,4 +1,4 @@
-export type ColType = 'numeric' | 'date' | 'string';
+import type { ColType } from './InspectorStateTypes';
 
 export type SchemaColStat = {
   idx: number;

@@ -1,5 +1,6 @@
 import { clearContextMenu, CONTEXT_MENU_COMMAND_EVENT } from '$lib/navigation/contextualMenu';
 import { handleSurfaceNavMenuCommand, type SurfaceNavMenuContext } from './SurfaceNavMenuController';
+import { surfaceLogger } from '$lib/utils/loggers';
 
 type SurfaceLifecycleCtx = SurfaceNavMenuContext & {
   getLastAction: () => string;
@@ -14,12 +15,11 @@ function mountSurfaceDevErrorLogger(getLastAction: () => string) {
   w.__scSurfaceErrLoggerPatched = true;
   const safeLog = (...args: any[]) => {
     try {
-      // eslint-disable-next-line no-console
-      console.error(...args);
+      surfaceLogger.error(args.join(' '), args.length > 1 ? args.slice(1) : undefined);
     } catch {}
   };
   window.addEventListener('error', (ev: ErrorEvent) => {
-    safeLog('[SC][SurfaceToolbox][error]', { file: ev.filename, line: ev.lineno, col: ev.colno }, 'lastAction=', getLastAction());
+    safeLog('SurfaceToolbox error', { file: ev.filename, line: ev.lineno, col: ev.colno, lastAction: getLastAction() });
     if (ev.error?.stack) safeLog(ev.error.stack);
   });
   window.addEventListener('unhandledrejection', (ev: PromiseRejectionEvent) => {
