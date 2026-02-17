@@ -26,9 +26,11 @@
  */
 
 // Feature flags - checked at build time for dead code elimination
-const ENABLE_DEBUG = import.meta.env.VITE_ENABLE_DEBUG_LOGS === 'true' || import.meta.env.DEV;
-const ENABLE_TRACE = import.meta.env.VITE_ENABLE_TRACE_LOGS === 'true' || import.meta.env.DEV;
-const ENABLE_PERF = import.meta.env.VITE_ENABLE_PERF_LOGS === 'true' || import.meta.env.DEV;
+// Safe access for test environments where import.meta.env might be undefined
+const env = typeof import.meta.env !== 'undefined' ? import.meta.env : { DEV: true };
+const ENABLE_DEBUG = env.VITE_ENABLE_DEBUG_LOGS === 'true' || env.DEV;
+const ENABLE_TRACE = env.VITE_ENABLE_TRACE_LOGS === 'true' || env.DEV;
+const ENABLE_PERF = env.VITE_ENABLE_PERF_LOGS === 'true' || env.DEV;
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'trace' | 'perf';
 
