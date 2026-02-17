@@ -2,6 +2,7 @@
  * BushingCardPositionController - Manages free positioning of bushing cards
  * Supports absolute positioning anywhere on screen with grid snapping and collision detection
  */
+import { bushingLogger } from '$lib/utils/loggers';
 
 export type CardId = 
   | 'header' | 'guidance' | 'setup' | 'geometry' | 'profile' | 'process'
@@ -171,7 +172,7 @@ export function loadFreeLayout(): FreeLayoutV4 {
       return migrateV3toV4(v3);
     }
   } catch (e) {
-    console.error('[BushingFreePosition] Failed to load layout:', e);
+    bushingLogger.error('Failed to load free layout', e);
   }
   
   // Return default layout
@@ -189,7 +190,7 @@ export function saveFreeLayout(layout: FreeLayoutV4): void {
   try {
     localStorage.setItem(LAYOUT_V4_KEY, JSON.stringify(layout));
   } catch (e) {
-    console.error('[BushingFreePosition] Failed to save layout:', e);
+    bushingLogger.error('Failed to save free layout', e);
   }
 }
 

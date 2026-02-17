@@ -21,6 +21,7 @@
   import { safeGetItem, safeSetItem, safeParseJSON } from './BushingStorageHelper';
   import { DragDropHistory } from './dragHistory';
   import { MATERIALS } from '$lib/core/bushing/materials';
+  import { bushingLogger, bushingExportLogger } from '$lib/utils/loggers';
 
   const KEY = 'scd.bushing.inputs.v15';
   const FREE_POSITIONING_KEY = 'scd.bushing.freePositioning.enabled';
@@ -153,7 +154,7 @@
         useFreePositioning = stored === '1' || stored === 'true';
         initialized = true;
       } catch (e) {
-        console.error('[Bushing] Init error:', e);
+        bushingLogger.error('Init error', e);
         initError = `Init error: ${e instanceof Error ? e.message : String(e)}`;
         initialized = true;
       }
@@ -186,7 +187,7 @@
       try { 
         persistTopLevelLayout(leftCardOrder, rightCardOrder); 
       } catch (e) { 
-        console.error('[Bushing] Failed to save layout:', e); 
+        bushingLogger.error('Failed to save layout', e); 
       } 
     }
   });
@@ -211,13 +212,13 @@
   });
   if (typeof window !== 'undefined' && import.meta.env.DEV) {
     const runtimeSentinel = (globalThis as any).__SCD_BUSHING_SCENE_SENTINEL__;
-    if (runtimeSentinel !== BUSHING_SCENE_MODULE_SENTINEL) console.error('[SC][Bushing][path-integrity]', { expected: BUSHING_SCENE_MODULE_SENTINEL, actual: runtimeSentinel });
+    if (runtimeSentinel !== BUSHING_SCENE_MODULE_SENTINEL) bushingLogger.error('Path integrity check failed', { expected: BUSHING_SCENE_MODULE_SENTINEL, actual: runtimeSentinel });
   }
 
   function toggleRendererMode() { useLegacyRenderer = !useLegacyRenderer; renderMode = useLegacyRenderer ? 'legacy' : 'section'; safeSetItem(LEGACY_RENDERER_KEY, useLegacyRenderer ? '1' : '0'); }
   function toggleTraceMode() { traceEnabled = !traceEnabled; safeSetItem(TRACE_MODE_KEY, traceEnabled ? '1' : '0'); }
   async function onExportSvg() { await exportBushingSvg({ form, results, draftingView }); }
-  async function onExportPdf() { try { await exportBushingPdf({ form, results, draftingView }); } catch (err) { console.warn('[Bushing][Export][PDF] failed', err); } }
+  async function onExportPdf() { try { await exportBushingPdf({ form, results, draftingView }); } catch (err) { bushingExportLogger.warn('PDF export failed', err); } }
   
   function handleBabylonInitFailure(reason: string) {
     babylonInitNotice = reason || 'Babylon initialization failed.';
@@ -228,12 +229,12 @@
         safeSetItem('scd.bushing.babylonInitFailCount', String(prior + 1));
         safeSetItem('scd.bushing.babylonInitLast', JSON.stringify(payload));
       } catch {}
-      console.warn('[Bushing][Babylon][init-failed]', payload);
+      bushingLogger.warn('Babylon init failed', payload);
     }
   }
 
   onMount(() => {
-    console.log('[Bushing] Mounted', { initError, units: form.units, cards: leftCardOrder.length + rightCardOrder.length });
+    bushingLogger.debug('Mounted', { initError, units: form.units, cards: leftCardOrder.length + rightCardOrder.length });
     mountBushingContextMenu({ onExportSvg: () => { void onExportSvg(); }, onExportPdf: () => { void onExportPdf(); }, toggleRendererMode, toggleTraceMode });
     if (typeof window !== 'undefined') {
       (window as any).__SCD_BUSHING_TEST_REORDER__ = (lane: 'left' | 'right', sourceId: string, targetId: string) => {

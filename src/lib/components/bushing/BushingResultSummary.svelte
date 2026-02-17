@@ -5,6 +5,7 @@
   import BushingLameStressPlot from './BushingLameStressPlot.svelte';
   import BushingEnforcementDetails from './BushingEnforcementDetails.svelte';
   import NativeDragLane from './NativeDragLane.svelte';
+  import { bushingLogger } from '$lib/utils/loggers';
 
   let {
     form,
@@ -32,7 +33,7 @@
         }
       }
     } catch (e) {
-      console.warn('[BushingResultSummary] Failed to load section order:', e);
+      bushingLogger.warn('Failed to load section order', e);
     }
   });
   
@@ -43,7 +44,7 @@
       try {
         localStorage.setItem(SECTION_ORDER_KEY, JSON.stringify(newOrder));
       } catch (e) {
-        console.warn('[BushingResultSummary] Failed to save section order:', e);
+        bushingLogger.warn('Failed to save section order', e);
       }
     }
   }
