@@ -1,42 +1,16 @@
 import type { IFilterSet } from '@svar-ui/svelte-filter';
 import type { GenTab, MultiQueryClause, Recipe, RecipeState } from '$lib/components/inspector/InspectorOrchestratorDeps';
-import type { SchemaColStat } from '$lib/components/inspector/InspectorStateTypes';
+import type { 
+  SchemaColStat, 
+  ColType, 
+  MatchMode, 
+  NumericFilterState, 
+  DateFilterState, 
+  CategoryFilterState,
+  DatasetSource,
+  WorkspaceDataset
+} from '$lib/components/inspector/InspectorStateTypes';
 
-type ColType = 'numeric' | 'date' | 'string';
-type MatchMode = 'fuzzy' | 'regex' | 'exact';
-
-type NumericFilterState = {
-  enabled: boolean;
-  colIdx: number | null;
-  minText: string;
-  maxText: string;
-  error: string | null;
-};
-
-type DateFilterState = {
-  enabled: boolean;
-  colIdx: number | null;
-  minIso: string;
-  maxIso: string;
-  error: string | null;
-};
-
-type CategoryFilterState = {
-  enabled: boolean;
-  colIdx: number | null;
-  selected: Set<string>;
-};
-
-type DatasetSource =
-  | { kind: 'text'; text: string }
-  | { kind: 'path'; path: string };
-
-type WorkspaceDataset = {
-  id: string;
-  label: string;
-  hasHeaders: boolean;
-  source: DatasetSource;
-};
 
 type DialogMod = typeof import('@tauri-apps/plugin-dialog');
 

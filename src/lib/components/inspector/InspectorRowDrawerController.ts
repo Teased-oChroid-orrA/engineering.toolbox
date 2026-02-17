@@ -1,4 +1,4 @@
-import type { ColType } from '$lib/components/inspector/InspectorSchemaController';
+import type { ColType } from '$lib/components/inspector/InspectorStateTypes';
 import { fmtDate, parseDateRelaxed, parseF64Relaxed } from '$lib/components/inspector/InspectorSchemaController';
 
 export type DrawerKV = { key: string; value: string; idx: number | null; type: ColType | null };

@@ -137,22 +137,28 @@
   let babylonInitNotice = $state<string | null>(null);
   let babylonDiagnostics = $state<any[]>([]);
   let showInformationView = $state(false);
+  let initialized = $state(false);
   
-  if (typeof window !== 'undefined') {
-    try {
-      form = { ...form, ...safeParseJSON(safeGetItem(KEY), {}) };
-      ({ leftCardOrder, rightCardOrder } = loadTopLevelLayout());
-      dndEnabled = readBushingDndEnabled();
-      useLegacyRenderer = safeGetItem(LEGACY_RENDERER_KEY) === '1';
-      renderMode = useLegacyRenderer ? 'legacy' : 'section';
-      traceEnabled = safeGetItem(TRACE_MODE_KEY) === '1';
-      const stored = safeGetItem(FREE_POSITIONING_KEY);
-      useFreePositioning = stored === '1' || stored === 'true';
-    } catch (e) {
-      console.error('[Bushing] Init error:', e);
-      initError = `Init error: ${e instanceof Error ? e.message : String(e)}`;
+  // Svelte 5: Use $effect for initialization to ensure proper reactivity
+  $effect(() => {
+    if (!initialized && typeof window !== 'undefined') {
+      try {
+        form = { ...form, ...safeParseJSON(safeGetItem(KEY), {}) };
+        ({ leftCardOrder, rightCardOrder } = loadTopLevelLayout());
+        dndEnabled = readBushingDndEnabled();
+        useLegacyRenderer = safeGetItem(LEGACY_RENDERER_KEY) === '1';
+        renderMode = useLegacyRenderer ? 'legacy' : 'section';
+        traceEnabled = safeGetItem(TRACE_MODE_KEY) === '1';
+        const stored = safeGetItem(FREE_POSITIONING_KEY);
+        useFreePositioning = stored === '1' || stored === 'true';
+        initialized = true;
+      } catch (e) {
+        console.error('[Bushing] Init error:', e);
+        initError = `Init error: ${e instanceof Error ? e.message : String(e)}`;
+        initialized = true;
+      }
     }
-  }
+  });
   
   // Svelte 5: Convert reactive statement to $effect for policy synchronization
   $effect(() => {

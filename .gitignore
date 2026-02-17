@@ -22,3 +22,7 @@ pnpm-debug.log*
 # file size policy reports
 violations.json
 report.html
+
+# backup files
+*.backup
+*.original
