@@ -103,9 +103,9 @@
     items={sectionItems}
     enabled={true}
     flipDurationMs={200}
-    on:finalize={handleReorder}
-    let:item>
-    {#if item.id === 'metrics'}
+    on:finalize={handleReorder}>
+    {#snippet children(item)}
+      {#if item.id === 'metrics'}
       <div class="grid grid-cols-1 gap-4 md:grid-cols-[0.78fr_1.22fr]">
         <div
           class="cursor-pointer"
@@ -212,6 +212,7 @@
         </CardContent>
       </Card>
     {/if}
+    {/snippet}
   </NativeDragLane>
 </div>
 

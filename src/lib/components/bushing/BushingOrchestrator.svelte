@@ -287,21 +287,22 @@
       items={leftLaneItems}
       columnId="left"
       allowCrossColumn={true}
-      on:finalize={(ev) => commitLeftLane(ev.detail.items)}
-      let:item>
-      <BushingLeftLaneCards 
-        itemId={item.id}
-        bind:form
-        {results}
-        {isFailed}
-        {dndEnabled}
-        {canUndo}
-        {canRedo}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onShowInformation={() => (showInformationView = true)}
-        moveProps={leftMoveProps(item.id as LeftCardId)}
-      />
+      on:finalize={(ev) => commitLeftLane(ev.detail.items)}>
+      {#snippet children(item)}
+        <BushingLeftLaneCards 
+          itemId={item.id}
+          bind:form
+          {results}
+          {isFailed}
+          {dndEnabled}
+          {canUndo}
+          {canRedo}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onShowInformation={() => (showInformationView = true)}
+          moveProps={leftMoveProps(item.id as LeftCardId)}
+        />
+      {/snippet}
     </NativeDragLane>
   </div>
 
@@ -312,38 +313,45 @@
       items={rightLaneItems}
       columnId="right"
       allowCrossColumn={true}
-      on:finalize={(ev) => commitRightLane(ev.detail.items)}
-      let:item>
-      {#if item.id === 'drafting'}
-        <BushingDraggableCard column="right" cardId="drafting" title="Drafting View" {...rightMoveProps('drafting')}>
-          <BushingDraftingPanel
-            {draftingView}
-            {useLegacyRenderer}
-            {renderMode}
-            {traceEnabled}
-            cacheHits={cacheStats.hits}
-            cacheMisses={cacheStats.misses}
-            isInfinitePlate={Boolean(results.geometry?.isSaturationActive)}
-            {babylonInitNotice}
-            {visualDiagnostics}
-            {babylonDiagnostics}
-            onExportSvg={onExportSvg}
-            onExportPdf={onExportPdf}
-            onToggleRendererMode={toggleRendererMode}
-            onToggleTraceMode={toggleTraceMode}
-            onBabylonDiagnostics={(diag) => { babylonDiagnostics = diag; }}
-            onBabylonInitFailure={handleBabylonInitFailure}
-          />
-        </BushingDraggableCard>
-      {:else if item.id === 'summary'}
-        <BushingDraggableCard column="right" cardId="summary" title="Results Panel" {...rightMoveProps('summary')}>
-          <BushingResultSummary {form} {results} />
-        </BushingDraggableCard>
-      {:else if item.id === 'diagnostics'}
-        <BushingDraggableCard column="right" cardId="diagnostics" title="Diagnostics" {...rightMoveProps('diagnostics')}>
-          <BushingDiagnosticsPanel {results} {dndEnabled} />
-        </BushingDraggableCard>
-      {/if}
+      on:finalize={(ev) => commitRightLane(ev.detail.items)}>
+      {#snippet children(item)}
+        {#if item.id === 'drafting'}
+          <BushingDraggableCard column="right" cardId="drafting" title="Drafting View" {...rightMoveProps('drafting')}>
+            {#snippet children()}
+              <BushingDraftingPanel
+                {draftingView}
+                {useLegacyRenderer}
+                {renderMode}
+                {traceEnabled}
+                cacheHits={cacheStats.hits}
+                cacheMisses={cacheStats.misses}
+                isInfinitePlate={Boolean(results.geometry?.isSaturationActive)}
+                {babylonInitNotice}
+                {visualDiagnostics}
+                {babylonDiagnostics}
+                onExportSvg={onExportSvg}
+                onExportPdf={onExportPdf}
+                onToggleRendererMode={toggleRendererMode}
+                onToggleTraceMode={toggleTraceMode}
+                onBabylonDiagnostics={(diag) => { babylonDiagnostics = diag; }}
+                onBabylonInitFailure={handleBabylonInitFailure}
+              />
+            {/snippet}
+          </BushingDraggableCard>
+        {:else if item.id === 'summary'}
+          <BushingDraggableCard column="right" cardId="summary" title="Results Panel" {...rightMoveProps('summary')}>
+            {#snippet children()}
+              <BushingResultSummary {form} {results} />
+            {/snippet}
+          </BushingDraggableCard>
+        {:else if item.id === 'diagnostics'}
+          <BushingDraggableCard column="right" cardId="diagnostics" title="Diagnostics" {...rightMoveProps('diagnostics')}>
+            {#snippet children()}
+              <BushingDiagnosticsPanel {results} {dndEnabled} />
+            {/snippet}
+          </BushingDraggableCard>
+        {/if}
+      {/snippet}
     </NativeDragLane>
   </div>
 </div>

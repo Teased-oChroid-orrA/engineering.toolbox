@@ -101,9 +101,9 @@
       listClass="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2"
       enabled={dndEnabled}
       items={diagLaneItems}
-      on:finalize={(ev) => commitDiagLane(ev.detail.items)}
-      let:item>
-      {#if item.id === 'edge'}
+      on:finalize={(ev) => commitDiagLane(ev.detail.items)}>
+      {#snippet children(item)}
+        {#if item.id === 'edge'}
         <div class="rounded-md" data-diag-card="edge">
           <div class="mb-1 flex justify-end gap-1 text-[10px]">
             <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" onclick={() => move('edge', -1)} disabled={!canMove('edge', -1)}>Up</button>
@@ -170,6 +170,7 @@
           </Card>
         </div>
       {/if}
+      {/snippet}
     </NativeDragLane>
   </details>
 </div>
