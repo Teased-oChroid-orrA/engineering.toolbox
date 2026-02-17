@@ -30,6 +30,12 @@
     formatPercentMAC, 
     hasMACData 
   } from '$lib/core/weight-balance/mac';
+  import { 
+    mapCGToDisplay, 
+    mapInputDisplayToStation,
+    getCGPositionLabel,
+    formatCGDisplay
+  } from '$lib/core/weight-balance/displayAdapters';
   import { calculateBallast, type BallastSolution } from '$lib/core/weight-balance/ballast';
   import type { AircraftProfile, LoadingItem, LoadingResults, LoadingItemType, CGEnvelope } from '$lib/core/weight-balance/types';
   import { 
@@ -99,7 +105,10 @@
         weight: results.totalWeight,
         cgPosition: results.cgPosition
       },
-      category: results.category || undefined
+      category: results.category || undefined,
+      useMACDisplay,
+      lemac: aircraft.lemac,
+      mac: aircraft.mac
     });
   }
   
@@ -475,9 +484,13 @@
         <div class="flex gap-2 flex-wrap">
           {#if hasMACData(aircraft.lemac, aircraft.mac)}
             <button 
-              onclick={() => useMACDisplay = !useMACDisplay}
+              onclick={() => {
+                useMACDisplay = !useMACDisplay;
+                updateEnvelopeChart();
+              }}
               class="px-4 py-2 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500 text-indigo-300 rounded transition-colors flex items-center gap-2"
               title="Toggle Station/%MAC Display"
+              aria-pressed={useMACDisplay}
             >
               {useMACDisplay ? '📐 %MAC' : '📏 Station'}
             </button>
@@ -997,6 +1010,11 @@
   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showEnvelopeDialog = false)}>
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <h2 class="text-xl font-semibold text-white mb-4">Edit W&B Envelope</h2>
+      {#if useMACDisplay && hasMACData(aircraft.lemac, aircraft.mac)}
+        <div class="mb-4 p-3 bg-indigo-500/10 border border-indigo-500/30 rounded text-sm text-indigo-300">
+          📐 <strong>%MAC Display Active:</strong> Inputs below are in station units (inches). Display values shown for reference.
+        </div>
+      {/if}
       <div class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <div>
@@ -1023,22 +1041,36 @@
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm text-gray-400 mb-2">Forward Limit (in)</label>
+            <label class="block text-sm text-gray-400 mb-2">
+              Forward Limit ({getCGPositionLabel(useMACDisplay)})
+            </label>
             <input 
               type="number"
               bind:value={editingEnvelope.forwardLimit}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
               step="0.1"
             />
+            {#if useMACDisplay && hasMACData(aircraft.lemac, aircraft.mac) && editingEnvelope.forwardLimit}
+              <div class="text-xs text-gray-500 mt-1">
+                Display: {mapCGToDisplay(editingEnvelope.forwardLimit, useMACDisplay, aircraft.lemac, aircraft.mac).toFixed(1)}% MAC
+              </div>
+            {/if}
           </div>
           <div>
-            <label class="block text-sm text-gray-400 mb-2">Aft Limit (in)</label>
+            <label class="block text-sm text-gray-400 mb-2">
+              Aft Limit ({getCGPositionLabel(useMACDisplay)})
+            </label>
             <input 
               type="number"
               bind:value={editingEnvelope.aftLimit}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
               step="0.1"
             />
+            {#if useMACDisplay && hasMACData(aircraft.lemac, aircraft.mac) && editingEnvelope.aftLimit}
+              <div class="text-xs text-gray-500 mt-1">
+                Display: {mapCGToDisplay(editingEnvelope.aftLimit, useMACDisplay, aircraft.lemac, aircraft.mac).toFixed(1)}% MAC
+              </div>
+            {/if}
           </div>
         </div>
         <div>
@@ -1069,9 +1101,14 @@
                     type="number"
                     bind:value={vertex.cgPosition}
                     class="w-full px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:border-blue-500 focus:outline-none"
-                    placeholder="CG Position (in)"
+                    placeholder={`CG Position (${useMACDisplay ? '% MAC' : 'in'})`}
                     step="0.1"
                   />
+                  {#if useMACDisplay && hasMACData(aircraft.lemac, aircraft.mac) && vertex.cgPosition}
+                    <div class="text-xs text-gray-500 mt-0.5">
+                      {mapCGToDisplay(vertex.cgPosition, useMACDisplay, aircraft.lemac, aircraft.mac).toFixed(1)}%
+                    </div>
+                  {/if}
                 </div>
                 <button
                   onclick={() => removeEnvelopeVertex(idx)}
