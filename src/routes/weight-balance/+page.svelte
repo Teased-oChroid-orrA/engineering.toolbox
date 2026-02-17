@@ -844,7 +844,13 @@
 
 <!-- Save Dialog -->
 {#if showSaveDialog}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showSaveDialog = false)}>
+  <div 
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" 
+    role="button"
+    tabindex="0"
+    onclick={(e) => e.target === e.currentTarget && (showSaveDialog = false)}
+    onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showSaveDialog = false)}
+    aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
       <h2 class="text-xl font-semibold text-white mb-4">Save Configuration</h2>
       <div class="mb-4">
@@ -855,7 +861,6 @@
           bind:value={configName}
           class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
           placeholder="Enter configuration name"
-          autofocus
         />
       </div>
       <div class="flex gap-2 justify-end">
@@ -878,7 +883,13 @@
 
 <!-- Add Item Dialog -->
 {#if showAddItemDialog}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showAddItemDialog = false)}>
+  <div 
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" 
+    role="button"
+    tabindex="0"
+    onclick={(e) => e.target === e.currentTarget && (showAddItemDialog = false)}
+    onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showAddItemDialog = false)}
+    aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
       <h2 class="text-xl font-semibold text-white mb-4">Add Custom Item</h2>
       <div class="space-y-4">
@@ -890,7 +901,6 @@
             bind:value={newItemName}
             class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
             placeholder="e.g., Extra Baggage"
-            autofocus
           />
         </div>
         <div>
@@ -954,7 +964,7 @@
 
 <!-- Aircraft Selection Dialog -->
 {#if showAircraftDialog}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showAircraftDialog = false)}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="button" tabindex="0" onclick={(e) => e.target === e.currentTarget && (showAircraftDialog = false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showAircraftDialog = false)} aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <h2 class="text-xl font-semibold text-white mb-4">Select Aircraft</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1015,7 +1025,7 @@
 
 <!-- Envelope Editor Dialog -->
 {#if showEnvelopeDialog && editingEnvelope}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showEnvelopeDialog = false)}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="button" tabindex="0" onclick={(e) => e.target === e.currentTarget && (showEnvelopeDialog = false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showEnvelopeDialog = false)} aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <h2 class="text-xl font-semibold text-white mb-4">Edit W&B Envelope</h2>
       {#if useMACDisplay && hasMACData(aircraft.lemac, aircraft.mac)}
@@ -1182,7 +1192,7 @@
 
 <!-- Item Library Dialog -->
 {#if showItemLibraryDialog}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showItemLibraryDialog = false)}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="button" tabindex="0" onclick={(e) => e.target === e.currentTarget && (showItemLibraryDialog = false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showItemLibraryDialog = false)} aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <h2 class="text-xl font-semibold text-white mb-4">Item Library</h2>
       <div class="mb-4">
@@ -1246,7 +1256,7 @@
 
 <!-- My Templates Dialog -->
 {#if showTemplatesDialog}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showTemplatesDialog = false)}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="button" tabindex="0" onclick={(e) => e.target === e.currentTarget && (showTemplatesDialog = false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showTemplatesDialog = false)} aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <h2 class="text-xl font-semibold text-white mb-4">My Templates</h2>
       {#if userTemplates.length === 0}
@@ -1305,7 +1315,7 @@
 
 <!-- Save Template Dialog -->
 {#if showSaveTemplateDialog && selectedItemForTemplate}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showSaveTemplateDialog = false)}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="button" tabindex="0" onclick={(e) => e.target === e.currentTarget && (showSaveTemplateDialog = false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showSaveTemplateDialog = false)} aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
       <h2 class="text-xl font-semibold text-white mb-4">Save as Template</h2>
       <div class="space-y-4">
@@ -1370,7 +1380,7 @@
 
 <!-- Ballast Calculation Dialog -->
 {#if showBallastDialog && ballastSolution}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showBallastDialog = false)}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="button" tabindex="0" onclick={(e) => e.target === e.currentTarget && (showBallastDialog = false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showBallastDialog = false)} aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-lg w-full mx-4">
       <h2 class="text-xl font-semibold text-white mb-4">⚖️ Ballast Calculation</h2>
       
@@ -1423,7 +1433,7 @@
 
 <!-- MAC Configuration Dialog -->
 {#if showMACDialog}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={(e) => e.target === e.currentTarget && (showMACDialog = false)}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="button" tabindex="0" onclick={(e) => e.target === e.currentTarget && (showMACDialog = false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showMACDialog = false)} aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
       <h2 class="text-xl font-semibold text-white mb-4">⚙️ MAC Reference Configuration</h2>
       
