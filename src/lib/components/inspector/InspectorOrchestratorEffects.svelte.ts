@@ -8,27 +8,7 @@
 
 import type { RecipeState } from '$lib/components/inspector/InspectorOrchestratorDeps';
 import { devLog } from '$lib/utils/devLog';
-
-export type NumericFilter = {
-  enabled: boolean;
-  colIdx: number | null;
-  minText: string;
-  maxText: string;
-};
-
-export type DateFilter = {
-  enabled: boolean;
-  colIdx: number | null;
-  minIso: string;
-  maxIso: string;
-};
-
-export type CategoryFilter = {
-  enabled: boolean;
-  colIdx: number | null;
-  selected: Set<string> | null;
-};
-
+import type { NumericFilter, DateFilter, CategoryFilter } from './InspectorOrchestratorEffectsTypes';
 // ========================= Effect 1: showDataControls =========================
 export function setupShowDataControlsEffect(deps: {
   hasLoadedDatasetSignals: (params: {
