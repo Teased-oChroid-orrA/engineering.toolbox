@@ -63,7 +63,8 @@
     "verify:inspector-sticky-query": "playwright test tests/inspector-sticky-query.spec.ts",
     "verify:inspector-scroll-smoothness": "playwright test tests/inspector-scroll-smoothness.spec.ts",
     "verify:inspector-ux": "npm run -s verify:inspector-overlay-visibility && npm run -s verify:inspector-sticky-query && npm run -s verify:inspector-scroll-smoothness",
-    "benchmark:virtual": "node ./scripts/benchmark-virtualization.mjs"
+    "benchmark:virtual": "node ./scripts/benchmark-virtualization.mjs",
+    "test:unit": "playwright test --config=playwright.unit.config.ts"
   },
   "dependencies": {
     "@babylonjs/core": "^8.50.5",
