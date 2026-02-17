@@ -46,6 +46,7 @@
     addToRecentConfigurations,
     type SavedConfiguration
   } from '$lib/core/weight-balance/storage';
+  import { wbLogger } from '$lib/utils/loggers';
   
   let aircraft = $state<AircraftProfile>(SAMPLE_CESSNA_172S);
   let items = $state<LoadingItem[]>(createSampleLoading('c172s'));
@@ -83,7 +84,7 @@
   function recalculate() {
     const validation = validateInput(aircraft, items);
     if (!validation.valid) {
-      console.error('Validation errors:', validation.errors);
+      wbLogger.error('Validation errors', { errors: validation.errors });
       return;
     }
     

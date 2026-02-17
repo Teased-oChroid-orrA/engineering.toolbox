@@ -1,3 +1,5 @@
+import { uiLogger } from '$lib/utils/loggers';
+
 export type ContextMenuScope = 'inspector' | 'surface' | 'bushing';
 
 export type ContextMenuAction = {
@@ -39,13 +41,13 @@ function writeRegistry(next: MenuRegistry): void {
 
 export function registerContextMenu(registration: ContextMenuRegistration): void {
   if (typeof window === 'undefined') return;
-  console.log('[MENU DEBUG] registerContextMenu called with:', registration);
+  uiLogger.debug('registerContextMenu called', registration);
   writeRegistry({ ...readRegistry(), [registration.scope]: registration });
-  console.log('[MENU DEBUG] Dispatching event:', CONTEXT_MENU_REGISTER_EVENT);
+  uiLogger.debug('Dispatching event', { event: CONTEXT_MENU_REGISTER_EVENT });
   window.dispatchEvent(
     new CustomEvent<ContextMenuRegistration>(CONTEXT_MENU_REGISTER_EVENT, { detail: registration })
   );
-  console.log('[MENU DEBUG] Event dispatched successfully');
+  uiLogger.debug('Event dispatched successfully');
 }
 
 export function clearContextMenu(scope: ContextMenuScope): void {
@@ -58,11 +60,11 @@ export function clearContextMenu(scope: ContextMenuScope): void {
 
 export function emitContextMenuCommand(scope: ContextMenuScope, id: string): void {
   if (typeof window === 'undefined') return;
-  console.log('[MENU CMD] emitContextMenuCommand called, scope:', scope, 'id:', id);
+  uiLogger.debug('emitContextMenuCommand called', { scope, id });
   const event = new CustomEvent<{ scope: ContextMenuScope; id: string }>(CONTEXT_MENU_COMMAND_EVENT, { detail: { scope, id } });
-  console.log('[MENU CMD] Dispatching event:', CONTEXT_MENU_COMMAND_EVENT, 'detail:', { scope, id });
+  uiLogger.debug('Dispatching event', { event: CONTEXT_MENU_COMMAND_EVENT, detail: { scope, id } });
   window.dispatchEvent(event);
-  console.log('[MENU CMD] Event dispatched');
+  uiLogger.debug('Event dispatched');
 }
 
 export function getRegisteredContextMenus(): MenuRegistry {

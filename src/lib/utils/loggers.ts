@@ -52,3 +52,7 @@ export const persistenceLogger = createLogger('Persistence');
 // Error loggers
 export const errorLogger = createLogger('Error');
 export const validationLogger = createLogger('Validation');
+
+// UI loggers
+export const uiLogger = createLogger('UI');
+export const themeLogger = createLogger('Theme');

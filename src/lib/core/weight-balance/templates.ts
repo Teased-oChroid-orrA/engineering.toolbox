@@ -4,6 +4,7 @@
  */
 
 import type { LoadingItem } from './types';
+import { wbLogger } from '$lib/utils/loggers';
 
 const TEMPLATES_STORAGE_KEY = 'wb.item.templates.v1';
 
@@ -36,7 +37,7 @@ export function loadTemplates(): ItemTemplate[] {
     const library: TemplateLibrary = JSON.parse(stored);
     return library.templates || [];
   } catch (error) {
-    console.error('Failed to load item templates:', error);
+    wbLogger.error('Failed to load item templates', error);
     return [];
   }
 }
@@ -55,7 +56,7 @@ export function saveTemplates(templates: ItemTemplate[]): boolean {
     localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(library, null, 2));
     return true;
   } catch (error) {
-    console.error('Failed to save item templates:', error);
+    wbLogger.error('Failed to save item templates', error);
     return false;
   }
 }
@@ -227,7 +228,7 @@ export function importTemplates(jsonString: string, merge: boolean = false): boo
     
     return saveTemplates(finalTemplates);
   } catch (error) {
-    console.error('Failed to import templates:', error);
+    wbLogger.error('Failed to import templates', error);
     return false;
   }
 }
