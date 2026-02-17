@@ -1026,8 +1026,9 @@
       <div class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm text-gray-400 mb-2">Category</label>
+            <label for="envelope-category" class="block text-sm text-gray-400 mb-2">Category</label>
             <select 
+              id="envelope-category"
               bind:value={editingEnvelope.category}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
             >
@@ -1037,8 +1038,9 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm text-gray-400 mb-2">Max Weight (lbs)</label>
+            <label for="envelope-max-weight" class="block text-sm text-gray-400 mb-2">Max Weight (lbs)</label>
             <input 
+              id="envelope-max-weight"
               type="number"
               bind:value={editingEnvelope.maxWeight}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
@@ -1049,10 +1051,11 @@
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm text-gray-400 mb-2">
+            <label for="envelope-forward-limit" class="block text-sm text-gray-400 mb-2">
               Forward Limit ({getCGPositionLabel(useMACDisplay)})
             </label>
             <input 
+              id="envelope-forward-limit"
               type="number"
               bind:value={editingEnvelope.forwardLimit}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
@@ -1065,10 +1068,11 @@
             {/if}
           </div>
           <div>
-            <label class="block text-sm text-gray-400 mb-2">
+            <label for="envelope-aft-limit" class="block text-sm text-gray-400 mb-2">
               Aft Limit ({getCGPositionLabel(useMACDisplay)})
             </label>
             <input 
+              id="envelope-aft-limit"
               type="number"
               bind:value={editingEnvelope.aftLimit}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
@@ -1083,7 +1087,7 @@
         </div>
         <div>
           <div class="flex items-center justify-between mb-2">
-            <label class="text-sm text-gray-400">Envelope Vertices</label>
+            <div class="text-sm text-gray-400">Envelope Vertices</div>
             <button
               onclick={addEnvelopeVertex}
               class="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500 text-blue-300 rounded text-xs transition-colors"
@@ -1306,8 +1310,9 @@
       <h2 class="text-xl font-semibold text-white mb-4">Save as Template</h2>
       <div class="space-y-4">
         <div>
-          <label class="block text-sm text-gray-400 mb-2">Template Name</label>
+          <label for="template-name" class="block text-sm text-gray-400 mb-2">Template Name</label>
           <input 
+            id="template-name"
             type="text"
             bind:value={templateName}
             class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
@@ -1315,8 +1320,9 @@
           />
         </div>
         <div>
-          <label class="block text-sm text-gray-400 mb-2">Description (optional)</label>
+          <label for="template-description" class="block text-sm text-gray-400 mb-2">Description (optional)</label>
           <textarea 
+            id="template-description"
             bind:value={templateDescription}
             class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
             rows="2"
@@ -1324,8 +1330,9 @@
           ></textarea>
         </div>
         <div>
-          <label class="block text-sm text-gray-400 mb-2">Category</label>
+          <label for="template-category" class="block text-sm text-gray-400 mb-2">Category</label>
           <select 
+            id="template-category"
             bind:value={templateCategory}
             class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
           >
@@ -1428,10 +1435,11 @@
       
       <div class="space-y-4 mb-6">
         <div>
-          <label class="block text-sm text-gray-400 mb-2">
+          <label for="mac-lemac" class="block text-sm text-gray-400 mb-2">
             LEMAC - Leading Edge MAC (inches from datum)
           </label>
           <input 
+            id="mac-lemac"
             type="number"
             value={aircraft.lemac || 0}
             oninput={(e) => {
@@ -1444,10 +1452,11 @@
           />
         </div>
         <div>
-          <label class="block text-sm text-gray-400 mb-2">
+          <label for="mac-length" class="block text-sm text-gray-400 mb-2">
             MAC Length (inches)
           </label>
           <input 
+            id="mac-length"
             type="number"
             value={aircraft.mac || 0}
             oninput={(e) => {
