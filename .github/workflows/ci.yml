@@ -24,8 +24,29 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Cache SvelteKit build output
+        uses: actions/cache@v4
+        with:
+          path: |
+            .svelte-kit
+            build
+          key: ${{ runner.os }}-svelte-build-${{ hashFiles('src/**', 'static/**', 'svelte.config.js', 'vite.config.ts', 'package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-svelte-build-
 
       - name: Type and feature checks
         run: npm run check
@@ -33,10 +54,6 @@ jobs:
       - name: Build frontend (includes build verification)
         run: npm run build
       
-      - name: Run file size policy
-        run: npm run -s verify:file-size-policy
-        continue-on-error: true
-
       - name: Run file size policy V2 (warn mode)
         run: npm run verify:file-size-policy:v2:warn
         continue-on-error: true
@@ -44,4 +61,21 @@ jobs:
       - name: Run unit tests
         run: npm run test:unit
         if: hashFiles('playwright.unit.config.ts') != ''
-        continue-on-error: true
+
+      - name: CI Success Summary
+        if: success()
+        run: |
+          echo "✅ All CI checks passed!"
+          echo "- Type checking: ✓"
+          echo "- Build: ✓"
+          echo "- Tests: ✓"
+
+      - name: CI Failure Summary
+        if: failure()
+        run: |
+          echo "❌ CI checks failed!"
+          echo "Please run locally before pushing:"
+          echo "  npm run check"
+          echo "  npm run build"
+          echo "  npm run test:unit"
+          exit 1
