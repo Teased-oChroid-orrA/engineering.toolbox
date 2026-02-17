@@ -15,7 +15,7 @@ function mountSurfaceDevErrorLogger(getLastAction: () => string) {
   w.__scSurfaceErrLoggerPatched = true;
   const safeLog = (...args: any[]) => {
     try {
-      surfaceLogger.error(...args);
+      surfaceLogger.error(args.join(' '), args.length > 1 ? args.slice(1) : undefined);
     } catch {}
   };
   window.addEventListener('error', (ev: ErrorEvent) => {

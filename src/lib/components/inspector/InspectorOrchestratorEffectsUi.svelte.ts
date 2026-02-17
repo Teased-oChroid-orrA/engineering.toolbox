@@ -1,5 +1,4 @@
 /**
-import { inspectorLogger } from '$lib/utils/loggers';
  * InspectorOrchestratorEffectsUi.svelte.ts
  * 
  * UI-specific $effect blocks extracted from InspectorOrchestratorEffects.svelte.ts.
@@ -9,6 +8,7 @@ import { inspectorLogger } from '$lib/utils/loggers';
 import { invoke } from '@tauri-apps/api/core';
 import { DEFAULT_GRID_WINDOW_SIZE } from '$lib/components/inspector/InspectorGridConstants';
 import { devLog } from '$lib/utils/devLog';
+import { inspectorLogger } from '$lib/utils/loggers';
 
 // ========================= Effect 1: uiAnimDur effect =========================
 export function setupUiAnimDurEffect(deps: {
