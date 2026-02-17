@@ -1,4 +1,5 @@
 import { devLog } from '$lib/utils/devLog';
+import { inspectorLogger } from '$lib/utils/loggers';
 import { MAX_BROWSER_MODE_ROWS } from '$lib/components/inspector/InspectorGridConstants';
 import type { LoadControllerContext } from './InspectorControllerContext';
 import { resetBrowserModeOriginalRows } from './InspectorOrchestratorFilterController';
@@ -11,9 +12,9 @@ export async function loadCsvFromText(
   forcedLabel?: string,
   applyInitialFilter = true
 ) {
-  console.error('★★★ LOAD CONTROLLER EXECUTING ★★★ text length:', text.length);
-  console.log('[LOAD CTRL] loadCsvFromText called, text length:', text.length);
-  console.log('[LOAD CTRL] hasHeadersOverride:', hasHeadersOverride, 'trackWorkspace:', trackWorkspace);
+  inspectorLogger.error('★★★ LOAD CONTROLLER EXECUTING ★★★ text length:', text.length);
+  inspectorLogger.debug('[LOAD CTRL] loadCsvFromText called, text length:', text.length);
+  inspectorLogger.debug('[LOAD CTRL] hasHeadersOverride:', hasHeadersOverride, 'trackWorkspace:', trackWorkspace);
   
   // Reset browser mode original rows when loading new CSV
   resetBrowserModeOriginalRows();
@@ -62,7 +63,7 @@ export async function loadCsvFromText(
         resp = (await ctx.invoke('inspector_load_csv_text', { text, hasHeaders: ctx.hasHeaders })) as any;
       }
     } catch (backendError) {
-      console.error('[LOAD CSV] Backend error, trying browser fallback:', backendError);
+      inspectorLogger.error('[LOAD CSV] Backend error, trying browser fallback:', backendError);
       const { parseCsvInBrowser } = await import('$lib/utils/csvParser');
       const parsed = parseCsvInBrowser(text, ctx.hasHeaders);
       browserModeRows = parsed.rows;

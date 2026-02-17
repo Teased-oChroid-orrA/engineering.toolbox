@@ -1,4 +1,5 @@
 import { clearContextMenu, CONTEXT_MENU_COMMAND_EVENT } from '$lib/navigation/contextualMenu';
+import { inspectorLogger } from '$lib/utils/loggers';
 
 type InspectorLifecycleCtx = {
   invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
@@ -74,16 +75,16 @@ function createInspectorKeyHandler(ctx: InspectorLifecycleCtx) {
 function createInspectorContextMenuHandler(ctx: InspectorLifecycleCtx) {
   return (e: Event) => {
     const detail = (e as CustomEvent<{ scope: string; id: string }>).detail;
-    console.log('[MENU ACTION] Event received, detail:', detail);
+    inspectorLogger.debug('Menu action event received', detail);
     if (!detail || detail.scope !== 'inspector') return;
     const id = detail.id;
-    console.log('[MENU ACTION] Processing inspector action:', id);
+    inspectorLogger.debug('Processing inspector action', { id });
     if (id === 'load_stream') {
-      console.log('[MENU ACTION] Calling openStreamLoadFromMenu');
+      inspectorLogger.debug('Calling openStreamLoadFromMenu');
       return void ctx.openStreamLoadFromMenu();
     }
     if (id === 'load_fallback') {
-      console.log('[MENU ACTION] Calling openFallbackLoadFromMenu');
+      inspectorLogger.debug('Calling openFallbackLoadFromMenu');
       return ctx.openFallbackLoadFromMenu();
     }
     if (id === 'open_schema') return ctx.openSchema();
@@ -157,7 +158,7 @@ export function mountInspectorLifecycle(ctx: InspectorLifecycleCtx): () => void 
   const onContextMenuCommand = createInspectorContextMenuHandler(ctx);
   window.addEventListener('keydown', onKey);
   window.addEventListener(CONTEXT_MENU_COMMAND_EVENT, onContextMenuCommand as EventListener);
-  console.log('[Inspector Menu] Event listener attached for:', CONTEXT_MENU_COMMAND_EVENT);
+  inspectorLogger.debug('Event listener attached for context menu', { event: CONTEXT_MENU_COMMAND_EVENT });
 
   return () => {
     window.removeEventListener('error', resizeObserverNoiseGuard);

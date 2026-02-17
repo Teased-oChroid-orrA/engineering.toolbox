@@ -1,4 +1,5 @@
 import type { IFilter, IFilterSet } from '@svar-ui/svelte-filter';
+import { inspectorLogger } from '$lib/utils/loggers';
 import { devLog } from '$lib/utils/devLog';
 import type { FilterControllerContext } from './InspectorControllerContext';
 import {
@@ -231,10 +232,10 @@ export async function applyFilterSpec(ctx: FilterControllerContext, spec: any): 
 }
 
 export async function runFilterNow(ctx: FilterControllerContext, forceCurrent = false) {
-  console.error('★★★ RUN FILTER NOW CALLED ★★★');
-  console.error('[FILTER NOW] loadState._id:', (ctx as any).loadState?._id);
-  console.error('[FILTER NOW] loadState.hasLoaded:', (ctx as any).loadState?.hasLoaded);
-  console.error('[FILTER NOW] ctx.hasLoaded:', ctx.hasLoaded);
+  inspectorLogger.error('★★★ RUN FILTER NOW CALLED ★★★');
+  inspectorLogger.error('[FILTER NOW] loadState._id:', (ctx as any).loadState?._id);
+  inspectorLogger.error('[FILTER NOW] loadState.hasLoaded:', (ctx as any).loadState?.hasLoaded);
+  inspectorLogger.error('[FILTER NOW] ctx.hasLoaded:', ctx.hasLoaded);
   devLog('FILTER NOW CONTROLLER', 'Entry - hasLoaded:', ctx.hasLoaded, 'isMergedView:', ctx.isMergedView);
   
   ctx.queueDebugRate('runFilterNow', 150, 'runFilterNow', {
@@ -247,7 +248,7 @@ export async function runFilterNow(ctx: FilterControllerContext, forceCurrent = 
   });
   
   if (!ctx.hasLoaded || ctx.suspendReactiveFiltering) {
-    console.error('★★★ EARLY EXIT 1 ★★★ hasLoaded:', ctx.hasLoaded, 'suspended:', ctx.suspendReactiveFiltering);
+    inspectorLogger.error('★★★ EARLY EXIT 1 ★★★ hasLoaded:', ctx.hasLoaded, 'suspended:', ctx.suspendReactiveFiltering);
     devLog('FILTER NOW', 'Early exit: hasLoaded:', ctx.hasLoaded, 'suspended:', ctx.suspendReactiveFiltering);
     return;
   }
@@ -255,7 +256,7 @@ export async function runFilterNow(ctx: FilterControllerContext, forceCurrent = 
   devLog('FILTER NOW', 'Passed early checks');
   
   if (ctx.crossQueryBusy) {
-    console.error('★★★ EARLY EXIT 2 ★★★ crossQueryBusy:', ctx.crossQueryBusy);
+    inspectorLogger.error('★★★ EARLY EXIT 2 ★★★ crossQueryBusy:', ctx.crossQueryBusy);
     return;
   }
   if (!forceCurrent && ctx.loadedDatasets.length > 1 && ctx.queryScope !== 'current') {
@@ -284,7 +285,7 @@ export async function runFilterNow(ctx: FilterControllerContext, forceCurrent = 
 }
 
 export async function drainFilterQueue(ctx: FilterControllerContext) {
-  console.error('★★★ DRAIN FILTER QUEUE CALLED ★★★');
+  inspectorLogger.error('★★★ DRAIN FILTER QUEUE CALLED ★★★');
   devLog('DRAIN FILTER QUEUE', 'Called - filterInFlight:', ctx.filterInFlight, 'hasLoaded:', ctx.hasLoaded);
   if (ctx.filterInFlight || !ctx.hasLoaded) {
     devLog('DRAIN FILTER QUEUE', 'Early exit - filterInFlight:', ctx.filterInFlight, 'hasLoaded:', ctx.hasLoaded);
@@ -329,7 +330,7 @@ export async function runFilterPass(ctx: FilterControllerContext) {
     // This fix prevents the infinite loop: runFilterPass → fetchVisibleSlice → updates visibleRows → triggers effect → runFilterPass
     devLog('FILTER PASS', 'Filter complete. Slice fetch effect will handle fetching with proper grid indices.');
   } catch (err: any) {
-    console.error('[FILTER PASS ERROR]', err);
+    inspectorLogger.error('[FILTER PASS ERROR]', err);
     const msg = err?.message ?? String(err);
     if (ctx.matchMode === 'regex') ctx.queryError = msg;
     else ctx.loadError = msg;

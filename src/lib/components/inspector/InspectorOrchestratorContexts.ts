@@ -1,4 +1,5 @@
 import type { IFilterSet } from '@svar-ui/svelte-filter';
+import { inspectorLogger } from '$lib/utils/loggers';
 import type { GenTab, MultiQueryClause, Recipe, RecipeState } from '$lib/components/inspector/InspectorOrchestratorDeps';
 import type { 
   SchemaColStat, 
@@ -263,9 +264,9 @@ export function loadControllerCtxStateMain(state: {
     set pendingRestore(v: RecipeState | null) { state.pendingRestore = v; },
     get hasLoaded() { return state.loadState.hasLoaded; },
     set hasLoaded(v: boolean) { 
-      console.error('★★★ SET hasLoaded to:', v);
+      inspectorLogger.error('★★★ SET hasLoaded to:', v);
       state.loadState.hasLoaded = v;
-      console.error('★★★ loadState.hasLoaded is now:', state.loadState.hasLoaded);
+      inspectorLogger.error('★★★ loadState.hasLoaded is now:', state.loadState.hasLoaded);
     },
     get showDataControls() { return state.showDataControls; },
     set showDataControls(v: boolean) { state.showDataControls = v; },
@@ -491,7 +492,7 @@ export function gridControllerCtx(state: {
     set mergedRowsAll(v: string[][]) { state.loadState.mergedRowsAll = v; },
     get visibleRows() { return state.loadState.visibleRows; },
     set visibleRows(v: string[][]) { 
-      console.log('[GRID CTX] Setting visibleRows, length:', v?.length, 'first row:', v?.[0]);
+      inspectorLogger.debug('[GRID CTX] Setting visibleRows, length:', v?.length, 'first row:', v?.[0]);
       state.loadState.visibleRows = v;
       state.loadState._version++;  // Increment version to force reactivity
     },

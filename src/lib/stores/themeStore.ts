@@ -4,6 +4,7 @@
  */
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
+import { themeLogger } from '$lib/utils/loggers';
 
 export type ThemeMode = 'light' | 'dark' | 'teal-light' | 'teal-dark';
 
@@ -18,7 +19,7 @@ function loadTheme(): ThemeMode {
       return saved as ThemeMode;
     }
   } catch (e) {
-    console.warn('[Theme] Failed to load theme:', e);
+    themeLogger.warn('Failed to load theme', e);
   }
   return DEFAULT_THEME;
 }
@@ -28,7 +29,7 @@ function saveTheme(mode: ThemeMode) {
   try {
     localStorage.setItem(THEME_KEY, mode);
   } catch (e) {
-    console.warn('[Theme] Failed to save theme:', e);
+    themeLogger.warn('Failed to save theme', e);
   }
 }
 

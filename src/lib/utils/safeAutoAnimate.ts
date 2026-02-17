@@ -9,6 +9,7 @@
 //   // ctrl?.disable() on destroy if desired.
 
 import autoAnimate from '@formkit/auto-animate';
+import { uiLogger } from './loggers';
 
 export function isWebKitRuntime(): boolean {
   if (typeof navigator === 'undefined') return false;
@@ -33,8 +34,7 @@ export function safeAutoAnimate(
     // @ts-ignore
     return autoAnimate(el, options);
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn('[auto-animate] disabled due to error', err);
+    uiLogger.warn('auto-animate disabled due to error', err);
     return null;
   }
 }
