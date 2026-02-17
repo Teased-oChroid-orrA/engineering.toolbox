@@ -592,16 +592,17 @@
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="text-sm text-gray-400">Aircraft</label>
+              <div class="text-sm text-gray-400">Aircraft</div>
               <div class="text-white font-mono">{aircraft.name}</div>
             </div>
             <div>
-              <label class="text-sm text-gray-400">Model</label>
+              <div class="text-sm text-gray-400">Model</div>
               <div class="text-white font-mono">{aircraft.model}</div>
             </div>
             <div>
-              <label class="text-sm text-gray-400">Basic Empty Weight</label>
+              <label for="basic-empty-weight" class="text-sm text-gray-400">Basic Empty Weight</label>
               <input 
+                id="basic-empty-weight"
                 type="number"
                 value={displayWeight(aircraft.basicEmptyWeight, displayUnits).toFixed(displayUnits === 'metric' ? 1 : 0)}
                 oninput={(e) => {
@@ -614,8 +615,9 @@
               />
             </div>
             <div>
-              <label class="text-sm text-gray-400">BEW Arm</label>
+              <label for="bew-arm" class="text-sm text-gray-400">BEW Arm</label>
               <input 
+                id="bew-arm"
                 type="number"
                 value={displayArm(aircraft.basicEmptyWeightArm, displayUnits).toFixed(1)}
                 oninput={(e) => {
@@ -627,8 +629,9 @@
               />
             </div>
             <div>
-              <label class="text-sm text-gray-400">Max Takeoff Weight</label>
+              <label for="max-takeoff-weight" class="text-sm text-gray-400">Max Takeoff Weight</label>
               <input 
+                id="max-takeoff-weight"
                 type="number"
                 value={displayWeight(aircraft.maxTakeoffWeight, displayUnits).toFixed(displayUnits === 'metric' ? 1 : 0)}
                 oninput={(e) => {
@@ -641,7 +644,7 @@
               />
             </div>
             <div>
-              <label class="text-sm text-gray-400">Datum</label>
+              <div class="text-sm text-gray-400">Datum</div>
               <div class="text-white font-mono capitalize">{aircraft.datumLocation.type.replace('_', ' ')}</div>
             </div>
           </div>
@@ -845,8 +848,9 @@
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4">
       <h2 class="text-xl font-semibold text-white mb-4">Save Configuration</h2>
       <div class="mb-4">
-        <label class="block text-sm text-gray-400 mb-2">Configuration Name</label>
+        <label for="config-name" class="block text-sm text-gray-400 mb-2">Configuration Name</label>
         <input 
+          id="config-name"
           type="text"
           bind:value={configName}
           class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
@@ -879,8 +883,9 @@
       <h2 class="text-xl font-semibold text-white mb-4">Add Custom Item</h2>
       <div class="space-y-4">
         <div>
-          <label class="block text-sm text-gray-400 mb-2">Item Name</label>
+          <label for="item-name" class="block text-sm text-gray-400 mb-2">Item Name</label>
           <input 
+            id="item-name"
             type="text"
             bind:value={newItemName}
             class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
@@ -889,8 +894,9 @@
           />
         </div>
         <div>
-          <label class="block text-sm text-gray-400 mb-2">Item Type</label>
+          <label for="item-type" class="block text-sm text-gray-400 mb-2">Item Type</label>
           <select 
+            id="item-type"
             bind:value={newItemType}
             class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
           >
@@ -906,8 +912,9 @@
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm text-gray-400 mb-2">Weight ({getWeightUnit(displayUnits)})</label>
+            <label for="item-weight" class="block text-sm text-gray-400 mb-2">Weight ({getWeightUnit(displayUnits)})</label>
             <input 
+              id="item-weight"
               type="number"
               bind:value={newItemWeight}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
@@ -916,8 +923,9 @@
             />
           </div>
           <div>
-            <label class="block text-sm text-gray-400 mb-2">Arm ({getArmUnit(displayUnits)})</label>
+            <label for="item-arm" class="block text-sm text-gray-400 mb-2">Arm ({getArmUnit(displayUnits)})</label>
             <input 
+              id="item-arm"
               type="number"
               bind:value={newItemArm}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
