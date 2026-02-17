@@ -41,6 +41,8 @@
   export let drawerList: any[] = [];
   export let drawerExplain: any = null;
   export let headerHeuristicReason: string | null = null;
+  export let headerConfidence: number | null = null;
+  export let autoDecision: boolean | null = null;
   export let visibleColumns: any = [];
   export let columnPickerNotice: string | null = null;
   export let svarFields: any[] = [];
@@ -135,6 +137,8 @@
   {drawerList}
   {drawerExplain}
   {headerHeuristicReason}
+  {headerConfidence}
+  {autoDecision}
   {visibleColumns}
   {columnPickerNotice}
   {svarFields}

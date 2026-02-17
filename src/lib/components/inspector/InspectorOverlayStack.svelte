@@ -52,6 +52,8 @@
   export let drawerList: any[];
   export let drawerExplain: any;
   export let headerHeuristicReason: string;
+  export let headerConfidence: number | null = null;
+  export let autoDecision: boolean | null = null;
   export let visibleColumns: Set<number>;
   export let columnPickerNotice: string | null;
   export let svarFields: any[];
@@ -200,7 +202,7 @@
   />
 </InspectorOverlayPortal>
 
-<InspectorOverlayPortal><InspectorHeaderPromptModal open={showHeaderPrompt} {uiAnimDur} {headerHeuristicReason} onCancel={cancelHeaderPrompt} onChoose={applyHeaderChoice} /></InspectorOverlayPortal>
+<InspectorOverlayPortal><InspectorHeaderPromptModal open={showHeaderPrompt} {uiAnimDur} {headerHeuristicReason} {headerConfidence} {autoDecision} onCancel={cancelHeaderPrompt} onChoose={applyHeaderChoice} /></InspectorOverlayPortal>
 <InspectorOverlayPortal><InspectorColumnPickerModal open={showColumnPicker} {uiAnimDur} {headers} {visibleColumns} {columnPickerNotice} onClose={() => (showColumnPicker = false)} onSmartSelect={smartSelectColumns} onSelectAll={selectAllColumns} onAutoDefault={clearColumnSelection} onToggle={toggleVisibleCol} /></InspectorOverlayPortal>
 <InspectorOverlayPortal>
   <InspectorSvarBuilderModal

@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-
   type Dataset = {
     id: string;
     label: string;
@@ -11,18 +9,17 @@
     activeDatasetId = '',
     crossQueryBusy = false,
     isMergedView = false,
-    mergedRowsCount = 0
+    mergedRowsCount = 0,
+    onActivate = () => {},
+    onUnload = () => {}
   } = $props<{
     loadedDatasets?: Dataset[];
     activeDatasetId?: string;
     crossQueryBusy?: boolean;
     isMergedView?: boolean;
     mergedRowsCount?: number;
-  }>();
-
-  const dispatch = createEventDispatcher<{
-    activate: { id: string };
-    unload: { id: string };
+    onActivate?: (id: string) => void;
+    onUnload?: (id: string) => void;
   }>();
 </script>
 
@@ -39,7 +36,7 @@
         <div class={`inline-flex items-center rounded-lg border inspector-pop-sub ${activeDatasetId === ds.id ? 'border-emerald-300/40 bg-emerald-500/15' : 'border-white/10 bg-white/5'}`}>
           <button
             class={`btn btn-xs border-0 ${activeDatasetId === ds.id ? 'variant-filled' : 'variant-soft'}`}
-            onclick={() => dispatch('unload', { id: ds.id })}
+            onclick={() => onUnload(ds.id)}
             title={`Click to unload: ${ds.label}`}
           >
             {ds.label || 'Unknown File'}
