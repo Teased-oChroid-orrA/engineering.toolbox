@@ -62,13 +62,50 @@ jobs:
         run: npm run test:unit
         if: hashFiles('playwright.unit.config.ts') != ''
 
+      - name: Start preview server
+        run: |
+          echo "Starting preview server on port 5173..."
+          nohup npm run preview -- --port 5173 > /tmp/preview.log 2>&1 &
+          echo $! > /tmp/preview.pid
+          echo "Preview server PID: $(cat /tmp/preview.pid)"
+      
+      - name: Wait for preview server
+        run: |
+          echo "Waiting for preview server to be ready..."
+          npx wait-on http://127.0.0.1:5173 --timeout 60000 --interval 1000
+          echo "✓ Preview server is ready"
+      
+      - name: Run E2E tests
+        run: npm run test:e2e
+        continue-on-error: false
+      
+      - name: Show preview server logs on failure
+        if: failure()
+        run: |
+          echo "=== Preview server logs (last 50 lines) ==="
+          tail -50 /tmp/preview.log || echo "No preview logs found"
+      
+      - name: Cleanup preview server
+        if: always()
+        run: |
+          if [ -f /tmp/preview.pid ]; then
+            PID=$(cat /tmp/preview.pid)
+            if kill -0 $PID 2>/dev/null; then
+              echo "Stopping preview server (PID: $PID)"
+              kill $PID || true
+              sleep 2
+              kill -9 $PID 2>/dev/null || true
+            fi
+          fi
+
       - name: CI Success Summary
         if: success()
         run: |
           echo "✅ All CI checks passed!"
           echo "- Type checking: ✓"
           echo "- Build: ✓"
-          echo "- Tests: ✓"
+          echo "- Unit tests: ✓"
+          echo "- E2E tests: ✓"
 
       - name: CI Failure Summary
         if: failure()
@@ -78,4 +115,5 @@ jobs:
           echo "  npm run check"
           echo "  npm run build"
           echo "  npm run test:unit"
+          echo "  npm run test:e2e"
           exit 1
