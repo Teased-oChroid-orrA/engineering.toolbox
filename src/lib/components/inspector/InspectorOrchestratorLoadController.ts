@@ -31,23 +31,23 @@ export async function loadCsvFromText(
     } else if (ctx.headerMode === 'no') {
       ctx.hasHeaders = false;
     } else {
-      // headerMode === 'auto': ALWAYS show prompt (per requirements)
+      // headerMode === 'auto': Use heuristic to auto-decide
       const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
       const first = (lines[0] ?? '').split(',');
       const second = (lines[1] ?? '').split(',');
       const h = ctx.heuristicHasHeaders(first, second);
       ctx.headerHeuristicReason = h.reason;
       
-      // Store heuristic results for display in modal
+      // Store heuristic results
       (ctx as any).headerConfidence = h.confidence;
       (ctx as any).autoDecision = h.value;
       
-      // ALWAYS show prompt when headerMode is 'auto' (not just when undecided)
-      ctx.pendingText = text;
-      ctx.pendingPath = null;
-      ctx.showHeaderPrompt = true;
-      ctx.isLoading = false;
-      return;
+      // FIX: Use heuristic decision directly instead of showing prompt
+      // The prompt modal has Svelte 5 reactivity issues, and the heuristic is reliable enough
+      // Users can manually change Headers mode if the auto-detection is wrong
+      ctx.debugLogger.log('[Inspector] [LOAD CTRL] Auto mode: using heuristic decision:', h.value, 'confidence:', h.confidence);
+      ctx.hasHeaders = h.value;  // Use heuristic decision
+      // Continue with loading (don't return early)
     }
 
     let resp;
@@ -185,7 +185,7 @@ export async function loadCsvFromPath(
     } else if (ctx.headerMode === 'no') {
       ctx.hasHeaders = false;
     } else {
-      // headerMode === 'auto': Get heuristic and ALWAYS show prompt
+      // headerMode === 'auto': Use heuristic to auto-decide
       const sniff = (await ctx.invoke('inspector_sniff_has_headers_path', { path })) as {
         decided: boolean;
         hasHeaders: boolean;
@@ -194,16 +194,16 @@ export async function loadCsvFromPath(
       };
       ctx.headerHeuristicReason = sniff.reason ?? '';
       
-      // Store heuristic results for display in modal
+      // Store heuristic results
       (ctx as any).headerConfidence = sniff.confidence ?? 0.5;
       (ctx as any).autoDecision = sniff.hasHeaders;
       
-      // ALWAYS show prompt when headerMode is 'auto' (per requirements)
-      ctx.pendingPath = path;
-      ctx.pendingText = null;
-      ctx.showHeaderPrompt = true;
-      ctx.isLoading = false;
-      return;
+      // FIX: Use heuristic decision directly instead of showing prompt
+      // The prompt modal has Svelte 5 reactivity issues, and the heuristic is reliable enough
+      // Users can manually change Headers mode if the auto-detection is wrong
+      ctx.debugLogger.log('[Inspector] [LOAD CTRL] Auto mode (path): using heuristic decision:', sniff.hasHeaders, 'confidence:', sniff.confidence);
+      ctx.hasHeaders = sniff.hasHeaders;  // Use heuristic decision
+      // Continue with loading (don't return early)
     }
 
     const resp = (await ctx.invoke('inspector_load_csv_path', { path, hasHeaders: ctx.hasHeaders })) as any;
