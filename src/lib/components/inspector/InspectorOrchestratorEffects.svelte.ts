@@ -48,6 +48,7 @@ export function setupSliceFetchEffect(deps: {
   endIdx: () => number;
   totalFilteredCount: () => number;
   visibleColIdxsLength: () => number;
+  datasetId: () => string;  // Bug 3 fix: Add datasetId to prevent stale fetch key
 }, callbacks: {
   scheduleSliceFetch: () => void;
 }) {
@@ -62,16 +63,17 @@ export function setupSliceFetchEffect(deps: {
     const end = deps.endIdx();
     const count = deps.totalFilteredCount();
     const colsLen = deps.visibleColIdxsLength();
+    const dsId = deps.datasetId();  // Bug 3 fix: Include datasetId
     
-    // Prevent infinite loop: Only fetch if parameters actually changed
-    const fetchKey = `${start}|${end}|${count}|${colsLen}`;
+    // Bug 3 fix: Include datasetId to prevent stale key from skipping fetch on reload
+    const fetchKey = `${dsId}|${start}|${end}|${count}|${colsLen}`;
     if (fetchKey === lastFetchKey) {
       devLog('[SLICE FETCH EFFECT] Skipped - params unchanged:', fetchKey);
       return;
     }
     
     lastFetchKey = fetchKey;
-    devLog('[SLICE FETCH EFFECT] Triggered - start:', start, 'end:', end, 'count:', count, 'colsLen:', colsLen);
+    devLog('[SLICE FETCH EFFECT] Triggered - start:', start, 'end:', end, 'count:', count, 'colsLen:', colsLen, 'dsId:', dsId);
     callbacks.scheduleSliceFetch();
   });
 }

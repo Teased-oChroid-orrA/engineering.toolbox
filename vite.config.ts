@@ -2,10 +2,12 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   // file:// portability: ensure built asset URLs are relative
   base: './',
   plugins: [tailwindcss(), sveltekit()],
+  // Bug 1 fix: Force re-bundle dependencies on dev startup to prevent 504 Outdated Optimize Dep
+  optimizeDeps: command === 'serve' ? { force: true } : undefined,
   // Ensure imported static assets can be inlined when using
   // kit.output.bundleStrategy = 'inline' (portable file:// build).
   // See SvelteKit configuration docs.
@@ -32,4 +34,4 @@ export default defineConfig({
     port: 5173,
     strictPort: true
   }
-});
+}));

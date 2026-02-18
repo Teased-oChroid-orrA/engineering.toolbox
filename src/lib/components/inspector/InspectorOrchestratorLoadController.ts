@@ -102,6 +102,12 @@ export async function loadCsvFromText(
     // Setting ctx.hasLoaded = true creates a new property due to TypeScript cast
     (ctx as any).loadState.hasLoaded = true;
     devLog('LOAD CSV', 'hasLoaded set to true, datasetId:', ctx.datasetId);
+    
+    // Bug 3 fix: Reset grid window so setupGridWindowInitEffect can reinitialize
+    if (typeof (ctx as any).loadState.resetGridWindow === 'function') {
+      (ctx as any).loadState.resetGridWindow();
+    }
+    
     // showDataControls removed - now always true in Orchestrator
     ctx.activeDatasetId = ctx.datasetId;
 
@@ -216,6 +222,12 @@ export async function loadCsvFromPath(
     // CRITICAL FIX: Use loadState directly to ensure reactivity (same fix as loadCsvFromText)
     (ctx as any).loadState.hasLoaded = true;
     devLog('LOAD CSV PATH', 'hasLoaded set to true, datasetId:', ctx.datasetId);
+    
+    // Bug 3 fix: Reset grid window so setupGridWindowInitEffect can reinitialize
+    if (typeof (ctx as any).loadState.resetGridWindow === 'function') {
+      (ctx as any).loadState.resetGridWindow();
+    }
+    
     // showDataControls removed - now always true in Orchestrator
     ctx.activeDatasetId = ctx.datasetId;
 
@@ -283,7 +295,11 @@ export function upsertWorkspaceDataset(ctx: LoadControllerContext, ds: any) {
 
 export async function unloadWorkspaceDataset(ctx: LoadControllerContext, id: string) {
   const remaining = (ctx.loadedDatasets ?? []).filter((x: any) => x.id !== id);
-  ctx.loadedDatasets = remaining;
+  
+  // Bug 4 fix: Use in-place mutation to preserve Svelte 5 reactivity (same as upsertWorkspaceDataset)
+  ctx.loadedDatasets.length = 0;
+  ctx.loadedDatasets.push(...remaining);
+  
   ctx.crossQueryResults = ctx.crossQueryResults.filter((x: any) => x.datasetId !== id);
   if (ctx.activeDatasetId !== id) return;
   if (remaining.length === 0) {
@@ -299,6 +315,11 @@ export async function unloadWorkspaceDataset(ctx: LoadControllerContext, id: str
     (ctx as any).loadState.isMergedView = false;
     ctx.mergedHeaders = [];
     ctx.mergedRowsAll = [];
+    
+    // Bug 4 fix: Reset grid window so the grid clears properly
+    if (typeof (ctx as any).loadState.resetGridWindow === 'function') {
+      (ctx as any).loadState.resetGridWindow();
+    }
     return;
   }
   await ctx.activateWorkspaceDataset(remaining[0].id);

@@ -142,7 +142,8 @@ body {
     --surface-tilt-y: -2.2deg;
     --surface-lift-y: -4px;
     position: relative;
-    transform-style: preserve-3d;
+    /* Bug 5 fix: Remove transform-style: preserve-3d to prevent macOS CATransformLayer shadow warnings */
+    /* transform-style: preserve-3d; */
     transition:
       transform var(--surface-motion-standard) var(--surface-motion-ease),
       border-color var(--surface-motion-fast) var(--surface-motion-ease),
@@ -193,7 +194,8 @@ body {
     --bushing-tilt-y: -2deg;
     --bushing-lift-y: -6px;
     position: relative;
-    transform-style: preserve-3d;
+    /* Bug 5 fix: Remove transform-style: preserve-3d to prevent macOS CATransformLayer shadow warnings */
+    /* transform-style: preserve-3d; */
     transform-origin: center center;
     transition:
       transform var(--bushing-motion-standard) var(--bushing-motion-ease),
