@@ -64,6 +64,7 @@
   // Controllers can read from and mutate this object
   // Using getters ensures changes to component state are automatically reflected
   // NOTE: hiddenUploadInput excluded - it's a DOM binding, not reactive state
+  // FIX: showHeaderPrompt must be in loadState for proper reactivity (was previously passed as parameter)
   let loadState = $state({
     get isLoading() { return isLoading; },
     set isLoading(v) { isLoading = v; },
@@ -86,7 +87,11 @@
     get pendingPath() { return pendingPath; },
     set pendingPath(v) { pendingPath = v; },
     get showHeaderPrompt() { return showHeaderPrompt; },
-    set showHeaderPrompt(v) { showHeaderPrompt = v; },
+    set showHeaderPrompt(v) { 
+      console.log('[LOAD STATE] Setting showHeaderPrompt to:', v);
+      showHeaderPrompt = v; 
+      console.log('[LOAD STATE] showHeaderPrompt is now:', showHeaderPrompt);
+    },
     get headers() { return headers; },
     set headers(v) { headers = v; },
     get totalRowCount() { return totalRowCount; },
@@ -126,7 +131,8 @@
   }
   
   function loadControllerCtx() { 
-    return buildLoadControllerCtx({ loadState, invoke, debugLogger, dialogMod, fnv1a32, heuristicHasHeaders, computeDatasetIdentity, upsertWorkspaceDatasetInList, loadRecipesForDataset, loadLastStateForDataset, applyState, runFilterNow, buildFilterSpec, queueDebug, queueDebugRate, recordPerf, runCrossDatasetQuery, activateWorkspaceDataset, hiddenUploadInput, isLoading, isMergedView, loadError, hasHeaders, headerMode, headerHeuristicReason, pendingText, pendingPath, showHeaderPrompt, headers, totalRowCount, totalFilteredCount, visibleRows, colTypes, datasetId, datasetLabel, recipes, pendingRestore, hasLoaded, showDataControls, activeDatasetId, mergedRowsAll, loadedDatasets, query, matchMode, targetColIdx, numericF, dateF, catF, suspendReactiveFiltering, sortColIdx, sortDir, sortSpecs, visibleColumns, pinnedLeft, pinnedRight, hiddenColumns, columnWidths, crossQueryBusy, queryScope, crossQueryResults, mergedHeaders, preMergedHeaders, preMergedColTypes, preMergedTotalRowCount, preMergedTotalFilteredCount });
+    // FIX: removed showHeaderPrompt from parameters - it's now in loadState
+    return buildLoadControllerCtx({ loadState, invoke, debugLogger, dialogMod, fnv1a32, heuristicHasHeaders, computeDatasetIdentity, upsertWorkspaceDatasetInList, loadRecipesForDataset, loadLastStateForDataset, applyState, runFilterNow, buildFilterSpec, queueDebug, queueDebugRate, recordPerf, runCrossDatasetQuery, activateWorkspaceDataset, hiddenUploadInput, isLoading, isMergedView, loadError, hasHeaders, headerMode, headerHeuristicReason, pendingText, pendingPath, headers, totalRowCount, totalFilteredCount, visibleRows, colTypes, datasetId, datasetLabel, recipes, pendingRestore, hasLoaded, showDataControls, activeDatasetId, mergedRowsAll, loadedDatasets, query, matchMode, targetColIdx, numericF, dateF, catF, suspendReactiveFiltering, sortColIdx, sortDir, sortSpecs, visibleColumns, pinnedLeft, pinnedRight, hiddenColumns, columnWidths, crossQueryBusy, queryScope, crossQueryResults, mergedHeaders, preMergedHeaders, preMergedColTypes, preMergedTotalRowCount, preMergedTotalFilteredCount });
   }
     async function loadCsvFromText(text: string, hasHeadersOverride?: boolean, trackWorkspace = true, forcedLabel?: string, applyInitialFilter = true) { await loadCsvFromTextController(loadControllerCtx(), text, hasHeadersOverride, trackWorkspace, forcedLabel, applyInitialFilter); } async function loadCsvFromPath(path: string, hasHeadersOverride?: boolean, trackWorkspace = true, forcedLabel?: string, applyInitialFilter = true) { await loadCsvFromPathController(loadControllerCtx(), path, hasHeadersOverride, trackWorkspace, forcedLabel, applyInitialFilter); }
   function gridControllerCtx() { return buildGridControllerCtx({ invoke, recordPerf, queueDebug, loadState, updateVisibleRows, hasLoaded, sliceGate, startIdx: gridWindow.startIdx, endIdx: gridWindow.endIdx, visibleColIdxs, isMergedView, mergedRowsAll, visibleRows, loadError, totalFilteredCount, sliceTimer, headers, sortGate, sortColIdx, sortDir, sortSpecs, visibleColumns, columnPickerNotice, showColumnPicker, hiddenColumns, pinnedLeft, pinnedRight, columnWidths }); }
