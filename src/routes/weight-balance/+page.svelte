@@ -34,10 +34,29 @@
     mapCGToDisplay, 
     mapInputDisplayToStation,
     getCGPositionLabel,
-    formatCGDisplay
+    formatCGDisplay,
+    convertEnvelopeInputToStation,
+    convertStationToEnvelopeInput,
+    getEnvelopeCGInputPlaceholder,
+    getEnvelopeCGInputUnit
   } from '$lib/core/weight-balance/displayAdapters';
   import { calculateBallast, type BallastSolution } from '$lib/core/weight-balance/ballast';
-  import type { AircraftProfile, LoadingItem, LoadingResults, LoadingItemType, CGEnvelope } from '$lib/core/weight-balance/types';
+  import { 
+    simulateFuelBurn, 
+    createFuelBurnConfigFromItems,
+    FUEL_BURN_PROFILES 
+  } from '$lib/core/weight-balance/fuelBurn';
+  import type { 
+    AircraftProfile, 
+    LoadingItem, 
+    LoadingResults, 
+    LoadingItemType, 
+    CGEnvelope,
+    EnvelopeInputMode,
+    FuelBurnConfig,
+    FuelBurnResults,
+    FuelTank
+  } from '$lib/core/weight-balance/types';
   import { 
     saveConfigurationToFile,
     loadConfigurationFromFile,
@@ -80,6 +99,17 @@
   let displayUnits = $state<UnitSystem>('imperial');
   let useMACDisplay = $state(false);
   let ballastSolution = $state<BallastSolution | null>(null);
+  
+  // Envelope input mode state
+  let envelopeInputMode = $state<EnvelopeInputMode>('station');
+  
+  // Fuel burn simulation state
+  let showFuelBurnDialog = $state(false);
+  let fuelBurnConfig = $state<FuelBurnConfig | null>(null);
+  let fuelBurnResults = $state<FuelBurnResults | null>(null);
+  let fuelBurnRate = $state(10); // gal/hr
+  let fuelBurnDuration = $state(180); // minutes
+  let selectedFuelProfile = $state<string | null>(null);
   
   function recalculate() {
     const validation = validateInput(aircraft, items);
@@ -167,35 +197,16 @@
   function handleEditEnvelope(envelope: CGEnvelope | null) {
     if (!envelope) return;
     editingEnvelope = JSON.parse(JSON.stringify(envelope)); // Deep copy
+    
+    // Convert envelope to current input mode for editing
+    convertEditingEnvelopeToInputMode(envelopeInputMode);
+    
     envelopeValidationErrors = validateEnvelope(editingEnvelope!);
     showEnvelopeDialog = true;
   }
   
   function handleSaveEnvelope() {
-    if (!editingEnvelope) return;
-    
-    // Validate envelope before saving
-    const errors = validateEnvelope(editingEnvelope);
-    const summary = getValidationSummary(errors);
-    
-    if (!summary.isValid) {
-      // Still allow saving but show warning
-      if (!confirm(`Envelope has validation errors:\n${summary.message}\n\nDo you want to save anyway?`)) {
-        return;
-      }
-    }
-    
-    const envelopeIndex = aircraft.envelopes.findIndex(e => e.category === editingEnvelope!.category);
-    if (envelopeIndex >= 0) {
-      aircraft.envelopes[envelopeIndex] = editingEnvelope;
-    } else {
-      aircraft.envelopes.push(editingEnvelope);
-    }
-    
-    showEnvelopeDialog = false;
-    editingEnvelope = null;
-    envelopeValidationErrors = [];
-    recalculate();
+    saveEnvelopeWithConversion();
   }
   
   function addEnvelopeVertex() {
@@ -213,6 +224,179 @@
   function validateCurrentEnvelope() {
     if (!editingEnvelope) return;
     envelopeValidationErrors = validateEnvelope(editingEnvelope);
+  }
+  
+  // Envelope input mode conversion functions
+  function convertEditingEnvelopeToInputMode(targetMode: EnvelopeInputMode) {
+    if (!editingEnvelope || !hasMACData(aircraft.lemac, aircraft.mac)) return;
+    
+    // Convert vertices
+    for (const vertex of editingEnvelope.vertices) {
+      vertex.cgPosition = convertStationToEnvelopeInput(
+        vertex.cgPosition,
+        targetMode,
+        aircraft.lemac,
+        aircraft.mac
+      );
+    }
+    
+    // Convert forward/aft limits
+    if (editingEnvelope.forwardLimit) {
+      editingEnvelope.forwardLimit = convertStationToEnvelopeInput(
+        editingEnvelope.forwardLimit,
+        targetMode,
+        aircraft.lemac,
+        aircraft.mac
+      );
+    }
+    if (editingEnvelope.aftLimit) {
+      editingEnvelope.aftLimit = convertStationToEnvelopeInput(
+        editingEnvelope.aftLimit,
+        targetMode,
+        aircraft.lemac,
+        aircraft.mac
+      );
+    }
+  }
+  
+  function toggleEnvelopeInputMode() {
+    const newMode: EnvelopeInputMode = envelopeInputMode === 'station' ? 'mac' : 'station';
+    
+    // Convert current editing envelope values to new mode
+    convertEditingEnvelopeToInputMode(newMode);
+    
+    envelopeInputMode = newMode;
+  }
+  
+  function saveEnvelopeWithConversion() {
+    if (!editingEnvelope) return;
+    
+    // Convert all input values back to station (canonical model) before saving
+    const envelopeToSave = JSON.parse(JSON.stringify(editingEnvelope));
+    
+    for (const vertex of envelopeToSave.vertices) {
+      vertex.cgPosition = convertEnvelopeInputToStation(
+        vertex.cgPosition,
+        envelopeInputMode,
+        aircraft.lemac,
+        aircraft.mac
+      );
+    }
+    
+    if (envelopeToSave.forwardLimit) {
+      envelopeToSave.forwardLimit = convertEnvelopeInputToStation(
+        envelopeToSave.forwardLimit,
+        envelopeInputMode,
+        aircraft.lemac,
+        aircraft.mac
+      );
+    }
+    
+    if (envelopeToSave.aftLimit) {
+      envelopeToSave.aftLimit = convertEnvelopeInputToStation(
+        envelopeToSave.aftLimit,
+        envelopeInputMode,
+        aircraft.lemac,
+        aircraft.mac
+      );
+    }
+    
+    // Validate the converted envelope
+    const errors = validateEnvelope(envelopeToSave);
+    const summary = getValidationSummary(errors);
+    
+    if (!summary.isValid) {
+      if (!confirm(`Envelope has validation errors:\n${summary.message}\n\nDo you want to save anyway?`)) {
+        return;
+      }
+    }
+    
+    const envelopeIndex = aircraft.envelopes.findIndex(e => e.category === envelopeToSave.category);
+    if (envelopeIndex >= 0) {
+      aircraft.envelopes[envelopeIndex] = envelopeToSave;
+    } else {
+      aircraft.envelopes.push(envelopeToSave);
+    }
+    
+    showEnvelopeDialog = false;
+    editingEnvelope = null;
+    envelopeValidationErrors = [];
+    envelopeInputMode = 'station'; // Reset to station for next edit
+    recalculate();
+  }
+  
+  // Fuel burn simulation functions
+  function openFuelBurnSimulator() {
+    fuelBurnConfig = createFuelBurnConfigFromItems(items, fuelBurnRate, fuelBurnDuration);
+    showFuelBurnDialog = true;
+  }
+  
+  function runFuelBurnSimulation() {
+    if (!fuelBurnConfig) return;
+    
+    fuelBurnConfig.burnRate = fuelBurnRate;
+    fuelBurnConfig.duration = fuelBurnDuration;
+    
+    fuelBurnResults = simulateFuelBurn(aircraft, items, fuelBurnConfig);
+    updateEnvelopeChartWithFuelBurn();
+  }
+  
+  function applyFuelProfile(profileKey: string) {
+    const profile = FUEL_BURN_PROFILES[profileKey as keyof typeof FUEL_BURN_PROFILES];
+    if (profile) {
+      fuelBurnRate = profile.burnRate;
+      fuelBurnDuration = profile.duration;
+      selectedFuelProfile = profileKey;
+      runFuelBurnSimulation();
+    }
+  }
+  
+  function updateEnvelopeChartWithFuelBurn() {
+    if (!envelopeContainer || !results) return;
+    
+    const cgPath = fuelBurnResults?.steps.map(step => ({
+      weight: step.totalWeight,
+      cgPosition: step.cgPosition,
+      time: step.time,
+      inEnvelope: step.inEnvelope
+    })) ?? [];
+    
+    renderCGEnvelope(envelopeContainer, aircraft.envelopes, {
+      width: envelopeContainer.clientWidth,
+      height: 400,
+      margin: { top: 20, right: 20, bottom: 50, left: 60 },
+      currentCG: {
+        weight: results.totalWeight,
+        cgPosition: results.cgPosition
+      },
+      category: results.category || undefined,
+      useMACDisplay,
+      lemac: aircraft.lemac,
+      mac: aircraft.mac,
+      cgPath // Add CG travel path
+    });
+  }
+  
+  function exportFuelBurnReport() {
+    if (!fuelBurnResults) return;
+    
+    // Create CSV content
+    let csv = 'Time (min),Fuel Remaining (gal),Weight (lbs),CG Position (in),Moment (lb-in),Category,In Envelope\n';
+    
+    for (const step of fuelBurnResults.steps) {
+      csv += `${step.time.toFixed(1)},${step.fuelRemaining.toFixed(1)},${step.totalWeight.toFixed(1)},${step.cgPosition.toFixed(2)},${step.totalMoment.toFixed(1)},${step.category || 'N/A'},${step.inEnvelope ? 'Yes' : 'No'}\n`;
+    }
+    
+    // Download CSV
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fuel-burn-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
   
   // Item library functions
@@ -1028,10 +1212,31 @@
 {#if showEnvelopeDialog && editingEnvelope}
   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="button" tabindex="0" onclick={(e) => e.target === e.currentTarget && (showEnvelopeDialog = false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (showEnvelopeDialog = false)} aria-label="Close dialog">
     <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-      <h2 class="text-xl font-semibold text-white mb-4">Edit W&B Envelope</h2>
-      {#if useMACDisplay && hasMACData(aircraft.lemac, aircraft.mac)}
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold text-white">Edit W&B Envelope</h2>
+        
+        <!-- Input Mode Toggle -->
+        {#if hasMACData(aircraft.lemac, aircraft.mac)}
+          <button
+            onclick={toggleEnvelopeInputMode}
+            class="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500 text-blue-300 rounded text-sm transition-colors"
+            title="Toggle input mode between station and %MAC"
+          >
+            <span class="text-xs font-mono">
+              {envelopeInputMode === 'station' ? '📏 Station' : '📐 %MAC'}
+            </span>
+            <span class="text-xs opacity-70">⇄</span>
+          </button>
+        {/if}
+      </div>
+      
+      {#if hasMACData(aircraft.lemac, aircraft.mac)}
         <div class="mb-4 p-3 bg-indigo-500/10 border border-indigo-500/30 rounded text-sm text-indigo-300">
-          📐 <strong>%MAC Display Active:</strong> Inputs below are in station units (inches). Display values shown for reference.
+          {#if envelopeInputMode === 'station'}
+            📏 <strong>Station Mode:</strong> Input CG positions in inches from datum. {useMACDisplay ? 'Display will show %MAC on chart.' : ''}
+          {:else}
+            📐 <strong>%MAC Mode:</strong> Input CG positions as % MAC. Values are converted to station for storage.
+          {/if}
         </div>
       {/if}
       <div class="space-y-4">
@@ -1063,7 +1268,7 @@
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label for="envelope-forward-limit" class="block text-sm text-gray-400 mb-2">
-              Forward Limit ({getCGPositionLabel(useMACDisplay)})
+              Forward Limit ({getEnvelopeCGInputUnit(envelopeInputMode)})
             </label>
             <input 
               id="envelope-forward-limit"
@@ -1071,16 +1276,12 @@
               bind:value={editingEnvelope.forwardLimit}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
               step="0.1"
+              placeholder={getEnvelopeCGInputPlaceholder(envelopeInputMode)}
             />
-            {#if useMACDisplay && hasMACData(aircraft.lemac, aircraft.mac) && editingEnvelope.forwardLimit}
-              <div class="text-xs text-gray-500 mt-1">
-                Display: {mapCGToDisplay(editingEnvelope.forwardLimit, useMACDisplay, aircraft.lemac, aircraft.mac).toFixed(1)}% MAC
-              </div>
-            {/if}
           </div>
           <div>
             <label for="envelope-aft-limit" class="block text-sm text-gray-400 mb-2">
-              Aft Limit ({getCGPositionLabel(useMACDisplay)})
+              Aft Limit ({getEnvelopeCGInputUnit(envelopeInputMode)})
             </label>
             <input 
               id="envelope-aft-limit"
@@ -1088,12 +1289,8 @@
               bind:value={editingEnvelope.aftLimit}
               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
               step="0.1"
+              placeholder={getEnvelopeCGInputPlaceholder(envelopeInputMode)}
             />
-            {#if useMACDisplay && hasMACData(aircraft.lemac, aircraft.mac) && editingEnvelope.aftLimit}
-              <div class="text-xs text-gray-500 mt-1">
-                Display: {mapCGToDisplay(editingEnvelope.aftLimit, useMACDisplay, aircraft.lemac, aircraft.mac).toFixed(1)}% MAC
-              </div>
-            {/if}
           </div>
         </div>
         <div>
@@ -1124,14 +1321,9 @@
                     type="number"
                     bind:value={vertex.cgPosition}
                     class="w-full px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:border-blue-500 focus:outline-none"
-                    placeholder={`CG Position (${useMACDisplay ? '% MAC' : 'in'})`}
+                    placeholder={getEnvelopeCGInputPlaceholder(envelopeInputMode)}
                     step="0.1"
                   />
-                  {#if useMACDisplay && hasMACData(aircraft.lemac, aircraft.mac) && vertex.cgPosition}
-                    <div class="text-xs text-gray-500 mt-0.5">
-                      {mapCGToDisplay(vertex.cgPosition, useMACDisplay, aircraft.lemac, aircraft.mac).toFixed(1)}%
-                    </div>
-                  {/if}
                 </div>
                 <button
                   onclick={() => removeEnvelopeVertex(idx)}

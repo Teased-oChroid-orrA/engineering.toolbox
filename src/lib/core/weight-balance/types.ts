@@ -126,3 +126,64 @@ export const FUEL_WEIGHTS: Record<FuelType, number> = {
   jet_a1: 6.7,
   mogas: 6.0
 };
+
+/**
+ * Envelope input mode for CG position editing
+ * - 'station': Input values are in station coordinates (inches from datum)
+ * - 'mac': Input values are in %MAC coordinates
+ */
+export type EnvelopeInputMode = 'station' | 'mac';
+
+/**
+ * Fuel tank configuration for fuel burn simulation
+ */
+export interface FuelTank {
+  id: string;
+  name: string;
+  capacity: number;        // gallons
+  arm: number;             // inches from datum
+  currentFuel: number;     // gallons
+  fuelType: FuelType;
+  burnPriority: number;    // 1 = burns first, 2 = second, etc.
+}
+
+/**
+ * Fuel burn simulation step
+ */
+export interface FuelBurnStep {
+  time: number;            // minutes from start
+  fuelRemaining: number;   // total fuel remaining (gallons)
+  tankFuels: Record<string, number>;  // fuel in each tank (gallons)
+  totalWeight: number;     // aircraft gross weight (lbs)
+  cgPosition: number;      // CG position (inches from datum)
+  totalMoment: number;     // total moment (lb-in)
+  category: 'normal' | 'utility' | 'acrobatic' | null;
+  inEnvelope: boolean;
+}
+
+/**
+ * Fuel burn simulation configuration
+ */
+export interface FuelBurnConfig {
+  burnRate: number;        // gallons per hour
+  duration: number;        // total flight time (minutes)
+  tanks: FuelTank[];
+  profileName?: string;    // optional profile template name
+}
+
+/**
+ * Fuel burn simulation results
+ */
+export interface FuelBurnResults {
+  steps: FuelBurnStep[];
+  warnings: string[];
+  summary: {
+    initialWeight: number;
+    finalWeight: number;
+    fuelBurned: number;     // gallons
+    cgTravel: number;       // inches
+    maxCGForward: number;
+    maxCGAft: number;
+    allStepsValid: boolean;
+  };
+}

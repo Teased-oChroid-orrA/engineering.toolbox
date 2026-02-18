@@ -91,3 +91,53 @@ export function formatCGDisplay(
   const percentMAC = stationToPercentMAC(cgStation, lemac!, mac!);
   return percentMAC.toFixed(1);
 }
+
+/**
+ * Convert envelope input value to station (canonical model units)
+ * Used when editing envelope vertices - converts user input to model coordinates
+ */
+export function convertEnvelopeInputToStation(
+  inputValue: number,
+  inputMode: 'station' | 'mac',
+  lemac?: number,
+  mac?: number
+): number {
+  if (inputMode === 'station' || !hasMACData(lemac, mac)) {
+    return inputValue;
+  }
+  
+  // Input is in %MAC, convert to station
+  return percentMACToStation(inputValue, lemac!, mac!);
+}
+
+/**
+ * Convert envelope station value to display input (for editing)
+ * Used when populating envelope editor - converts model to user's preferred input units
+ */
+export function convertStationToEnvelopeInput(
+  stationValue: number,
+  inputMode: 'station' | 'mac',
+  lemac?: number,
+  mac?: number
+): number {
+  if (inputMode === 'station' || !hasMACData(lemac, mac)) {
+    return stationValue;
+  }
+  
+  // Convert station to %MAC for input
+  return stationToPercentMAC(stationValue, lemac!, mac!);
+}
+
+/**
+ * Get the placeholder text for envelope CG input based on mode
+ */
+export function getEnvelopeCGInputPlaceholder(inputMode: 'station' | 'mac'): string {
+  return inputMode === 'station' ? 'CG Position (inches)' : 'CG Position (% MAC)';
+}
+
+/**
+ * Get the unit label for envelope CG input
+ */
+export function getEnvelopeCGInputUnit(inputMode: 'station' | 'mac'): string {
+  return inputMode === 'station' ? 'inches' : '% MAC';
+}
