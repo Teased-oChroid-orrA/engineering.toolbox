@@ -15,7 +15,7 @@ export function buildInspectorContextMenu(args: {
       {
         title: 'Data',
         actions: [
-          { id: 'load_stream', label: '📂 Load File...', disabled: !args.canOpenPath },
+          { id: 'load_stream', label: '📂 Load File...' },
           { id: 'load_fallback', label: '📤 Upload...' }
         ]
       },

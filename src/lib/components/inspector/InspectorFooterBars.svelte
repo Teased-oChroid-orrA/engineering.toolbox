@@ -11,6 +11,8 @@
     columns = 0,
     rows = 0,
     filtered = 0,
+    aggregateFileCount = 1,
+    aggregateLabel = '',
     rendered = 0,
     startIdx = 0,
     endIdx = 0,
@@ -28,6 +30,8 @@
     columns?: number;
     rows?: number;
     filtered?: number;
+    aggregateFileCount?: number;
+    aggregateLabel?: string;
     rendered?: number;
     startIdx?: number;
     endIdx?: number;
@@ -56,6 +60,8 @@
     {columns}
     {rows}
     {filtered}
+    {aggregateFileCount}
+    {aggregateLabel}
     {rendered}
     {startIdx}
     {endIdx}

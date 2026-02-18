@@ -1,6 +1,5 @@
 import { devLog } from '$lib/utils/devLog';
 import { inspectorLogger } from '$lib/utils/loggers';
-import { MAX_BROWSER_MODE_ROWS } from '$lib/components/inspector/InspectorGridConstants';
 import type { LoadControllerContext } from './InspectorControllerContext';
 import { resetBrowserModeOriginalRows } from './InspectorOrchestratorFilterController';
 
@@ -12,7 +11,7 @@ export async function loadCsvFromText(
   forcedLabel?: string,
   applyInitialFilter = true
 ) {
-  inspectorLogger.error('★★★ LOAD CONTROLLER EXECUTING ★★★ text length:', text.length);
+  inspectorLogger.debug('[LOAD CTRL] Executing text load, length:', text.length);
   inspectorLogger.debug('[LOAD CTRL] loadCsvFromText called, text length:', text.length);
   inspectorLogger.debug('[LOAD CTRL] hasHeadersOverride:', hasHeadersOverride, 'trackWorkspace:', trackWorkspace);
   
@@ -45,7 +44,11 @@ export async function loadCsvFromText(
       // FIX: Use heuristic decision directly instead of showing prompt
       // The prompt modal has Svelte 5 reactivity issues, and the heuristic is reliable enough
       // Users can manually change Headers mode if the auto-detection is wrong
-      ctx.debugLogger.log('[Inspector] [LOAD CTRL] Auto mode: using heuristic decision:', h.value, 'confidence:', h.confidence);
+      ctx.queueDebug('loadCsvFromText:autoHeaderDecision', {
+        decidedHeaders: h.value,
+        confidence: h.confidence,
+        reason: h.reason
+      });
       ctx.hasHeaders = h.value;  // Use heuristic decision
       // Continue with loading (don't return early)
     }
@@ -54,7 +57,8 @@ export async function loadCsvFromText(
     let browserModeRows: string[][] | null = null;
     try {
       // Check if Tauri is available
-      if (typeof window !== 'undefined' && !(window as any).__TAURI_INTERNALS__) {
+      const hasTauriRuntime = typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
+      if (!hasTauriRuntime) {
         const { parseCsvInBrowser } = await import('$lib/utils/csvParser');
         const parsed = parseCsvInBrowser(text, ctx.hasHeaders);
         browserModeRows = parsed.rows;
@@ -77,9 +81,8 @@ export async function loadCsvFromText(
 
     // If browser mode, store rows in mergedRowsAll and enable merged view
     if (browserModeRows !== null) {
-      if (browserModeRows.length > MAX_BROWSER_MODE_ROWS) {
-        throw new Error(`CSV too large for browser mode: ${browserModeRows.length} rows (max ${MAX_BROWSER_MODE_ROWS})`);
-      }
+      // Browser mode still virtualizes rendered rows; keep all parsed rows available.
+      // Large files should prefer path-based loading in Tauri for best memory profile.
       // CRITICAL: Use loadState directly to ensure reactivity (same bug as hasLoaded)
       (ctx as any).loadState.isMergedView = true;
       (ctx as any).loadState.mergedRowsAll = [...browserModeRows];
@@ -116,7 +119,11 @@ export async function loadCsvFromText(
         id: ctx.datasetId,
         label: forcedLabel || ctx.datasetLabel,
         hasHeaders: ctx.hasHeaders,
-        source: { kind: 'text', text }
+        source: { kind: 'text', text },
+        rowCount: resp.rowCount ?? 0,
+        colCount: (resp.headers ?? []).length,
+        headerNames: [...(resp.headers ?? [])],
+        filteredCount: resp.rowCount ?? 0
       });
     }
 
@@ -151,6 +158,7 @@ export async function loadCsvFromText(
       await ctx.runFilterNow();
     }
   } catch (e: any) {
+    inspectorLogger.error('[LOAD CSV TEXT] Failed to complete load', e);
     ctx.loadError = e?.message ?? String(e);
     (ctx as any).loadState.hasLoaded = false;
     (ctx as any).loadState.headers = [];
@@ -201,7 +209,11 @@ export async function loadCsvFromPath(
       // FIX: Use heuristic decision directly instead of showing prompt
       // The prompt modal has Svelte 5 reactivity issues, and the heuristic is reliable enough
       // Users can manually change Headers mode if the auto-detection is wrong
-      ctx.debugLogger.log('[Inspector] [LOAD CTRL] Auto mode (path): using heuristic decision:', sniff.hasHeaders, 'confidence:', sniff.confidence);
+      ctx.queueDebug('loadCsvFromPath:autoHeaderDecision', {
+        decidedHeaders: sniff.hasHeaders,
+        confidence: sniff.confidence ?? null,
+        reason: sniff.reason ?? ''
+      });
       ctx.hasHeaders = sniff.hasHeaders;  // Use heuristic decision
       // Continue with loading (don't return early)
     }
@@ -236,7 +248,11 @@ export async function loadCsvFromPath(
         id: ctx.datasetId,
         label: forcedLabel || path.split('/').pop() || ctx.datasetLabel,
         hasHeaders: ctx.hasHeaders,
-        source: { kind: 'path', path }
+        source: { kind: 'path', path },
+        rowCount: resp.rowCount ?? 0,
+        colCount: (resp.headers ?? []).length,
+        headerNames: [...(resp.headers ?? [])],
+        filteredCount: resp.rowCount ?? 0
       });
     }
 
@@ -271,6 +287,7 @@ export async function loadCsvFromPath(
       await ctx.runFilterNow();
     }
   } catch (e: any) {
+    inspectorLogger.error('[LOAD CSV PATH] Failed to complete load', e);
     ctx.loadError = e?.message ?? String(e);
     (ctx as any).loadState.hasLoaded = false;
     (ctx as any).loadState.headers = [];
@@ -416,6 +433,20 @@ export async function runCrossDatasetQuery(ctx: LoadControllerContext) {
     });
 
     ctx.crossQueryResults = resp?.datasetResults ?? [];
+    if ((ctx.loadedDatasets?.length ?? 0) > 0) {
+      const byId = new Map((resp?.datasetResults ?? []).map((r: any) => [r.datasetId, r]));
+      const next = (ctx.loadedDatasets ?? []).map((ds: any) => {
+        const hit = byId.get(ds.id);
+        if (!hit) return ds;
+        return {
+          ...ds,
+          rowCount: typeof hit.total === 'number' ? hit.total : ds.rowCount,
+          filteredCount: typeof hit.filtered === 'number' ? hit.filtered : ds.filteredCount
+        };
+      });
+      ctx.loadedDatasets.length = 0;
+      ctx.loadedDatasets.push(...next);
+    }
     ctx.mergedHeaders = resp?.mergedHeaders ?? [];
     (ctx as any).loadState.mergedRowsAll = resp?.mergedRows ?? [];
     (ctx as any).loadState.isMergedView = true;

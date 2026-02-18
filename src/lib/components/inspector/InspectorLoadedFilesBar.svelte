@@ -38,8 +38,18 @@
             class={`btn btn-xs border-0 ${activeDatasetId === ds.id ? 'variant-filled' : 'variant-soft'}`}
             onclick={() => onUnload(ds.id)}
             title={`Click to unload: ${ds.label}`}
+            data-testid={`inspector-loaded-file-unload-${ds.id}`}
           >
             {ds.label || 'Unknown File'}
+          </button>
+          <button
+            class="btn btn-xs variant-ghost border-0 px-2 text-white/70 hover:text-white"
+            onclick={() => onUnload(ds.id)}
+            title={`Close file: ${ds.label}`}
+            aria-label={`Close file ${ds.label || 'Unknown File'}`}
+            data-testid={`inspector-loaded-file-close-${ds.id}`}
+          >
+            ×
           </button>
         </div>
       {/each}

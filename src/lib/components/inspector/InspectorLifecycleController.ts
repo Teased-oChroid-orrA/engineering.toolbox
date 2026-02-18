@@ -142,6 +142,12 @@ export function mountInspectorLifecycle(ctx: InspectorLifecycleCtx): () => void 
   }
 
   (async () => {
+    const hasTauriRuntime = typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
+    if (!hasTauriRuntime) {
+      ctx.setCanOpenPath(false);
+      ctx.setDialogModule(null);
+      return;
+    }
     try {
       const mod = await import(/* @vite-ignore */ '@tauri-apps/plugin-dialog');
       ctx.setDialogModule(mod);

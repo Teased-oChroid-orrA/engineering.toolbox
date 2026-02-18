@@ -232,10 +232,11 @@ export async function applyFilterSpec(ctx: FilterControllerContext, spec: any): 
 }
 
 export async function runFilterNow(ctx: FilterControllerContext, forceCurrent = false) {
-  inspectorLogger.error('★★★ RUN FILTER NOW CALLED ★★★');
-  inspectorLogger.error('[FILTER NOW] loadState._id:', (ctx as any).loadState?._id);
-  inspectorLogger.error('[FILTER NOW] loadState.hasLoaded:', (ctx as any).loadState?.hasLoaded);
-  inspectorLogger.error('[FILTER NOW] ctx.hasLoaded:', ctx.hasLoaded);
+  inspectorLogger.debug('[FILTER NOW] triggered', {
+    forceCurrent,
+    hasLoaded: ctx.hasLoaded,
+    isMergedView: ctx.isMergedView
+  });
   devLog('FILTER NOW CONTROLLER', 'Entry - hasLoaded:', ctx.hasLoaded, 'isMergedView:', ctx.isMergedView);
   
   ctx.queueDebugRate('runFilterNow', 150, 'runFilterNow', {
@@ -248,7 +249,10 @@ export async function runFilterNow(ctx: FilterControllerContext, forceCurrent = 
   });
   
   if (!ctx.hasLoaded || ctx.suspendReactiveFiltering) {
-    inspectorLogger.error('★★★ EARLY EXIT 1 ★★★ hasLoaded:', ctx.hasLoaded, 'suspended:', ctx.suspendReactiveFiltering);
+    inspectorLogger.debug('[FILTER NOW] skipped (not loaded or suspended)', {
+      hasLoaded: ctx.hasLoaded,
+      suspended: ctx.suspendReactiveFiltering
+    });
     devLog('FILTER NOW', 'Early exit: hasLoaded:', ctx.hasLoaded, 'suspended:', ctx.suspendReactiveFiltering);
     return;
   }
@@ -256,7 +260,7 @@ export async function runFilterNow(ctx: FilterControllerContext, forceCurrent = 
   devLog('FILTER NOW', 'Passed early checks');
   
   if (ctx.crossQueryBusy) {
-    inspectorLogger.error('★★★ EARLY EXIT 2 ★★★ crossQueryBusy:', ctx.crossQueryBusy);
+    inspectorLogger.debug('[FILTER NOW] skipped (crossQueryBusy)');
     return;
   }
   if (!forceCurrent && ctx.loadedDatasets.length > 1 && ctx.queryScope !== 'current') {
@@ -285,7 +289,7 @@ export async function runFilterNow(ctx: FilterControllerContext, forceCurrent = 
 }
 
 export async function drainFilterQueue(ctx: FilterControllerContext) {
-  inspectorLogger.error('★★★ DRAIN FILTER QUEUE CALLED ★★★');
+  inspectorLogger.debug('[FILTER QUEUE] drain requested');
   devLog('DRAIN FILTER QUEUE', 'Called - filterInFlight:', ctx.filterInFlight, 'hasLoaded:', ctx.hasLoaded);
   if (ctx.filterInFlight || !ctx.hasLoaded) {
     devLog('DRAIN FILTER QUEUE', 'Early exit - filterInFlight:', ctx.filterInFlight, 'hasLoaded:', ctx.hasLoaded);
@@ -314,6 +318,14 @@ export async function runFilterPass(ctx: FilterControllerContext) {
 
     if (!ctx.filterGate.isLatest(token)) return;
     ctx.loadState.totalFilteredCount = count;
+    if ((ctx.loadedDatasets?.length ?? 0) > 0 && ctx.activeDatasetId) {
+      const idx = ctx.loadedDatasets.findIndex((d: any) => d.id === ctx.activeDatasetId);
+      if (idx >= 0) {
+        const current = ctx.loadedDatasets[idx] as any;
+        const next = { ...current, filteredCount: count, rowCount: ctx.totalRowCount, colCount: ctx.headers.length };
+        ctx.loadedDatasets.splice(idx, 1, next);
+      }
+    }
     
     devLog('FILTER PASS', 'Set totalFilteredCount to', count, 'on loadState');
     

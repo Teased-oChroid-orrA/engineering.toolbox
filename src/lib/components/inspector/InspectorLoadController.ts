@@ -7,6 +7,10 @@ export type WorkspaceDataset = {
   label: string;
   hasHeaders: boolean;
   source: DatasetSource;
+  rowCount?: number;
+  colCount?: number;
+  headerNames?: string[];
+  filteredCount?: number;
 };
 
 export const hasLoadedDatasetSignals = (args: {

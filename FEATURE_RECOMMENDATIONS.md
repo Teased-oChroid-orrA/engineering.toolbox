@@ -239,6 +239,17 @@ This document outlines an extensive list of recommended features to elevate the 
 - [ ] **Web scraping** - Extract data from HTML tables
 - [ ] **Workflow automation** - Record and replay analysis workflows
 
+### 4.5 Implemented Stability & Scale Fixes (2026-02-18)
+
+**Priority: HIGH** | **Complexity: MEDIUM**
+
+- [x] **Multi-file aggregate metrics** - `COLUMNS / ROWS / FILTERED` now aggregate across loaded files, with cross-file scope label.
+- [x] **Cross-file scope indicator** - Metrics bar now shows `Across X files` when multiple CSVs are loaded.
+- [x] **Large CSV browser-mode hard-stop removed** - Eliminated hard `100000` row throw path that blocked legitimate large loads.
+- [x] **Tauri upload path fast-path** - Upload flow now prefers native path loading when available (avoids unnecessary full text transfer in Tauri mode).
+- [x] **Dataset stats persistence** - `rowCount / colCount / filteredCount` tracked per loaded dataset and synchronized after filtering/cross-query.
+- [x] **Noisy error-level diagnostics reduced** - Removed/converted temporary debug `error` logs that polluted Inspector console output.
+
 ---
 
 ## 5. New Toolboxes & Modules

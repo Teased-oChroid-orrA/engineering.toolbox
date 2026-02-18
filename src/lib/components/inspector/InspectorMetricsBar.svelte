@@ -5,6 +5,8 @@
     columns = 0,
     rows = 0,
     filtered = 0,
+    aggregateFileCount = 1,
+    aggregateLabel = '',
     rendered = 0,
     startIdx = 0,
     endIdx = 0,
@@ -15,6 +17,8 @@
     columns?: number;
     rows?: number;
     filtered?: number;
+    aggregateFileCount?: number;
+    aggregateLabel?: string;
     rendered?: number;
     startIdx?: number;
     endIdx?: number;
@@ -38,6 +42,12 @@
       <span class="text-[10px] uppercase tracking-widest text-white/40">Filtered</span>
       <span class="text-lg font-semibold text-white"><NumberFlow value={filtered} /></span>
     </div>
+    {#if aggregateFileCount > 1}
+      <div class="flex flex-col justify-end">
+        <span class="text-[10px] uppercase tracking-widest text-cyan-200/70">Scope</span>
+        <span class="text-[11px] font-medium text-cyan-100/80">{aggregateLabel || `Across ${aggregateFileCount} files`}</span>
+      </div>
+    {/if}
     <div class="flex flex-col">
       <span class="text-[10px] uppercase tracking-widest text-white/40">Rendered</span>
       <span class="text-lg font-semibold text-white"><NumberFlow value={rendered} /></span>
