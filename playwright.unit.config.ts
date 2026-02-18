@@ -22,6 +22,7 @@ export default defineConfig({
     '**/simple-*.spec.ts',
     '**/surface-*.spec.ts',
     '**/test-*.spec.ts',
-    '**/visual/**'
+    '**/visual/**',
+    '**/wb/**' // Weight-balance E2E tests
   ]
 });

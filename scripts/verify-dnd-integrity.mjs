@@ -68,7 +68,7 @@ const layoutPersistenceSrc = fs.readFileSync(layoutPersistencePath, 'utf8');
 
 const requiredChecks = [
   { pattern: /new Set\(.+\)\.size/, description: 'duplicate detection using Set.size' },
-  { pattern: /console\.warn.*duplicate/i, description: 'warning log for duplicates' },
+  { pattern: /(console\.warn|bushingLogger\.warn|logger\.warn).*duplicate/i, description: 'warning log for duplicates' },
   { pattern: /localStorage\.removeItem/, description: 'corrupted data cleanup' }
 ];
 
