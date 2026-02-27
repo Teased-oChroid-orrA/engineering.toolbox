@@ -14,6 +14,8 @@
     csysYPoint = $bindable(),
     csysFromLine = $bindable(),
     csysCopyIdx = $bindable(),
+    csysRelocateIdx = $bindable(),
+    csysRelocatePointIdx = $bindable(),
     planeCreateMode = $bindable(),
     planeP0 = $bindable(),
     planeP1 = $bindable(),
@@ -31,6 +33,7 @@
     startDatumsModalDrag,
     armDatumPick,
     addDatumCsys,
+    relocateCsysToPoint,
     addDatumPlane,
     csys,
     planes,
@@ -45,14 +48,18 @@
     surfaceDraftRequired,
     surfaceCreateKind = $bindable(),
     creatorPick = $bindable(),
-    createLineA = $bindable(),
-    createLineB = $bindable(),
-    createPtX = $bindable(),
-    createPtY = $bindable(),
-    createPtZ = $bindable(),
-    beginLinePick,
+    points,
+    edges,
+    surfaces,
     beginSurfacePick,
-    addPoint,
+    createSurfaceFromDraft,
+    addPointsBatch,
+    connectPointsByIndex,
+    deletePointCascade,
+    deleteLineOnly,
+    deleteSurfaceOnly,
+    toggleSurfaceDraftPoint,
+    addSurfaceDraftFromLine,
     finishContourSurface,
     surfaceCurveOpsModalOpen = $bindable(),
     surfCurveModalPanelEl = $bindable(),
@@ -110,6 +117,8 @@
   bind:csysYPoint
   bind:csysFromLine
   bind:csysCopyIdx
+  bind:csysRelocateIdx
+  bind:csysRelocatePointIdx
   bind:planeCreateMode
   bind:planeP0
   bind:planeP1
@@ -127,6 +136,7 @@
   {startDatumsModalDrag}
   {armDatumPick}
   {addDatumCsys}
+  {relocateCsysToPoint}
   {addDatumPlane}
   {csys}
   {planes}
@@ -141,14 +151,18 @@
   {surfaceDraftRequired}
   bind:surfaceCreateKind
   bind:creatorPick
-  bind:createLineA
-  bind:createLineB
-  bind:createPtX
-  bind:createPtY
-  bind:createPtZ
-  {beginLinePick}
+  {points}
+  {edges}
+  {surfaces}
   {beginSurfacePick}
-  {addPoint}
+  {createSurfaceFromDraft}
+  {addPointsBatch}
+  {connectPointsByIndex}
+  {deletePointCascade}
+  {deleteLineOnly}
+  {deleteSurfaceOnly}
+  {toggleSurfaceDraftPoint}
+  {addSurfaceDraftFromLine}
   {finishContourSurface}
   bind:surfaceCurveOpsModalOpen
   bind:surfCurveModalPanelEl

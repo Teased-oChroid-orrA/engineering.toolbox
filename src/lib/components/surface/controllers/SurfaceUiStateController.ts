@@ -5,6 +5,9 @@ export type SurfaceWorkspaceUiState = {
   zoomK?: number;
   pan?: { x: number; y: number };
   rot?: { alpha: number; beta: number };
+  rendererMode?: 'svg';
+  rendererTheme?: 'technical' | 'studio' | 'high-contrast' | 'aurora';
+  performanceMode?: boolean;
 };
 
 const CORE_MODE_KEY = 'sc.surface.coreMode';

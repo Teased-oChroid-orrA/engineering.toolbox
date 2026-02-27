@@ -2,6 +2,7 @@
   import SurfaceSelectionControls from './SurfaceSelectionControls.svelte';
   import SurfaceFileMenu from './SurfaceFileMenu.svelte';
   import type { ToolCursorMode } from './controllers/SurfaceCursorController';
+import type { RendererTheme } from '$lib/surface/renderer/types';
 
   export let actionsBarEl: HTMLElement | null = null;
   export let coreMode = true;
@@ -18,8 +19,11 @@
   export let fileNotice: string | null = null;
   export let canUndo = false;
   export let canRedo = false;
+  export let canDeleteSelection = false;
   export let minPointsFor = { line: 2, surface: 3 };
   export let pointsCount = 0;
+  export let rendererTheme: RendererTheme = 'technical';
+  export let performanceMode = false;
 
   export let onToggleCoreMode: () => void = () => {};
   export let onSetToolCursor: (mode: ToolCursorMode) => void = () => {};
@@ -39,9 +43,12 @@
   export let onOpenSettings: () => void = () => {};
   export let onUndo: () => void = () => {};
   export let onRedo: () => void = () => {};
+  export let onOpenDeletePreview: () => void = () => {};
+  export let onSetRendererTheme: (theme: RendererTheme) => void = () => {};
+  export let onTogglePerformanceMode: () => void = () => {};
 </script>
 
-<div class="flex items-center gap-2" bind:this={actionsBarEl}>
+<div class="flex flex-wrap items-start gap-2 w-full" bind:this={actionsBarEl}>
   <div class="glass-panel surface-tech-card surface-panel-slide surface-pop-card surface-depth-2 rounded-xl px-3 py-2 flex items-center gap-2">
     <div class="text-[10px] text-white/50 uppercase tracking-widest">Mode</div>
     <button
@@ -53,8 +60,8 @@
     </button>
   </div>
 
-  <div class="glass-panel surface-tech-card surface-panel-slide surface-pop-card surface-depth-2 rounded-xl px-2 py-2 flex flex-col items-start gap-1 min-w-[320px]">
-    <div class="text-[10px] text-white/50 uppercase tracking-widest px-1">Create</div>
+  <div class="glass-panel surface-tech-card surface-panel-slide surface-pop-card surface-depth-2 rounded-xl px-2 py-2 flex flex-col items-start gap-1 min-w-[280px] grow">
+    <div class="text-[10px] text-white/50 uppercase tracking-widest px-1">Workflow</div>
     <div class="flex items-center gap-1">
       <button
         class={toolCursor === 'select' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-70'}
@@ -86,14 +93,24 @@
       </button>
       <button
         class={toolCursor === 'surface' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-70'}
-        onclick={() => onSetToolCursor('surface')}
-        title="Create surfaces from point picks"
+        onclick={() => {
+          onSetToolCursor('surface');
+          onOpenCreateGeometry();
+        }}
+        title="Create surfaces from selected draft points"
         disabled={pointsCount < minPointsFor.surface}
       >
         Surface
       </button>
+      <button
+        class="btn btn-xs variant-soft opacity-85"
+        onclick={onOpenCreateGeometry}
+        title="Open full geometry builder"
+      >
+        Builder
+      </button>
     </div>
-    <div class={`px-1 text-[11px] ${createPrereqNotice ? 'text-amber-200/90' : 'text-white/55'}`}>{topCreateHint}</div>
+    <div class={`px-1 text-[11px] ${createPrereqNotice ? 'text-amber-200/90' : 'text-white/55'}`}>Point -> Line -> Surface. {topCreateHint}</div>
   </div>
 
   <div class="glass-panel surface-tech-card surface-panel-slide surface-pop-card surface-depth-2 rounded-xl px-3 py-2 flex items-center gap-3">
@@ -150,6 +167,28 @@
     </button>
   </div>
 
+  <div class="glass-panel surface-pop-card surface-depth-1 rounded-xl px-2 py-2 flex items-center gap-2">
+    <div class="text-[10px] text-white/50 uppercase tracking-widest px-1">Renderer</div>
+    <select
+      class="select select-xs glass-input w-28"
+      bind:value={rendererTheme}
+      onchange={(event) => onSetRendererTheme((event.currentTarget as HTMLSelectElement).value as RendererTheme)}
+      title="Renderer theme profile"
+    >
+      <option value="technical">Technical</option>
+      <option value="studio">Studio</option>
+      <option value="high-contrast">High Contrast</option>
+      <option value="aurora">Aurora</option>
+    </select>
+    <button
+      class={performanceMode ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-75'}
+      onclick={onTogglePerformanceMode}
+      title="Adaptive decimation + worker hit-testing"
+    >
+      Perf {performanceMode ? 'On' : 'Off'}
+    </button>
+  </div>
+
   <SurfaceFileMenu
     {onLoadFile}
     {onExportCSV}
@@ -165,7 +204,10 @@
     bind:fileNotice
   />
 
-  <div class="glass-panel surface-pop-card surface-depth-1 rounded-xl px-2 py-2 flex items-center gap-2">
+  <div class="glass-panel surface-pop-card surface-depth-1 rounded-xl px-2 py-2 flex items-center gap-2 ml-auto">
+    <button class="btn btn-sm variant-soft" onclick={onOpenDeletePreview} disabled={!canDeleteSelection} title="Delete selected geometry (Delete)">
+      Delete
+    </button>
     <button class="btn btn-sm variant-soft" onclick={onUndo} disabled={!canUndo} title="Undo (Ctrl/Cmd+Z)">Undo</button>
     <button class="btn btn-sm variant-soft" onclick={onRedo} disabled={!canRedo} title="Redo (Ctrl/Cmd+Shift+Z)">Redo</button>
   </div>

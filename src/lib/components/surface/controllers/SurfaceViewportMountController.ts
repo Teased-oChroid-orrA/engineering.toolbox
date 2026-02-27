@@ -23,6 +23,8 @@ type SurfaceViewportMountCtx = {
 const ZOOM_MIN = 0.15;
 const ZOOM_MAX = 12;
 const ZOOM_WHEEL_GAIN = 0.0015;
+const ZOOM_DELTA_CLAMP = 180;
+const PAN_LIMIT = 250_000;
 
 type DragState = {
   isDragging: boolean;
@@ -44,7 +46,15 @@ function makePointerHandlers(ctx: SurfaceViewportMountCtx, state: DragState) {
       const rect = ctx.svgEl.getBoundingClientRect();
       const mx = event.clientX - rect.left;
       const my = event.clientY - rect.top;
-      ctx.setRotateAnchor({ mx, my, pivot: ctx.pickOrbitPivot(mx, my) });
+      const pivot = ctx.pickOrbitPivot(mx, my);
+      const rotatedPivot = ctx.rotateForView(pivot, ctx.getRot());
+      const zoomK = ctx.getZoomK();
+      const pan = ctx.getPan();
+      // Keep the chosen pivot at its current screen position during rotation.
+      // This avoids the "snap-to-click" translation while preserving pivot-based orbit.
+      const anchorX = rotatedPivot.x * zoomK + ctx.getW() / 2 + pan.x;
+      const anchorY = rotatedPivot.y * zoomK + ctx.getH() / 2 + pan.y;
+      ctx.setRotateAnchor({ mx: anchorX, my: anchorY, pivot });
     } else {
       ctx.setRotateAnchor(null);
     }
@@ -98,7 +108,9 @@ function onWheelViewport(ctx: SurfaceViewportMountCtx, event: WheelEvent) {
   event.preventDefault();
 
   const currentZoom = ctx.getZoomK();
-  const factor = Math.exp(-event.deltaY * ZOOM_WHEEL_GAIN);
+  const modeScale = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? 120 : 1;
+  const dy = Math.max(-ZOOM_DELTA_CLAMP, Math.min(ZOOM_DELTA_CLAMP, event.deltaY * modeScale));
+  const factor = Math.exp(-dy * ZOOM_WHEEL_GAIN);
   const nextZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, currentZoom * factor));
   if (!Number.isFinite(nextZoom) || nextZoom === currentZoom) return;
 
@@ -111,9 +123,12 @@ function onWheelViewport(ctx: SurfaceViewportMountCtx, event: WheelEvent) {
   const wy = (my - pan.y - ctx.getH() / 2) / currentZoom;
 
   ctx.setZoomK(nextZoom);
+  const nextPanX = mx - (wx * nextZoom + ctx.getW() / 2);
+  const nextPanY = my - (wy * nextZoom + ctx.getH() / 2);
+  if (!Number.isFinite(nextPanX) || !Number.isFinite(nextPanY)) return;
   ctx.setPan({
-    x: mx - (wx * nextZoom + ctx.getW() / 2),
-    y: my - (wy * nextZoom + ctx.getH() / 2)
+    x: Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, nextPanX)),
+    y: Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, nextPanY))
   });
 }
 

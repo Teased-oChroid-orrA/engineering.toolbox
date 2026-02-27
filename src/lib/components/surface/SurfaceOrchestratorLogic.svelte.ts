@@ -1157,11 +1157,15 @@ export interface HandlePointClickResult {
   lineInsertPickMode: boolean;
   createLineA?: number | null;
   createLineB?: number | null;
+  createLineNow?: boolean;
+  createSurfaceNow?: boolean;
 }
 
 export function handlePointClick(
   idx: number,
   ev: PointerEvent,
+  toolCursor: ToolCursorMode,
+  surfaceCreateKind: 'triangle' | 'quad' | 'contour',
   creatorPick: any,
   surfaceDraft: number[],
   datumPick: any,
@@ -1173,12 +1177,122 @@ export function handlePointClick(
   edges: Edge[],
   curves: Curve[]
 ): HandlePointClickResult {
+  void ev;
+  void points;
+  void csys;
+  void edges;
+  void curves;
+
+  const uniqueAppend = (values: number[], value: number) => (values.includes(value) ? values : [...values, value]);
+  const requiredSurfacePoints = surfaceCreateKind === 'triangle' ? 3 : surfaceCreateKind === 'quad' ? 4 : 3;
+
+  if (datumPick) {
+    return {
+      pendingPointIdx: idx,
+      creatorPick,
+      surfaceDraft,
+      datumPick: null,
+      lineInsertPickMode,
+      createLineA,
+      createLineB
+    };
+  }
+
+  if (lineInsertPickMode) {
+    return {
+      pendingPointIdx: idx,
+      creatorPick,
+      surfaceDraft,
+      datumPick,
+      lineInsertPickMode: false,
+      createLineA,
+      createLineB
+    };
+  }
+
+  if (creatorPick?.kind === 'line') {
+    if (creatorPick.slot === 'A') {
+      return {
+        pendingPointIdx: idx,
+        creatorPick: { kind: 'line', slot: 'B' },
+        surfaceDraft,
+        datumPick,
+        lineInsertPickMode,
+        createLineA: idx,
+        createLineB
+      };
+    }
+    const lineA = createLineA;
+    if (lineA != null && lineA !== idx) {
+      return {
+        pendingPointIdx: null,
+        creatorPick: null,
+        surfaceDraft: [],
+        datumPick,
+        lineInsertPickMode,
+        createLineA: lineA,
+        createLineB: idx,
+        createLineNow: true
+      };
+    }
+    return {
+      pendingPointIdx: idx,
+      creatorPick: { kind: 'line', slot: 'A' },
+      surfaceDraft,
+      datumPick,
+      lineInsertPickMode,
+      createLineA: idx,
+      createLineB: null
+    };
+  }
+
+  if (creatorPick?.kind === 'surface' || toolCursor === 'surface') {
+    const nextDraft = uniqueAppend(surfaceDraft, idx);
+    const shouldCreate = surfaceCreateKind !== 'contour' && nextDraft.length >= requiredSurfacePoints;
+    return {
+      pendingPointIdx: idx,
+      creatorPick: shouldCreate ? null : { kind: 'surface', slot: nextDraft.length },
+      surfaceDraft: nextDraft,
+      datumPick,
+      lineInsertPickMode,
+      createLineA,
+      createLineB,
+      createSurfaceNow: shouldCreate
+    };
+  }
+
+  if (toolCursor === 'line') {
+    if (createLineA == null || createLineA === idx) {
+      return {
+        pendingPointIdx: idx,
+        creatorPick,
+        surfaceDraft,
+        datumPick,
+        lineInsertPickMode,
+        createLineA: idx,
+        createLineB: null
+      };
+    }
+    return {
+      pendingPointIdx: null,
+      creatorPick,
+      surfaceDraft: [],
+      datumPick,
+      lineInsertPickMode,
+      createLineA,
+      createLineB: idx,
+      createLineNow: true
+    };
+  }
+
   return {
-    pendingPointIdx: null,
+    pendingPointIdx: idx,
     creatorPick,
     surfaceDraft,
     datumPick,
-    lineInsertPickMode
+    lineInsertPickMode,
+    createLineA,
+    createLineB
   };
 }
 
@@ -1197,5 +1311,19 @@ export interface ConvertEdgeToCurveResult {
 }
 
 export function convertEdgeToCurve(params: ConvertEdgeToCurveParams): ConvertEdgeToCurveResult {
-  return { success: false, error: 'Not implemented' };
+  const { edgeIdx, edges, curves } = params;
+  const edge = edges[edgeIdx];
+  if (!edge) return { success: false, error: 'Selected line does not exist' };
+  const [a, b] = edge;
+  if (a === b) return { success: false, error: 'Line endpoints are identical' };
+
+  const nextCurve: Curve = {
+    name: `Curve ${curves.length + 1}`,
+    pts: [a, b]
+  };
+
+  return {
+    success: true,
+    curves: [...curves, nextCurve]
+  };
 }

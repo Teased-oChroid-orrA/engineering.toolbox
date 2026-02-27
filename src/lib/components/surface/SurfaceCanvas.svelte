@@ -1,6 +1,7 @@
 <script lang="ts">
   import SurfaceViewportContextMenu from './SurfaceViewportContextMenu.svelte';
   import SurfaceCanvasScene from './SurfaceCanvasScene.svelte';
+  import SurfaceViewportNavPad from './SurfaceViewportNavPad.svelte';
 
   export let viewportEl: HTMLDivElement | null = null;
   export let svgEl: SVGSVGElement | null = null;
@@ -21,13 +22,17 @@
   export let onSvgPointerDown: (e: PointerEvent) => void;
   export let onSvgPointerMove: (e: PointerEvent) => void;
   export let onSvgPointerUp: (e: PointerEvent) => void;
+  export let contextTargetKind: 'point' | 'line' | 'empty' = 'empty';
+  export let contextTargetIndex: number | null = null;
 
   export let sortedSurfaces: { i: number; pts: [number, number, number, number] | number[]; z: number; name: string }[] = [];
   export let sortedEdges: { i: number; a: number; b: number; z: number }[] = [];
+  export let pointRenderIds: number[] = [];
   export let projected: { x: number; y: number; z: number }[] = [];
   export let pointBaseRadius: number = 5;
   export let edgeHitWidth: number = 10;
   export let activeEdgeIdx: number | null = null;
+  export let selectedLineSet: Set<number> = new Set();
   export let setActiveEdgeIdx: (idx: number) => void;
   export let onEdgeClick: (idx: number, ev?: MouseEvent) => void = (idx) => setActiveEdgeIdx(idx);
   export let onSurfaceClick: (idx: number, ev?: MouseEvent) => void = () => {};
@@ -76,7 +81,19 @@
   export let fitToScreen: () => void;
   export let resetView: () => void;
   export let selectedBadge: { x: number; y: number; label: string } | null = null;
-  export let cullMargin: number = 120;
+  export let cullMargin: number = 0;
+  export let isolatedPointIds: Set<number> | null = null;
+  export let isolatedLineIds: Set<number> | null = null;
+  export let onDeletePointCascade: (idx: number) => void = () => {};
+  export let onDeleteLineOnly: (idx: number) => void = () => {};
+  export let onConnectFromPoint: (idx: number) => void = () => {};
+  export let onConnectToPoint: (idx: number) => void = () => {};
+  export let onIsolateFromPoint: (idx: number) => void = () => {};
+  export let onIsolateFromLine: (idx: number) => void = () => {};
+  export let onClearIsolation: () => void = () => {};
+  export let onPanBy: (dx: number, dy: number) => void = () => {};
+  export let onRotateBy: (dx: number, dy: number) => void = () => {};
+  export let onZoomBy: (factor: number) => void = () => {};
 
   const inView = (x: number, y: number) => x >= -cullMargin && x <= w + cullMargin && y >= -cullMargin && y <= h + cullMargin;
   const segmentInView = (a: { x: number; y: number }, b: { x: number; y: number }) => {
@@ -120,6 +137,18 @@
     onpointermove={onSvgPointerMove}
     onpointerup={onSvgPointerUp}
   >
+    <defs>
+      <radialGradient id="surfaceViewportVignette" cx="50%" cy="50%" r="68%">
+        <stop offset="62%" stop-color="rgba(2, 6, 23, 0)" />
+        <stop offset="100%" stop-color="rgba(2, 6, 23, 0.36)" />
+      </radialGradient>
+      <linearGradient id="surfaceViewportFog" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="rgba(125,211,252,0.06)" />
+        <stop offset="100%" stop-color="rgba(15,23,42,0.20)" />
+      </linearGradient>
+    </defs>
+    <rect x="0" y="0" width={w} height={h} fill="url(#surfaceViewportFog)" class="pointer-events-none" />
+
     <SurfaceCanvasScene
       {selecting}
       {selectionMode}
@@ -131,9 +160,11 @@
       {datumPlanePatches}
       {datumAxisSegments}
       {projected}
+      {pointRenderIds}
       {showEdges}
       {sortedEdges}
       {activeEdgeIdx}
+      {selectedLineSet}
       {edgeHitWidth}
       {keyActivate}
       {onEdgeClick}
@@ -160,6 +191,8 @@
       {pointBaseRadius}
       {handlePointClick}
       {points}
+      {isolatedPointIds}
+      {isolatedLineIds}
       {inView}
       {segmentInView}
       {polyInView}
@@ -209,35 +242,6 @@
       </g>
     {/if}
 
-    {#if showPoints}
-      {#each projected as node, i (i)}
-        {@const absd = evalRes ? Math.abs(evalRes.signedDistances[i] ?? 0) : 0}
-        {@const baseFill = pendingPointIdx === i ? 'rgba(99,102,241,0.95)' : 'rgba(255,255,255,0.60)'}
-        {@const hmFill = heatmapOn && evalRes ? heatColor(absd, heatScale) : baseFill}
-        {#if inView(node.x, node.y)}
-          <circle
-            cx={node.x}
-            cy={node.y}
-            r={selectedSet.has(i) ? pointBaseRadius + 2 : (pendingPointIdx === i ? pointBaseRadius + 2 : pointBaseRadius)}
-            fill={hmFill}
-            fill-opacity={pointDepthOpacity(node.z)}
-            stroke={selectedSet.has(i) ? 'rgba(56,189,248,0.95)' : (cylOutlierSet.has(i) ? 'rgba(251,191,36,0.95)' : (outlierSet.has(i) ? 'rgba(244,63,94,0.95)' : 'rgba(255,255,255,0.75)'))}
-            stroke-opacity={0.35 + 0.65 * pointDepthOpacity(node.z)}
-            stroke-width="1"
-            class="transition-transform"
-            role="button"
-            tabindex="0"
-            aria-label={`Select point P${i + 1}`}
-            onpointerup={(e) => handlePointClick(i, e as unknown as MouseEvent)}
-            onclick={(e) => handlePointClick(i, e)}
-            onkeydown={(ke) => keyActivate(ke, () => handlePointClick(i))}
-          >
-            <title>P{i + 1}: ({points[i].x}, {points[i].y}, {points[i].z})</title>
-          </circle>
-        {/if}
-      {/each}
-    {/if}
-
     {#if probeOn && probe}
       <g class="pointer-events-none">
         <ellipse
@@ -271,6 +275,15 @@
 
     {#if selectedBadge && showLabels}
       <g class="pointer-events-none">
+        <circle
+          cx={selectedBadge.x}
+          cy={selectedBadge.y}
+          r="11"
+          fill="rgba(56,189,248,0.12)"
+          stroke="rgba(56,189,248,0.65)"
+          stroke-width="1.2"
+          stroke-dasharray="3 2"
+        />
         <rect
           x={selectedBadge.x + 10}
           y={selectedBadge.y - 28}
@@ -285,14 +298,35 @@
         </text>
       </g>
     {/if}
+
+    <rect x="0" y="0" width={w} height={h} fill="url(#surfaceViewportVignette)" class="pointer-events-none" />
   </svg>
 
   <SurfaceViewportContextMenu
     open={vpMenuOpen}
     x={vpMenuX}
     y={vpMenuY}
+    targetKind={contextTargetKind}
+    targetIndex={contextTargetIndex}
     onFitToScreen={fitToScreen}
     onResetView={resetView}
+    {onDeletePointCascade}
+    {onDeleteLineOnly}
+    {onConnectFromPoint}
+    {onConnectToPoint}
+    {onIsolateFromPoint}
+    {onIsolateFromLine}
+    {onClearIsolation}
     onClose={closeViewportMenu}
   />
+
+  <SurfaceViewportNavPad
+    onPan={onPanBy}
+    onRotate={onRotateBy}
+    onZoomIn={() => onZoomBy(1.12)}
+    onZoomOut={() => onZoomBy(1 / 1.12)}
+    onFit={fitToScreen}
+    onReset={resetView}
+  />
+
 </div>
