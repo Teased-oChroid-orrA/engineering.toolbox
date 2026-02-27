@@ -7,7 +7,7 @@
 
 </script>
 
-<div class="space-y-6">
+<div class="space-y-6" data-route-ready="suite">
   <div class="flex items-center justify-between">
     <div>
       <div class="text-sm font-semibold">Engineering Evaluation Suite</div>

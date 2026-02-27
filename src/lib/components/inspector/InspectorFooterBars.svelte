@@ -11,12 +11,15 @@
     columns = 0,
     rows = 0,
     filtered = 0,
+    aggregateFileCount = 1,
+    aggregateLabel = '',
     rendered = 0,
     startIdx = 0,
     endIdx = 0,
     overscan = 0,
     maxWindow = 0,
     parseDiagnostics = [],
+    showMetrics = true,
     onActivateDataset = () => {},
     onUnloadDataset = () => {}
   } = $props<{
@@ -28,12 +31,15 @@
     columns?: number;
     rows?: number;
     filtered?: number;
+    aggregateFileCount?: number;
+    aggregateLabel?: string;
     rendered?: number;
     startIdx?: number;
     endIdx?: number;
     overscan?: number;
     maxWindow?: number;
     parseDiagnostics?: Array<{ idx: number; name: string; numericFail: number; dateFail: number }>;
+    showMetrics?: boolean;
     onActivateDataset?: (id: string) => void;
     onUnloadDataset?: (id: string) => void;
   }>();
@@ -51,16 +57,20 @@
   />
 </div>
 
-<div class="order-30">
-  <InspectorMetricsBar
-    {columns}
-    {rows}
-    {filtered}
-    {rendered}
-    {startIdx}
-    {endIdx}
-    {overscan}
-    {maxWindow}
-    {parseDiagnostics}
-  />
-</div>
+{#if showMetrics}
+  <div class="order-30">
+    <InspectorMetricsBar
+      {columns}
+      {rows}
+      {filtered}
+      {aggregateFileCount}
+      {aggregateLabel}
+      {rendered}
+      {startIdx}
+      {endIdx}
+      {overscan}
+      {maxWindow}
+      {parseDiagnostics}
+    />
+  </div>
+{/if}

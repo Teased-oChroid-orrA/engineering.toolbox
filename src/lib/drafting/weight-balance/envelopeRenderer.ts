@@ -1,333 +1,90 @@
 /**
  * CG Envelope Renderer using D3
- * Visualizes the CG envelope boundaries and current aircraft position
  */
 
 import * as d3 from 'd3';
-import type { CGEnvelope, EnvelopePoint } from '$lib/core/weight-balance/types';
-import { mapVertexToDisplay, mapCGToDisplay, getCGAxisLabel } from '$lib/core/weight-balance/displayAdapters';
-import { formatPercentMAC } from '$lib/core/weight-balance/mac';
+import type { CGEnvelope } from '$lib/core/weight-balance/types';
+import { getCGAxisLabel, mapCGToDisplay, mapVertexToDisplay } from '$lib/core/weight-balance/displayAdapters';
+import { drawAxisLabels, drawEnvelopes, drawGridAndAxes } from './envelopeRendererLayers';
+import { drawCurrentCG } from './envelopeRendererCurrentCG';
 
 export interface EnvelopeRenderConfig {
   width: number;
   height: number;
   margin: { top: number; right: number; bottom: number; left: number };
   currentCG?: { weight: number; cgPosition: number };
+  uncertaintyBand?: { cgMin: number; cgMax: number };
   category?: string;
   useMACDisplay?: boolean;
   lemac?: number;
   mac?: number;
 }
 
-export function renderCGEnvelope(
-  container: HTMLElement,
-  envelopes: CGEnvelope[],
-  config: EnvelopeRenderConfig
-): void {
-  // Clear previous content
+export function renderCGEnvelope(container: HTMLElement, envelopes: CGEnvelope[], config: EnvelopeRenderConfig): void {
   d3.select(container).selectAll('*').remove();
-  
-  const { width, height, margin, currentCG, useMACDisplay = false, lemac, mac } = config;
+
+  const { width, height, margin, currentCG, uncertaintyBand, useMACDisplay = false, lemac, mac } = config;
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;
-  
-  // Create SVG
   const svg = d3.select(container)
     .append('svg')
     .attr('width', width)
     .attr('height', height)
     .attr('viewBox', `0 0 ${width} ${height}`)
     .style('background', '#1e293b');
-  
-  const g = svg.append('g')
-    .attr('transform', `translate(${margin.left},${margin.top})`);
-  
-  // Convert vertices to display coordinates (memoized for this render)
-  const displayEnvelopes = envelopes.map(envelope => ({
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+  const displayEnvelopes = toDisplayEnvelopes(envelopes, useMACDisplay, lemac, mac);
+  const { xScale, yScale } = createScales(displayEnvelopes, innerWidth, innerHeight);
+
+  drawGridAndAxes(g, xScale, yScale, innerWidth, innerHeight, useMACDisplay, lemac, mac);
+  drawEnvelopes(g, displayEnvelopes, xScale, yScale, innerWidth, useMACDisplay);
+  if (currentCG) {
+    drawCurrentCG(
+      g,
+      currentCG,
+      uncertaintyBand,
+      envelopes,
+      xScale,
+      yScale,
+      innerWidth,
+      innerHeight,
+      useMACDisplay,
+      lemac,
+      mac
+    );
+  }
+  drawAxisLabels(g, innerWidth, innerHeight, margin, getCGAxisLabel(useMACDisplay));
+}
+
+function toDisplayEnvelopes(
+  envelopes: CGEnvelope[],
+  useMACDisplay: boolean,
+  lemac?: number,
+  mac?: number
+): CGEnvelope[] {
+  return envelopes.map((envelope) => ({
     ...envelope,
-    vertices: envelope.vertices.map(v => mapVertexToDisplay(v, useMACDisplay, lemac, mac)),
-    forwardLimit: envelope.forwardLimit !== undefined && envelope.forwardLimit !== null
-      ? mapCGToDisplay(envelope.forwardLimit, useMACDisplay, lemac, mac)
-      : undefined,
-    aftLimit: envelope.aftLimit !== undefined && envelope.aftLimit !== null
-      ? mapCGToDisplay(envelope.aftLimit, useMACDisplay, lemac, mac)
-      : undefined
+    vertices: envelope.vertices.map((vertex) => mapVertexToDisplay(vertex, useMACDisplay, lemac, mac)),
+    forwardLimit: envelope.forwardLimit !== undefined ? mapCGToDisplay(envelope.forwardLimit, useMACDisplay, lemac, mac) : undefined,
+    aftLimit: envelope.aftLimit !== undefined ? mapCGToDisplay(envelope.aftLimit, useMACDisplay, lemac, mac) : undefined
   }));
-  
-  // Find data extents from display coordinates
-  const allVertices = displayEnvelopes.flatMap(e => e.vertices);
-  const cgExtent = d3.extent(allVertices, d => d.cgPosition) as [number, number];
-  const weightExtent = d3.extent(allVertices, d => d.weight) as [number, number];
-  
-  // Add padding
+}
+
+function createScales(
+  envelopes: CGEnvelope[],
+  innerWidth: number,
+  innerHeight: number
+): { xScale: d3.ScaleLinear<number, number>; yScale: d3.ScaleLinear<number, number> } {
+  const allVertices = envelopes.flatMap((envelope) => envelope.vertices);
+  const cgExtent = d3.extent(allVertices, (vertex) => vertex.cgPosition) as [number, number];
+  const weightExtent = d3.extent(allVertices, (vertex) => vertex.weight) as [number, number];
   const cgPadding = (cgExtent[1] - cgExtent[0]) * 0.1;
   const weightPadding = (weightExtent[1] - weightExtent[0]) * 0.1;
-  
-  // Create scales
-  const xScale = d3.scaleLinear()
-    .domain([cgExtent[0] - cgPadding, cgExtent[1] + cgPadding])
-    .range([0, innerWidth]);
-  
-  const yScale = d3.scaleLinear()
-    .domain([weightExtent[1] + weightPadding, weightExtent[0] - weightPadding]) // Inverted
+
+  const xScale = d3.scaleLinear().domain([cgExtent[0] - cgPadding, cgExtent[1] + cgPadding]).range([0, innerWidth]);
+  const yScale = d3
+    .scaleLinear()
+    .domain([weightExtent[1] + weightPadding, weightExtent[0] - weightPadding])
     .range([0, innerHeight]);
-  
-  // Add grid with custom tick format for %MAC mode
-  const xAxis = d3.axisBottom(xScale).ticks(10);
-  if (useMACDisplay && lemac !== undefined && mac !== undefined && mac > 0) {
-    xAxis.tickFormat((d) => formatPercentMAC(d as number, 0).replace(' MAC', ''));
-  }
-  const yAxis = d3.axisLeft(yScale).ticks(10);
-  
-  g.append('g')
-    .attr('class', 'grid')
-    .attr('transform', `translate(0,${innerHeight})`)
-    .call(xAxis)
-    .call(g => g.select('.domain').remove())
-    .call(g => g.selectAll('.tick line')
-      .clone()
-      .attr('y2', -innerHeight)
-      .attr('stroke', '#334155')
-      .attr('stroke-opacity', 0.3))
-    .call(g => g.selectAll('.tick text')
-      .attr('fill', '#94a3b8')
-      .attr('font-size', '11px'));
-  
-  g.append('g')
-    .attr('class', 'grid')
-    .call(yAxis)
-    .call(g => g.select('.domain').remove())
-    .call(g => g.selectAll('.tick line')
-      .clone()
-      .attr('x2', innerWidth)
-      .attr('stroke', '#334155')
-      .attr('stroke-opacity', 0.3))
-    .call(g => g.selectAll('.tick text')
-      .attr('fill', '#94a3b8')
-      .attr('font-size', '11px'));
-  
-  // Category colors
-  const categoryColors: Record<string, string> = {
-    normal: '#22c55e',
-    utility: '#eab308',
-    acrobatic: '#ef4444'
-  };
-  
-  // Render envelopes using display coordinates
-  displayEnvelopes.forEach(displayEnvelope => {
-    const line = d3.line<EnvelopePoint>()
-      .x(d => xScale(d.cgPosition))
-      .y(d => yScale(d.weight))
-      .curve(d3.curveLinear);
-    
-    const color = categoryColors[displayEnvelope.category] || '#64748b';
-    
-    // Draw envelope polygon
-    g.append('path')
-      .datum([...displayEnvelope.vertices, displayEnvelope.vertices[0]]) // Close the path
-      .attr('d', line)
-      .attr('fill', color)
-      .attr('fill-opacity', 0.1)
-      .attr('stroke', color)
-      .attr('stroke-width', 2)
-      .attr('stroke-opacity', 0.8);
-    
-    // Draw forward limit line if defined
-    if (displayEnvelope.forwardLimit !== undefined && displayEnvelope.forwardLimit !== null) {
-      g.append('line')
-        .attr('x1', xScale(displayEnvelope.forwardLimit))
-        .attr('y1', 0)
-        .attr('x2', xScale(displayEnvelope.forwardLimit))
-        .attr('y2', innerHeight)
-        .attr('stroke', color)
-        .attr('stroke-width', 2)
-        .attr('stroke-dasharray', '5,5')
-        .attr('stroke-opacity', 0.6);
-      
-      // Add label for forward limit
-      const labelText = useMACDisplay 
-        ? `Fwd: ${displayEnvelope.forwardLimit.toFixed(1)}%`
-        : `Fwd: ${displayEnvelope.forwardLimit.toFixed(1)}"`;
-      g.append('text')
-        .attr('x', xScale(displayEnvelope.forwardLimit))
-        .attr('y', -5)
-        .attr('text-anchor', 'middle')
-        .attr('fill', color)
-        .attr('font-size', '10px')
-        .text(labelText);
-    }
-    
-    // Draw aft limit line if defined
-    if (displayEnvelope.aftLimit !== undefined && displayEnvelope.aftLimit !== null) {
-      g.append('line')
-        .attr('x1', xScale(displayEnvelope.aftLimit))
-        .attr('y1', 0)
-        .attr('x2', xScale(displayEnvelope.aftLimit))
-        .attr('y2', innerHeight)
-        .attr('stroke', color)
-        .attr('stroke-width', 2)
-        .attr('stroke-dasharray', '5,5')
-        .attr('stroke-opacity', 0.6);
-      
-      // Add label for aft limit
-      const labelText = useMACDisplay 
-        ? `Aft: ${displayEnvelope.aftLimit.toFixed(1)}%`
-        : `Aft: ${displayEnvelope.aftLimit.toFixed(1)}"`;
-      g.append('text')
-        .attr('x', xScale(displayEnvelope.aftLimit))
-        .attr('y', -5)
-        .attr('text-anchor', 'middle')
-        .attr('fill', color)
-        .attr('font-size', '10px')
-        .text(labelText);
-    }
-    
-    // Draw max weight line
-    if (displayEnvelope.maxWeight) {
-      g.append('line')
-        .attr('x1', 0)
-        .attr('y1', yScale(displayEnvelope.maxWeight))
-        .attr('x2', innerWidth)
-        .attr('y2', yScale(displayEnvelope.maxWeight))
-        .attr('stroke', color)
-        .attr('stroke-width', 2)
-        .attr('stroke-dasharray', '5,5')
-        .attr('stroke-opacity', 0.6);
-      
-      // Add label for max weight
-      g.append('text')
-        .attr('x', innerWidth - 5)
-        .attr('y', yScale(displayEnvelope.maxWeight) - 5)
-        .attr('text-anchor', 'end')
-        .attr('fill', color)
-        .attr('font-size', '10px')
-        .text(`Max: ${displayEnvelope.maxWeight.toFixed(0)} lbs`);
-    }
-    
-    // Add envelope category label
-    const centroid = displayEnvelope.vertices.reduce((acc, v) => ({
-      cgPosition: acc.cgPosition + v.cgPosition / displayEnvelope.vertices.length,
-      weight: acc.weight + v.weight / displayEnvelope.vertices.length
-    }), { cgPosition: 0, weight: 0 });
-    
-    g.append('text')
-      .attr('x', xScale(centroid.cgPosition))
-      .attr('y', yScale(centroid.weight))
-      .attr('text-anchor', 'middle')
-      .attr('fill', color)
-      .attr('font-size', '12px')
-      .attr('font-weight', 'bold')
-      .text(displayEnvelope.category.toUpperCase());
-  });
-  
-  // Render current position
-  if (currentCG) {
-    const { weight, cgPosition } = currentCG;
-    
-    // Convert current CG to display coordinates
-    const displayCGPosition = mapCGToDisplay(cgPosition, useMACDisplay, lemac, mac);
-    
-    // Check if in envelope (use original coordinates)
-    const inEnvelope = envelopes.some(e => 
-      isPointInPolygon(cgPosition, weight, e.vertices)
-    );
-    
-    const pointColor = inEnvelope ? '#22c55e' : '#ef4444';
-    
-    // Crosshair lines
-    g.append('line')
-      .attr('x1', 0)
-      .attr('x2', innerWidth)
-      .attr('y1', yScale(weight))
-      .attr('y2', yScale(weight))
-      .attr('stroke', pointColor)
-      .attr('stroke-width', 1)
-      .attr('stroke-dasharray', '4,4')
-      .attr('opacity', 0.5);
-    
-    g.append('line')
-      .attr('x1', xScale(displayCGPosition))
-      .attr('x2', xScale(displayCGPosition))
-      .attr('y1', 0)
-      .attr('y2', innerHeight)
-      .attr('stroke', pointColor)
-      .attr('stroke-width', 1)
-      .attr('stroke-dasharray', '4,4')
-      .attr('opacity', 0.5);
-    
-    // Point
-    g.append('circle')
-      .attr('cx', xScale(displayCGPosition))
-      .attr('cy', yScale(weight))
-      .attr('r', 6)
-      .attr('fill', pointColor)
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 2);
-    
-    // Label with appropriate units
-    const cgLabel = useMACDisplay 
-      ? `${weight.toFixed(0)} lbs @ ${displayCGPosition.toFixed(1)}% MAC`
-      : `${weight.toFixed(0)} lbs @ ${cgPosition.toFixed(2)}"`;
-    g.append('text')
-      .attr('x', xScale(displayCGPosition) + 10)
-      .attr('y', yScale(weight) - 10)
-      .attr('fill', pointColor)
-      .attr('font-size', '12px')
-      .attr('font-weight', 'bold')
-      .text(cgLabel);
-  }
-  
-  // Axis labels
-  g.append('text')
-    .attr('x', innerWidth / 2)
-    .attr('y', innerHeight + margin.bottom - 5)
-    .attr('text-anchor', 'middle')
-    .attr('fill', '#94a3b8')
-    .attr('font-size', '13px')
-    .attr('font-weight', 'bold')
-    .text(getCGAxisLabel(useMACDisplay));
-  
-  g.append('text')
-    .attr('x', -innerHeight / 2)
-    .attr('y', -margin.left + 15)
-    .attr('text-anchor', 'middle')
-    .attr('transform', 'rotate(-90)')
-    .attr('fill', '#94a3b8')
-    .attr('font-size', '13px')
-    .attr('font-weight', 'bold')
-    .text('Weight (lbs)');
-}
-
-function getCentroid(vertices: EnvelopePoint[]): { cgPosition: number; weight: number } {
-  const n = vertices.length;
-  let cx = 0;
-  let cy = 0;
-  
-  vertices.forEach(v => {
-    cx += v.cgPosition;
-    cy += v.weight;
-  });
-  
-  return {
-    cgPosition: cx / n,
-    weight: cy / n
-  };
-}
-
-function isPointInPolygon(x: number, y: number, vertices: EnvelopePoint[]): boolean {
-  let inside = false;
-  
-  for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
-    const xi = vertices[i].cgPosition;
-    const yi = vertices[i].weight;
-    const xj = vertices[j].cgPosition;
-    const yj = vertices[j].weight;
-    
-    const intersect = ((yi > y) !== (yj > y))
-      && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-    
-    if (intersect) inside = !inside;
-  }
-  
-  return inside;
+  return { xScale, yScale };
 }

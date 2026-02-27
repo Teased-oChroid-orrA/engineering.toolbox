@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod geometry;
+mod fastener;
 mod inspector;
 mod surface;
 
@@ -82,6 +83,7 @@ fn main() {
             inspector::inspector_sort,
             inspector::inspector_set_quiet_logs,
             inspector::inspector_explain_row,
+            fastener::fastener_verify_stiffness,
             // inspector_export_filtered_csv is optional and may be added later
         ])
         .run(tauri::generate_context!())

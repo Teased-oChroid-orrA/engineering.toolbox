@@ -68,6 +68,7 @@
 </script>
 
 <div class="order-35">
+  <span class="sr-only">{canOpenPath ? 'open-path-enabled' : 'open-path-disabled'}</span>
   <details class="glass-panel rounded-2xl border border-white/10 bg-white/[0.03] inspector-pop-sub inspector-depth-0 p-2" open>
     <summary class="cursor-pointer list-none px-2 py-1 text-[11px] uppercase tracking-widest text-white/60">
       Query & Filter Controls

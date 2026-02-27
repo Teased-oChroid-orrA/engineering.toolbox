@@ -16,6 +16,8 @@
   export let csysYPoint = 2;
   export let csysFromLine = 0;
   export let csysCopyIdx = 0;
+  export let csysRelocateIdx = 0;
+  export let csysRelocatePointIdx = 0;
   export let planeCreateMode: any = 'three_points';
   export let planeP0 = 0;
   export let planeP1 = 1;
@@ -35,6 +37,7 @@
   export let startDatumsModalDrag: (ev: PointerEvent) => void = () => {};
   export let armDatumPick: (...args: any[]) => void = () => {};
   export let addDatumCsys: () => void = () => {};
+  export let relocateCsysToPoint: () => void = () => {};
   export let addDatumPlane: () => void = () => {};
 
   export let createGeometryModalOpen = false;
@@ -48,15 +51,19 @@
   export let surfaceDraftRequired = 3;
   export let surfaceCreateKind: any = 'quad';
   export let creatorPick: any = null;
-  export let createLineA: number | null = 0;
-  export let createLineB: number | null = 1;
-  export let createPtX = 0;
-  export let createPtY = 0;
-  export let createPtZ = 0;
-  export let beginLinePick: (...args: any[]) => void = () => {};
+  export let points: any[] = [];
+  export let edges: any[] = [];
+  export let surfaces: any[] = [];
   export let beginSurfacePick: (...args: any[]) => void = () => {};
-  export let addPoint: () => void = () => {};
+  export let createSurfaceFromDraft: () => void = () => {};
   export let finishContourSurface: () => void = () => {};
+  export let addPointsBatch: (points: any[]) => void = () => {};
+  export let connectPointsByIndex: (a: number, b: number) => void = () => {};
+  export let deletePointCascade: (idx: number) => void = () => {};
+  export let deleteLineOnly: (idx: number) => void = () => {};
+  export let deleteSurfaceOnly: (idx: number) => void = () => {};
+  export let toggleSurfaceDraftPoint: (idx: number) => void = () => {};
+  export let addSurfaceDraftFromLine: (lineIdx: number) => void = () => {};
 
   export let surfaceCurveOpsModalOpen = false;
   export let surfCurveModalPanelEl: HTMLElement | null = null;
@@ -116,6 +123,8 @@
   bind:csysYPoint
   bind:csysFromLine
   bind:csysCopyIdx
+  bind:csysRelocateIdx
+  bind:csysRelocatePointIdx
   bind:planeCreateMode
   bind:planeP0
   bind:planeP1
@@ -133,9 +142,11 @@
   {startDatumsModalDrag}
   {armDatumPick}
   {addDatumCsys}
+  {relocateCsysToPoint}
   {addDatumPlane}
   {csys}
   {planes}
+  {pointsCount}
 />
 
 <SurfaceCreateGeometryModal
@@ -150,16 +161,20 @@
   {surfaceDraftRequired}
   bind:surfaceCreateKind
   bind:creatorPick
-  bind:createLineA
-  bind:createLineB
-  bind:createPtX
-  bind:createPtY
-  bind:createPtZ
+  {points}
+  {edges}
+  {surfaces}
   onClose={() => (createGeometryModalOpen = false)}
-  {beginLinePick}
   {beginSurfacePick}
-  {addPoint}
+  {createSurfaceFromDraft}
   {finishContourSurface}
+  onAddPointsBatch={addPointsBatch}
+  onConnectPoints={connectPointsByIndex}
+  onDeletePoint={deletePointCascade}
+  onDeleteLine={deleteLineOnly}
+  onDeleteSurface={deleteSurfaceOnly}
+  onToggleSurfacePoint={toggleSurfaceDraftPoint}
+  onAddSurfaceFromLine={addSurfaceDraftFromLine}
 />
 
 <SurfaceCurveOpsModal

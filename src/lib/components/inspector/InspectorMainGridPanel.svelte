@@ -2,6 +2,7 @@
   import InspectorQueryRow from '$lib/components/inspector/InspectorQueryRow.svelte';
   import InspectorMergedGrid from '$lib/components/inspector/InspectorMergedGrid.svelte';
   import InspectorVirtualGrid from '$lib/components/inspector/InspectorVirtualGrid.svelte';
+  import InspectorMetricsBar from '$lib/components/inspector/InspectorMetricsBar.svelte';
   import type { MultiQueryClause } from '$lib/components/inspector/InspectorStateTypes';
 
   export let hasLoaded = false;
@@ -34,6 +35,17 @@
   export let hiddenColumns: number[] = [];
   export let columnWidths: Record<number, number> = {};
   export let activeDatasetLabel: string | null = null;
+  export let columns = 0;
+  export let rows = 0;
+  export let filtered = 0;
+  export let aggregateFileCount = 1;
+  export let aggregateLabel = '';
+  export let rendered = 0;
+  export let startIdx = 0;
+  export let endIdx = 0;
+  export let overscan = 0;
+  export let maxWindow = 0;
+  export let parseDiagnostics: Array<{ idx: number; name: string; numericFail: number; dateFail: number }> = [];
 
   export let onMatchModeChange: (value: 'fuzzy' | 'exact' | 'regex') => void = () => {};
   export let onQueryScopeChange: (value: 'current' | 'all' | 'ask') => void = () => {};
@@ -98,36 +110,60 @@
 </div>
 
 <div class="order-50">
-  {#if isMergedView && mergedGroupedRows.length > 0 && mergedGroupedRows.some(g => g.source !== 'Merged results')}
-    <InspectorMergedGrid
-      {mergedDisplayHeaders}
-      {mergedGroupedRows}
-      {mergedRowFxEnabled}
-      {uiAnimDur}
-    />
-  {:else}
-    <InspectorVirtualGrid
-      {headers}
-      {visibleRows}
-      {visibleColIdxs}
-      {totalFilteredCount}
-      rowHeight={ROW_HEIGHT}
-      overscan={OVERSCAN}
-      maxWindowAbs={MAX_WINDOW_ABS}
-      {sortColIdx}
-      {sortDir}
-      {sortPriority}
-      {pinnedLeft}
-      {pinnedRight}
-      {hiddenColumns}
-      {columnWidths}
-      onRequestSort={onRequestSort}
-      onOpenRow={onOpenRow}
-      onColumnResize={onColumnResize}
-      {highlightCell}
-      onWindowChange={onGridWindowChange}
-      onScrollTrace={onGridScrollTrace}
-      topBanner={activeDatasetLabel}
-    />
-  {/if}
+  <div class="space-y-3">
+    <div>
+      <InspectorMetricsBar
+        {columns}
+        {rows}
+        {filtered}
+        {aggregateFileCount}
+        {aggregateLabel}
+        {rendered}
+        {startIdx}
+        {endIdx}
+        {overscan}
+        {maxWindow}
+        {parseDiagnostics}
+      />
+    </div>
+    <div>
+      {#if isMergedView && mergedGroupedRows.length > 0}
+        <InspectorMergedGrid
+          {mergedDisplayHeaders}
+          {mergedGroupedRows}
+          {mergedRowFxEnabled}
+          {uiAnimDur}
+          rowHeight={ROW_HEIGHT}
+          overscan={OVERSCAN}
+          maxWindowAbs={MAX_WINDOW_ABS}
+          onWindowChange={onGridWindowChange}
+          onScrollTrace={onGridScrollTrace}
+        />
+      {:else}
+        <InspectorVirtualGrid
+          {headers}
+          {visibleRows}
+          {visibleColIdxs}
+          {totalFilteredCount}
+          rowHeight={ROW_HEIGHT}
+          overscan={OVERSCAN}
+          maxWindowAbs={MAX_WINDOW_ABS}
+          {sortColIdx}
+          {sortDir}
+          {sortPriority}
+          {pinnedLeft}
+          {pinnedRight}
+          {hiddenColumns}
+          {columnWidths}
+          onRequestSort={onRequestSort}
+          onOpenRow={onOpenRow}
+          onColumnResize={onColumnResize}
+          {highlightCell}
+          onWindowChange={onGridWindowChange}
+          onScrollTrace={onGridScrollTrace}
+          topBanner={isMergedView ? null : activeDatasetLabel}
+        />
+      {/if}
+    </div>
+  </div>
 </div>

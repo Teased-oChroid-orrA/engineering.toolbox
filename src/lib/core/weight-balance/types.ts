@@ -101,6 +101,63 @@ export interface LoadingResults {
   category: 'normal' | 'utility' | 'acrobatic' | null;
   categoryValid: boolean;
   overallStatus: 'safe' | 'warning' | 'error';
+  calculationTrace: CalculationTraceEntry[];
+  audit: LoadingAudit;
+  analysis: LoadingAnalysis;
+}
+
+export interface CalculationTraceEntry {
+  id: string;
+  name: string;
+  type: LoadingItemType;
+  weight: number;
+  arm: number;
+  moment: number;
+  isFuel: boolean;
+}
+
+export interface LoadingAudit {
+  generatedAt: string;
+  inputHash: string;
+  checks: {
+    errors: number;
+    warnings: number;
+    info: number;
+  };
+}
+
+export interface LoadingAnalysis {
+  uncertaintyBand: UncertaintyBand;
+  sensitivity: SensitivityEntry[];
+  sensitivityDeltaWeight: number;
+}
+
+export interface UncertaintyBand {
+  weightTolerance: number;
+  armTolerance: number;
+  totalWeightMin: number;
+  totalWeightMax: number;
+  totalMomentMin: number;
+  totalMomentMax: number;
+  cgMin: number;
+  cgMax: number;
+  cgSpan: number;
+}
+
+export interface SensitivityEntry {
+  itemId: string;
+  itemName: string;
+  arm: number;
+  baselineWeight: number;
+  deltaWeight: number;
+  cgPerUnitWeight: number;
+  deltaCGForStep: number;
+}
+
+export interface CalculationOptions {
+  uncertaintyWeightTolerance?: number;
+  uncertaintyArmTolerance?: number;
+  sensitivityDeltaWeight?: number;
 }
 
 export interface ValidationResult {

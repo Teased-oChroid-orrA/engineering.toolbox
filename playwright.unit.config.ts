@@ -21,6 +21,7 @@ export default defineConfig({
     '**/real-*.spec.ts',
     '**/simple-*.spec.ts',
     '**/surface-*.spec.ts',
+    '**/toolbox-screenshots.spec.ts',
     '**/test-*.spec.ts',
     '**/visual/**',
     '**/wb/**' // Weight-balance E2E tests

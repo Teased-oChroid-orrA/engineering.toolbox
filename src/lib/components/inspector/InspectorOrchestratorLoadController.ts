@@ -1,8 +1,109 @@
 import { devLog } from '$lib/utils/devLog';
 import { inspectorLogger } from '$lib/utils/loggers';
-import { MAX_BROWSER_MODE_ROWS } from '$lib/components/inspector/InspectorGridConstants';
 import type { LoadControllerContext } from './InspectorControllerContext';
 import { resetBrowserModeOriginalRows } from './InspectorOrchestratorFilterController';
+
+function normalizeDatasetLabel(input: string | null | undefined, fallback = 'Unnamed file'): string {
+  const raw = (input ?? '').trim();
+  const dequoted = raw.replace(/^["']+|["']+$/g, '').trim();
+  if (!dequoted || /^\[?\s*none\s*\]?$/i.test(dequoted) || /^\(\s*none\s*\)$/i.test(dequoted)) {
+    return fallback;
+  }
+  const base = dequoted.split(/[\\/]/).pop() ?? dequoted;
+  const stripped = base.replace(/\.csv$/i, '').trim();
+  return stripped || fallback;
+}
+
+function ensureSourceColumnHeaders(headers: string[]): { baseHeaders: string[]; fullHeaders: string[]; sourceIdx: number } {
+  const srcIdx = headers.indexOf('_source_file');
+  if (srcIdx >= 0) {
+    const base = headers.filter((_, i) => i !== srcIdx);
+    return { baseHeaders: base, fullHeaders: [...base, '_source_file'], sourceIdx: base.length };
+  }
+  return { baseHeaders: [...headers], fullHeaders: [...headers, '_source_file'], sourceIdx: headers.length };
+}
+
+function alignRowToHeaders(row: string[], rowHeaders: string[], targetHeaders: string[]): string[] {
+  const idx = new Map<string, number>();
+  for (let i = 0; i < rowHeaders.length; i++) idx.set(rowHeaders[i], i);
+  return targetHeaders.map((h) => {
+    const at = idx.get(h);
+    return at == null ? '' : (row?.[at] ?? '');
+  });
+}
+
+function appendBrowserDatasetToMergedRows(ctx: LoadControllerContext, args: {
+  datasetLabel: string;
+  parsedHeaders: string[];
+  parsedRows: string[][];
+  existingHeaders: string[];
+  existingRows: string[][];
+}) {
+  const currentDatasets = (ctx.loadedDatasets ?? []) as any[];
+  const fallbackExistingSource = normalizeDatasetLabel(currentDatasets[0]?.label);
+
+  const existingNorm = ensureSourceColumnHeaders(args.existingHeaders ?? []);
+  const newNorm = ensureSourceColumnHeaders(args.parsedHeaders ?? []);
+  const combinedBaseHeaders = [...existingNorm.baseHeaders];
+  for (const h of newNorm.baseHeaders) if (!combinedBaseHeaders.includes(h)) combinedBaseHeaders.push(h);
+  const combinedFullHeaders = [...combinedBaseHeaders, '_source_file'];
+  const sourceIdx = combinedBaseHeaders.length;
+
+  const remappedExisting = (args.existingRows ?? []).map((r) => {
+    const sourceRaw = existingNorm.sourceIdx < r.length ? r[existingNorm.sourceIdx] : fallbackExistingSource;
+    const aligned = alignRowToHeaders(r, existingNorm.baseHeaders, combinedBaseHeaders);
+    aligned[sourceIdx] = normalizeDatasetLabel(sourceRaw, fallbackExistingSource);
+    return aligned;
+  });
+
+  const remappedNew = (args.parsedRows ?? []).map((r) => {
+    const aligned = alignRowToHeaders(r, newNorm.baseHeaders, combinedBaseHeaders);
+    aligned[sourceIdx] = args.datasetLabel;
+    return aligned;
+  });
+
+  (ctx as any).loadState.headers = combinedFullHeaders;
+  (ctx as any).loadState.colTypes = [...combinedBaseHeaders.map(() => 'string'), 'string'];
+  (ctx as any).loadState.mergedRowsAll = [...remappedExisting, ...remappedNew];
+  (ctx as any).loadState.totalRowCount = (ctx as any).loadState.mergedRowsAll.length;
+  (ctx as any).loadState.totalFilteredCount = (ctx as any).loadState.mergedRowsAll.length;
+  (ctx as any).loadState.visibleRows = (ctx as any).loadState.mergedRowsAll;
+  (ctx as any).loadState.isMergedView = true;
+}
+
+async function rebuildMergedRowsFromWorkspaceTextDatasets(ctx: LoadControllerContext) {
+  const datasets = (ctx.loadedDatasets ?? []).filter((ds: any) => ds?.source?.kind === 'text');
+  if (datasets.length <= 1) return;
+  const { parseCsvInBrowser } = await import('$lib/utils/csvParser');
+  const unionHeaders: string[] = [];
+  const parsed = datasets.map((ds: any) => {
+    const out = parseCsvInBrowser(String(ds.source.text ?? ''), !!ds.hasHeaders);
+    for (const h of out.headers ?? []) if (!unionHeaders.includes(h)) unionHeaders.push(h);
+    return { label: normalizeDatasetLabel(ds.label), headers: out.headers ?? [], rows: out.rows ?? [] };
+  });
+
+  const outRows: string[][] = [];
+  for (const ds of parsed) {
+    const idx = new Map<string, number>();
+    for (let i = 0; i < ds.headers.length; i++) idx.set(ds.headers[i], i);
+    for (const row of ds.rows) {
+      const aligned = unionHeaders.map((h) => {
+        const at = idx.get(h);
+        return at == null ? '' : (row?.[at] ?? '');
+      });
+      aligned.push(ds.label);
+      outRows.push(aligned);
+    }
+  }
+
+  (ctx as any).loadState.headers = [...unionHeaders, '_source_file'];
+  (ctx as any).loadState.colTypes = [...unionHeaders.map(() => 'string'), 'string'];
+  (ctx as any).loadState.mergedRowsAll = outRows;
+  (ctx as any).loadState.totalRowCount = outRows.length;
+  (ctx as any).loadState.totalFilteredCount = outRows.length;
+  (ctx as any).loadState.visibleRows = outRows;
+  (ctx as any).loadState.isMergedView = true;
+}
 
 export async function loadCsvFromText(
   ctx: LoadControllerContext,
@@ -12,7 +113,7 @@ export async function loadCsvFromText(
   forcedLabel?: string,
   applyInitialFilter = true
 ) {
-  inspectorLogger.error('★★★ LOAD CONTROLLER EXECUTING ★★★ text length:', text.length);
+  inspectorLogger.debug('[LOAD CTRL] Executing text load, length:', text.length);
   inspectorLogger.debug('[LOAD CTRL] loadCsvFromText called, text length:', text.length);
   inspectorLogger.debug('[LOAD CTRL] hasHeadersOverride:', hasHeadersOverride, 'trackWorkspace:', trackWorkspace);
   
@@ -24,6 +125,10 @@ export async function loadCsvFromText(
   // ctx.isMergedView = false;  // REMOVED: This breaks browser mode which needs isMergedView=true
   ctx.loadError = null;
   try {
+    let didCrossMerge = false;
+    const previousMergedHeaders = [...(((ctx as any).loadState.headers ?? []) as string[])];
+    const previousMergedRows = [...(((ctx as any).loadState.mergedRowsAll ?? []) as string[][])];
+
     if (hasHeadersOverride !== undefined) {
       ctx.hasHeaders = !!hasHeadersOverride;
     } else if (ctx.headerMode === 'yes') {
@@ -31,30 +136,35 @@ export async function loadCsvFromText(
     } else if (ctx.headerMode === 'no') {
       ctx.hasHeaders = false;
     } else {
-      // headerMode === 'auto': ALWAYS show prompt (per requirements)
+      // headerMode === 'auto': Use heuristic to auto-decide
       const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
       const first = (lines[0] ?? '').split(',');
       const second = (lines[1] ?? '').split(',');
       const h = ctx.heuristicHasHeaders(first, second);
       ctx.headerHeuristicReason = h.reason;
       
-      // Store heuristic results for display in modal
+      // Store heuristic results
       (ctx as any).headerConfidence = h.confidence;
       (ctx as any).autoDecision = h.value;
       
-      // ALWAYS show prompt when headerMode is 'auto' (not just when undecided)
-      ctx.pendingText = text;
-      ctx.pendingPath = null;
-      ctx.showHeaderPrompt = true;
-      ctx.isLoading = false;
-      return;
+      // FIX: Use heuristic decision directly instead of showing prompt
+      // The prompt modal has Svelte 5 reactivity issues, and the heuristic is reliable enough
+      // Users can manually change Headers mode if the auto-detection is wrong
+      ctx.queueDebug('loadCsvFromText:autoHeaderDecision', {
+        decidedHeaders: h.value,
+        confidence: h.confidence,
+        reason: h.reason
+      });
+      ctx.hasHeaders = h.value;  // Use heuristic decision
+      // Continue with loading (don't return early)
     }
 
     let resp;
     let browserModeRows: string[][] | null = null;
     try {
       // Check if Tauri is available
-      if (typeof window !== 'undefined' && !(window as any).__TAURI_INTERNALS__) {
+      const hasTauriRuntime = typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
+      if (!hasTauriRuntime) {
         const { parseCsvInBrowser } = await import('$lib/utils/csvParser');
         const parsed = parseCsvInBrowser(text, ctx.hasHeaders);
         browserModeRows = parsed.rows;
@@ -75,17 +185,6 @@ export async function loadCsvFromText(
     (ctx as any).loadState.totalRowCount = resp.rowCount ?? 0;
     (ctx as any).loadState.colTypes = (resp.colTypes ?? []) as any[];
 
-    // If browser mode, store rows in mergedRowsAll and enable merged view
-    if (browserModeRows !== null) {
-      if (browserModeRows.length > MAX_BROWSER_MODE_ROWS) {
-        throw new Error(`CSV too large for browser mode: ${browserModeRows.length} rows (max ${MAX_BROWSER_MODE_ROWS})`);
-      }
-      // CRITICAL: Use loadState directly to ensure reactivity (same bug as hasLoaded)
-      (ctx as any).loadState.isMergedView = true;
-      (ctx as any).loadState.mergedRowsAll = [...browserModeRows];
-      devLog('LOAD CSV', 'Browser mode: stored', browserModeRows.length, 'rows');
-    }
-
     const ids = ctx.computeDatasetIdentity(
       `text:${ctx.fnv1a32((text ?? '').slice(0, 20000))}`,
       ctx.headers,
@@ -93,8 +192,20 @@ export async function loadCsvFromText(
       ctx.fnv1a32
     );
     ctx.datasetId = ids.id;
-    ctx.datasetLabel = ids.label;
-    if (forcedLabel) ctx.datasetLabel = forcedLabel;
+    ctx.datasetLabel = normalizeDatasetLabel(forcedLabel || ids.label);
+
+    // Browser mode must preserve all loaded files in one merged stream.
+    // Previous behavior replaced mergedRowsAll with the newest file.
+    if (browserModeRows !== null) {
+      appendBrowserDatasetToMergedRows(ctx, {
+        datasetLabel: ctx.datasetLabel,
+        parsedHeaders: resp.headers ?? [],
+        parsedRows: browserModeRows,
+        existingHeaders: previousMergedHeaders,
+        existingRows: previousMergedRows
+      });
+      devLog('LOAD CSV', 'Browser mode: merged rows now', ((ctx as any).loadState.mergedRowsAll ?? []).length);
+    }
 
     ctx.recipes = await ctx.loadRecipesForDataset(ctx.datasetId);
     ctx.pendingRestore = await ctx.loadLastStateForDataset(ctx.datasetId);
@@ -114,10 +225,25 @@ export async function loadCsvFromText(
     if (trackWorkspace) {
       upsertWorkspaceDataset(ctx, {
         id: ctx.datasetId,
-        label: forcedLabel || ctx.datasetLabel,
+        label: normalizeDatasetLabel(forcedLabel || ctx.datasetLabel),
         hasHeaders: ctx.hasHeaders,
-        source: { kind: 'text', text }
+        source: { kind: 'text', text },
+        rowCount: resp.rowCount ?? 0,
+        colCount: (resp.headers ?? []).length,
+        headerNames: [...(resp.headers ?? [])],
+        filteredCount: resp.rowCount ?? 0
       });
+    }
+
+    if (trackWorkspace && (ctx.loadedDatasets?.length ?? 0) > 1 && (ctx.loadedDatasets ?? []).every((ds: any) => ds?.source?.kind === 'text')) {
+      await rebuildMergedRowsFromWorkspaceTextDatasets(ctx);
+    }
+
+    // Tauri text uploads can load through backend without browser fallback rows.
+    // In that mode, keep the multi-file merged grid synchronized explicitly.
+    if (trackWorkspace && (ctx.loadedDatasets?.length ?? 0) > 1 && browserModeRows === null) {
+      await ctx.runCrossDatasetQuery();
+      didCrossMerge = true;
     }
 
     if (!ctx.suspendReactiveFiltering) {
@@ -144,13 +270,14 @@ export async function loadCsvFromText(
     }
 
     const preserveActiveQuery = (ctx.query ?? '').trim().length > 0 || ctx.matchMode !== 'fuzzy' || ctx.targetColIdx != null;
-    if (ctx.pendingRestore && applyInitialFilter && !preserveActiveQuery) {
+    if (ctx.pendingRestore && applyInitialFilter && !preserveActiveQuery && !didCrossMerge) {
       await ctx.applyState(ctx.pendingRestore);
       ctx.pendingRestore = null;
-    } else if (applyInitialFilter) {
+    } else if (applyInitialFilter && !didCrossMerge) {
       await ctx.runFilterNow();
     }
   } catch (e: any) {
+    inspectorLogger.error('[LOAD CSV TEXT] Failed to complete load', e);
     ctx.loadError = e?.message ?? String(e);
     (ctx as any).loadState.hasLoaded = false;
     (ctx as any).loadState.headers = [];
@@ -185,7 +312,7 @@ export async function loadCsvFromPath(
     } else if (ctx.headerMode === 'no') {
       ctx.hasHeaders = false;
     } else {
-      // headerMode === 'auto': Get heuristic and ALWAYS show prompt
+      // headerMode === 'auto': Use heuristic to auto-decide
       const sniff = (await ctx.invoke('inspector_sniff_has_headers_path', { path })) as {
         decided: boolean;
         hasHeaders: boolean;
@@ -194,16 +321,20 @@ export async function loadCsvFromPath(
       };
       ctx.headerHeuristicReason = sniff.reason ?? '';
       
-      // Store heuristic results for display in modal
+      // Store heuristic results
       (ctx as any).headerConfidence = sniff.confidence ?? 0.5;
       (ctx as any).autoDecision = sniff.hasHeaders;
       
-      // ALWAYS show prompt when headerMode is 'auto' (per requirements)
-      ctx.pendingPath = path;
-      ctx.pendingText = null;
-      ctx.showHeaderPrompt = true;
-      ctx.isLoading = false;
-      return;
+      // FIX: Use heuristic decision directly instead of showing prompt
+      // The prompt modal has Svelte 5 reactivity issues, and the heuristic is reliable enough
+      // Users can manually change Headers mode if the auto-detection is wrong
+      ctx.queueDebug('loadCsvFromPath:autoHeaderDecision', {
+        decidedHeaders: sniff.hasHeaders,
+        confidence: sniff.confidence ?? null,
+        reason: sniff.reason ?? ''
+      });
+      ctx.hasHeaders = sniff.hasHeaders;  // Use heuristic decision
+      // Continue with loading (don't return early)
     }
 
     const resp = (await ctx.invoke('inspector_load_csv_path', { path, hasHeaders: ctx.hasHeaders })) as any;
@@ -215,8 +346,7 @@ export async function loadCsvFromPath(
 
     const ids = ctx.computeDatasetIdentity(`path:${path}`, ctx.headers, ctx.totalRowCount, ctx.fnv1a32);
     ctx.datasetId = ids.id;
-    ctx.datasetLabel = ids.label;
-    if (forcedLabel) ctx.datasetLabel = forcedLabel;
+    ctx.datasetLabel = normalizeDatasetLabel(forcedLabel || ids.label);
     ctx.recipes = await ctx.loadRecipesForDataset(ctx.datasetId);
     ctx.pendingRestore = await ctx.loadLastStateForDataset(ctx.datasetId);
     // CRITICAL FIX: Use loadState directly to ensure reactivity (same fix as loadCsvFromText)
@@ -234,9 +364,13 @@ export async function loadCsvFromPath(
     if (trackWorkspace) {
       upsertWorkspaceDataset(ctx, {
         id: ctx.datasetId,
-        label: forcedLabel || path.split('/').pop() || ctx.datasetLabel,
+        label: normalizeDatasetLabel(forcedLabel || path.split('/').pop() || ctx.datasetLabel),
         hasHeaders: ctx.hasHeaders,
-        source: { kind: 'path', path }
+        source: { kind: 'path', path },
+        rowCount: resp.rowCount ?? 0,
+        colCount: (resp.headers ?? []).length,
+        headerNames: [...(resp.headers ?? [])],
+        filteredCount: resp.rowCount ?? 0
       });
     }
 
@@ -271,6 +405,7 @@ export async function loadCsvFromPath(
       await ctx.runFilterNow();
     }
   } catch (e: any) {
+    inspectorLogger.error('[LOAD CSV PATH] Failed to complete load', e);
     ctx.loadError = e?.message ?? String(e);
     (ctx as any).loadState.hasLoaded = false;
     (ctx as any).loadState.headers = [];
@@ -301,7 +436,8 @@ export async function unloadWorkspaceDataset(ctx: LoadControllerContext, id: str
   ctx.loadedDatasets.push(...remaining);
   
   ctx.crossQueryResults = ctx.crossQueryResults.filter((x: any) => x.datasetId !== id);
-  if (ctx.activeDatasetId !== id) return;
+  resetBrowserModeOriginalRows();
+
   if (remaining.length === 0) {
     ctx.activeDatasetId = '';
     ctx.datasetId = '';
@@ -311,18 +447,44 @@ export async function unloadWorkspaceDataset(ctx: LoadControllerContext, id: str
     (ctx as any).loadState.totalRowCount = 0;
     (ctx as any).loadState.totalFilteredCount = 0;
     (ctx as any).loadState.hasLoaded = false;
-    // showDataControls removed - now always true in Orchestrator
     (ctx as any).loadState.isMergedView = false;
     ctx.mergedHeaders = [];
     ctx.mergedRowsAll = [];
-    
-    // Bug 4 fix: Reset grid window so the grid clears properly
     if (typeof (ctx as any).loadState.resetGridWindow === 'function') {
       (ctx as any).loadState.resetGridWindow();
     }
     return;
   }
-  await ctx.activateWorkspaceDataset(remaining[0].id);
+
+  if (remaining.length === 1) {
+    // If unloading down to one dataset while in merged/cross mode,
+    // always restore that dataset as the active single-file view.
+    await ctx.activateWorkspaceDataset(remaining[0].id);
+    return;
+  }
+
+  if (remaining.every((ds: any) => ds?.source?.kind === 'text')) {
+    await rebuildMergedRowsFromWorkspaceTextDatasets(ctx);
+    (ctx as any).loadState.hasLoaded = true;
+    (ctx as any).loadState.isMergedView = true;
+    if (!(remaining as any[]).some((ds: any) => ds.id === ctx.activeDatasetId)) {
+      ctx.activeDatasetId = remaining[0].id;
+      ctx.datasetId = remaining[0].id;
+      ctx.datasetLabel = normalizeDatasetLabel(remaining[0].label);
+    }
+    await ctx.runFilterNow(true);
+    return;
+  }
+
+  if (!(remaining as any[]).some((ds: any) => ds.id === ctx.activeDatasetId)) {
+    await ctx.activateWorkspaceDataset(remaining[0].id);
+    return;
+  }
+  if (ctx.queryScope === 'all') {
+    await ctx.runCrossDatasetQuery();
+  } else {
+    await ctx.runFilterNow(true);
+  }
 }
 
 export async function openStreamLoadFromMenu(ctx: LoadControllerContext) {
@@ -416,6 +578,20 @@ export async function runCrossDatasetQuery(ctx: LoadControllerContext) {
     });
 
     ctx.crossQueryResults = resp?.datasetResults ?? [];
+    if ((ctx.loadedDatasets?.length ?? 0) > 0) {
+      const byId = new Map((resp?.datasetResults ?? []).map((r: any) => [r.datasetId, r]));
+      const next = (ctx.loadedDatasets ?? []).map((ds: any) => {
+        const hit = byId.get(ds.id);
+        if (!hit) return ds;
+        return {
+          ...ds,
+          rowCount: typeof hit.total === 'number' ? hit.total : ds.rowCount,
+          filteredCount: typeof hit.filtered === 'number' ? hit.filtered : ds.filteredCount
+        };
+      });
+      ctx.loadedDatasets.length = 0;
+      ctx.loadedDatasets.push(...next);
+    }
     ctx.mergedHeaders = resp?.mergedHeaders ?? [];
     (ctx as any).loadState.mergedRowsAll = resp?.mergedRows ?? [];
     (ctx as any).loadState.isMergedView = true;

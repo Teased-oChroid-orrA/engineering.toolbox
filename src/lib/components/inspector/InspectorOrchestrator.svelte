@@ -19,8 +19,8 @@
   import { setupUiAnimDurEffect, setupQuietBackendLogsEffect, setupContextMenuEffect, setupCategoryColumnChangeEffect, setupCategorySearchEffect, setupGridWindowInitEffect } from '$lib/components/inspector/InspectorOrchestratorEffectsUi.svelte';
   import { filterControllerCtx as buildFilterControllerCtx, loadControllerCtxCore as buildLoadControllerCtxCore, loadControllerCtxStateMain as buildLoadControllerCtxStateMain, loadControllerCtxStateQueryAndGrid as buildLoadControllerCtxStateQueryAndGrid, loadControllerCtx as buildLoadControllerCtx, gridControllerCtx as buildGridControllerCtx, rowDrawerControllerCtx as buildRowDrawerControllerCtx, modalUiCtx as buildModalUiCtx, recipesControllerCtx as buildRecipesControllerCtx, schemaControllerCtx as buildSchemaControllerCtx, schemaInsightsCtx as buildSchemaInsightsCtx, stateControllerCtx as buildStateControllerCtx } from '$lib/components/inspector/InspectorOrchestratorContexts';
     type DialogMod = typeof import('@tauri-apps/plugin-dialog'); type ColType = 'numeric' | 'date' | 'string'; type LoadResp = { headers: string[]; rowCount: number; colTypes?: ColType[]; filteredCount?: number }; type SliceResp = { rows: string[][] } | string[][];
-    type DatasetSource = { kind: 'text'; text: string } | { kind: 'path'; path: string }; type WorkspaceDataset = { id: string; label: string; hasHeaders: boolean; source: DatasetSource }; const ROW_HEIGHT = INSPECTOR_THEME.grid.rowHeight; const OVERSCAN = INSPECTOR_THEME.grid.overscan; const MAX_WINDOW_ABS = INSPECTOR_THEME.grid.maxWindowAbs; let uiAnimDur = $state(160); const perf = new PerfRecorder(); const SLO_P95_MS = { filter: 180, slice: 60, sort: 250, schema: 350, category: 120, row_drawer: 180 } as const; const recordPerf = (op: 'filter' | 'slice' | 'sort' | 'schema' | 'category' | 'row_drawer', started: number, meta?: Record<string, unknown>) => recordPerfUtil(perf, SLO_P95_MS, op, started, meta); const filterGate = createRequestGate(); const sliceGate = createRequestGate(); const sortGate = createRequestGate(); const categoryGate = createRequestGate(); let headers = $state<string[]>([]); let totalRowCount = $state(0); let totalFilteredCount = $state(0);
-    let visibleRows = $state<string[][]>([]); let colTypes = $state<ColType[]>([]); let datasetId = $state<string>(''); let datasetLabel = $state<string>('(none)'); let loadedDatasets = $state<WorkspaceDataset[]>([]); let activeDatasetId = $state<string>(''); let activeDatasetLabel = $derived.by(() => { const active = (loadedDatasets ?? []).find((d) => d.id === activeDatasetId); return ((active?.label || datasetLabel || '(active dataset)') ?? '').trim() || '(active dataset)'; });
+    type DatasetSource = { kind: 'text'; text: string } | { kind: 'path'; path: string }; type WorkspaceDataset = { id: string; label: string; hasHeaders: boolean; source: DatasetSource; rowCount?: number; colCount?: number; headerNames?: string[]; filteredCount?: number }; const ROW_HEIGHT = INSPECTOR_THEME.grid.rowHeight; const OVERSCAN = INSPECTOR_THEME.grid.overscan; const MAX_WINDOW_ABS = INSPECTOR_THEME.grid.maxWindowAbs; let uiAnimDur = $state(160); const perf = new PerfRecorder(); const SLO_P95_MS = { filter: 180, slice: 60, sort: 250, schema: 350, category: 120, row_drawer: 180 } as const; const recordPerf = (op: 'filter' | 'slice' | 'sort' | 'schema' | 'category' | 'row_drawer', started: number, meta?: Record<string, unknown>) => recordPerfUtil(perf, SLO_P95_MS, op, started, meta); const filterGate = createRequestGate(); const sliceGate = createRequestGate(); const sortGate = createRequestGate(); const categoryGate = createRequestGate(); let headers = $state<string[]>([]); let totalRowCount = $state(0); let totalFilteredCount = $state(0);
+    let visibleRows = $state<string[][]>([]); let colTypes = $state<ColType[]>([]); let datasetId = $state<string>(''); let datasetLabel = $state<string>('(none)'); let loadedDatasets = $state<WorkspaceDataset[]>([]); let activeDatasetId = $state<string>(''); const sanitizeSourceLabel = (input: string | null | undefined, fallback = 'Unnamed file') => { const raw = String(input ?? '').trim(); const dequoted = raw.replace(/^["']+|["']+$/g, '').trim(); if (!dequoted || /^\[?\s*none\s*\]?$/i.test(dequoted) || /^\(\s*none\s*\)$/i.test(dequoted)) return fallback; const base = dequoted.split(/[\\/]/).pop() ?? dequoted; const stripped = base.replace(/\.csv$/i, '').trim(); return stripped || fallback; }; let activeDatasetLabel = $derived.by(() => { const active = (loadedDatasets ?? []).find((d) => d.id === activeDatasetId); const fallbackLoaded = (loadedDatasets?.length ?? 0) > 0 ? loadedDatasets[0]?.label : ''; const base = active?.label || fallbackLoaded || datasetLabel || ''; return sanitizeSourceLabel(base, 'Unnamed file'); });
     let queryScope = $state<'current' | 'all' | 'ask'>('current'); let crossQueryBusy = $state(false); let crossQueryResults = $state<{ datasetId: string; label: string; filtered: number; total: number }[]>([]); let mergedHeaders = $state<string[]>([]); let mergedRowsAll = $state<string[][]>([]); let isMergedView = $state(false); let preMergedHeaders = $state<string[]>([]); let preMergedColTypes = $state<ColType[]>([]); let preMergedTotalRowCount = $state(0); let preMergedTotalFilteredCount = $state(0); let hiddenUploadInput: HTMLInputElement | null = null; let suspendReactiveFiltering = $state(false);
     let headerIndexMap = $derived.by(() => { const m = new Map<string, number>(); for (let i = 0; i < (headers ?? []).length; i++) m.set(headers[i], i); return m; }); type SchemaColStat = { idx: number; name: string; type: ColType; empty: number; nonEmpty: number; emptyPct: number; typeConfidence: number; numericParseRate: number; dateParseRate: number; distinctSample: number; distinctRatio: number; entropyNorm: number; topSample: { v: string; n: number }[]; min?: string; max?: string }; let showSchemaModal = $state(false); let schemaLoading = $state(false); let schemaError = $state<string | null>(null); let schemaSearch = $state(''); let schemaSampleN = $state(2000); let schemaSampleTier = $state<'fast' | 'balanced' | 'full'>('balanced'); let schemaStats = $state<SchemaColStat[]>([]);
     let schemaScopeLabel = $state<'full' | 'filtered'>('full'); const schemaCache = new Map<string, SchemaColStat[]>(); let schemaSearchQ = $derived.by(() => (schemaSearch ?? '').toLowerCase().trim()); let schemaFiltered = $derived.by(() => { const q = schemaSearchQ; const base = schemaStats ?? []; if (!q) return base; return base.filter((s) => (`${s.idx} ${s.name} ${s.type}`).toLowerCase().includes(q)); });
@@ -37,12 +37,53 @@
     const RECIPES_STORE_KEY = 'inspector.recipes.store.v3'; const LAST_STATE_STORE_KEY = 'inspector.last_state.store.v3'; const LEGACY_RECIPES_STORE_KEYS = ['inspector.recipes.store.v2']; const LEGACY_LAST_STATE_KEYS = ['inspector.last_state.store.v2']; let autoRestoreEnabled = $state(true); let recipes = $state<Recipe[]>([]); let showRecipeModal = $state(false); let recipeName = $state(''); let recipeTags = $state(''); let recipeNotice = $state<string | null>(null); let importMode = $state<'current' | 'file'>('current'); let pendingRestore: RecipeState | null = null; let regexHints = $derived.by(() => (matchMode === 'regex' ? analyzeRegex(query) : [])); let regexDanger = $derived.by(() => regexHints.some((h) => h.level === 'danger'));
     let showRegexHelp = $state(false); let showRegexGenerator = $state(false); let showSvarBuilder = $state(false); let svarFilterSet = $state<IFilterSet>({ glue: 'and', rules: [] }); let svarNotice = $state<string | null>(null); let debugLogEnabled = $state(true); let debugLogPath = $state<string>(''); let lastGridWindowSig = $state(''); let lastCrossReactiveSig = $state(''); let lastFilterReactiveSig = $state(''); let isTauri = $state(false); let canOpenPath = $state(false); let dialogMod = $state<DialogMod | null>(null); let prefersReducedMotion = $state(false);
     let mergedRowFxEnabled = $derived.by(() => !prefersReducedMotion && !crossQueryBusy && (visibleRows?.length ?? 0) <= 260); let autoAnimateDuration = $derived.by(() => { if (prefersReducedMotion) return 0; if (crossQueryBusy || totalFilteredCount > 200_000) return 90; if (totalFilteredCount > 50_000) return 120; if (totalFilteredCount > 10_000) return 145; return 180; }); const topControlSpans = { headers: 'col-span-12 md:col-span-6 lg:col-span-3 md:row-start-1', target: 'col-span-12 md:col-span-6 lg:col-span-3 md:row-start-1', match: 'hidden', scope: 'hidden', query: 'hidden', options: 'col-span-12 md:col-span-8 lg:col-span-4 md:row-start-1', maxScan: 'col-span-12 md:col-span-4 lg:col-span-2 md:row-start-1' } as Record<string, string>;
-    setupShowDataControlsEffect({ hasLoadedDatasetSignals, hasLoaded: () => hasLoaded, loadedDatasetsLength: () => loadedDatasets?.length ?? 0, activeDatasetId: () => activeDatasetId, datasetId: () => datasetId, headersLength: () => headers?.length ?? 0, totalRowCount: () => totalRowCount }, (value) => { showDataControls = value; }); let visibleColIdxs = $derived.by(() => { const n = headers.length; if (!n) return []; const sourceIdx = headers.indexOf('_source_file'); const defaultCols = () => { if (n > 50) { const set = new Set<number>(); set.add(0); for (let i = 0; i < Math.min(n, 12); i++) set.add(i); return [...set].filter((i) => i !== sourceIdx).sort((a, b) => a - b); } return Array.from({ length: n }, (_, i) => i).filter((i) => i !== sourceIdx); }; if (visibleColumns && visibleColumns.size > 0) { const picked = [...visibleColumns].filter((i) => i >= 0 && i < n && i !== sourceIdx).sort((a, b) => a - b); return picked.length > 0 ? picked : defaultCols(); } return defaultCols(); }); let mergedSourceIdx = $derived.by(() => (isMergedView ? headers.indexOf('_source_file') : -1));
-    let mergedDisplayHeaders = $derived.by(() => { if (!isMergedView) return headers; if (mergedSourceIdx < 0) return headers; return headers.filter((_, i) => i !== mergedSourceIdx); }); let mergedGroupedRows = $derived.by(() => { if (!isMergedView) return [] as { source: string; rows: string[][] }[]; const srcIdx = mergedSourceIdx; const groups: { source: string; rows: string[][] }[] = []; let lastSource = ''; for (const rawRow of visibleRows ?? []) { const source = srcIdx >= 0 ? (rawRow?.[srcIdx] ?? 'Unknown source') : 'Merged results'; const row = srcIdx >= 0 ? rawRow.filter((_, i) => i !== srcIdx) : rawRow; if (!groups.length || source !== lastSource) { groups.push({ source, rows: [row] }); lastSource = source; } else { groups[groups.length - 1].rows.push(row); } } return groups; }); let parseDiagnostics = $derived.by(() => { const out: { idx: number; name: string; numericFail: number; dateFail: number }[] = []; if (!(visibleRows?.length ?? 0)) return out; for (let i = 0; i < headers.length; i++) { const t = colTypes?.[i] ?? 'string'; if (t !== 'numeric' && t !== 'date') continue; let nFail = 0, dFail = 0; for (const row of visibleRows ?? []) { const raw = (row?.[i] ?? '').trim(); if (!raw) continue; if (t === 'numeric' && parseF64Relaxed(raw) == null) nFail++; if (t === 'date' && parseDateRelaxed(raw) == null) dFail++; } if (nFail > 0 || dFail > 0) out.push({ idx: i, name: headers[i] ?? String(i), numericFail: nFail, dateFail: dFail }); } return out.slice(0, 8); });
+    setupShowDataControlsEffect({ hasLoadedDatasetSignals, hasLoaded: () => hasLoaded, loadedDatasetsLength: () => loadedDatasets?.length ?? 0, activeDatasetId: () => activeDatasetId, datasetId: () => datasetId, headersLength: () => headers?.length ?? 0, totalRowCount: () => totalRowCount }, (value) => { showDataControls = value; }); let visibleColIdxs = $derived.by(() => { const n = headers.length; if (!n) return []; const sourceIdx = headers.indexOf('_source_file'); const defaultCols = () => { if (n > 50) { const set = new Set<number>(); set.add(0); for (let i = 0; i < Math.min(n, 12); i++) set.add(i); return [...set].filter((i) => i !== sourceIdx).sort((a, b) => a - b); } return Array.from({ length: n }, (_, i) => i).filter((i) => i !== sourceIdx); }; if (visibleColumns && visibleColumns.size > 0) { const picked = [...visibleColumns].filter((i) => i >= 0 && i < n && i !== sourceIdx).sort((a, b) => a - b); return picked.length > 0 ? picked : defaultCols(); } return defaultCols(); }); let mergedSourceIdx = $derived.by(() => { if (!isMergedView) return -1; const declared = headers.indexOf('_source_file'); if (declared >= 0) return declared; const sampleLen = mergedRowsAll?.[0]?.length ?? 0; return sampleLen > headers.length ? sampleLen - 1 : -1; });
+    let mergedDisplayHeaders = $derived.by(() => {
+      if (!isMergedView) return headers;
+      if (mergedSourceIdx < 0) return headers;
+      return headers.filter((_, i) => i !== mergedSourceIdx);
+    });
+    let mergedGroupedRows = $derived.by(() => {
+      if (!isMergedView) return [] as { source: string; rows: string[][] }[];
+      const declaredSrcIdx = mergedSourceIdx;
+      const groups: { source: string; rows: string[][] }[] = [];
+      const defaultSource = (loadedDatasets?.length ?? 0) === 1
+        ? sanitizeSourceLabel(loadedDatasets?.[0]?.label, activeDatasetLabel)
+        : 'Merged results';
+      let lastSource = '';
+
+      const rowsForGrouping = (mergedRowsAll?.length ?? 0) > 0 ? (mergedRowsAll ?? []) : (visibleRows ?? []);
+      for (const rawRow of rowsForGrouping) {
+        let sourceRaw = '';
+        let row = rawRow ?? [];
+        if (declaredSrcIdx >= 0) {
+          sourceRaw = rawRow?.[declaredSrcIdx] ?? '';
+          row = rawRow.filter((_, i) => i !== declaredSrcIdx);
+        } else if ((rawRow?.length ?? 0) > mergedDisplayHeaders.length) {
+          // Browser-mode safeguard: if rows carry a trailing source column
+          // but headers lost `_source_file`, keep per-file grouping working.
+          const inferredSrcIdx = (rawRow?.length ?? 1) - 1;
+          sourceRaw = rawRow?.[inferredSrcIdx] ?? '';
+          row = rawRow.slice(0, inferredSrcIdx);
+        } else {
+          sourceRaw = '';
+          row = rawRow ?? [];
+        }
+        const source = sanitizeSourceLabel(sourceRaw, defaultSource);
+        if (!groups.length || source !== lastSource) {
+          groups.push({ source, rows: [row] });
+          lastSource = source;
+        } else {
+          groups[groups.length - 1].rows.push(row);
+        }
+      }
+      return groups;
+    });
+    let aggregateFileCount = $derived.by(() => loadedDatasets?.length ?? 0); let aggregateRows = $derived.by(() => { const files = loadedDatasets?.length ?? 0; if (files === 0) return 0; if (files === 1) return totalRowCount; return (loadedDatasets ?? []).reduce((sum, ds) => sum + (ds.rowCount ?? 0), 0); }); let aggregateColumns = $derived.by(() => { const files = loadedDatasets?.length ?? 0; if (files === 0) return 0; if (files === 1) return headers.length; const names = new Set<string>(); for (const ds of (loadedDatasets ?? [])) { for (const name of (ds.headerNames ?? [])) { if (name) names.add(name); } } return names.size > 0 ? names.size : (loadedDatasets ?? []).reduce((sum, ds) => sum + (ds.colCount ?? 0), 0); }); let aggregateFiltered = $derived.by(() => { const files = loadedDatasets?.length ?? 0; if (files === 0) return 0; if (files === 1) return totalFilteredCount; if (queryScope === 'all' && (crossQueryResults?.length ?? 0) > 0) return (crossQueryResults ?? []).reduce((sum, r) => sum + (r.filtered ?? 0), 0); return (loadedDatasets ?? []).reduce((sum, ds) => sum + (ds.filteredCount ?? ds.rowCount ?? 0), 0); }); let aggregateLabel = $derived.by(() => (aggregateFileCount > 1 ? `Across ${aggregateFileCount} files` : '')); let parseDiagnostics = $derived.by(() => { const out: { idx: number; name: string; numericFail: number; dateFail: number }[] = []; if (!(visibleRows?.length ?? 0)) return out; for (let i = 0; i < headers.length; i++) { const t = colTypes?.[i] ?? 'string'; if (t !== 'numeric' && t !== 'date') continue; let nFail = 0, dFail = 0; for (const row of visibleRows ?? []) { const raw = (row?.[i] ?? '').trim(); if (!raw) continue; if (t === 'numeric' && parseF64Relaxed(raw) == null) nFail++; if (t === 'date' && parseDateRelaxed(raw) == null) dFail++; } if (nFail > 0 || dFail > 0) out.push({ idx: i, name: headers[i] ?? String(i), numericFail: nFail, dateFail: dFail }); } return out.slice(0, 8); });
     const svarFieldType = (t: ColType | undefined): 'text' | 'number' | 'date' => { if (t === 'numeric') return 'number'; if (t === 'date') return 'date'; return 'text'; }; let svarFields = $derived.by(() => (headers ?? []).map((h, i) => ({ id: String(i), label: h, type: svarFieldType(colTypes?.[i]) }))); let svarOptions = $derived.by(() => { const out: Record<string, (string | number | Date)[]> = {}; for (const s of schemaStats ?? []) { const top = (s.topSample ?? []).slice(0, 10).map((x) => x.v).filter((v) => v.length > 0); if (top.length) out[String(s.idx)] = top; } return out; });
     async function applyHeaderChoice(choice: boolean) { showHeaderPrompt = false; const t = pendingText; const p = pendingPath; pendingText = null; pendingPath = null; if (t != null) { await loadCsvFromText(t, choice); } else if (p != null) { await loadCsvFromPath(p, choice); } } function cancelHeaderPrompt() { showHeaderPrompt = false; pendingText = null; pendingPath = null; isLoading = false; }
   function filterControllerCtx() {
-    return buildFilterControllerCtx({ FILTER_DEBOUNCE_MS, buildFilterSpecFromState, invoke, escapeRegExp, queueDebug, queueDebugRate, recordPerf, runCrossDatasetQuery, fetchVisibleSlice, loadState, headers, hasLoaded, suspendReactiveFiltering, crossQueryBusy, queryScope, isMergedView, loadedDatasets, filterPending, filterInFlight, filterGate, filterLastReason, filterTimer, crossQueryTimer, query, multiQueryEnabled, multiQueryExpanded, multiQueryClauses, targetColIdx, matchMode, numericF, dateF, catF, maxRowsScanText, totalRowCount, totalFilteredCount, visibleColIdxs, queryError, loadError, lastCrossReactiveSig, crossQueryResults, preMergedHeaders, preMergedColTypes, preMergedTotalRowCount, preMergedTotalFilteredCount, colTypes, svarFilterSet, showSvarBuilder, svarNotice, mergedRowsAll, visibleRows });
+    return buildFilterControllerCtx({ FILTER_DEBOUNCE_MS, buildFilterSpecFromState, invoke, escapeRegExp, queueDebug, queueDebugRate, recordPerf, runCrossDatasetQuery, fetchVisibleSlice, loadState, headers, hasLoaded, suspendReactiveFiltering, crossQueryBusy, queryScope, isMergedView, loadedDatasets, activeDatasetId, filterPending, filterInFlight, filterGate, filterLastReason, filterTimer, crossQueryTimer, query, multiQueryEnabled, multiQueryExpanded, multiQueryClauses, targetColIdx, matchMode, numericF, dateF, catF, maxRowsScanText, totalRowCount, totalFilteredCount, visibleColIdxs, queryError, loadError, lastCrossReactiveSig, crossQueryResults, preMergedHeaders, preMergedColTypes, preMergedTotalRowCount, preMergedTotalFilteredCount, colTypes, svarFilterSet, showSvarBuilder, svarNotice, mergedRowsAll, visibleRows });
   }
   function buildFilterSpec() { return buildFilterSpecController(filterControllerCtx()); }
     async function applyFilterSpec(spec: any): Promise<number> { const resp = (await invoke('inspector_filter', { spec })) as number | { filteredCount: number }; return typeof resp === 'number' ? resp : (resp?.filteredCount ?? totalRowCount); } async function runFilterNow(forceCurrent = false) { await runFilterNowController(filterControllerCtx(), forceCurrent); }
@@ -64,6 +105,7 @@
   // Controllers can read from and mutate this object
   // Using getters ensures changes to component state are automatically reflected
   // NOTE: hiddenUploadInput excluded - it's a DOM binding, not reactive state
+  // FIX: showHeaderPrompt must be in loadState for proper reactivity (was previously passed as parameter)
   let loadState = $state({
     get isLoading() { return isLoading; },
     set isLoading(v) { isLoading = v; },
@@ -86,7 +128,11 @@
     get pendingPath() { return pendingPath; },
     set pendingPath(v) { pendingPath = v; },
     get showHeaderPrompt() { return showHeaderPrompt; },
-    set showHeaderPrompt(v) { showHeaderPrompt = v; },
+    set showHeaderPrompt(v) { 
+      console.log('[LOAD STATE] Setting showHeaderPrompt to:', v);
+      showHeaderPrompt = v; 
+      console.log('[LOAD STATE] showHeaderPrompt is now:', showHeaderPrompt);
+    },
     get headers() { return headers; },
     set headers(v) { headers = v; },
     get totalRowCount() { return totalRowCount; },
@@ -126,7 +172,8 @@
   }
   
   function loadControllerCtx() { 
-    return buildLoadControllerCtx({ loadState, invoke, debugLogger, dialogMod, fnv1a32, heuristicHasHeaders, computeDatasetIdentity, upsertWorkspaceDatasetInList, loadRecipesForDataset, loadLastStateForDataset, applyState, runFilterNow, buildFilterSpec, queueDebug, queueDebugRate, recordPerf, runCrossDatasetQuery, activateWorkspaceDataset, hiddenUploadInput, isLoading, isMergedView, loadError, hasHeaders, headerMode, headerHeuristicReason, pendingText, pendingPath, showHeaderPrompt, headers, totalRowCount, totalFilteredCount, visibleRows, colTypes, datasetId, datasetLabel, recipes, pendingRestore, hasLoaded, showDataControls, activeDatasetId, mergedRowsAll, loadedDatasets, query, matchMode, targetColIdx, numericF, dateF, catF, suspendReactiveFiltering, sortColIdx, sortDir, sortSpecs, visibleColumns, pinnedLeft, pinnedRight, hiddenColumns, columnWidths, crossQueryBusy, queryScope, crossQueryResults, mergedHeaders, preMergedHeaders, preMergedColTypes, preMergedTotalRowCount, preMergedTotalFilteredCount });
+    // FIX: removed showHeaderPrompt from parameters - it's now in loadState
+    return buildLoadControllerCtx({ loadState, invoke, debugLogger, dialogMod, fnv1a32, heuristicHasHeaders, computeDatasetIdentity, upsertWorkspaceDatasetInList, loadRecipesForDataset, loadLastStateForDataset, applyState, runFilterNow, buildFilterSpec, queueDebug, queueDebugRate, recordPerf, runCrossDatasetQuery, activateWorkspaceDataset, hiddenUploadInput, isLoading, isMergedView, loadError, hasHeaders, headerMode, headerHeuristicReason, pendingText, pendingPath, headers, totalRowCount, totalFilteredCount, visibleRows, colTypes, datasetId, datasetLabel, recipes, pendingRestore, hasLoaded, showDataControls, activeDatasetId, mergedRowsAll, loadedDatasets, query, matchMode, targetColIdx, numericF, dateF, catF, suspendReactiveFiltering, sortColIdx, sortDir, sortSpecs, visibleColumns, pinnedLeft, pinnedRight, hiddenColumns, columnWidths, crossQueryBusy, queryScope, crossQueryResults, mergedHeaders, preMergedHeaders, preMergedColTypes, preMergedTotalRowCount, preMergedTotalFilteredCount });
   }
     async function loadCsvFromText(text: string, hasHeadersOverride?: boolean, trackWorkspace = true, forcedLabel?: string, applyInitialFilter = true) { await loadCsvFromTextController(loadControllerCtx(), text, hasHeadersOverride, trackWorkspace, forcedLabel, applyInitialFilter); } async function loadCsvFromPath(path: string, hasHeadersOverride?: boolean, trackWorkspace = true, forcedLabel?: string, applyInitialFilter = true) { await loadCsvFromPathController(loadControllerCtx(), path, hasHeadersOverride, trackWorkspace, forcedLabel, applyInitialFilter); }
   function gridControllerCtx() { return buildGridControllerCtx({ invoke, recordPerf, queueDebug, loadState, updateVisibleRows, hasLoaded, sliceGate, startIdx: gridWindow.startIdx, endIdx: gridWindow.endIdx, visibleColIdxs, isMergedView, mergedRowsAll, visibleRows, loadError, totalFilteredCount, sliceTimer, headers, sortGate, sortColIdx, sortDir, sortSpecs, visibleColumns, columnPickerNotice, showColumnPicker, hiddenColumns, pinnedLeft, pinnedRight, columnWidths }); }
@@ -165,7 +212,7 @@
   function onMultiQueryEnabledChange(enabled: boolean) { setMultiQueryEnabled(multiQueryCtx(), enabled); }
   function onMultiQueryExpandedChange(expanded: boolean) { setMultiQueryExpanded(multiQueryCtx(), expanded); }
     const debugLogger = createInspectorDebugLogger({ 
-      enabled: () => debugLogEnabled && typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__, 
+      enabled: () => debugLogEnabled && typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__), 
       writeBatch: async (lines) => {
         try {
           return (await invoke('inspector_debug_log_batch', { lines })) as string;
@@ -207,6 +254,11 @@
     if (!files.length) return;
     try {
       for (const f of files) {
+        const tauriFilePath = typeof (f as any)?.path === 'string' ? (f as any).path as string : '';
+        if (canOpenPath && isTauri && tauriFilePath) {
+          await loadCsvFromPath(tauriFilePath, undefined, true, f.name);
+          continue;
+        }
         const text = await f.text();
         await loadCsvFromText(text, undefined, true, f.name);
       }
@@ -269,10 +321,11 @@
     {activeDatasetId}
     {crossQueryBusy}
     {isMergedView}
-    mergedRowsCount={mergedRowsAll.length} columns={headers.length} rows={totalRowCount}
-    filtered={totalFilteredCount} rendered={gridWindow.renderedCount} startIdx={gridWindow.startIdx}
+    mergedRowsCount={mergedRowsAll.length} columns={aggregateColumns} rows={aggregateRows}
+    filtered={aggregateFiltered} aggregateFileCount={aggregateFileCount} aggregateLabel={aggregateLabel} rendered={gridWindow.renderedCount} startIdx={gridWindow.startIdx}
     endIdx={gridWindow.endIdx} overscan={OVERSCAN} maxWindow={gridWindow.maxWindow}
     {parseDiagnostics}
+    showMetrics={false}
     onActivateDataset={(id) => void activateWorkspaceDataset(id)} onUnloadDataset={async (id) => await unloadWorkspaceDatasetController(loadControllerCtx(), id)}
   />
   <InspectorMainGridPanel
@@ -304,6 +357,17 @@
     {hiddenColumns}
     {columnWidths}
     {activeDatasetLabel}
+    columns={aggregateColumns}
+    rows={aggregateRows}
+    filtered={aggregateFiltered}
+    {aggregateFileCount}
+    {aggregateLabel}
+    rendered={gridWindow.renderedCount}
+    startIdx={gridWindow.startIdx}
+    endIdx={gridWindow.endIdx}
+    overscan={OVERSCAN}
+    maxWindow={gridWindow.maxWindow}
+    {parseDiagnostics}
     onMatchModeChange={(value: 'fuzzy' | 'exact' | 'regex') => { matchMode = value; }} onQueryScopeChange={(value: 'current' | 'all' | 'ask') => { queryScope = value; onQueryScopeChangeController(filterControllerCtx()); }} onQueryChange={(value: string) => { query = value; }}
     onOpenBuilder={() => openSvarBuilderModal(modalUiCtx())} onSetRegexMode={() => { matchMode = 'regex'; }} onOpenHelp={() => { showRegexHelp = true; }}
     onOpenGenerator={() => openRegexGeneratorModal(modalUiCtx())} onOpenRecipes={() => openRecipesModal(modalUiCtx())} onMultiQueryEnabledChange={onMultiQueryEnabledChange}

@@ -2,7 +2,7 @@
   import ProfileToolbox from '$lib/components/ProfileToolbox.svelte';
 </script>
 
-<div class="space-y-4">
+<div class="space-y-4" data-route-ready="properties">
   <div class="flex items-center justify-between">
     <div>
       <div class="text-sm font-semibold">Structural Property Analyzer</div>

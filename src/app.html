@@ -5,7 +5,10 @@
     <link rel="icon" href="./favicon.png" />
     <meta name="viewport" content="width=device-width" />
     %sveltekit.head%
-    
+    <style>
+      html, body { background-color: #020617; margin: 0; }
+    </style>
+
     <script>
       // DEV ONLY — ResizeObserver provenance logger
       (() => {
@@ -58,28 +61,347 @@
       #splash {
         position: fixed; inset: 0; z-index: 9999;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        background: radial-gradient(circle at 50% 120%, rgba(99, 102, 241, 0.15), rgba(2, 6, 23, 1));
-        transition: opacity 0.5s ease-out;
+        background:
+          radial-gradient(circle at 20% 10%, rgba(34, 211, 238, 0.18), transparent 40%),
+          radial-gradient(circle at 85% 20%, rgba(59, 130, 246, 0.22), transparent 42%),
+          radial-gradient(circle at 50% 120%, rgba(99, 102, 241, 0.16), rgba(2, 6, 23, 1));
+        transition: opacity 0.38s ease-out, transform 0.38s ease-out;
         pointer-events: none;
       }
+      #splash.done {
+        opacity: 0;
+        transform: scale(1.02);
+      }
+      .splash-card {
+        width: min(540px, calc(100vw - 32px));
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.78), rgba(2, 6, 23, 0.82));
+        border-radius: 14px;
+        box-shadow: 0 22px 60px rgba(2, 6, 23, 0.55);
+        padding: 18px 18px 14px 18px;
+        backdrop-filter: blur(8px);
+      }
+      .splash-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+        letter-spacing: 0.08em;
+        font-size: 11px;
+        text-transform: uppercase;
+        color: rgba(226, 232, 240, 0.82);
+      }
+      .splash-track {
+        height: 8px;
+        width: 100%;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.2);
+        overflow: hidden;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+      }
+      .splash-fill {
+        height: 100%;
+        width: 0%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, rgba(34, 211, 238, 0.95), rgba(59, 130, 246, 0.95), rgba(99, 102, 241, 0.95));
+        transition: width 0.25s ease-out;
+      }
+      .splash-meta {
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      }
+      .splash-message {
+        color: rgba(186, 230, 253, 0.9);
+        font-size: 12px;
+      }
+      .splash-kernel {
+        color: rgba(203, 213, 225, 0.62);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+      .splash-step {
+        margin-top: 8px;
+        color: rgba(125, 211, 252, 0.86);
+        font-size: 11px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+      }
+      .splash-diagnostics {
+        margin-top: 6px;
+        min-height: 16px;
+        color: rgba(148, 163, 184, 0.9);
+        font-size: 10px;
+        letter-spacing: 0.01em;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+      }
+      .splash-subtrack {
+        margin-top: 8px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+      }
+      .splash-subslot {
+        height: 4px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.22);
+        overflow: hidden;
+      }
+      .splash-subfill {
+        height: 100%;
+        width: 0%;
+        border-radius: 999px;
+        transition: width 0.25s ease-out, background-color 0.25s ease-out;
+      }
       .spinner {
-        width: 40px; height: 40px;
+        width: 30px; height: 30px;
         border: 3px solid rgba(255,255,255,0.1);
-        border-top-color: #6366f1; /* Indigo */
+        border-top-color: #22d3ee;
         border-radius: 50%;
         animation: spin 1s linear infinite;
       }
       @keyframes spin { to { transform: rotate(360deg); } }
-      body:not(:empty) #splash { display: none; } 
     </style>
   </head>
-  <body data-sveltekit-preload-data="hover" class="bg-zinc-950 text-white antialiased selection:bg-indigo-500/30">
+  <body data-sveltekit-preload-data="tap" class="bg-zinc-950 text-white antialiased selection:bg-indigo-500/30">
     <div id="splash">
-      <div class="spinner"></div>
-      <div style="margin-top: 1rem; font-family: sans-serif; font-size: 0.75rem; color: rgba(255,255,255,0.4); letter-spacing: 0.1em;">
-        INITIALIZING KERNEL
+      <div class="splash-card">
+        <div class="splash-head">
+          <span>Structural Companion Boot</span>
+          <span id="splash-percent">0%</span>
+        </div>
+        <div class="splash-track">
+          <div id="splash-fill" class="splash-fill"></div>
+        </div>
+        <div class="splash-meta">
+          <span id="splash-message" class="splash-message">Initializing runtime...</span>
+          <span class="splash-kernel">Kernel</span>
+        </div>
+        <div id="splash-step" class="splash-step">Step 0/3 · Waiting for toolbox hooks...</div>
+        <div id="splash-diagnostics" class="splash-diagnostics">Awaiting toolbox hook telemetry...</div>
+        <div id="splash-subtrack" class="splash-subtrack" aria-label="Step progress bars"></div>
+      </div>
+      <div style="margin-top: 14px; opacity: 0.8;">
+        <div class="spinner"></div>
       </div>
     </div>
+    <script>
+      (() => {
+        const ensureStaticRouteReadyMarker = () => {
+          const routeFromHash = () => {
+            const hash = window.location.hash || '#/';
+            const raw = hash.startsWith('#/') ? hash.slice(2) : '';
+            return raw || 'dashboard';
+          };
+          let marker = document.getElementById('static-route-ready-marker');
+          if (!marker) {
+            marker = document.createElement('div');
+            marker.id = 'static-route-ready-marker';
+            marker.style.display = 'none';
+            document.body.appendChild(marker);
+          }
+          marker.setAttribute('data-static-route-ready', routeFromHash());
+        };
+        ensureStaticRouteReadyMarker();
+        window.addEventListener('hashchange', ensureStaticRouteReadyMarker);
+
+        const splash = document.getElementById('splash');
+        const fill = document.getElementById('splash-fill');
+        const pct = document.getElementById('splash-percent');
+        const msg = document.getElementById('splash-message');
+        const stepEl = document.getElementById('splash-step');
+        const diagEl = document.getElementById('splash-diagnostics');
+        const subtrackEl = document.getElementById('splash-subtrack');
+        if (!splash || !fill || !pct || !msg || !stepEl || !diagEl || !subtrackEl) return;
+
+        let progress = 4;
+        let done = false;
+        let trickle = null;
+        let lastStepCount = 0;
+        let lastWaitPulseAt = Date.now();
+        const bootStartedAt = Date.now();
+        let slowPhaseIdx = 0;
+        const slowPhases = [
+          'collecting route-hook heartbeat',
+          'verifying dynamic modules',
+          'reconciling hook telemetry',
+          'binding final startup listeners',
+          'handoff to route runtime'
+        ];
+        const subfills = [];
+
+        const ensureSubBars = (count) => {
+          const desired = Math.max(0, Number(count) || 0);
+          if (desired === lastStepCount && subfills.length === desired) return;
+          lastStepCount = desired;
+          subfills.length = 0;
+          subtrackEl.innerHTML = '';
+          subtrackEl.style.gridTemplateColumns = `repeat(${Math.max(1, desired)}, minmax(0, 1fr))`;
+          for (let i = 0; i < desired; i += 1) {
+            const slot = document.createElement('div');
+            slot.className = 'splash-subslot';
+            const sub = document.createElement('div');
+            sub.className = 'splash-subfill';
+            slot.appendChild(sub);
+            subtrackEl.appendChild(slot);
+            subfills.push(sub);
+          }
+        };
+
+        const paintSubBars = (steps) => {
+          if (!Array.isArray(steps) || steps.length === 0) {
+            ensureSubBars(3);
+            subfills.forEach((sub, idx) => {
+              sub.style.width = idx === 0 ? '45%' : '0%';
+              sub.style.background = idx === 0 ? 'rgba(34, 211, 238, 0.95)' : 'transparent';
+            });
+            return;
+          }
+          ensureSubBars(steps.length);
+          steps.forEach((step, idx) => {
+            const sub = subfills[idx];
+            if (!sub) return;
+            if (step.status === 'done') {
+              sub.style.width = '100%';
+              sub.style.background = 'rgba(74, 222, 128, 0.95)';
+            } else if (step.status === 'failed') {
+              sub.style.width = '100%';
+              sub.style.background = 'rgba(251, 113, 133, 0.95)';
+            } else if (step.status === 'running') {
+              sub.style.width = '60%';
+              sub.style.background = 'rgba(34, 211, 238, 0.95)';
+            } else {
+              sub.style.width = '0%';
+              sub.style.background = 'transparent';
+            }
+          });
+        };
+
+        const apply = (value, message) => {
+          progress = Math.max(progress, Math.min(100, Math.round(value)));
+          fill.style.width = `${progress}%`;
+          pct.textContent = `${progress}%`;
+          if (message) msg.textContent = message;
+        };
+
+        const finish = (message = 'Ready') => {
+          if (done) return;
+          done = true;
+          if (trickle) clearInterval(trickle);
+          apply(100, message);
+          const totalMs = Date.now() - bootStartedAt;
+          window.dispatchEvent(
+            new CustomEvent('boot-overlay-finished', {
+              detail: {
+                elapsedMs: totalMs,
+                progress,
+                message,
+                phase: stepEl.textContent || 'Step 3/3',
+                diagnostics: diagEl.textContent || ''
+              }
+            })
+          );
+          splash.classList.add('done');
+          setTimeout(() => {
+            splash.remove();
+          }, 420);
+        };
+
+        apply(8, 'Preparing UI shell...');
+        paintSubBars([]);
+        diagEl.textContent = 'Boot sequence started.';
+        document.addEventListener('DOMContentLoaded', () => apply(22, 'Loading interface assets...'), { once: true });
+        window.addEventListener('load', () => apply(46, 'Bootstrapping toolboxes...'), { once: true });
+        if (document.fonts && document.fonts.ready) {
+          document.fonts.ready.then(() => apply(62, 'Fonts and visuals ready.'));
+        }
+
+        trickle = setInterval(() => {
+          if (done) return;
+          const idleForMs = Date.now() - lastWaitPulseAt;
+          if (progress < 88) {
+            apply(progress + (progress < 40 ? 6 : progress < 70 ? 3 : 1));
+          } else if (progress < 99 && idleForMs > 900) {
+            const nextProgress = progress < 96 ? progress + 1 : progress + (idleForMs > 2400 ? 1 : 0);
+            apply(nextProgress);
+            if (progress >= 96) {
+              const elapsedSec = ((Date.now() - bootStartedAt) / 1000).toFixed(1);
+              const phase = slowPhases[slowPhaseIdx % slowPhases.length];
+              slowPhaseIdx += 1;
+              stepEl.textContent = `Step 3/3 · Waiting for toolbox hooks...`;
+              msg.textContent = 'Still loading toolbox modules...';
+              diagEl.textContent = `Boot sequence started · ${phase} (${elapsedSec}s)`;
+            } else {
+              diagEl.textContent = `${diagEl.textContent.split(' · ')[0]} · receiving slow hook telemetry...`;
+            }
+          }
+        }, 240);
+
+        window.addEventListener('app-progress', (ev) => {
+          const detail = ev.detail || {};
+          lastWaitPulseAt = Date.now();
+          if (typeof detail.progress === 'number') apply(detail.progress, detail.message);
+          if (detail.stepPrefix || detail.activeLabel) {
+            stepEl.textContent = `${detail.stepPrefix ?? 'Step'} \u00b7 ${detail.activeLabel ?? 'Loading'}`;
+          }
+          if (typeof detail.waitElapsedMs === 'number') {
+            const elapsedSec = (detail.waitElapsedMs / 1000).toFixed(1);
+            const missingText =
+              detail.waitMissingText ||
+              (Array.isArray(detail.waitMissing) && detail.waitMissing.length > 0
+                ? detail.waitMissing.slice(0, 3).join(' • ')
+                : 'pending route hooks');
+            diagEl.textContent = `Waiting ${elapsedSec}s · ${missingText}`;
+            if (detail.progress >= 96) {
+              msg.textContent = 'Still loading toolbox modules...';
+              stepEl.textContent = `Step 3/3 · Waiting for toolbox hooks...`;
+            }
+          } else if (detail.message) {
+            diagEl.textContent = detail.message;
+          }
+          paintSubBars(detail.steps);
+        });
+        window.addEventListener('app-ready', () => finish('Workspace ready.'), { once: true });
+
+        const mo = new MutationObserver(() => {
+          if (done) return;
+          const nonStaticRouteMarker = document.querySelector('[data-route-ready]:not(#static-route-ready-marker)');
+          if (document.querySelector('[data-main-nav-root], .canvas-hit-layer, .min-h-screen') || nonStaticRouteMarker) {
+            mo.disconnect();
+            apply(92, 'Finalizing startup...');
+            if (nonStaticRouteMarker) {
+              finish('Workspace ready.');
+            }
+          }
+        });
+        mo.observe(document.body, { childList: true, subtree: true });
+
+        setTimeout(() => {
+          if (!done) {
+            apply(96, 'Still loading toolbox modules...');
+            stepEl.textContent = 'Step 3/3 · Waiting for toolbox hooks...';
+            diagEl.textContent = 'Boot sequence started · receiving slow hook telemetry...';
+          }
+          mo.disconnect();
+        }, 16000);
+
+        setTimeout(() => {
+          if (done) return;
+          const marker = document.querySelector('[data-route-ready]:not(#static-route-ready-marker)');
+          if (marker) {
+            finish('Workspace ready.');
+          }
+        }, 9000);
+
+        setTimeout(() => {
+          if (!done) finish('Ready (fallback).');
+        }, 40000);
+      })();
+    </script>
     <div style="display: contents">%sveltekit.body%</div>
   </body>
 </html>

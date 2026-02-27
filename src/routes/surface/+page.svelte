@@ -2,4 +2,6 @@
   import SurfaceToolbox from '$lib/components/SurfaceToolbox.svelte';
 </script>
 
-<SurfaceToolbox />
+<div data-route-ready="surface">
+  <SurfaceToolbox />
+</div>

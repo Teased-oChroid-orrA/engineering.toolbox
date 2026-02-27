@@ -33,6 +33,7 @@ export function filterControllerCtx(state: {
   queryScope: 'current' | 'all' | 'ask';
   isMergedView: boolean;
   loadedDatasets: WorkspaceDataset[];
+  activeDatasetId: string;
   filterPending: boolean;
   filterInFlight: boolean;
   filterGate: any;
@@ -87,6 +88,8 @@ export function filterControllerCtx(state: {
     set isMergedView(v: boolean) { state.loadState.isMergedView = v; },
     get loadedDatasets() { return state.loadedDatasets; },
     set loadedDatasets(v: WorkspaceDataset[]) { state.loadedDatasets = v; },
+    get activeDatasetId() { return state.activeDatasetId; },
+    set activeDatasetId(v: string) { state.activeDatasetId = v; },
     get filterPending() { return state.filterPending; },
     set filterPending(v: boolean) { state.filterPending = v; },
     get filterInFlight() { return state.filterInFlight; },
@@ -199,6 +202,7 @@ export function loadControllerCtxStateMain(state: {
     mergedRowsAll: string[][];
     visibleRows: string[][];  // Add visibleRows to type
     totalFilteredCount: number;
+    showHeaderPrompt: boolean;  // FIX: Move showHeaderPrompt to loadState for proper reactivity
   };
   hiddenUploadInput: HTMLInputElement | null;
   isLoading: boolean;
@@ -208,7 +212,6 @@ export function loadControllerCtxStateMain(state: {
   headerHeuristicReason: string;
   pendingText: string | null;
   pendingPath: string | null;
-  showHeaderPrompt: boolean;
   // Backward compatibility - these read from derived values
   headers: string[];
   totalRowCount: number;
@@ -242,8 +245,8 @@ export function loadControllerCtxStateMain(state: {
     set pendingText(v: string | null) { state.pendingText = v; },
     get pendingPath() { return state.pendingPath; },
     set pendingPath(v: string | null) { state.pendingPath = v; },
-    get showHeaderPrompt() { return state.showHeaderPrompt; },
-    set showHeaderPrompt(v: boolean) { state.showHeaderPrompt = v; },
+    get showHeaderPrompt() { return state.loadState.showHeaderPrompt; },  // FIX: Read from loadState
+    set showHeaderPrompt(v: boolean) { state.loadState.showHeaderPrompt = v; },  // FIX: Write to loadState
     get headers() { return state.loadState.headers; },
     set headers(v: string[]) { state.loadState.headers = v; },
     get totalRowCount() { return state.loadState.totalRowCount; },
@@ -368,6 +371,7 @@ export function loadControllerCtx(state: {
     mergedRowsAll: string[][];
     visibleRows: string[][];
     totalFilteredCount: number;
+    showHeaderPrompt: boolean;  // FIX: Add showHeaderPrompt to loadState type
   };
   invoke: any;
   debugLogger: any;
@@ -395,7 +399,7 @@ export function loadControllerCtx(state: {
   headerHeuristicReason: string;
   pendingText: string | null;
   pendingPath: string | null;
-  showHeaderPrompt: boolean;
+  // Note: showHeaderPrompt removed from here, now in loadState
   headers: string[];
   totalRowCount: number;
   totalFilteredCount: number;

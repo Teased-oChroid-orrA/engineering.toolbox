@@ -4,25 +4,15 @@
   import type { BushingInputs, BushingOutput } from '$lib/core/bushing';
   import BushingLameStressPlot from './BushingLameStressPlot.svelte';
   import BushingEnforcementDetails from './BushingEnforcementDetails.svelte';
+  import BushingResultInfoDialog from './BushingResultInfoDialog.svelte';
   import NativeDragLane from './NativeDragLane.svelte';
   import { bushingLogger } from '$lib/utils/loggers';
-
-  let {
-    form,
-    results
-  }: {
-    form: BushingInputs;
-    results: BushingOutput;
-  } = $props();
-
+  let { form, results }: { form: BushingInputs; results: BushingOutput } = $props();
   let infoDialog = $state<'safety' | 'fit' | null>(null);
-
-  // Internal section ordering with persistence
   type SectionId = 'metrics' | 'lame';
   const SECTION_ORDER_KEY = 'scd.bushing.resultsSummary.sectionOrder.v1';
   let sectionOrder = $state<SectionId[]>(['metrics', 'lame']);
   let sectionItems = $derived(sectionOrder.map(id => ({ id })));
-  
   onMount(() => {
     try {
       const saved = localStorage.getItem(SECTION_ORDER_KEY);
@@ -36,7 +26,6 @@
       bushingLogger.warn('Failed to load section order', e);
     }
   });
-  
   function handleReorder(ev: CustomEvent<{ items: Array<{ id: string }> }>) {
     const newOrder = ev.detail.items.map(i => i.id as SectionId);
     if (JSON.stringify(newOrder) !== JSON.stringify(sectionOrder)) {
@@ -48,10 +37,8 @@
       }
     }
   }
-
   const PSI_TO_MPA = 0.006894757;
   const LBF_TO_N = 4.4482216152605;
-
   const fmt = (n: number | null | undefined, d = 2) => (!Number.isFinite(Number(n)) ? '---' : Number(n).toFixed(d));
   const fmtTol = (lower: number, upper: number, nominal: number, d = 4) =>
     `${fmt(nominal, d)} (+${fmt(upper - nominal, d)}/-${fmt(nominal - lower, d)})`;
@@ -65,7 +52,6 @@
   const valOk = 'text-emerald-300';
   const valFail = 'text-rose-300';
   const valInfo = 'text-cyan-200';
-
   let failed = $derived(results.governing.margin < 0 || results.physics.marginHousing < 0 || results.physics.marginBushing < 0);
   let fitFailed = $derived(results.warningCodes.some((w) => w.code === 'TOLERANCE_INFEASIBLE' || w.code === 'NET_CLEARANCE_FIT'));
   let edgeFailed = $derived(results.warningCodes.some((w) => w.code.includes('EDGE_DISTANCE')));
@@ -79,9 +65,8 @@
   );
   let positiveInterference = $derived(results.physics.deltaEffective > 0);
   let odContained = $derived(results.tolerance.status !== 'infeasible');
-
   function focusSection(id: string) {
-    if (!id || id.trim() === '') return; // Guard against empty strings
+    if (!id || id.trim() === '') return;
     const el = document.getElementById(id);
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -90,7 +75,6 @@
     infoDialog = null;
   }
 </script>
-
 <div class="space-y-3">
   <div class="flex items-center justify-between">
     <h3 class="text-sm font-semibold text-slate-100">Results Summary</h3>
@@ -217,59 +201,14 @@
   </NativeDragLane>
 </div>
 
-{#if infoDialog}
-  <div class="fixed inset-0 z-[120] grid place-items-center p-4">
-    <button
-      type="button"
-      aria-label="Close dialog backdrop"
-      class="absolute inset-0 bg-black/65"
-      onclick={() => (infoDialog = null)}>
-    </button>
-    <div class="relative z-10 w-full max-w-[760px]">
-    <Card class="border-cyan-300/35 bg-slate-950/95 text-slate-100 shadow-2xl">
-      <CardContent class="space-y-3 pt-5 text-sm">
-        {#if infoDialog === 'safety'}
-          <div class="text-sm font-semibold text-cyan-100">Safety Margins (Yield)</div>
-          <div class="text-white/80">These are hoop-yield margins from a thick-cylinder press-fit model. `Housing` compares predicted housing hoop stress to housing yield allowable; `Bushing` does the same for the bushing bore wall.</div>
-          <div class="text-white/80">`Sequencing` in this tool is a geometry/process adequacy check: it verifies that edge ligament is sufficient for stable installation and progressive load transfer, so the joint does not localize damage before the intended bearing path is established.</div>
-          <div class="text-white/80">`Governing` is not the average of these two. It is the minimum margin across all structural and geometry constraints in the active rule set. A negative governing value with positive yield margins means a different check controls failure, most commonly edge-distance sequencing or minimum-wall criteria.</div>
-          <div class="text-white/80">Design implication: a yield-safe pair can still be configuration-unsafe if geometry/process constraints are violated.</div>
-          <div class="rounded-md border border-cyan-300/25 bg-cyan-500/5 p-2 text-[12px] text-cyan-100/95">
-            Active governing check: <span class="font-mono">{results.governing.name}</span>
-          </div>
-          {#if edgeFailed || wallFailed}
-            <div class="rounded-md border border-amber-300/50 bg-amber-500/15 p-2 text-[12px] text-amber-100">
-              Related failing checks:
-              {#if edgeFailed}
-                <button class="ml-1 underline underline-offset-2" onclick={() => focusSection('bushing-edge-distance-card')}>Edge Distance</button>
-              {/if}
-              {#if wallFailed}
-                <button class="ml-2 underline underline-offset-2" onclick={() => focusSection('bushing-wall-thickness-card')}>Wall Thickness</button>
-              {/if}
-            </div>
-          {/if}
-        {:else}
-          <div class="text-sm font-semibold text-cyan-100">Fit Physics</div>
-          <div class="text-white/80">This panel quantifies the mechanics of assembly fit. Interference produces radial contact pressure through elastic compliance of both members; install force is then estimated from friction, pressure, and engagement length.</div>
-          <div class="text-white/80">Tolerance entries describe interval behavior, not single-value behavior. `OD (tol)` is solver-selected to satisfy interference limits across bore variation. `Target tol` is the requested interference window, and `Achieved tol` is the resulting assembled window from the solved OD plus bore tolerance stack-up.</div>
-          <div class="text-white/80">If achieved limits cannot fully remain inside target limits, the system is over-constrained by tolerance spread and should be resolved by tightening bore tolerance, widening interference window, or revising nominals.</div>
-          <div class="rounded-md border border-cyan-300/25 bg-cyan-500/5 p-2 text-[12px] text-cyan-100/95">
-            Current effective interference: <span class="font-mono">{fmt(results.physics.deltaEffective, 4)}</span>
-          </div>
-          {#if fitFailed}
-            <div class="rounded-md border border-amber-300/50 bg-amber-500/15 p-2 text-[12px] text-amber-100">
-              Fit constraint warnings are active.
-              <button class="ml-1 underline underline-offset-2" onclick={() => focusSection('bushing-geometry-card')}>Open Geometry Inputs</button>
-            </div>
-          {/if}
-        {/if}
-        <div class="pt-2">
-          <button class="rounded-md border border-cyan-300/40 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20" onclick={() => (infoDialog = null)}>
-            Close
-          </button>
-        </div>
-      </CardContent>
-    </Card>
-    </div>
-  </div>
-{/if}
+<BushingResultInfoDialog
+  open={infoDialog !== null}
+  mode={infoDialog}
+  {results}
+  {edgeFailed}
+  {wallFailed}
+  {fitFailed}
+  {fmt}
+  {focusSection}
+  onClose={() => (infoDialog = null)}
+/>

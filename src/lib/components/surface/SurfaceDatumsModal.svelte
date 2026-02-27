@@ -9,6 +9,8 @@
   export let csysYPoint = 2;
   export let csysFromLine = 0;
   export let csysCopyIdx = 0;
+  export let csysRelocateIdx = 0;
+  export let csysRelocatePointIdx = 0;
   export let planeCreateMode: 'three_points' | 'point_normal' | 'offset_surface' | 'two_lines' | 'point_direction' | 'csys_principal' = 'three_points';
   export let planeP0 = 0;
   export let planeP1 = 1;
@@ -24,10 +26,12 @@
   export let planePrincipal: 'XY' | 'YZ' | 'ZX' = 'XY';
   export let csys: Array<{ name: string }> = [];
   export let planes: Array<{ name: string }> = [];
+  export let pointsCount = 0;
   export let datumPick: { target: 'csys3' | 'csysPointLine'; slot: 'origin' | 'x' | 'y' | 'line' } | null = null;
   export let startDatumsModalDrag: (ev: PointerEvent) => void;
   export let armDatumPick: (target: 'csys3' | 'csysPointLine', slot: 'origin' | 'x' | 'y' | 'line') => void;
   export let addDatumCsys: () => void;
+  export let relocateCsysToPoint: () => void;
   export let addDatumPlane: () => void;
 </script>
 
@@ -64,6 +68,20 @@
             <input class="input input-xs glass-input w-full" type="number" min="0" bind:value={csysCopyIdx} title="Source CSYS index" />
           {/if}
           <button class="btn btn-xs variant-soft w-full" onclick={addDatumCsys}>+ Add CSYS</button>
+          <div class="pt-2 border-t border-white/10 space-y-2">
+            <div class="text-[10px] uppercase tracking-widest text-white/45">Relocate Existing CSYS</div>
+            <div class="grid grid-cols-2 gap-1 text-[10px]">
+              <div>
+                <div class="text-white/45 mb-1">CSYS #</div>
+                <input class="input input-xs glass-input w-full" type="number" min="0" max={Math.max(0, csys.length - 1)} bind:value={csysRelocateIdx} />
+              </div>
+              <div>
+                <div class="text-white/45 mb-1">Point #</div>
+                <input class="input input-xs glass-input w-full" type="number" min="0" max={Math.max(0, pointsCount - 1)} bind:value={csysRelocatePointIdx} />
+              </div>
+            </div>
+            <button class="btn btn-xs variant-soft w-full" onclick={relocateCsysToPoint} disabled={csys.length === 0 || pointsCount === 0}>Relocate CSYS Origin</button>
+          </div>
         </div>
         <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
           <div class="text-[11px] text-white/50 uppercase tracking-widest">Create Plane</div>
