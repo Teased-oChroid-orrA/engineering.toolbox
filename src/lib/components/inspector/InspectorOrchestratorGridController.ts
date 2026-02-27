@@ -17,7 +17,7 @@ export async function fetchVisibleSlice(ctx: GridControllerContext) {
 
   try {
     if (ctx.isMergedView) {
-      const base = ctx.mergedRowsAll.slice(s, e);
+      const base = ctx.mergedRowsAll;
       if (!ctx.sliceGate.isLatest(token)) return;
       
       // CRITICAL FIX: Use callback to trigger Svelte reactivity

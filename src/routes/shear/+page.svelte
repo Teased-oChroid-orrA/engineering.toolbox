@@ -140,6 +140,7 @@
 
 </script>
 
+<div data-route-ready="shear">
 <div class="grid h-[calc(100vh-6rem)] grid-cols-1 gap-4 overflow-hidden p-1 lg:grid-cols-[400px_1fr]">
   <div class="flex flex-col gap-4 overflow-y-auto pb-24 pr-2 scrollbar-hide">
     <div class="flex items-center justify-between px-1">
@@ -367,4 +368,5 @@
       </div>
     {/if}
   </div>
+</div>
 </div>

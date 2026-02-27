@@ -280,7 +280,7 @@
   </BushingFreePositionContainer>
 {:else}
   <!-- Lane-based layout (legacy) -->
-<div class="grid grid-cols-1 gap-4 p-1 pt-4 lg:grid-cols-[450px_1fr]">
+<div class="grid grid-cols-1 gap-4 p-1 pt-4 lg:grid-cols-[450px_1fr]" data-route-ready="bushing">
   <div class="flex flex-col gap-4 pb-8 pr-2">
     <NativeDragLane
       listClass="flex flex-col gap-4"

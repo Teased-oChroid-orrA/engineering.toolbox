@@ -17,11 +17,21 @@
       icon: '◎',
       color: 'text-indigo-400',
       bg: 'bg-indigo-500/10 border-indigo-500/20'
-    }
+    },
+    {
+      title: 'Fastener Toolbox',
+      desc: 'Sequential fastener load-transfer path analysis across multi-row joints.',
+      href: '#/fastener',
+      icon: '⛓',
+      color: 'text-amber-300',
+      bg: 'bg-amber-500/10 border-amber-500/20'
+    },
+    
   ];
+
 </script>
 
-<div class="space-y-8 p-4">
+<div class="space-y-8 p-4" data-route-ready="dashboard">
   <div class="glass-panel p-8 rounded-2xl relative overflow-hidden">
     <div class="relative z-10">
       <h1 class="text-3xl font-bold tracking-tight text-white mb-2">Welcome Back, Engineer.</h1>
@@ -34,7 +44,7 @@
   </div>
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-    {#each tools as tool}
+    {#each tools as tool (tool.href)}
       <a href={tool.href} class="block group">
         <Card class={`h-full glass-card hover:scale-[1.02] transition-all duration-300 ${tool.bg}`}>
           <CardContent class="p-6">

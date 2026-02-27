@@ -33,6 +33,7 @@ export function filterControllerCtx(state: {
   queryScope: 'current' | 'all' | 'ask';
   isMergedView: boolean;
   loadedDatasets: WorkspaceDataset[];
+  activeDatasetId: string;
   filterPending: boolean;
   filterInFlight: boolean;
   filterGate: any;
@@ -87,6 +88,8 @@ export function filterControllerCtx(state: {
     set isMergedView(v: boolean) { state.loadState.isMergedView = v; },
     get loadedDatasets() { return state.loadedDatasets; },
     set loadedDatasets(v: WorkspaceDataset[]) { state.loadedDatasets = v; },
+    get activeDatasetId() { return state.activeDatasetId; },
+    set activeDatasetId(v: string) { state.activeDatasetId = v; },
     get filterPending() { return state.filterPending; },
     set filterPending(v: boolean) { state.filterPending = v; },
     get filterInFlight() { return state.filterInFlight; },

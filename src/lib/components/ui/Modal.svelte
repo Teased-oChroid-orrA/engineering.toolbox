@@ -69,7 +69,7 @@
     children
   }: Props = $props();
 
-  let dialogElement: HTMLDivElement | null = null;
+  let dialogElement = $state<HTMLDivElement | null>(null);
   let previousActiveElement: HTMLElement | null = null;
 
   // Size classes
@@ -134,6 +134,7 @@
   <div
     class="fixed inset-0 z-50 flex items-center justify-center p-4"
     role="dialog"
+    tabindex="-1"
     aria-modal="true"
     aria-labelledby={title ? 'modal-title' : undefined}
     aria-describedby={description ? 'modal-description' : undefined}

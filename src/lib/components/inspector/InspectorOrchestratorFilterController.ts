@@ -59,9 +59,13 @@ export function buildFilterSpec(ctx: FilterControllerContext) {
 
 // Store the original unfiltered rows for browser mode
 let browserModeOriginalRows: string[][] | null = null;
+let lastBrowserFilterSig = '';
+let lastBrowserFilteredRows: string[][] | null = null;
 
 export function resetBrowserModeOriginalRows() {
   browserModeOriginalRows = null;
+  lastBrowserFilterSig = '';
+  lastBrowserFilteredRows = null;
 }
 
 export async function applyFilterSpec(ctx: FilterControllerContext, spec: any): Promise<number> {
@@ -77,149 +81,187 @@ export async function applyFilterSpec(ctx: FilterControllerContext, spec: any): 
     
     const allRows = browserModeOriginalRows;
     
-    // No filters - restore all data
-    if (!spec || spec.empty) {
-      ctx.loadState.mergedRowsAll = [...allRows];
+    const hasPrimaryQuery = String(spec?.query ?? '').trim().length > 0;
+    const hasMultiQuery = !!(spec?.multiQueryEnabled && Array.isArray(spec?.multiQueryClauses) && spec.multiQueryClauses.some((c: any) => String(c?.query ?? '').trim().length > 0));
+    const hasNumeric = !!spec?.numericFilter?.enabled;
+    const hasDate = !!spec?.dateFilter?.enabled;
+    const hasCategory = !!spec?.categoryFilter?.enabled;
+    const hasActiveFilter = hasPrimaryQuery || hasMultiQuery || hasNumeric || hasDate || hasCategory;
+
+    // No active filters - restore all data regardless of maxRowsScan cap.
+    if (!spec || spec.empty || !hasActiveFilter) {
+      ctx.loadState.mergedRowsAll = allRows;
+      lastBrowserFilterSig = '';
+      lastBrowserFilteredRows = allRows;
       devLog('FILTER', 'No filter: restored all', allRows.length, 'rows');
       return ctx.loadState.totalRowCount ?? allRows.length;
     }
+
+    const specSig = JSON.stringify({
+      q: spec.query ?? '',
+      c: spec.columnIdx ?? null,
+      m: spec.matchMode ?? 'fuzzy',
+      mq: spec.multiQueryEnabled ? (spec.multiQueryClauses ?? []) : [],
+      nf: spec.numericFilter ?? null,
+      df: spec.dateFilter ?? null,
+      cf: spec.categoryFilter ?? null,
+      scan: spec.maxRowsScan ?? 0
+    });
     
-    // Apply client-side filtering logic
-    const headers = ctx.loadState.headers ?? [];
-    let filteredRows = allRows;
-    
-    // Helper: match row against query
-    const matchesQuery = (row: string[], query: string, columnIdx: number | null, matchMode: string): boolean => {
-      if (!query) return true;
-      
-      const searchIn = columnIdx !== null && columnIdx >= 0 && columnIdx < row.length
-        ? [row[columnIdx] ?? '']
-        : row;
-      
-      const lowerQuery = query.toLowerCase();
-      
-      for (const cell of searchIn) {
-        const cellLower = (cell ?? '').toLowerCase();
-        
-        if (matchMode === 'fuzzy') {
-          if (cellLower.includes(lowerQuery)) return true;
-        } else if (matchMode === 'exact') {
-          if (cellLower === lowerQuery) return true;
-        } else if (matchMode === 'regex') {
-          try {
-            const regex = new RegExp(query, 'i');
-            if (regex.test(cell)) return true;
-          } catch {
-            return false;
+    // Build optimized matchers once per filter pass to keep large-dataset
+    // query interaction responsive in browser mode.
+    const buildQueryMatcher = (query: string, columnIdx: number | null, mode: string) => {
+      const q = (query ?? '').trim();
+      if (!q) return () => true;
+      const safeMode = mode ?? 'fuzzy';
+      const lowerQ = q.toLowerCase();
+      const regex = safeMode === 'regex' ? new RegExp(q, 'i') : null;
+      return (row: string[]) => {
+        const cells = columnIdx != null && columnIdx >= 0 && columnIdx < row.length
+          ? [row[columnIdx] ?? '']
+          : row;
+        for (const cell of cells) {
+          const raw = String(cell ?? '');
+          if (safeMode === 'fuzzy') {
+            if (raw.toLowerCase().includes(lowerQ)) return true;
+          } else if (safeMode === 'exact') {
+            if (raw.toLowerCase() === lowerQ) return true;
+          } else if (regex && regex.test(raw)) {
+            return true;
           }
         }
-      }
-      
-      return false;
+        return false;
+      };
     };
-    
-    // Apply main query filter
-    if (spec.query && spec.query.trim()) {
-      filteredRows = filteredRows.filter(row => 
-        matchesQuery(row, spec.query, spec.columnIdx, spec.matchMode)
-      );
-      devLog('FILTER', 'After query filter:', filteredRows.length, 'rows');
-    }
-    
-    // Apply multi-query clauses (if enabled)
-    if (spec.multiQueryEnabled && spec.multiQueryClauses && spec.multiQueryClauses.length > 0) {
-      for (const clause of spec.multiQueryClauses) {
-        if (!clause.query || !clause.query.trim()) continue;
-        
-        if (clause.logicalOp === 'OR') {
-          // Union: add rows from allRows that match this clause and aren't already included
-          // Use a simple hash to track row content and avoid duplicates
-          const hashRow = (row: string[]) => {
-            // Simple content-based hash: combine all cells with a delimiter unlikely to appear in CSV data
-            return row.map(cell => (cell ?? '').replace(/\|/g, '||')).join('|~|');
-          };
-          const existingRowsSet = new Set(filteredRows.map(hashRow));
-          for (const row of allRows) {
-            const rowHash = hashRow(row);
-            if (!existingRowsSet.has(rowHash) && matchesQuery(row, clause.query, clause.targetColIdx ?? null, clause.mode ?? 'fuzzy')) {
-              filteredRows.push(row);
-              existingRowsSet.add(rowHash);
-            }
+
+    const mainMatcher = buildQueryMatcher(spec.query ?? '', spec.columnIdx ?? null, spec.matchMode ?? 'fuzzy');
+    const clauseMatchers = (spec.multiQueryEnabled && spec.multiQueryClauses?.length > 0)
+      ? spec.multiQueryClauses
+          .filter((clause: any) => (clause?.query ?? '').trim().length > 0)
+          .map((clause: any) => ({
+            logicalOp: clause.logicalOp === 'OR' ? 'OR' : 'AND',
+            test: buildQueryMatcher(clause.query ?? '', clause.targetColIdx ?? null, clause.mode ?? 'fuzzy')
+          }))
+      : [];
+
+    const numericEnabled = !!(spec.numericFilter?.enabled && spec.numericFilter?.colIdx != null);
+    const numericCol = Number(spec.numericFilter?.colIdx ?? -1);
+    const numericMin = Number(spec.numericFilter?.min ?? -1e308);
+    const numericMax = Number(spec.numericFilter?.max ?? 1e308);
+
+    const dateEnabled = !!(spec.dateFilter?.enabled && spec.dateFilter?.colIdx != null);
+    const dateCol = Number(spec.dateFilter?.colIdx ?? -1);
+    const minIso = String(spec.dateFilter?.minIso || '1900-01-01');
+    const maxIso = String(spec.dateFilter?.maxIso || '3000-01-01');
+
+    const categoryEnabled = !!(spec.categoryFilter?.enabled && spec.categoryFilter?.colIdx != null);
+    const categoryCol = Number(spec.categoryFilter?.colIdx ?? -1);
+    const selectedSet = new Set<string>(spec.categoryFilter?.selected ?? []);
+
+    const previousSig = lastBrowserFilterSig;
+    const scanLimit = Number(spec.maxRowsScan ?? 0);
+    const canNarrowFromPrevious =
+      !!lastBrowserFilteredRows &&
+      !spec.multiQueryEnabled &&
+      !(spec.numericFilter?.enabled) &&
+      !(spec.dateFilter?.enabled) &&
+      !(spec.categoryFilter?.enabled) &&
+      (spec.matchMode === 'fuzzy' || spec.matchMode === 'exact') &&
+      (() => {
+        try {
+          const prev = previousSig ? JSON.parse(previousSig) : null;
+          if (!prev) return false;
+          const sameColumn = (prev.c ?? null) === (spec.columnIdx ?? null);
+          const sameMode = (prev.m ?? 'fuzzy') === (spec.matchMode ?? 'fuzzy');
+          const prevQ = String(prev.q ?? '');
+          const nextQ = String(spec.query ?? '');
+          return sameColumn && sameMode && prevQ.length > 0 && nextQ.startsWith(prevQ);
+        } catch {
+          return false;
+        }
+      })();
+
+    const sourceRows = canNarrowFromPrevious ? (lastBrowserFilteredRows as string[][]) : allRows;
+    const filteredRows: string[][] = [];
+    const yieldEvery = sourceRows.length > 500_000 ? 1200 : sourceRows.length > 100_000 ? 2500 : 8000;
+    let nextYield = yieldEvery;
+
+    for (let i = 0; i < sourceRows.length; i++) {
+      const row = sourceRows[i];
+      let include = mainMatcher(row);
+
+      for (const clause of clauseMatchers) {
+        const matched = clause.test(row);
+        include = clause.logicalOp === 'OR' ? (include || matched) : (include && matched);
+      }
+      if (!include) {
+        if (i >= nextYield) {
+          nextYield += yieldEvery;
+          await new Promise((r) => setTimeout(r, 0));
+        }
+        continue;
+      }
+
+      if (numericEnabled) {
+        const n = Number(row?.[numericCol] ?? '');
+        if (!(Number.isFinite(n) && n >= numericMin && n <= numericMax)) {
+          if (i >= nextYield) {
+            nextYield += yieldEvery;
+            await new Promise((r) => setTimeout(r, 0));
           }
-        } else {
-          // AND (default): intersect with existing results
-          filteredRows = filteredRows.filter(row =>
-            matchesQuery(row, clause.query, clause.targetColIdx ?? null, clause.mode ?? 'fuzzy')
-          );
+          continue;
         }
       }
-      devLog('FILTER', 'After multi-query:', filteredRows.length, 'rows');
-    }
-    
-    // Apply numeric filter
-    if (spec.numericFilter && spec.numericFilter.enabled && spec.numericFilter.colIdx !== null) {
-      const colIdx = spec.numericFilter.colIdx;
-      const min = spec.numericFilter.min ?? -1e308;
-      const max = spec.numericFilter.max ?? 1e308;
-      
-      filteredRows = filteredRows.filter(row => {
-        const cell = row[colIdx] ?? '';
-        const num = Number(cell);
-        return Number.isFinite(num) && num >= min && num <= max;
-      });
-      devLog('FILTER', 'After numeric filter:', filteredRows.length, 'rows');
-    }
-    
-    // Apply date filter
-    if (spec.dateFilter && spec.dateFilter.enabled && spec.dateFilter.colIdx !== null) {
-      const colIdx = spec.dateFilter.colIdx;
-      const minIso = spec.dateFilter.minIso || '1900-01-01';
-      const maxIso = spec.dateFilter.maxIso || '3000-01-01';
-      
-      filteredRows = filteredRows.filter(row => {
-        const cell = (row[colIdx] ?? '').trim();
-        if (!cell) return false;
-        
-        // Parse date (support ISO format and common formats)
+
+      if (dateEnabled) {
+        const cell = String(row?.[dateCol] ?? '').trim();
+        if (!cell) {
+          if (i >= nextYield) {
+            nextYield += yieldEvery;
+            await new Promise((r) => setTimeout(r, 0));
+          }
+          continue;
+        }
         let dateStr = cell;
         if (cell.includes('/')) {
-          // Convert MM/DD/YYYY to YYYY-MM-DD
           const parts = cell.split('/');
-          if (parts.length === 3) {
-            dateStr = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
-          }
+          if (parts.length === 3) dateStr = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
         }
-        
-        return dateStr >= minIso && dateStr <= maxIso;
-      });
-      devLog('FILTER', 'After date filter:', filteredRows.length, 'rows');
-    }
-    
-    // Apply category filter
-    if (spec.categoryFilter && spec.categoryFilter.enabled && spec.categoryFilter.colIdx !== null) {
-      const colIdx = spec.categoryFilter.colIdx;
-      const selectedSet = new Set(spec.categoryFilter.selected ?? []);
-      
-      if (selectedSet.size > 0) {
-        filteredRows = filteredRows.filter(row => {
-          const cell = (row[colIdx] ?? '').trim();
-          return selectedSet.has(cell);
-        });
-        devLog('FILTER', 'After category filter:', filteredRows.length, 'rows');
+        if (!(dateStr >= minIso && dateStr <= maxIso)) {
+          if (i >= nextYield) {
+            nextYield += yieldEvery;
+            await new Promise((r) => setTimeout(r, 0));
+          }
+          continue;
+        }
       }
-    }
-    
-    // Apply max rows scan limit
-    if (spec.maxRowsScan && spec.maxRowsScan > 0 && filteredRows.length > spec.maxRowsScan) {
-      filteredRows = filteredRows.slice(0, spec.maxRowsScan);
-      devLog('FILTER', 'After max scan limit:', filteredRows.length, 'rows');
+
+      if (categoryEnabled && selectedSet.size > 0) {
+        const cell = String(row?.[categoryCol] ?? '').trim();
+        if (!selectedSet.has(cell)) {
+          if (i >= nextYield) {
+            nextYield += yieldEvery;
+            await new Promise((r) => setTimeout(r, 0));
+          }
+          continue;
+        }
+      }
+
+      filteredRows.push(row);
+      if (scanLimit > 0 && filteredRows.length >= scanLimit) break;
+      if (i >= nextYield) {
+        nextYield += yieldEvery;
+        await new Promise((r) => setTimeout(r, 0));
+      }
     }
     
     const count = filteredRows.length;
     
     // CRITICAL: Update mergedRowsAll with filtered results
     // fetchVisibleSlice will slice from this array
-    ctx.loadState.mergedRowsAll = [...filteredRows];
+    ctx.loadState.mergedRowsAll = filteredRows;
+    lastBrowserFilterSig = specSig;
+    lastBrowserFilteredRows = filteredRows;
     
     devLog('FILTER', 'Browser mode: filtered', count, 'of', allRows.length, 'rows');
     
@@ -358,10 +400,12 @@ export function scheduleFilter(ctx: FilterControllerContext, reason = 'debounced
   });
   ctx.filterLastReason = reason;
   if (ctx.filterTimer) clearTimeout(ctx.filterTimer);
+  const totalRows = Number(ctx.totalRowCount ?? 0);
+  const debounceMs = totalRows >= 500_000 ? 600 : totalRows >= 100_000 ? 360 : ctx.FILTER_DEBOUNCE_MS;
   ctx.filterTimer = setTimeout(() => {
     ctx.filterPending = true;
     void drainFilterQueue(ctx);
-  }, ctx.FILTER_DEBOUNCE_MS);
+  }, debounceMs);
 }
 
 export function scheduleCrossQuery(ctx: FilterControllerContext, reason = 'debounced-cross-input') {

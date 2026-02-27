@@ -16,7 +16,7 @@ export default defineConfig({
     trace: 'retain-on-failure'
   },
   webServer: {
-    command: `node ./scripts/preflight-check.mjs && svelte-kit sync && vite dev --host 127.0.0.1 --port ${playwrightPort} --strictPort`,
+    command: `node ./scripts/preflight-check.mjs && npx svelte-kit sync && npx vite dev --host 127.0.0.1 --port ${playwrightPort} --strictPort`,
     url: baseURL,
     timeout: 120_000,
     reuseExistingServer: false

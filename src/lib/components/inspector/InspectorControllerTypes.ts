@@ -297,6 +297,7 @@ export type FilterControllerContext = Pick<
   | 'preMergedTotalRowCount'
   | 'preMergedTotalFilteredCount'
   | 'loadedDatasets'
+  | 'activeDatasetId'
   | 'mergedRowsAll'
   | 'visibleRows'
   | 'totalRowCount'

@@ -2,4 +2,6 @@
   import BushingOrchestrator from '$lib/components/bushing/BushingOrchestrator.svelte';
 </script>
 
-<BushingOrchestrator />
+<div data-route-ready="bushing">
+  <BushingOrchestrator />
+</div>

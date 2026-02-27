@@ -19,6 +19,7 @@
     overscan = 0,
     maxWindow = 0,
     parseDiagnostics = [],
+    showMetrics = true,
     onActivateDataset = () => {},
     onUnloadDataset = () => {}
   } = $props<{
@@ -38,6 +39,7 @@
     overscan?: number;
     maxWindow?: number;
     parseDiagnostics?: Array<{ idx: number; name: string; numericFail: number; dateFail: number }>;
+    showMetrics?: boolean;
     onActivateDataset?: (id: string) => void;
     onUnloadDataset?: (id: string) => void;
   }>();
@@ -55,18 +57,20 @@
   />
 </div>
 
-<div class="order-30">
-  <InspectorMetricsBar
-    {columns}
-    {rows}
-    {filtered}
-    {aggregateFileCount}
-    {aggregateLabel}
-    {rendered}
-    {startIdx}
-    {endIdx}
-    {overscan}
-    {maxWindow}
-    {parseDiagnostics}
-  />
-</div>
+{#if showMetrics}
+  <div class="order-30">
+    <InspectorMetricsBar
+      {columns}
+      {rows}
+      {filtered}
+      {aggregateFileCount}
+      {aggregateLabel}
+      {rendered}
+      {startIdx}
+      {endIdx}
+      {overscan}
+      {maxWindow}
+      {parseDiagnostics}
+    />
+  </div>
+{/if}

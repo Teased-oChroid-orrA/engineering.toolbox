@@ -835,10 +835,28 @@ pub fn inspector_filter(state: State<'_, DataState>, spec: FilterSpec) -> Result
 
 #[tauri::command(rename_all = "camelCase")]
 pub fn inspector_query_multiple_csv(req: MultiCsvQueryRequest) -> Result<MultiCsvQueryResponse, String> {
+    let sanitize_source_label = |label: &str, path: Option<&String>| -> String {
+        let raw = label.trim().trim_matches(|c| c == '"' || c == '\'');
+        let is_none_like = raw.is_empty()
+            || raw.eq_ignore_ascii_case("none")
+            || raw.eq_ignore_ascii_case("(none)")
+            || raw.eq_ignore_ascii_case("[none]");
+        let base = if is_none_like {
+            path.and_then(|p| std::path::Path::new(p).file_name().and_then(|n| n.to_str()).map(|s| s.to_string()))
+                .unwrap_or_else(|| "Unnamed file".to_string())
+        } else {
+            raw.to_string()
+        };
+        let stripped = base.strip_suffix(".csv").or_else(|| base.strip_suffix(".CSV")).unwrap_or(&base);
+        let out = stripped.trim();
+        if out.is_empty() { "Unnamed file".to_string() } else { out.to_string() }
+    };
+
     let mut dataset_results: Vec<MultiCsvDatasetResult> = Vec::with_capacity(req.datasets.len());
     let mut raw_rows: Vec<(String, Vec<String>, Vec<String>)> = Vec::new(); // (source, headers, row)
 
     for ds in req.datasets.iter() {
+        let source_label = sanitize_source_label(&ds.label, ds.path.as_ref());
         let (headers, columns, _col_types, row_count) = match ds.kind.as_str() {
             "text" => {
                 let text = ds
@@ -860,7 +878,7 @@ pub fn inspector_query_multiple_csv(req: MultiCsvQueryRequest) -> Result<MultiCs
         let idxs = filter_indices(&columns, row_count, &req.spec)?;
         dataset_results.push(MultiCsvDatasetResult {
             dataset_id: ds.dataset_id.clone(),
-            label: ds.label.clone(),
+            label: source_label.clone(),
             filtered: idxs.len(),
             total: row_count,
         });
@@ -870,7 +888,7 @@ pub fn inspector_query_multiple_csv(req: MultiCsvQueryRequest) -> Result<MultiCs
             for c in 0..headers.len() {
                 row.push(columns.get(c).and_then(|col| col.get(row_idx)).cloned().unwrap_or_default());
             }
-            raw_rows.push((ds.label.clone(), headers.clone(), row));
+            raw_rows.push((source_label.clone(), headers.clone(), row));
         }
     }
 

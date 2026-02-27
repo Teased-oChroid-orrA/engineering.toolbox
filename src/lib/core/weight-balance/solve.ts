@@ -3,298 +3,108 @@
  * Implements FAA-H-8083-1B Tabular Method
  */
 
-import type {
-  AircraftProfile,
-  LoadingItem,
-  LoadingResults,
-  ValidationResult,
-  CGEnvelope
-} from './types';
-
-// Constants
-const ENVELOPE_MARGIN_THRESHOLD = 0.5; // inches
-const MIN_POLYGON_VERTICES = 3;
+import type { AircraftProfile, CalculationOptions, CalculationTraceEntry, LoadingItem, LoadingResults, ValidationResult } from './types';
+import { computeLoadingAnalysis, resolveCalculationOptions } from './analysis';
+import { buildInputHash } from './hash';
+import { determineBestCategory, isPointInEnvelope } from './envelope';
+import { runValidations } from './resultValidation';
+import { validateInput } from './inputValidation';
 
 interface ItemWithMoment extends LoadingItem {
   moment: number;
 }
 
-/**
- * Format weight value with appropriate units
- */
-function formatWeightWithUnits(weight: number, units: 'imperial' | 'metric'): string {
-  const unitLabel = units === 'imperial' ? 'lbs' : 'kg';
-  return `${weight.toFixed(1)} ${unitLabel}`;
-}
-
-/**
- * Main W&B calculation function using tabular method
- */
 export function calculateWeightAndBalance(
   aircraft: AircraftProfile,
-  items: LoadingItem[]
+  items: LoadingItem[],
+  options: CalculationOptions = {}
 ): LoadingResults {
-  // Step 1: Calculate moments for each item
-  const itemsWithMoments: ItemWithMoment[] = items.map(item => ({
-    ...item,
-    moment: item.weight * item.arm
-  }));
-  
-  // Step 2: Sum all weights and moments
-  const totalWeight = itemsWithMoments.reduce((sum, item) => sum + item.weight, 0);
-  const totalMoment = itemsWithMoments.reduce((sum, item) => sum + item.moment, 0);
-  
-  // Step 3: Calculate CG position (handle divide by zero)
-  const cgPosition = totalWeight > 0 ? totalMoment / totalWeight : 0;
-  
-  // Step 4: Calculate Zero Fuel Weight (exclude fuel items)
-  const nonFuelItems = itemsWithMoments.filter(
-    item => !item.type.startsWith('fuel_')
-  );
-  const zeroFuelWeight = nonFuelItems.reduce((sum, item) => sum + item.weight, 0);
-  const zeroFuelMoment = nonFuelItems.reduce((sum, item) => sum + item.moment, 0);
-  const zeroFuelCG = zeroFuelWeight > 0 ? zeroFuelMoment / zeroFuelWeight : 0;
-  
-  // Step 5: Run validations
+  const itemsWithMoments = toItemsWithMoments(items);
+  const totals = sumTotals(itemsWithMoments);
+  const zeroFuel = sumZeroFuel(itemsWithMoments);
   const validations = runValidations(aircraft, {
-    totalWeight,
-    cgPosition,
-    zeroFuelWeight,
-    zeroFuelCG
+    totalWeight: totals.totalWeight,
+    cgPosition: totals.cgPosition,
+    zeroFuelWeight: zeroFuel.zeroFuelWeight
   });
-  
-  // Step 6: Determine category and overall status
-  const category = determineBestCategory(aircraft, cgPosition, totalWeight);
-  const hasErrors = validations.some(v => v.severity === 'error');
-  const hasWarnings = validations.some(v => v.severity === 'warning');
-  const overallStatus = hasErrors ? 'error' : hasWarnings ? 'warning' : 'safe';
-  
+  const category = determineBestCategory(aircraft, totals.cgPosition, totals.totalWeight);
+  const overallStatus = resolveOverallStatus(validations);
+  const calculationTrace = toCalculationTrace(itemsWithMoments);
+  const resolvedOptions = resolveCalculationOptions(options);
+  const analysis = computeLoadingAnalysis(totals.totalWeight, totals.totalMoment, calculationTrace, resolvedOptions);
+
   return {
-    totalWeight,
-    totalMoment,
-    cgPosition,
-    zeroFuelWeight,
-    zeroFuelMoment,
-    zeroFuelCG,
+    ...totals,
+    ...zeroFuel,
     validations,
     category,
-    categoryValid: !hasErrors,
-    overallStatus
+    categoryValid: overallStatus !== 'error',
+    overallStatus,
+    calculationTrace,
+    audit: {
+      generatedAt: new Date().toISOString(),
+      inputHash: buildInputHash(aircraft, calculationTrace, resolvedOptions),
+      checks: summarizeValidationChecks(validations)
+    },
+    analysis
   };
 }
 
-/**
- * Run all validation rules
- */
-function runValidations(
-  aircraft: AircraftProfile,
-  results: {
-    totalWeight: number;
-    cgPosition: number;
-    zeroFuelWeight: number;
-    zeroFuelCG: number;
-  }
-): ValidationResult[] {
-  const validations: ValidationResult[] = [];
-  const { totalWeight, cgPosition, zeroFuelWeight } = results;
-  
-  // Validation 1: MTOW Check
-  if (totalWeight > aircraft.maxTakeoffWeight) {
-    validations.push({
-      code: 'MTOW_EXCEEDED',
-      severity: 'error',
-      message: `Total weight (${formatWeightWithUnits(totalWeight, aircraft.units)}) exceeds Maximum Takeoff Weight`,
-      value: totalWeight,
-      limit: aircraft.maxTakeoffWeight
-    });
-  }
-  
-  // Validation 2: MLW Check
-  if (totalWeight > aircraft.maxLandingWeight) {
-    validations.push({
-      code: 'MLW_EXCEEDED',
-      severity: 'warning',
-      message: `Total weight (${formatWeightWithUnits(totalWeight, aircraft.units)}) exceeds Maximum Landing Weight`,
-      value: totalWeight,
-      limit: aircraft.maxLandingWeight
-    });
-  }
-  
-  // Validation 3: Zero Fuel Weight Check
-  if (aircraft.maxZeroFuelWeight && zeroFuelWeight > aircraft.maxZeroFuelWeight) {
-    validations.push({
-      code: 'MZFW_EXCEEDED',
-      severity: 'error',
-      message: `Zero fuel weight (${formatWeightWithUnits(zeroFuelWeight, aircraft.units)}) exceeds Maximum Zero Fuel Weight`,
-      value: zeroFuelWeight,
-      limit: aircraft.maxZeroFuelWeight
-    });
-  }
-  
-  // Validation 4: CG Envelope Check
-  const categoryResult = checkCGEnvelope(aircraft, cgPosition, totalWeight);
-  if (!categoryResult.valid) {
-    validations.push({
-      code: 'CG_OUT_OF_ENVELOPE',
-      severity: 'error',
-      message: `CG position (${cgPosition.toFixed(2)}" aft of datum) is outside all approved envelopes`,
-      value: cgPosition
-    });
-  }
-  
-  // Validation 5: Near envelope boundary warning
-  if (categoryResult.valid && categoryResult.category) {
-    const margin = checkEnvelopeMargin(aircraft, cgPosition, totalWeight, categoryResult.category);
-    if (margin < ENVELOPE_MARGIN_THRESHOLD) {
-      validations.push({
-        code: 'CG_NEAR_BOUNDARY',
-        severity: 'warning',
-        message: `CG position is within ${ENVELOPE_MARGIN_THRESHOLD}" of ${categoryResult.category} envelope boundary`,
-        category: categoryResult.category
-      });
-    }
-  }
-  
-  // Validation 6: NaN/Infinity checks
-  if (!isFinite(cgPosition) || !isFinite(totalWeight)) {
-    validations.push({
-      code: 'INVALID_CALCULATION',
-      severity: 'error',
-      message: 'Invalid calculation result (NaN or Infinity)'
-    });
-  }
-  
-  return validations;
+export { isPointInEnvelope, validateInput };
+
+function toItemsWithMoments(items: LoadingItem[]): ItemWithMoment[] {
+  return items.map((item) => ({ ...item, moment: item.weight * item.arm }));
 }
 
-/**
- * Determine the best category for the given CG and weight
- */
-function determineBestCategory(
-  aircraft: AircraftProfile,
-  cgPosition: number,
-  totalWeight: number
-): 'normal' | 'utility' | 'acrobatic' | null {
-  const categoryPriority: Array<'normal' | 'utility' | 'acrobatic'> = ['normal', 'utility', 'acrobatic'];
-  
-  for (const cat of categoryPriority) {
-    const envelope = aircraft.envelopes.find(e => e.category === cat);
-    if (envelope && isPointInEnvelope(totalWeight, cgPosition, envelope)) {
-      return cat;
-    }
-  }
-  
-  return null;
+function sumTotals(itemsWithMoments: ItemWithMoment[]): {
+  totalWeight: number;
+  totalMoment: number;
+  cgPosition: number;
+} {
+  const totalWeight = itemsWithMoments.reduce((sum, item) => sum + item.weight, 0);
+  const totalMoment = itemsWithMoments.reduce((sum, item) => sum + item.moment, 0);
+  const cgPosition = totalWeight > 0 ? totalMoment / totalWeight : 0;
+  return { totalWeight, totalMoment, cgPosition };
 }
 
-/**
- * Check if a point is inside a CG envelope
- */
-export function isPointInEnvelope(
-  weight: number,
-  cgPosition: number,
-  envelope: CGEnvelope
-): boolean {
-  // Check weight limit first
-  if (weight > envelope.maxWeight) return false;
-  
-  // Try simple limits if available
-  if (envelope.forwardLimit !== undefined && envelope.aftLimit !== undefined) {
-    return cgPosition >= envelope.forwardLimit && cgPosition <= envelope.aftLimit;
-  }
-  
-  // Use point-in-polygon (ray casting algorithm)
-  if (!envelope.vertices || envelope.vertices.length < MIN_POLYGON_VERTICES) return false;
-  
-  const point = { x: cgPosition, y: weight };
-  const vertices = envelope.vertices;
-  let inside = false;
-  
-  for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
-    const xi = vertices[i].cgPosition;
-    const yi = vertices[i].weight;
-    const xj = vertices[j].cgPosition;
-    const yj = vertices[j].weight;
-    
-    const intersect = ((yi > point.y) !== (yj > point.y))
-      && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
-    
-    if (intersect) inside = !inside;
-  }
-  
-  return inside;
+function sumZeroFuel(itemsWithMoments: ItemWithMoment[]): {
+  zeroFuelWeight: number;
+  zeroFuelMoment: number;
+  zeroFuelCG: number;
+} {
+  const nonFuelItems = itemsWithMoments.filter((item) => !item.type.startsWith('fuel_'));
+  const zeroFuelWeight = nonFuelItems.reduce((sum, item) => sum + item.weight, 0);
+  const zeroFuelMoment = nonFuelItems.reduce((sum, item) => sum + item.moment, 0);
+  const zeroFuelCG = zeroFuelWeight > 0 ? zeroFuelMoment / zeroFuelWeight : 0;
+  return { zeroFuelWeight, zeroFuelMoment, zeroFuelCG };
 }
 
-/**
- * Check CG envelope validity and return category
- */
-function checkCGEnvelope(
-  aircraft: AircraftProfile,
-  cgPosition: number,
-  totalWeight: number
-): { valid: boolean; category?: string } {
-  for (const envelope of aircraft.envelopes) {
-    if (isPointInEnvelope(totalWeight, cgPosition, envelope)) {
-      return { valid: true, category: envelope.category };
-    }
-  }
-  return { valid: false };
+function toCalculationTrace(itemsWithMoments: ItemWithMoment[]): CalculationTraceEntry[] {
+  return itemsWithMoments.map((item) => ({
+    id: item.id,
+    name: item.name,
+    type: item.type,
+    weight: item.weight,
+    arm: item.arm,
+    moment: item.moment,
+    isFuel: item.type.startsWith('fuel_')
+  }));
 }
 
-/**
- * Calculate minimum distance to envelope boundary
- */
-function checkEnvelopeMargin(
-  aircraft: AircraftProfile,
-  cgPosition: number,
-  totalWeight: number,
-  category: string
-): number {
-  const envelope = aircraft.envelopes.find(e => e.category === category);
-  if (!envelope) return Infinity;
-  
-  // Simplified: check distance to forward/aft limits if available
-  if (envelope.forwardLimit !== undefined && envelope.aftLimit !== undefined) {
-    const forwardDistance = cgPosition - envelope.forwardLimit;
-    const aftDistance = envelope.aftLimit - cgPosition;
-    return Math.min(forwardDistance, aftDistance);
-  }
-  
-  // For complex envelopes, return a safe value
-  return 1.0;
+function resolveOverallStatus(validations: ValidationResult[]): 'safe' | 'warning' | 'error' {
+  if (validations.some((validation) => validation.severity === 'error')) return 'error';
+  if (validations.some((validation) => validation.severity === 'warning')) return 'warning';
+  return 'safe';
 }
 
-/**
- * Validate input data
- */
-export function validateInput(
-  aircraft: AircraftProfile | null,
-  items: LoadingItem[]
-): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-  
-  if (!aircraft) {
-    errors.push('No aircraft profile selected');
-    return { valid: false, errors };
-  }
-  
-  if (aircraft.basicEmptyWeight <= 0) {
-    errors.push('Basic empty weight must be positive');
-  }
-  
-  if (aircraft.maxTakeoffWeight <= 0) {
-    errors.push('Maximum takeoff weight must be positive');
-  }
-  
-  if (aircraft.envelopes.length === 0) {
-    errors.push('No CG envelopes defined');
-  }
-  
-  for (const item of items) {
-    if (item.weight < 0) {
-      errors.push(`Invalid weight for ${item.name}: ${item.weight}`);
-    }
-  }
-  
-  return { valid: errors.length === 0, errors };
+function summarizeValidationChecks(validations: ValidationResult[]): { errors: number; warnings: number; info: number } {
+  return validations.reduce(
+    (acc, validation) => {
+      if (validation.severity === 'error') acc.errors += 1;
+      if (validation.severity === 'warning') acc.warnings += 1;
+      if (validation.severity === 'info') acc.info += 1;
+      return acc;
+    },
+    { errors: 0, warnings: 0, info: 0 }
+  );
 }
