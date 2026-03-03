@@ -22,6 +22,7 @@ test('preload route renders solver outputs and report action', async ({ page }) 
   await expect(page.getByText('Adjacent Fastener Screening')).toBeVisible();
   await expect(page.getByText('Load cases')).toBeVisible();
   await expect(page.getByLabel('Preload bolt pattern map')).toBeVisible();
+  await expect(page.getByLabel('Preload fastener-group case envelopes')).toBeVisible();
   await expect(page.getByLabel('Preload geometry influence matrix heatmap')).toBeVisible();
   await expect(page.getByText('Physical layers remain plates.')).toBeVisible();
 });

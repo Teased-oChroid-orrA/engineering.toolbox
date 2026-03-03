@@ -32,3 +32,12 @@ test('captures preload joint section visualization panel', async ({ page }) => {
     path: '/Users/nautilus/Desktop/engineering.toolbox/implementation/screenshots/preload-joint-section-panel.png'
   });
 });
+
+test('captures preload influence matrix heatmap panel', async ({ page }) => {
+  await preparePreloadScreenshot(page);
+  const panel = page.getByLabel('Preload geometry influence matrix heatmap');
+  await expect(panel).toBeVisible();
+  await panel.screenshot({
+    path: '/Users/nautilus/Desktop/engineering.toolbox/implementation/screenshots/preload-influence-matrix-heatmap.png'
+  });
+});

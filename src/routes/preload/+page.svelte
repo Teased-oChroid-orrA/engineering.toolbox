@@ -861,6 +861,19 @@
     ? `F${fastenerGroupResult.criticalFastenerIndex + 1}`
     : 'Current fastener';
   $: governingLoadCaseLabel = fastenerGroupCaseResult?.governingCaseLabel ?? '—';
+  $: caseEnvelopeScale = Math.max(
+    1,
+    ...(fastenerGroupCaseResult?.cases.map((entry) => entry.result.criticalEquivalentDemand) ?? [1])
+  );
+  $: fastenerCaseEnvelopeRows =
+    fastenerGroupCaseResult?.cases.map((entry, index) => ({
+      index,
+      label: entry.label,
+      criticalFastenerLabel: `F${entry.result.criticalFastenerIndex + 1}`,
+      demand: entry.result.criticalEquivalentDemand,
+      ratio: entry.result.criticalEquivalentDemand / caseEnvelopeScale,
+      isGoverning: entry.caseId === fastenerGroupCaseResult.governingCaseId
+    })) ?? [];
   $: coneReachLength = Math.min(stackTotalLength / 2, (Math.max(topBearingFaceOuterDiameter, bottomBearingFaceOuterDiameter) - form.nominalDiameter) / Math.max(compressionConeSlope, 1e-6));
   $: jointDisplayMaxDiameter = Math.max(
     topBearingFaceOuterDiameter,
@@ -1453,6 +1466,23 @@
             <div>Adjacent fastener equivalent: <span class="font-mono text-cyan-300">{fmt(adjacentFastenerEquivalentLoad, 2)}</span></div>
             <div class="mt-2">Critical fastener: <span class="font-semibold text-amber-200">{criticalFastenerLabel}</span></div>
           </div>
+          {#if fastenerCaseEnvelopeRows.length}
+            <div class="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div class="mb-2 text-[10px] uppercase tracking-widest text-white/45">Per-case critical envelopes</div>
+              <svg viewBox="0 0 320 170" class="h-auto w-full rounded-lg border border-white/8 bg-black/20 p-2" aria-label="Preload fastener-group case envelopes">
+                <rect x="16" y="16" width="288" height="138" rx="12" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.08)" />
+                {#each fastenerCaseEnvelopeRows as row}
+                  {@const y = 42 + row.index * 24}
+                  <text x="26" y={y + 4} fill={row.isGoverning ? 'rgba(253,230,138,0.92)' : 'rgba(255,255,255,0.70)'} font-size="10">{row.label}</text>
+                  <line x1="98" y1={y} x2="256" y2={y} stroke="rgba(255,255,255,0.10)" stroke-width="2" stroke-linecap="round" />
+                  <line x1="98" y1={y} x2={98 + row.ratio * 158} y2={y} stroke={row.isGoverning ? '#fde68a' : '#22d3ee'} stroke-width="5" stroke-linecap="round" />
+                  <circle cx={98 + row.ratio * 158} cy={y} r="4" fill={row.isGoverning ? '#fde68a' : '#67e8f9'} />
+                  <text x="268" y={y + 4} text-anchor="end" fill="rgba(255,255,255,0.62)" font-size="9">{row.criticalFastenerLabel} • {fmt(row.demand, 2)}</text>
+                {/each}
+                <text x="24" y="150" fill="rgba(255,255,255,0.55)" font-size="10">Each bar shows the peak equivalent fastener demand within that load case. The longest bar is the governing case.</text>
+              </svg>
+            </div>
+          {/if}
           {#if fastenerGroupResult}
             <div class="rounded-lg border border-white/10 bg-black/20 p-3">
               <div class="mb-2 text-[10px] uppercase tracking-widest text-white/45">Pattern distribution</div>
@@ -1502,7 +1532,7 @@
             </div>
             <div class="rounded-lg border border-white/10 bg-black/20 p-3">
               <div class="mb-2 text-[10px] uppercase tracking-widest text-white/45">Influence matrix heatmap</div>
-              <svg viewBox="0 0 320 320" class="h-auto w-full rounded-lg border border-white/8 bg-black/20 p-2" aria-label="Preload geometry influence matrix heatmap">
+              <svg viewBox="0 0 320 320" class="h-auto w-full rounded-lg border border-white/8 bg-black/20 p-2" aria-label="Preload geometry influence matrix heatmap" data-preload-heatmap-svg="true">
                 <rect x="40" y="24" width="248" height="248" rx="10" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.08)" />
                 {#each fastenerGroupResult.geometryInfluenceMatrix as row, rowIndex}
                   {#each row as cell, columnIndex}
