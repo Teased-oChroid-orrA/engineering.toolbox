@@ -159,8 +159,8 @@ const DEFAULT_CONFIG = {
         function: 150
       }
     },
-    babylonRuntime: {
-      patterns: ['**/BushingBabylonRuntime.ts', '**/babylon/**/*.ts'],
+    renderRuntime: {
+      patterns: ['**/BushingD3Canvas.svelte', '**/BushingDrafting.svelte'],
       blockLimits: {
         function: 150
       }

@@ -6,7 +6,6 @@
   import InspectorTopControlsPanel from '$lib/components/inspector/InspectorTopControlsPanel.svelte';
   import InspectorMainGridPanel from '$lib/components/inspector/InspectorMainGridPanel.svelte';
   import InspectorFooterBars from '$lib/components/inspector/InspectorFooterBars.svelte';
-  import InspectorOverlayPanel from '$lib/components/inspector/InspectorOverlayPanel.svelte';
   import { aa, withViewTransition, recordPerf as recordPerfUtil, clamp } from '$lib/components/inspector/InspectorOrchestratorUtils';
   import { INSPECTOR_THEME, regexTemplates, fmtDate, parseDateRelaxed, parseF64Relaxed, profileSchemaFromRows, PerfRecorder, createRequestGate, computeDatasetIdentity, hasLoadedDatasetSignals, heuristicHasHeaders, upsertWorkspaceDatasetInList, buildFilterSpecFromState, parseMaxRowsScanText, applySvarBuilderToFiltersController, buildFilterSpecController, clearAllFiltersController, drainFilterQueueController, onQueryScopeChangeController, runFilterNowController, scheduleCrossQueryController, scheduleFilterController, activateWorkspaceDatasetController, loadCsvFromPathController, loadCsvFromTextController, openFallbackLoadFromMenuController, openStreamLoadFromMenuController, runCrossDatasetQueryController, unloadWorkspaceDatasetController, upsertWorkspaceDatasetController, clearColumnSelectionController, fetchVisibleSliceController, hideColumnController, onColumnResizeController, openColumnPickerController, requestSortController, scheduleSliceFetchController, selectAllColumnsController, smartSelectColumnsController, togglePinLeftController, togglePinRightController, toggleVisibleColController, applyRecipeController2, deleteRecipeController2, exportAnalysisBundleController, exportCsvPresetController, exportRecipesCurrentController, importRecipesFileController2, loadLastStateForDatasetController2, loadRecipesForDatasetController2, persistLastStateForDatasetController2, persistRecipesForDatasetController2, saveCurrentAsRecipeController2, toggleRecipeFavoriteController2, closeRowDrawerController2, copyDrawerAsJsonController3, drawerApplyCategoryController2, drawerApplyDateExactController3, drawerApplyNumericExactController3, drawerApplyTargetController2, navRowController2, openRowDrawerController3, computeSchemaStatsController2, fetchCategoryValuesController2, openSchemaController2, scheduleFetchCategoryController2, setSchemaDriftBaselineController2, computeSchemaDrift, computeSchemaOutliers, computeSchemaRelationshipHints, computeSchemaSuggested, schemaActionCategoryController, schemaActionDateRangeController, schemaActionNumericRangeController, schemaActionTargetController, applyStateController2, captureStateController2, buildRecipeExportBlob, captureRecipeState, downloadText, loadLastStateForDatasetFromStore, loadRecipesForDatasetFromStore, mergeImportedRecipes, migrateAndNormalizeRecipeState, newRecipeId, persistLastStateForDatasetToStore, persistRecipesForDatasetToStore, toCsvText, applyDrawerDateExact, applyDrawerNumericExact, copyDrawerAsJsonController, loadRowDrawerData, createInspectorDebugLogger, mountInspectorLifecycle, analyzeRegex, computeActiveFilterHash, escapeHtml, escapeRegExp, fnv1a32, multiQueryHighlightRegexes, newMultiQueryClause, registerContextMenu } from '$lib/components/inspector/InspectorOrchestratorDeps';
   import type { BuildMode, Clause, ClauseKind, GenTab, RecipeStateV3, Recipe, RecipeState, MultiQueryClause } from '$lib/components/inspector/InspectorOrchestratorDeps';
@@ -15,9 +14,9 @@
   import { addRegexGeneratorClause, applyGeneratedRegexUi, buildRegexGeneratorOutput, defaultRegexClauses, moveRegexGeneratorClause, regexGeneratorMatches, regexGeneratorWarnings, removeRegexGeneratorClause, validateRegexGenerator } from '$lib/components/inspector/InspectorRegexGeneratorUiController';
   import { buildInspectorContextMenu } from '$lib/components/inspector/InspectorMenuController';
   import { highlightCell as highlightCellCore } from '$lib/components/inspector/InspectorOrchestratorHighlight';
-  import { setupShowDataControlsEffect, setupSliceFetchEffect, setupReactiveFilterEffect, setupCrossQueryEffect, setupPersistStateEffect } from '$lib/components/inspector/InspectorOrchestratorEffects.svelte';
   import { setupUiAnimDurEffect, setupQuietBackendLogsEffect, setupContextMenuEffect, setupCategoryColumnChangeEffect, setupCategorySearchEffect, setupGridWindowInitEffect } from '$lib/components/inspector/InspectorOrchestratorEffectsUi.svelte';
   import { filterControllerCtx as buildFilterControllerCtx, loadControllerCtxCore as buildLoadControllerCtxCore, loadControllerCtxStateMain as buildLoadControllerCtxStateMain, loadControllerCtxStateQueryAndGrid as buildLoadControllerCtxStateQueryAndGrid, loadControllerCtx as buildLoadControllerCtx, gridControllerCtx as buildGridControllerCtx, rowDrawerControllerCtx as buildRowDrawerControllerCtx, modalUiCtx as buildModalUiCtx, recipesControllerCtx as buildRecipesControllerCtx, schemaControllerCtx as buildSchemaControllerCtx, schemaInsightsCtx as buildSchemaInsightsCtx, stateControllerCtx as buildStateControllerCtx } from '$lib/components/inspector/InspectorOrchestratorContexts';
+  import { devLog } from '$lib/utils/devLog';
     type DialogMod = typeof import('@tauri-apps/plugin-dialog'); type ColType = 'numeric' | 'date' | 'string'; type LoadResp = { headers: string[]; rowCount: number; colTypes?: ColType[]; filteredCount?: number }; type SliceResp = { rows: string[][] } | string[][];
     type DatasetSource = { kind: 'text'; text: string } | { kind: 'path'; path: string }; type WorkspaceDataset = { id: string; label: string; hasHeaders: boolean; source: DatasetSource; rowCount?: number; colCount?: number; headerNames?: string[]; filteredCount?: number }; const ROW_HEIGHT = INSPECTOR_THEME.grid.rowHeight; const OVERSCAN = INSPECTOR_THEME.grid.overscan; const MAX_WINDOW_ABS = INSPECTOR_THEME.grid.maxWindowAbs; let uiAnimDur = $state(160); const perf = new PerfRecorder(); const SLO_P95_MS = { filter: 180, slice: 60, sort: 250, schema: 350, category: 120, row_drawer: 180 } as const; const recordPerf = (op: 'filter' | 'slice' | 'sort' | 'schema' | 'category' | 'row_drawer', started: number, meta?: Record<string, unknown>) => recordPerfUtil(perf, SLO_P95_MS, op, started, meta); const filterGate = createRequestGate(); const sliceGate = createRequestGate(); const sortGate = createRequestGate(); const categoryGate = createRequestGate(); let headers = $state<string[]>([]); let totalRowCount = $state(0); let totalFilteredCount = $state(0);
     let visibleRows = $state<string[][]>([]); let colTypes = $state<ColType[]>([]); let datasetId = $state<string>(''); let datasetLabel = $state<string>('(none)'); let loadedDatasets = $state<WorkspaceDataset[]>([]); let activeDatasetId = $state<string>(''); const sanitizeSourceLabel = (input: string | null | undefined, fallback = 'Unnamed file') => { const raw = String(input ?? '').trim(); const dequoted = raw.replace(/^["']+|["']+$/g, '').trim(); if (!dequoted || /^\[?\s*none\s*\]?$/i.test(dequoted) || /^\(\s*none\s*\)$/i.test(dequoted)) return fallback; const base = dequoted.split(/[\\/]/).pop() ?? dequoted; const stripped = base.replace(/\.csv$/i, '').trim(); return stripped || fallback; }; let activeDatasetLabel = $derived.by(() => { const active = (loadedDatasets ?? []).find((d) => d.id === activeDatasetId); const fallbackLoaded = (loadedDatasets?.length ?? 0) > 0 ? loadedDatasets[0]?.label : ''; const base = active?.label || fallbackLoaded || datasetLabel || ''; return sanitizeSourceLabel(base, 'Unnamed file'); });
@@ -37,7 +36,7 @@
     const RECIPES_STORE_KEY = 'inspector.recipes.store.v3'; const LAST_STATE_STORE_KEY = 'inspector.last_state.store.v3'; const LEGACY_RECIPES_STORE_KEYS = ['inspector.recipes.store.v2']; const LEGACY_LAST_STATE_KEYS = ['inspector.last_state.store.v2']; let autoRestoreEnabled = $state(true); let recipes = $state<Recipe[]>([]); let showRecipeModal = $state(false); let recipeName = $state(''); let recipeTags = $state(''); let recipeNotice = $state<string | null>(null); let importMode = $state<'current' | 'file'>('current'); let pendingRestore: RecipeState | null = null; let regexHints = $derived.by(() => (matchMode === 'regex' ? analyzeRegex(query) : [])); let regexDanger = $derived.by(() => regexHints.some((h) => h.level === 'danger'));
     let showRegexHelp = $state(false); let showRegexGenerator = $state(false); let showSvarBuilder = $state(false); let svarFilterSet = $state<IFilterSet>({ glue: 'and', rules: [] }); let svarNotice = $state<string | null>(null); let debugLogEnabled = $state(true); let debugLogPath = $state<string>(''); let lastGridWindowSig = $state(''); let lastCrossReactiveSig = $state(''); let lastFilterReactiveSig = $state(''); let isTauri = $state(false); let canOpenPath = $state(false); let dialogMod = $state<DialogMod | null>(null); let prefersReducedMotion = $state(false);
     let mergedRowFxEnabled = $derived.by(() => !prefersReducedMotion && !crossQueryBusy && (visibleRows?.length ?? 0) <= 260); let autoAnimateDuration = $derived.by(() => { if (prefersReducedMotion) return 0; if (crossQueryBusy || totalFilteredCount > 200_000) return 90; if (totalFilteredCount > 50_000) return 120; if (totalFilteredCount > 10_000) return 145; return 180; }); const topControlSpans = { headers: 'col-span-12 md:col-span-6 lg:col-span-3 md:row-start-1', target: 'col-span-12 md:col-span-6 lg:col-span-3 md:row-start-1', match: 'hidden', scope: 'hidden', query: 'hidden', options: 'col-span-12 md:col-span-8 lg:col-span-4 md:row-start-1', maxScan: 'col-span-12 md:col-span-4 lg:col-span-2 md:row-start-1' } as Record<string, string>;
-    setupShowDataControlsEffect({ hasLoadedDatasetSignals, hasLoaded: () => hasLoaded, loadedDatasetsLength: () => loadedDatasets?.length ?? 0, activeDatasetId: () => activeDatasetId, datasetId: () => datasetId, headersLength: () => headers?.length ?? 0, totalRowCount: () => totalRowCount }, (value) => { showDataControls = value; }); let visibleColIdxs = $derived.by(() => { const n = headers.length; if (!n) return []; const sourceIdx = headers.indexOf('_source_file'); const defaultCols = () => { if (n > 50) { const set = new Set<number>(); set.add(0); for (let i = 0; i < Math.min(n, 12); i++) set.add(i); return [...set].filter((i) => i !== sourceIdx).sort((a, b) => a - b); } return Array.from({ length: n }, (_, i) => i).filter((i) => i !== sourceIdx); }; if (visibleColumns && visibleColumns.size > 0) { const picked = [...visibleColumns].filter((i) => i >= 0 && i < n && i !== sourceIdx).sort((a, b) => a - b); return picked.length > 0 ? picked : defaultCols(); } return defaultCols(); }); let mergedSourceIdx = $derived.by(() => { if (!isMergedView) return -1; const declared = headers.indexOf('_source_file'); if (declared >= 0) return declared; const sampleLen = mergedRowsAll?.[0]?.length ?? 0; return sampleLen > headers.length ? sampleLen - 1 : -1; });
+    $effect(() => { const hasSignals = hasLoadedDatasetSignals({ hasLoaded, loadedDatasetsLength: loadedDatasets?.length ?? 0, activeDatasetId: activeDatasetId ?? '', datasetId, headersLength: headers?.length ?? 0, totalRowCount }); showDataControls = hasSignals; }); let visibleColIdxs = $derived.by(() => { const n = headers.length; if (!n) return []; const sourceIdx = headers.indexOf('_source_file'); const defaultCols = () => { if (n > 50) { const set = new Set<number>(); set.add(0); for (let i = 0; i < Math.min(n, 12); i++) set.add(i); return [...set].filter((i) => i !== sourceIdx).sort((a, b) => a - b); } return Array.from({ length: n }, (_, i) => i).filter((i) => i !== sourceIdx); }; if (visibleColumns && visibleColumns.size > 0) { const picked = [...visibleColumns].filter((i) => i >= 0 && i < n && i !== sourceIdx).sort((a, b) => a - b); return picked.length > 0 ? picked : defaultCols(); } return defaultCols(); }); let mergedSourceIdx = $derived.by(() => { if (!isMergedView) return -1; const declared = headers.indexOf('_source_file'); if (declared >= 0) return declared; const sampleLen = mergedRowsAll?.[0]?.length ?? 0; return sampleLen > headers.length ? sampleLen - 1 : -1; });
     let mergedDisplayHeaders = $derived.by(() => {
       if (!isMergedView) return headers;
       if (mergedSourceIdx < 0) return headers;
@@ -222,8 +221,8 @@
         }
       }, 
       onPath: (path) => { if (!debugLogPath) debugLogPath = path; } 
-    }); const queueDebug = (event: string, data?: Record<string, unknown>) => debugLogger.enqueue(event, data); const queueDebugRate = (key: string, minMs: number, event: string, data?: Record<string, unknown>) => debugLogger.enqueueRate(key, minMs, event, data); onMount(() => mountInspectorLifecycle({ invoke: (cmd, args) => invoke(cmd, args as any), queueDebug, debugLogger, setDebugLogPath: (path) => { debugLogPath = path; }, setIsTauri: (v) => { isTauri = v; }, setPrefersReducedMotion: (v) => { prefersReducedMotion = v; }, setUiAnimDur: (v) => { uiAnimDur = v; }, setDialogModule: (mod) => { dialogMod = mod as DialogMod; }, setCanOpenPath: (v) => { canOpenPath = v; }, getQuietBackendLogs: () => quietBackendLogs, getShowShortcuts: () => showShortcuts, setShowShortcuts: (v) => { showShortcuts = v; }, getShowRowDrawer: () => showRowDrawer, closeRowDrawer: () => closeRowDrawerController2(rowDrawerControllerCtx()), openShortcuts: () => openShortcutsModal(modalUiCtx()), openSchema, openRecipes: () => openRecipesModal(modalUiCtx()), openRegexGenerator: () => openRegexGeneratorModal(modalUiCtx()), openBuilder: () => openSvarBuilderModal(modalUiCtx()), openColumnPicker: () => openColumnPickerController(gridControllerCtx()), openStreamLoadFromMenu: async () => await openStreamLoadFromMenuController(loadControllerCtx()), openFallbackLoadFromMenu: () => openFallbackLoadFromMenuController(loadControllerCtx()), clearAllFilters: () => clearAllFiltersController(filterControllerCtx()), computeSchemaStats, exportAnalysisBundle: () => exportAnalysisBundleController(recipesControllerCtx()), exportCsvPreset, toggleRegexHelp: () => { showRegexHelp = !showRegexHelp; }, toggleQuietBackendLogs: () => { quietBackendLogs = !quietBackendLogs; }, toggleAutoRestoreEnabled: () => { autoRestoreEnabled = !autoRestoreEnabled; }, focusQueryInput: () => { const el = document.querySelector<HTMLInputElement>('[data-inspector-query-input="true"], input[placeholder="Type to filter…"], input[placeholder="Regex pattern…"]'); el?.focus(); } })); setupSliceFetchEffect({ hasLoaded: () => hasLoaded, suspendReactiveFiltering: () => suspendReactiveFiltering, isMergedView: () => loadState.isMergedView, startIdx: () => gridWindow.startIdx, endIdx: () => gridWindow.endIdx, totalFilteredCount: () => totalFilteredCount, visibleColIdxsLength: () => visibleColIdxs.length, datasetId: () => datasetId }, { scheduleSliceFetch: () => scheduleSliceFetchController(gridControllerCtx()) });
-    setupReactiveFilterEffect({ hasLoaded: () => hasLoaded, suspendReactiveFiltering: () => suspendReactiveFiltering, queryScope: () => queryScope, query: () => query, matchMode: () => matchMode, targetColIdx: () => targetColIdx, maxRowsScanText: () => maxRowsScanText, numericF: () => numericF, dateF: () => dateF, catF: () => catF, lastFilterReactiveSig: () => lastFilterReactiveSig }, { scheduleFilter: (reason = 'debounced-input') => scheduleFilterController(filterControllerCtx(), reason), setLastFilterReactiveSig: (sig) => { lastFilterReactiveSig = sig; } }); setupCrossQueryEffect({ hasLoaded: () => hasLoaded, queryScope: () => queryScope, loadedDatasets: () => loadedDatasets, query: () => query, matchMode: () => matchMode, targetColIdx: () => targetColIdx, maxRowsScanText: () => maxRowsScanText, numericF: () => numericF, dateF: () => dateF, catF: () => catF, multiQueryEnabled: () => multiQueryEnabled, multiQueryClauses: () => multiQueryClauses, lastCrossReactiveSig: () => lastCrossReactiveSig }, { scheduleCrossQuery: (reason = 'debounced-cross-input') => scheduleCrossQueryController(filterControllerCtx(), reason), setLastCrossReactiveSig: (sig) => { lastCrossReactiveSig = sig; } }); setupPersistStateEffect({ hasLoaded: () => hasLoaded, datasetId: () => datasetId, query: () => query, matchMode: () => matchMode, targetColIdx: () => targetColIdx, maxRowsScanText: () => maxRowsScanText, numericF: () => numericF, dateF: () => dateF, catF: () => catF, sortColIdx: () => sortColIdx, sortDir: () => sortDir, sortSpecs: () => sortSpecs, visibleColumns: () => visibleColumns, pinnedLeft: () => pinnedLeft, pinnedRight: () => pinnedRight, hiddenColumns: () => hiddenColumns, columnWidths: () => columnWidths, captureState }, { persistLastStateForDataset });
+    }); const queueDebug = (event: string, data?: Record<string, unknown>) => debugLogger.enqueue(event, data); const queueDebugRate = (key: string, minMs: number, event: string, data?: Record<string, unknown>) => debugLogger.enqueueRate(key, minMs, event, data); onMount(() => mountInspectorLifecycle({ invoke: (cmd, args) => invoke(cmd, args as any), queueDebug, debugLogger, setDebugLogPath: (path) => { debugLogPath = path; }, setIsTauri: (v) => { isTauri = v; }, setPrefersReducedMotion: (v) => { prefersReducedMotion = v; }, setUiAnimDur: (v) => { uiAnimDur = v; }, setDialogModule: (mod) => { dialogMod = mod as DialogMod; }, setCanOpenPath: (v) => { canOpenPath = v; }, getQuietBackendLogs: () => quietBackendLogs, getShowShortcuts: () => showShortcuts, setShowShortcuts: (v) => { showShortcuts = v; }, getShowRowDrawer: () => showRowDrawer, closeRowDrawer: () => closeRowDrawerController2(rowDrawerControllerCtx()), openShortcuts: () => openShortcutsModal(modalUiCtx()), openSchema, openRecipes: () => openRecipesModal(modalUiCtx()), openRegexGenerator: () => openRegexGeneratorModal(modalUiCtx()), openBuilder: () => openSvarBuilderModal(modalUiCtx()), openColumnPicker: () => openColumnPickerController(gridControllerCtx()), openStreamLoadFromMenu: async () => await openStreamLoadFromMenuController(loadControllerCtx()), openFallbackLoadFromMenu: () => openFallbackLoadFromMenuController(loadControllerCtx()), clearAllFilters: () => clearAllFiltersController(filterControllerCtx()), computeSchemaStats, exportAnalysisBundle: () => exportAnalysisBundleController(recipesControllerCtx()), exportCsvPreset, toggleRegexHelp: () => { showRegexHelp = !showRegexHelp; }, toggleQuietBackendLogs: () => { quietBackendLogs = !quietBackendLogs; }, toggleAutoRestoreEnabled: () => { autoRestoreEnabled = !autoRestoreEnabled; }, focusQueryInput: () => { const el = document.querySelector<HTMLInputElement>('[data-inspector-query-input="true"], input[placeholder="Type to filter…"], input[placeholder="Regex pattern…"]'); el?.focus(); } })); $effect(() => { const loaded = hasLoaded; const suspended = suspendReactiveFiltering; if (!loaded || suspended) return; const start = gridWindow.startIdx; const end = gridWindow.endIdx; const count = totalFilteredCount; const colsLen = visibleColIdxs.length; const dsId = datasetId; const fetchKey = `${dsId}|${start}|${end}|${count}|${colsLen}`; if (fetchKey === lastGridWindowSig) { devLog('[SLICE FETCH EFFECT] Skipped - params unchanged:', fetchKey); return; } lastGridWindowSig = fetchKey; devLog('[SLICE FETCH EFFECT] Triggered - start:', start, 'end:', end, 'count:', count, 'colsLen:', colsLen, 'dsId:', dsId); scheduleSliceFetchController(gridControllerCtx()); });
+    $effect(() => { if (!hasLoaded || suspendReactiveFiltering || queryScope !== 'current') return; const nf = numericF; const df = dateF; const cf = catF; const catSelected = [...(cf.selected ?? new Set())].sort(); const sig = JSON.stringify({ q: query ?? '', mm: matchMode, tc: targetColIdx, mrs: maxRowsScanText ?? '', n: { e: nf.enabled, c: nf.colIdx, min: nf.minText ?? '', max: nf.maxText ?? '' }, d: { e: df.enabled, c: df.colIdx, min: df.minIso ?? '', max: df.maxIso ?? '' }, c: { e: cf.enabled, c: cf.colIdx, s: catSelected } }); if (sig === lastFilterReactiveSig) return; lastFilterReactiveSig = sig; scheduleFilterController(filterControllerCtx(), 'reactive-input'); }); $effect(() => { if (!hasLoaded || queryScope === 'current') return; const cf = catF; const catSelected = [...(cf.selected ?? new Set())].sort(); const dsSig = (loadedDatasets ?? []).map((d) => d.id).sort().join('|'); const nf = numericF; const df = dateF; const sig = JSON.stringify({ scope: queryScope, dsSig, q: query ?? '', mm: matchMode, tc: targetColIdx, mrs: maxRowsScanText ?? '', n: { e: nf.enabled, c: nf.colIdx, min: nf.minText ?? '', max: nf.maxText ?? '' }, d: { e: df.enabled, c: df.colIdx, min: df.minIso ?? '', max: df.maxIso ?? '' }, c: { e: cf.enabled, c: cf.colIdx, s: catSelected } }); if (sig === lastCrossReactiveSig) return; lastCrossReactiveSig = sig; scheduleCrossQueryController(filterControllerCtx(), 'reactive-cross-input'); }); $effect(() => { if (!hasLoaded || !datasetId) return; query; matchMode; targetColIdx; maxRowsScanText; const nf = numericF; nf.enabled; nf.colIdx; nf.minText; nf.maxText; const df = dateF; df.enabled; df.colIdx; df.minIso; df.maxIso; const cf = catF; cf.enabled; cf.colIdx; (cf.selected?.size ?? 0); sortColIdx; sortDir; sortSpecs; visibleColumns; pinnedLeft; pinnedRight; hiddenColumns; columnWidths; const st = captureState(); persistLastStateForDataset(datasetId, st); });
     setupUiAnimDurEffect({ prefersReducedMotion: () => prefersReducedMotion, crossQueryBusy: () => crossQueryBusy, totalFilteredCount: () => totalFilteredCount }, (value) => { uiAnimDur = value; }); setupQuietBackendLogsEffect({ quietBackendLogs: () => quietBackendLogs }); setupContextMenuEffect({ buildInspectorContextMenu, canOpenPath: () => canOpenPath, hasLoaded: () => hasLoaded, schemaLoading: () => schemaLoading, showRegexHelp: () => showRegexHelp, quietBackendLogs: () => quietBackendLogs, autoRestoreEnabled: () => autoRestoreEnabled }, { registerContextMenu });
     setupCategoryColumnChangeEffect({ hasLoaded: () => hasLoaded, catFColIdx: () => catF.colIdx }, { scheduleFetchCategory: (reset: boolean) => scheduleFetchCategoryController2(schemaControllerCtx(), reset) }); setupCategorySearchEffect({ hasLoaded: () => hasLoaded, catAvailSearch: () => catAvailSearch }, { scheduleFetchCategory: (reset: boolean) => scheduleFetchCategoryController2(schemaControllerCtx(), reset) });
     // Bug 2/3 fix: Add missing setupGridWindowInitEffect call
@@ -378,71 +377,73 @@
     {onGridWindowChange}
     {onGridScrollTrace}
   />
-  <InspectorOverlayPanel
-    bind:showRecipeModal
-    bind:showSchemaModal
-    bind:showRowDrawer
-    bind:showHeaderPrompt
-    bind:showColumnPicker
-    bind:showSvarBuilder
-    bind:showRegexGenerator
-    bind:showShortcuts
-    {uiAnimDur}
-    {hasLoaded}
-    bind:recipeNotice
-    bind:recipeName
-    bind:recipeTags
-    bind:importMode
-    {recipes}
-    {datasetLabel}
-    bind:schemaSampleN
-    {totalFilteredCount}
-    {totalRowCount}
-    {schemaScopeLabel}
-    {schemaError}
-    {schemaLoading}
-    bind:schemaSampleTier
-    bind:schemaSearch
-    {schemaSuggested}
-    {schemaOutliers}
-    {schemaRelationshipHints}
-    {schemaDrift}
-    {colTypes}
-    {headers}
-    {schemaFiltered}
-    bind:catF
-    {drawerVisualIdx}
-    bind:drawerSearch
-    {drawerLoading}
-    {drawerError}
-    {drawerList}
-    {drawerExplain}
-    {headerHeuristicReason}
-    {headerConfidence}
-    {autoDecision}
-    {visibleColumns}
-    {columnPickerNotice}
-    {svarFields}
-    {svarOptions}
-    bind:svarFilterSet
-    bind:genTab
-    bind:genFlagI
-    bind:genFlagM
-    bind:genFlagS
-    {genOut}
-    {genErr}
-    {genWarn}
-    {regexTemplates}
-    bind:testText
-    {testMatches}
-    bind:genBuildMode
-    bind:genClauses
-    {genAddKind}
-    {floatingStyle}
-    {resetModalPos}
-    {beginDragModal}
-    {computeSchemaStats}
-    {runFilterNow}
+  {#await import('$lib/components/inspector/InspectorOverlayPanel.svelte') then overlayPanel}
+    {@const InspectorOverlayPanel = overlayPanel.default}
+    <InspectorOverlayPanel
+      bind:showRecipeModal
+      bind:showSchemaModal
+      bind:showRowDrawer
+      bind:showHeaderPrompt
+      bind:showColumnPicker
+      bind:showSvarBuilder
+      bind:showRegexGenerator
+      bind:showShortcuts
+      {uiAnimDur}
+      {hasLoaded}
+      bind:recipeNotice
+      bind:recipeName
+      bind:recipeTags
+      bind:importMode
+      {recipes}
+      {datasetLabel}
+      bind:schemaSampleN
+      {totalFilteredCount}
+      {totalRowCount}
+      {schemaScopeLabel}
+      {schemaError}
+      {schemaLoading}
+      bind:schemaSampleTier
+      bind:schemaSearch
+      {schemaSuggested}
+      {schemaOutliers}
+      {schemaRelationshipHints}
+      {schemaDrift}
+      {colTypes}
+      {headers}
+      {schemaFiltered}
+      bind:catF
+      {drawerVisualIdx}
+      bind:drawerSearch
+      {drawerLoading}
+      {drawerError}
+      {drawerList}
+      {drawerExplain}
+      {headerHeuristicReason}
+      {headerConfidence}
+      {autoDecision}
+      {visibleColumns}
+      {columnPickerNotice}
+      {svarFields}
+      {svarOptions}
+      bind:svarFilterSet
+      bind:genTab
+      bind:genFlagI
+      bind:genFlagM
+      bind:genFlagS
+      {genOut}
+      {genErr}
+      {genWarn}
+      {regexTemplates}
+      bind:testText
+      {testMatches}
+      bind:genBuildMode
+      bind:genClauses
+      {genAddKind}
+      {floatingStyle}
+      {resetModalPos}
+      {beginDragModal}
+      {computeSchemaStats}
+      {runFilterNow}
     closeRowDrawer={() => closeRowDrawerController2(rowDrawerControllerCtx())} navRow={(delta: number) => navRowController2(rowDrawerControllerCtx(), delta)} copyDrawerAsJson={async () => await copyDrawerAsJsonController3(rowDrawerControllerCtx())}
     {applyHeaderChoice}
     {cancelHeaderPrompt}
@@ -455,8 +456,9 @@
     drawerApplyTarget={(idx: number) => drawerApplyTargetController2(rowDrawerControllerCtx(), idx)} drawerApplyCategory={(idx: number, value: string) => drawerApplyCategoryController2(rowDrawerControllerCtx(), idx, value)} drawerApplyNumericExact={(idx: number, value: string) => drawerApplyNumericExactController3(rowDrawerControllerCtx(), idx, value)}
     drawerApplyDateExact={(idx: number, value: string) => drawerApplyDateExactController3(rowDrawerControllerCtx(), idx, value)} applySvarBuilderToFilters={() => applySvarBuilderToFiltersController(filterControllerCtx())}
     {applyGeneratedRegex}
-    {moveClause}
-    {removeClause}
-    {addClause}
-  />
+      {moveClause}
+      {removeClause}
+      {addClause}
+    />
+  {/await}
 </div>

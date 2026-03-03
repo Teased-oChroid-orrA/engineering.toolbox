@@ -69,7 +69,7 @@
 
 <div class="order-35">
   <span class="sr-only">{canOpenPath ? 'open-path-enabled' : 'open-path-disabled'}</span>
-  <details class="glass-panel rounded-2xl border border-white/10 bg-white/[0.03] inspector-pop-sub inspector-depth-0 p-2" open>
+  <details class="glass-panel rounded-2xl border border-white/10 bg-white/[0.03] inspector-pop-sub inspector-depth-0 p-2 inspector-theme-panel" open>
     <summary class="cursor-pointer list-none px-2 py-1 text-[11px] uppercase tracking-widest text-white/60">
       Query & Filter Controls
     </summary>
@@ -145,3 +145,16 @@
     </div>
   </details>
 </div>
+
+<style>
+  .inspector-theme-panel {
+    border-color: color-mix(in srgb, var(--accent-primary) 18%, rgba(255, 255, 255, 0.08));
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 8%, transparent),
+      0 14px 34px rgba(2, 6, 23, 0.16);
+  }
+
+  .inspector-theme-panel summary {
+    color: color-mix(in srgb, white 56%, var(--accent-primary));
+  }
+</style>

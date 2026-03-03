@@ -7,17 +7,15 @@
   import BushingFreePositionSlots from './BushingFreePositionSlots.svelte';
   import BushingDraggableCard from './BushingDraggableCard.svelte';
   import NativeDragLane from './NativeDragLane.svelte';
-  import BushingInformationPage from './BushingInformationPage.svelte';
   import BushingDraftingPanel from './BushingDraftingPanel.svelte';
   import BushingResultSummary from './BushingResultSummary.svelte';
   import BushingDiagnosticsPanel from './BushingDiagnosticsPanel.svelte';
-  import BushingFreePositionContainer from './BushingFreePositionContainer.svelte';
   import { mountBushingContextMenu, updateBushingContextMenu } from './BushingContextMenuController';
   import { exportBushingPdf, exportBushingSvg } from './BushingExportController';
   import { buildBushingTraceRecord, emitBushingTrace } from './BushingTraceLogger';
   import { runBushingVisualDiagnostics } from './BushingVisualDiagnostics';
   import { canMoveInList, LEFT_DEFAULT_ORDER, RIGHT_DEFAULT_ORDER, moveCardInList, normalizeOrder, reorderList, type LeftCardId, type RightCardId } from './BushingCardLayoutController';
-  import { loadTopLevelLayout, persistTopLevelLayout, readBushingDndEnabled } from './BushingLayoutPersistence';
+  import { loadTopLevelLayout, persistTopLevelLayout, readBushingDndEnabled, loadBushingUiState, persistBushingUiState, loadBushingRuntimeState, persistBushingRuntimeState, persistBushingDndEnabled, type BushingUxMode } from './BushingLayoutPersistence';
   import { safeGetItem, safeSetItem, safeParseJSON } from './BushingStorageHelper';
   import { DragDropHistory } from './dragHistory';
   import { MATERIALS } from '$lib/core/bushing/materials';
@@ -33,6 +31,7 @@
   let rightCardOrder = $state<RightCardId[]>([...RIGHT_DEFAULT_ORDER]);
   let dndEnabled = $state(true);
   let useFreePositioning = $state(false);
+  let uxMode = $state<BushingUxMode>('guided');
   
   type LayoutState = { left: LeftCardId[]; right: RightCardId[] };
   const layoutHistory = new DragDropHistory<LayoutState>(50);
@@ -135,8 +134,8 @@
   let useLegacyRenderer = $state(false);
   let renderMode = $state<'section' | 'legacy'>('section');
   let traceEnabled = $state(false);
-  let babylonInitNotice = $state<string | null>(null);
-  let babylonDiagnostics = $state<any[]>([]);
+  let renderInitNotice = $state<string | null>(null);
+  let renderDiagnostics = $state<any[]>([]);
   let showInformationView = $state(false);
   let initialized = $state(false);
   
@@ -147,11 +146,13 @@
         form = { ...form, ...safeParseJSON(safeGetItem(KEY), {}) };
         ({ leftCardOrder, rightCardOrder } = loadTopLevelLayout());
         dndEnabled = readBushingDndEnabled();
-        useLegacyRenderer = safeGetItem(LEGACY_RENDERER_KEY) === '1';
+        const runtimeState = loadBushingRuntimeState();
+        useLegacyRenderer = runtimeState.useLegacyRenderer;
         renderMode = useLegacyRenderer ? 'legacy' : 'section';
-        traceEnabled = safeGetItem(TRACE_MODE_KEY) === '1';
-        const stored = safeGetItem(FREE_POSITIONING_KEY);
-        useFreePositioning = stored === '1' || stored === 'true';
+        traceEnabled = runtimeState.traceEnabled;
+        const uiState = loadBushingUiState();
+        uxMode = uiState.uxMode;
+        useFreePositioning = uiState.useFreePositioning;
         initialized = true;
       } catch (e) {
         bushingLogger.error('Init error', e);
@@ -191,6 +192,22 @@
       } 
     }
   });
+
+  $effect(() => {
+    if (!initialized || typeof window === 'undefined') return;
+    persistBushingUiState({ uxMode, useFreePositioning });
+    safeSetItem(FREE_POSITIONING_KEY, useFreePositioning ? '1' : '0');
+  });
+
+  $effect(() => {
+    if (!initialized || typeof window === 'undefined') return;
+    persistBushingRuntimeState({ useLegacyRenderer, traceEnabled });
+  });
+
+  $effect(() => {
+    if (!initialized || typeof window === 'undefined') return;
+    persistBushingDndEnabled(dndEnabled);
+  });
   
   // Svelte 5: Convert reactive statements to $derived for computed values
   let pipeline = $derived(evaluateBushingPipeline(form));
@@ -220,16 +237,16 @@
   async function onExportSvg() { await exportBushingSvg({ form, results, draftingView }); }
   async function onExportPdf() { try { await exportBushingPdf({ form, results, draftingView }); } catch (err) { bushingExportLogger.warn('PDF export failed', err); } }
   
-  function handleBabylonInitFailure(reason: string) {
-    babylonInitNotice = reason || 'Babylon initialization failed.';
+  function handleRenderInitFailure(reason: string) {
+    renderInitNotice = reason || 'Renderer initialization failed.';
     if (typeof window !== 'undefined') {
-      const payload = { at: new Date().toISOString(), reason: babylonInitNotice };
+      const payload = { at: new Date().toISOString(), reason: renderInitNotice };
       try {
-        const prior = Number(safeGetItem('scd.bushing.babylonInitFailCount') ?? '0');
-        safeSetItem('scd.bushing.babylonInitFailCount', String(prior + 1));
-        safeSetItem('scd.bushing.babylonInitLast', JSON.stringify(payload));
+        const prior = Number(safeGetItem('scd.bushing.renderInitFailCount') ?? '0');
+        safeSetItem('scd.bushing.renderInitFailCount', String(prior + 1));
+        safeSetItem('scd.bushing.renderInitLast', JSON.stringify(payload));
       } catch {}
-      bushingLogger.warn('Babylon init failed', payload);
+      bushingLogger.warn('Render init failed', payload);
     }
   }
 
@@ -241,8 +258,16 @@
         if (lane === 'left') leftCardOrder = normalizeOrder(reorderList(leftCardOrder, sourceId as LeftCardId, targetId as LeftCardId), LEFT_DEFAULT_ORDER);
         else rightCardOrder = normalizeOrder(reorderList(rightCardOrder, sourceId as RightCardId, targetId as RightCardId), RIGHT_DEFAULT_ORDER);
       };
-      (window as any).__ENABLE_FREE_POSITIONING__ = () => { localStorage.setItem(FREE_POSITIONING_KEY, '1'); window.location.reload(); };
-      (window as any).__DISABLE_FREE_POSITIONING__ = () => { localStorage.setItem(FREE_POSITIONING_KEY, '0'); window.location.reload(); };
+      (window as any).__ENABLE_FREE_POSITIONING__ = () => {
+        persistBushingUiState({ uxMode: 'advanced', useFreePositioning: true });
+        localStorage.setItem(FREE_POSITIONING_KEY, '1');
+        window.location.reload();
+      };
+      (window as any).__DISABLE_FREE_POSITIONING__ = () => {
+        persistBushingUiState({ uxMode, useFreePositioning: false });
+        localStorage.setItem(FREE_POSITIONING_KEY, '0');
+        window.location.reload();
+      };
     }
   });
 
@@ -261,23 +286,27 @@
     </div>
   </div>
 {:else if showInformationView}
-  <BushingInformationPage {form} {results} onBack={() => (showInformationView = false)} />
+  {#await import('./BushingInformationPage.svelte') then mod}
+    <mod.default {form} {results} onBack={() => (showInformationView = false)} />
+  {/await}
 {:else if useFreePositioning}
-  <BushingFreePositionContainer
+  {#await import('./BushingFreePositionContainer.svelte') then mod}
+  <mod.default
     {form} {results} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled}
-    {cacheStats} {babylonInitNotice} {visualDiagnostics} {babylonDiagnostics}
+    {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics}
     {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode}
-    {handleBabylonInitFailure} {dndEnabled} {showInformationView} {isFailed}>
-    <svelte:fragment slot="header"><BushingFreePositionSlots slot="header" bind:form {results} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {babylonInitNotice} {visualDiagnostics} {babylonDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleBabylonInitFailure} {dndEnabled} /></svelte:fragment>
-    <svelte:fragment slot="guidance"><BushingFreePositionSlots slot="guidance" bind:form {results} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {babylonInitNotice} {visualDiagnostics} {babylonDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleBabylonInitFailure} {dndEnabled} /></svelte:fragment>
-    <svelte:fragment slot="setup"><BushingFreePositionSlots slot="setup" bind:form {results} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {babylonInitNotice} {visualDiagnostics} {babylonDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleBabylonInitFailure} {dndEnabled} /></svelte:fragment>
-    <svelte:fragment slot="geometry"><BushingFreePositionSlots slot="geometry" bind:form {results} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {babylonInitNotice} {visualDiagnostics} {babylonDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleBabylonInitFailure} {dndEnabled} /></svelte:fragment>
-    <svelte:fragment slot="profile"><BushingFreePositionSlots slot="profile" bind:form {results} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {babylonInitNotice} {visualDiagnostics} {babylonDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleBabylonInitFailure} {dndEnabled} /></svelte:fragment>
-    <svelte:fragment slot="process"><BushingFreePositionSlots slot="process" bind:form {results} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {babylonInitNotice} {visualDiagnostics} {babylonDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleBabylonInitFailure} {dndEnabled} /></svelte:fragment>
-    <svelte:fragment slot="drafting"><BushingFreePositionSlots slot="drafting" bind:form {results} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {babylonInitNotice} {visualDiagnostics} {babylonDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleBabylonInitFailure} {dndEnabled} /></svelte:fragment>
-    <svelte:fragment slot="summary"><BushingFreePositionSlots slot="summary" bind:form {results} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {babylonInitNotice} {visualDiagnostics} {babylonDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleBabylonInitFailure} {dndEnabled} /></svelte:fragment>
-    <svelte:fragment slot="diagnostics"><BushingFreePositionSlots slot="diagnostics" bind:form {results} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {babylonInitNotice} {visualDiagnostics} {babylonDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleBabylonInitFailure} {dndEnabled} /></svelte:fragment>
-  </BushingFreePositionContainer>
+    {handleRenderInitFailure} {dndEnabled} {showInformationView} {isFailed}>
+    <svelte:fragment slot="header"><BushingFreePositionSlots slot="header" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
+    <svelte:fragment slot="guidance"><BushingFreePositionSlots slot="guidance" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
+    <svelte:fragment slot="setup"><BushingFreePositionSlots slot="setup" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
+    <svelte:fragment slot="geometry"><BushingFreePositionSlots slot="geometry" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
+    <svelte:fragment slot="profile"><BushingFreePositionSlots slot="profile" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
+    <svelte:fragment slot="process"><BushingFreePositionSlots slot="process" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
+    <svelte:fragment slot="drafting"><BushingFreePositionSlots slot="drafting" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
+    <svelte:fragment slot="summary"><BushingFreePositionSlots slot="summary" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
+    <svelte:fragment slot="diagnostics"><BushingFreePositionSlots slot="diagnostics" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
+  </mod.default>
+  {/await}
 {:else}
   <!-- Lane-based layout (legacy) -->
 <div class="grid grid-cols-1 gap-4 p-1 pt-4 lg:grid-cols-[450px_1fr]" data-route-ready="bushing">
@@ -294,6 +323,7 @@
           itemId={item.id}
           bind:form
           {results}
+          normalized={pipeline.normalized}
           {isFailed}
           {dndEnabled}
           {canUndo}
@@ -301,6 +331,8 @@
           onUndo={handleUndo}
           onRedo={handleRedo}
           onShowInformation={() => (showInformationView = true)}
+          {uxMode}
+          onSetUxMode={(mode) => (uxMode = mode)}
           moveProps={leftMoveProps(item.id as LeftCardId)}
         />
       {/snippet}
@@ -324,31 +356,32 @@
                 {useLegacyRenderer}
                 {renderMode}
                 {traceEnabled}
+                advancedMode={uxMode === 'advanced'}
                 cacheHits={cacheStats.hits}
                 cacheMisses={cacheStats.misses}
                 isInfinitePlate={Boolean(results.geometry?.isSaturationActive)}
-                {babylonInitNotice}
+                {renderInitNotice}
                 {visualDiagnostics}
-                {babylonDiagnostics}
+                {renderDiagnostics}
                 onExportSvg={onExportSvg}
                 onExportPdf={onExportPdf}
                 onToggleRendererMode={toggleRendererMode}
                 onToggleTraceMode={toggleTraceMode}
-                onBabylonDiagnostics={(diag) => { babylonDiagnostics = diag; }}
-                onBabylonInitFailure={handleBabylonInitFailure}
+                onRenderDiagnostics={(diag) => { renderDiagnostics = diag; }}
+                onRenderInitFailure={handleRenderInitFailure}
               />
             {/snippet}
           </BushingDraggableCard>
         {:else if item.id === 'summary'}
           <BushingDraggableCard column="right" cardId="summary" title="Results Panel" {...rightMoveProps('summary')}>
             {#snippet children()}
-              <BushingResultSummary {form} {results} />
+              <BushingResultSummary {form} {results} guidedMode={uxMode === 'guided'} />
             {/snippet}
           </BushingDraggableCard>
         {:else if item.id === 'diagnostics'}
           <BushingDraggableCard column="right" cardId="diagnostics" title="Diagnostics" {...rightMoveProps('diagnostics')}>
             {#snippet children()}
-              <BushingDiagnosticsPanel {results} {dndEnabled} />
+              <BushingDiagnosticsPanel {results} {dndEnabled} {uxMode} />
             {/snippet}
           </BushingDraggableCard>
         {/if}

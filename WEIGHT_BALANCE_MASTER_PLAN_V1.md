@@ -26,7 +26,7 @@ Following the established patterns in Structural Companion Desktop:
 - **Layered Architecture**: Domain → Controller → UI
 - **File Size Policy**: Components ≤300 lines, orchestrators ≤800 lines, modules per manifest
 - **Testing Strategy**: Unit tests, E2E tests, golden file validation, visual regression
-- **Rendering**: D3 for drafting (CG envelope visualization), Babylon.js for 3D (future)
+- **Rendering**: D3/SVG for drafting and engineering views
 - **Portability**: Hash-based routing, single-file HTML build capability
 
 ## Module Structure

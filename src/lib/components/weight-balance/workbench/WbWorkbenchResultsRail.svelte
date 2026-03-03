@@ -31,10 +31,10 @@
 
 <div class="space-y-6">
   {#if results}
-    <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
+    <div class="wb-theme-panel rounded-lg p-6">
       <h2 class="text-xl font-semibold text-white mb-4">Results</h2>
       <div class="space-y-4">
-        <div class="p-4 bg-slate-700/50 rounded-lg">
+        <div class="wb-theme-subpanel p-4 rounded-lg">
           <div class="text-sm text-gray-400 mb-1">Status</div>
           <div class="text-2xl font-bold {getStatusColor(results.overallStatus)} capitalize">{results.overallStatus}</div>
         </div>
@@ -71,17 +71,17 @@
           <div class="text-sm font-mono text-white">{formatMoment(results.totalMoment, displayUnits, 1)}</div>
         </div>
 
-        <div class="pt-2 border-t border-slate-700">
+        <div class="pt-2 border-t wb-theme-divider">
           <div class="text-xs text-gray-400 mb-1">Calculation Audit</div>
           <div class="text-xs font-mono text-white/90">Hash {results.audit.inputHash} • {results.audit.generatedAt}</div>
           <div class="text-xs text-gray-400 mt-1">Checks: {results.audit.checks.errors} errors • {results.audit.checks.warnings} warnings • {results.audit.checks.info} info</div>
         </div>
 
         <details class="pt-1">
-          <summary class="cursor-pointer text-xs text-cyan-300 hover:text-cyan-200 transition-colors select-none">Per-item moment trace ({results.calculationTrace.length})</summary>
-          <div class="mt-2 max-h-56 overflow-auto border border-slate-700 rounded-md">
+          <summary class="wb-theme-summary cursor-pointer text-xs transition-colors select-none">Per-item moment trace ({results.calculationTrace.length})</summary>
+          <div class="mt-2 max-h-56 overflow-auto wb-theme-frame rounded-md">
             <table class="w-full text-xs">
-              <thead class="sticky top-0 bg-slate-900/95 border-b border-slate-700 text-gray-300">
+              <thead class="sticky top-0 bg-slate-900/95 border-b wb-theme-divider text-gray-300">
                 <tr class="text-left">
                   <th class="px-2 py-1">Item</th>
                   <th class="px-2 py-1 text-right">Weight</th>
@@ -89,9 +89,9 @@
                   <th class="px-2 py-1 text-right">Moment</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-slate-700/60 text-white">
+              <tbody class="text-white" style="--tw-divide-opacity: 1; border-color: transparent;">
                 {#each results.calculationTrace as entry (entry.id)}
-                  <tr class="bg-slate-900/30">
+                  <tr class="wb-theme-row">
                     <td class="px-2 py-1">
                       {entry.name}
                       {#if entry.isFuel}<span class="ml-1 text-[10px] text-amber-300">(fuel)</span>{/if}
@@ -120,7 +120,7 @@
     </div>
 
     {#if results.validations.length > 0}
-      <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
+      <div class="wb-theme-panel rounded-lg p-6">
         <h2 class="text-xl font-semibold text-white mb-4">Validations</h2>
         <div class="space-y-2">
           {#each results.validations as validation}
@@ -134,3 +134,36 @@
     {/if}
   {/if}
 </div>
+
+<style>
+  .wb-theme-panel {
+    background: color-mix(in srgb, var(--bg-secondary) 68%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent-primary) 20%, rgba(255, 255, 255, 0.08));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  }
+
+  .wb-theme-subpanel {
+    background: color-mix(in srgb, var(--accent-primary) 8%, rgba(15, 23, 42, 0.58));
+  }
+
+  .wb-theme-divider {
+    border-color: color-mix(in srgb, var(--accent-primary) 18%, rgba(148, 163, 184, 0.22));
+  }
+
+  .wb-theme-summary {
+    color: color-mix(in srgb, white 64%, var(--accent-primary));
+  }
+
+  .wb-theme-summary:hover {
+    color: color-mix(in srgb, white 74%, var(--accent-primary));
+  }
+
+  .wb-theme-frame {
+    border: 1px solid color-mix(in srgb, var(--accent-primary) 16%, rgba(148, 163, 184, 0.18));
+  }
+
+  .wb-theme-row {
+    background: color-mix(in srgb, var(--bg-primary) 74%, transparent);
+    border-top: 1px solid color-mix(in srgb, var(--accent-primary) 8%, transparent);
+  }
+</style>

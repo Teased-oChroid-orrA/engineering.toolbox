@@ -38,17 +38,17 @@
   }>();
 </script>
 
-<div class="mb-8">
+<div class="wb-theme-shell mb-8">
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-4xl font-bold text-white mb-2">✈️ Aircraft Weight & Balance Calculator</h1>
-      <p class="text-gray-400">FAA-H-8083-1B Compliant • Tabular Method</p>
+      <p class="wb-theme-subtitle">FAA-H-8083-1B Compliant • Tabular Method</p>
     </div>
     <div class="flex gap-2 flex-wrap">
       {#if hasMACData(aircraft.lemac, aircraft.mac)}
         <button
           onclick={onToggleMacDisplay}
-          class="px-4 py-2 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500 text-indigo-300 rounded transition-colors flex items-center gap-2"
+          class="wb-theme-action px-4 py-2 rounded transition-colors flex items-center gap-2"
           title="Toggle Station/%MAC Display"
           aria-pressed={useMACDisplay}
         >
@@ -57,7 +57,7 @@
       {/if}
       <button
         onclick={onEditMAC}
-        class="px-3 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500 text-cyan-300 rounded transition-colors text-sm"
+        class="wb-theme-action px-3 py-2 rounded transition-colors text-sm"
         title="Configure MAC Reference"
       >
         ⚙️ MAC
@@ -74,7 +74,7 @@
       {#if results}
         <button
           onclick={onOpenFuelBurn}
-          class="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500 text-amber-300 rounded transition-colors text-sm"
+          class="wb-theme-action px-3 py-2 rounded transition-colors text-sm"
           title="Simulate Fuel Burn & CG Travel"
         >
           🔥 Fuel Burn
@@ -82,21 +82,21 @@
       {/if}
       <button
         onclick={onToggleUnits}
-        class="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500 text-purple-300 rounded transition-colors flex items-center gap-2"
+        class="wb-theme-action px-4 py-2 rounded transition-colors flex items-center gap-2"
         title="Toggle Units"
       >
         {displayUnits === 'imperial' ? '🇺🇸 lbs/in' : '🌍 kg/cm'}
       </button>
       <button
         onclick={onSave}
-        class="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500 text-green-300 rounded transition-colors flex items-center gap-2"
+        class="wb-theme-action px-4 py-2 rounded transition-colors flex items-center gap-2"
         title="Save Configuration (Ctrl+S)"
       >
         💾 Save
       </button>
       <button
         onclick={onLoad}
-        class="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500 text-blue-300 rounded transition-colors flex items-center gap-2"
+        class="wb-theme-action px-4 py-2 rounded transition-colors flex items-center gap-2"
         title="Load Configuration (Ctrl+O)"
       >
         📁 Load
@@ -130,3 +130,26 @@
     </div>
   </div>
 {/if}
+
+<style>
+  .wb-theme-shell {
+    --wb-accent-border: color-mix(in srgb, var(--accent-primary) 38%, transparent);
+    --wb-accent-fill: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+    --wb-accent-fill-hover: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+    --wb-accent-text: color-mix(in srgb, white 72%, var(--accent-primary));
+  }
+
+  .wb-theme-subtitle {
+    color: color-mix(in srgb, white 40%, var(--accent-primary));
+  }
+
+  .wb-theme-action {
+    background: var(--wb-accent-fill);
+    border: 1px solid var(--wb-accent-border);
+    color: var(--wb-accent-text);
+  }
+
+  .wb-theme-action:hover {
+    background: var(--wb-accent-fill-hover);
+  }
+</style>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { computePosition, autoUpdate, offset, flip, shift } from '@floating-ui/dom';
+  import { computePosition, offset, flip, shift } from '@floating-ui/dom';
 
   let {
     disabled = false,
@@ -21,8 +21,6 @@
   let buttonEl = $state<HTMLButtonElement | null>(null);
   let panelEl = $state<HTMLDivElement | null>(null);
   let panelStyle = $state('position:fixed;left:0px;top:0px;');
-  let cleanupAuto: (() => void) | null = null;
-
   const trigger = () => {
     if (disabled) return;
     open = !open;
@@ -45,22 +43,18 @@
   $effect(() => {
     open;
     if (!open) {
-      if (cleanupAuto) {
-        cleanupAuto();
-        cleanupAuto = null;
-      }
       return;
     }
     if (!buttonEl || !panelEl) return;
     void updatePosition();
-    cleanupAuto = autoUpdate(buttonEl, panelEl, () => {
+    const onWindowChange = () => {
       void updatePosition();
-    });
+    };
+    window.addEventListener('resize', onWindowChange, true);
+    window.addEventListener('scroll', onWindowChange, true);
     return () => {
-      if (cleanupAuto) {
-        cleanupAuto();
-        cleanupAuto = null;
-      }
+      window.removeEventListener('resize', onWindowChange, true);
+      window.removeEventListener('scroll', onWindowChange, true);
     };
   });
 

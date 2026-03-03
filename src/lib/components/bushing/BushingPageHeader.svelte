@@ -1,36 +1,57 @@
 <script lang="ts">
   import { Badge } from '$lib/components/ui';
   import { cn } from '$lib/utils';
-  import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
 
   export let isFailed = false;
   export let onShowInformation: () => void = () => {};
-  
-  let showThemeMenu = false;
+  export let uxMode: 'guided' | 'advanced' = 'guided';
+  export let onSetUxMode: (mode: 'guided' | 'advanced') => void = () => {};
 </script>
 
 <div class="flex items-center justify-between px-1">
   <h2 class="text-lg font-semibold tracking-tight text-white">Bushing Toolbox</h2>
   <div class="flex items-center gap-2">
-    <div class="relative">
+    <div class="flex items-center gap-1 rounded-full border border-white/10 bg-black/20 p-1">
       <button
-        class="rounded-full border border-indigo-300/35 bg-indigo-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-100 hover:bg-indigo-500/20"
-        onclick={() => (showThemeMenu = !showThemeMenu)}>
-        Theme
+        class={cn(
+          'rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-colors',
+          uxMode === 'guided' ? 'bg-white/10 text-white' : 'text-white/55 hover:text-white/75'
+        )}
+        onclick={() => onSetUxMode('guided')}>
+        Guided
       </button>
-      {#if showThemeMenu}
-        <div class="absolute right-0 top-full mt-2 z-[100] rounded-xl border border-white/10 bg-slate-900/95 shadow-2xl backdrop-blur-sm">
-          <ThemeToggle />
-        </div>
-      {/if}
+      <button
+        class={cn(
+          'rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-colors',
+          uxMode === 'advanced' ? 'bg-white/10 text-white' : 'text-white/55 hover:text-white/75'
+        )}
+        onclick={() => onSetUxMode('advanced')}>
+        Advanced
+      </button>
     </div>
     <button
-      class="rounded-full border border-cyan-300/35 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-100 hover:bg-cyan-500/20"
+      class="bushing-theme-accent rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide transition-colors"
       onclick={onShowInformation}>
       Information
     </button>
-    <Badge variant="outline" class={cn('text-[10px]', isFailed ? 'border-amber-400/40 text-amber-200' : 'border-emerald-400/35 text-emerald-200')}>
+    <Badge
+      variant="outline"
+      class={cn('text-[10px]', isFailed ? 'border-amber-400/40 text-amber-200' : '')}
+      style={!isFailed ? 'border-color: color-mix(in srgb, var(--accent-primary) 35%, transparent); color: color-mix(in srgb, white 72%, var(--accent-primary));' : undefined}
+    >
       {isFailed ? 'ATTN' : 'PASS'}
     </Badge>
   </div>
 </div>
+
+<style>
+  .bushing-theme-accent {
+    border: 1px solid color-mix(in srgb, var(--accent-primary) 42%, transparent);
+    background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+    color: color-mix(in srgb, white 74%, var(--accent-primary));
+  }
+
+  .bushing-theme-accent:hover {
+    background: color-mix(in srgb, var(--accent-primary) 22%, transparent);
+  }
+</style>

@@ -4,6 +4,7 @@
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { themeStore } from '$lib/stores/themeStore';
+  import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
   import { toolboxProgress } from '$lib/stores/toolboxProgress';
   import { AppBar } from '@skeletonlabs/skeleton-svelte';
   import { cn } from '$lib/utils';
@@ -21,8 +22,8 @@
   const nav = [
     { href: '#/', label: 'Home', path: '/' },
     { href: '#/bushing', label: 'Bushing', path: '/bushing' },
+    { href: '#/preload', label: 'Preload', path: '/preload' },
     { href: '#/shear', label: 'Shear', path: '/shear' },
-    { href: '#/fastener', label: 'Fastener', path: '/fastener' },
     { href: '#/profile', label: 'Profile', path: '/profile' },
     { href: '#/properties', label: 'Properties', path: '/properties' },
     { href: '#/buckling', label: 'Buckling', path: '/buckling' },
@@ -98,17 +99,17 @@
         done: 'Bushing ready.',
         selectors: ['[data-route-ready="bushing"]']
       },
+      '/preload': {
+        steps: ['Resolve preload route', 'Initialize preload solver', 'Render preload workspace'],
+        messages: ['Resolving preload route...', 'Initializing preload solver...', 'Rendering preload workspace...'],
+        done: 'Preload ready.',
+        selectors: ['[data-route-ready="preload"]']
+      },
       '/shear': {
         steps: ['Resolve shear route', 'Initialize shear model', 'Render shear workspace'],
         messages: ['Resolving shear route...', 'Initializing shear model...', 'Rendering shear workspace...'],
         done: 'Shear ready.',
         selectors: ['[data-route-ready="shear"]']
-      },
-      '/fastener': {
-        steps: ['Resolve fastener route', 'Initialize fastener model', 'Render fastener workspace'],
-        messages: ['Resolving fastener route...', 'Initializing fastener model...', 'Rendering fastener workspace...'],
-        done: 'Fastener ready.',
-        selectors: ['[data-route-ready="fastener"]']
       },
       '/profile': {
         steps: ['Resolve profile route', 'Initialize profile kernel', 'Render profile workspace'],
@@ -581,6 +582,13 @@
       <div>{startupNotice.text}</div>
     </div>
   {/if}
+
+  <div class="pointer-events-none fixed bottom-4 left-1/2 z-[1550] -translate-x-1/2">
+    <div class="pointer-events-auto rounded-2xl border border-white/10 bg-slate-950/84 px-3 py-2 shadow-2xl backdrop-blur-md">
+      <div class="mb-2 text-center text-[10px] uppercase tracking-[0.18em] text-white/48">Global Theme</div>
+      <ThemeToggle compact={true} />
+    </div>
+  </div>
 
   <div
     id="app-content-root"

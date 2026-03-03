@@ -32,23 +32,26 @@
 </script>
 
 <div class="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
-  <div class="text-[11px] font-semibold uppercase tracking-widest text-white/60">Offset–Intersection</div>
+  <div class="space-y-1">
+    <div class="text-[11px] font-semibold uppercase tracking-widest text-white/60">Line-Line Offset Intersection</div>
+    <div class="text-[11px] text-white/45">This uses two lines and finds where their offset copies cross. It does not offset points.</div>
+  </div>
 
-  <div class="grid grid-cols-2 gap-2">
-    <label class="text-[11px] text-white/50">
-      Edge A
-      <select
-        class="mt-1 w-full rounded-xl bg-black/20 border border-white/10 px-3 py-2 text-xs"
-        bind:value={selEdgeA}
-      >
-        {#each edges as e, i (i)}
-          <option value={i}>{i}: P{e[0]}→P{e[1]}</option>
-        {/each}
-      </select>
-    </label>
+  <label class="text-[11px] text-white/50">
+    Step 1: Line A
+    <select
+      class="mt-1 w-full rounded-xl bg-black/20 border border-white/10 px-3 py-2 text-xs"
+      bind:value={selEdgeA}
+    >
+      {#each edges as e, i (i)}
+        <option value={i}>{i}: P{e[0]}→P{e[1]}</option>
+      {/each}
+    </select>
+  </label>
 
+  {#if selEdgeA !== null}
     <label class="text-[11px] text-white/50">
-      Edge B
+      Step 2: Line B
       <select
         class="mt-1 w-full rounded-xl bg-black/20 border border-white/10 px-3 py-2 text-xs"
         bind:value={selEdgeB}
@@ -58,36 +61,38 @@
         {/each}
       </select>
     </label>
-  </div>
+  {/if}
 
-  <div class="grid grid-cols-[1fr_120px] gap-2 items-end">
-    <label class="text-[11px] text-white/50">
-      Offset distance
-      <input
-        type="number"
-        step="0.1"
-        class="mt-1 w-full rounded-xl bg-black/20 border border-white/10 px-3 py-2 text-xs"
-        bind:value={offsetDist}
-      />
-    </label>
+  {#if selEdgeA !== null && selEdgeB !== null}
+    <div class="grid grid-cols-[1fr_120px] gap-2 items-end">
+      <label class="text-[11px] text-white/50">
+        Step 3: Offset distance
+        <input
+          type="number"
+          step="0.1"
+          class="mt-1 w-full rounded-xl bg-black/20 border border-white/10 px-3 py-2 text-xs"
+          bind:value={offsetDist}
+        />
+      </label>
 
-    <label class="text-[11px] text-white/50">
-      Ref Pt
-      <select
-        class="mt-1 w-full rounded-xl bg-black/20 border border-white/10 px-3 py-2 text-xs"
-        bind:value={refPointIdx}
-        title="Reference point used to choose offset side"
-      >
-        {#each points as p, i (i)}
-          <option value={i}>P{i}</option>
-        {/each}
-      </select>
-    </label>
-  </div>
+      <label class="text-[11px] text-white/50">
+        Step 4: Side Point
+        <select
+          class="mt-1 w-full rounded-xl bg-black/20 border border-white/10 px-3 py-2 text-xs"
+          bind:value={refPointIdx}
+          title="Point used to choose which side the line offset goes toward"
+        >
+          {#each points as p, i (i)}
+            <option value={i}>P{i}</option>
+          {/each}
+        </select>
+      </label>
+    </div>
 
-  <button class="btn variant-filled-primary w-full" onclick={calcOffsetIntersection} disabled={intersectionBusy}>
-    {intersectionBusy ? 'Computing...' : 'Compute intersection'}
-  </button>
+    <button class="btn variant-filled-primary w-full" onclick={calcOffsetIntersection} disabled={intersectionBusy}>
+      {intersectionBusy ? 'Computing...' : 'Compute intersection'}
+    </button>
+  {/if}
 
   {#if intersection}
     <div class="rounded-xl bg-black/25 border border-white/10 p-3 space-y-1">

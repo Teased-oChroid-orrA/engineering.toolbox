@@ -30,7 +30,7 @@
 3. `src/lib/core/bushing/normalize.ts:54` - 124 lines (limit: 100)
 4. `src/lib/core/bushing/solveEngine.ts:162` - 262 lines (limit: 100)
 5. `src/lib/core/bushing/solveEngine.ts:448` - 130 lines (limit: 100)
-6. `src/lib/drafting/bushing/BushingBabylonRuntime.ts:20` - 221 lines (limit: 100)
+6. `src/lib/drafting/bushing/BushingD3Canvas.svelte` - rendering viewport remains under active review
 
 ### Rust Module + Functions (5 violations)
 7. `src-tauri/src/inspector.rs` - 1386 lines (limit: 800)

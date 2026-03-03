@@ -12,33 +12,66 @@
   import BushingResultSummary from './BushingResultSummary.svelte';
   import BushingDiagnosticsPanel from './BushingDiagnosticsPanel.svelte';
 
-  export let slot: string;
-  export let form: BushingInputs;
-  export let results: BushingPipelineState['results'];
-  export let isFailed: boolean;
-  export let onShowInformation: () => void;
-  export let draftingView: any;
-  export let useLegacyRenderer: boolean;
-  export let renderMode: any;
-  export let traceEnabled: boolean;
-  export let cacheStats: any;
-  export let babylonInitNotice: string | null;
-  export let visualDiagnostics: any[];
-  export let babylonDiagnostics: any[];
-  export let onExportSvg: () => Promise<void>;
-  export let onExportPdf: () => Promise<void>;
-  export let toggleRendererMode: () => void;
-  export let toggleTraceMode: () => void;
-  export let handleBabylonInitFailure: (reason: string) => void;
-  export let dndEnabled: boolean;
+  let {
+    slot,
+    form = $bindable(),
+    results,
+    normalized,
+    isFailed,
+    onShowInformation,
+    draftingView,
+    useLegacyRenderer,
+    renderMode,
+    traceEnabled,
+    cacheStats,
+    renderInitNotice,
+    visualDiagnostics,
+    renderDiagnostics,
+    onExportSvg,
+    onExportPdf,
+    toggleRendererMode,
+    toggleTraceMode,
+    handleRenderInitFailure,
+    dndEnabled,
+    uxMode = 'guided',
+    onSetUxMode = () => {}
+  }: {
+    slot: string;
+    form: BushingInputs;
+    results: BushingPipelineState['results'];
+    normalized: BushingPipelineState['normalized'];
+    isFailed: boolean;
+    onShowInformation: () => void;
+    draftingView: any;
+    useLegacyRenderer: boolean;
+    renderMode: any;
+    traceEnabled: boolean;
+    cacheStats: any;
+    renderInitNotice: string | null;
+    visualDiagnostics: any[];
+    renderDiagnostics: any[];
+    onExportSvg: () => Promise<void>;
+    onExportPdf: () => Promise<void>;
+    toggleRendererMode: () => void;
+    toggleTraceMode: () => void;
+    handleRenderInitFailure: (reason: string) => void;
+    dndEnabled: boolean;
+    uxMode?: 'guided' | 'advanced';
+    onSetUxMode?: (mode: 'guided' | 'advanced') => void;
+  } = $props();
+
+  let normalizationSummary = $derived.by(() => {
+    if (!normalized) return null;
+    return `Normalized bore ${Number(normalized.boreDia).toFixed(4)} • interference ${Number(normalized.interference).toFixed(4)}`;
+  });
 
   const TOL_MODE_ITEMS = [{ value: 'nominal_tol', label: 'Nominal +/- Tol' }, { value: 'limits', label: 'Lower / Upper' }];
 </script>
 
 {#if slot === 'header'}
-  <BushingPageHeader {isFailed} {onShowInformation} />
+  <BushingPageHeader {isFailed} {onShowInformation} {uxMode} {onSetUxMode} />
 {:else if slot === 'guidance'}
-  <BushingHelperGuidance {form} {results} />
+  <BushingHelperGuidance {form} {results} {uxMode} />
 {:else if slot === 'setup'}
   <Card id="bushing-setup-card" class="glass-card bushing-pop-card bushing-depth-2">
     <CardHeader class="pb-2 pt-4">
@@ -70,6 +103,9 @@
       <CardTitle class="text-[10px] font-bold uppercase text-indigo-300">2. Geometry</CardTitle>
     </CardHeader>
     <CardContent class="space-y-4">
+      {#if normalizationSummary}
+        <div class="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-[10px] text-white/70">{normalizationSummary}</div>
+      {/if}
       <div class="grid grid-cols-2 gap-3">
         <div class="space-y-1">
           <Label class="text-white/70">Bore Input Mode</Label>
@@ -99,21 +135,22 @@
     {useLegacyRenderer}
     {renderMode}
     {traceEnabled}
+    advancedMode={uxMode === 'advanced'}
     cacheHits={cacheStats.hits}
     cacheMisses={cacheStats.misses}
     isInfinitePlate={Boolean(results.geometry?.isSaturationActive)}
-    {babylonInitNotice}
+    {renderInitNotice}
     {visualDiagnostics}
-    {babylonDiagnostics}
+    {renderDiagnostics}
     {onExportSvg}
     {onExportPdf}
     onToggleRendererMode={toggleRendererMode}
     onToggleTraceMode={toggleTraceMode}
-    onBabylonDiagnostics={(diag) => { babylonDiagnostics = diag; }}
-    onBabylonInitFailure={handleBabylonInitFailure}
+    onRenderDiagnostics={(diag) => { renderDiagnostics = diag; }}
+    onRenderInitFailure={handleRenderInitFailure}
   />
 {:else if slot === 'summary'}
-  <BushingResultSummary {form} {results} />
+  <BushingResultSummary {form} {results} guidedMode={uxMode === 'guided'} />
 {:else if slot === 'diagnostics'}
-  <BushingDiagnosticsPanel {results} {dndEnabled} />
+  <BushingDiagnosticsPanel {results} {dndEnabled} {uxMode} />
 {/if}

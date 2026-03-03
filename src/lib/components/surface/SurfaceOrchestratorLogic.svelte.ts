@@ -431,6 +431,463 @@ export function createSurfaceFromIndices(params: CreateSurfaceFromIndicesParams)
   return { success: true, newSurfaceIdx: surfaces.length };
 }
 
+export interface DuplicateSelectionByVectorParams {
+  points: Point3D[];
+  edges: Edge[];
+  surfaces: SurfaceFace[];
+  selectedPointIds: number[];
+  selectedLineIds: number[];
+  selectedSurfaceIds: number[];
+  delta: Point3D;
+}
+
+export interface DuplicateSelectionByVectorResult {
+  newPoints: Point3D[];
+  newEdges: Edge[];
+  newSurfaces: SurfaceFace[];
+  pointIds: number[];
+  lineIds: number[];
+  surfaceIds: number[];
+}
+
+export interface MoveSelectionByVectorParams {
+  points: Point3D[];
+  edges: Edge[];
+  surfaces: SurfaceFace[];
+  selectedPointIds: number[];
+  selectedLineIds: number[];
+  selectedSurfaceIds: number[];
+  delta: Point3D;
+}
+
+export interface MoveSelectionByVectorResult {
+  nextPoints: Point3D[];
+  movedPointIds: number[];
+}
+
+export interface TransformAxisLocks {
+  x: boolean;
+  y: boolean;
+  z: boolean;
+}
+
+export type TransformAnchorMode = 'origin' | 'last' | 'centroid';
+
+export function applyAxisLocksToDelta(delta: Point3D, locks: TransformAxisLocks): Point3D {
+  const hasLockedAxis = locks.x || locks.y || locks.z;
+  if (!hasLockedAxis) return delta;
+  return {
+    x: locks.x ? delta.x : 0,
+    y: locks.y ? delta.y : 0,
+    z: locks.z ? delta.z : 0
+  };
+}
+
+export function resolveTransformAnchor(params: {
+  points: Point3D[];
+  pointIds: number[];
+  mode: TransformAnchorMode;
+  lastSelectedPointId?: number | null;
+}): Point3D {
+  const { points, pointIds, mode, lastSelectedPointId = null } = params;
+  if (mode === 'origin') return { x: 0, y: 0, z: 0 };
+  if (mode === 'last' && lastSelectedPointId !== null && points[lastSelectedPointId]) {
+    const p = points[lastSelectedPointId]!;
+    return { x: p.x, y: p.y, z: p.z };
+  }
+  const validIds = pointIds.filter((idx) => idx >= 0 && idx < points.length);
+  if (!validIds.length) return { x: 0, y: 0, z: 0 };
+  const sum = validIds.reduce(
+    (acc, idx) => {
+      const p = points[idx]!;
+      acc.x += p.x;
+      acc.y += p.y;
+      acc.z += p.z;
+      return acc;
+    },
+    { x: 0, y: 0, z: 0 }
+  );
+  const scale = 1 / validIds.length;
+  return { x: sum.x * scale, y: sum.y * scale, z: sum.z * scale };
+}
+
+export interface RotateSelectionAroundZParams {
+  points: Point3D[];
+  edges: Edge[];
+  surfaces: SurfaceFace[];
+  selectedPointIds: number[];
+  selectedLineIds: number[];
+  selectedSurfaceIds: number[];
+  angleDeg: number;
+  anchor: Point3D;
+}
+
+export interface RotateSelectionAroundZResult {
+  nextPoints: Point3D[];
+  rotatedPointIds: number[];
+}
+
+export interface DuplicateSelectionByZRotationParams {
+  points: Point3D[];
+  edges: Edge[];
+  surfaces: SurfaceFace[];
+  selectedPointIds: number[];
+  selectedLineIds: number[];
+  selectedSurfaceIds: number[];
+  angleDeg: number;
+  anchor: Point3D;
+}
+
+export interface DuplicateSelectionByZRotationResult {
+  newPoints: Point3D[];
+  newEdges: Edge[];
+  newSurfaces: SurfaceFace[];
+  pointIds: number[];
+  lineIds: number[];
+  surfaceIds: number[];
+}
+
+export interface DuplicateSelectionByMirrorAxisParams {
+  points: Point3D[];
+  edges: Edge[];
+  surfaces: SurfaceFace[];
+  selectedPointIds: number[];
+  selectedLineIds: number[];
+  selectedSurfaceIds: number[];
+  axis: 'x' | 'y';
+  anchor: Point3D;
+}
+
+export interface DuplicateSelectionByMirrorAxisResult {
+  newPoints: Point3D[];
+  newEdges: Edge[];
+  newSurfaces: SurfaceFace[];
+  pointIds: number[];
+  lineIds: number[];
+  surfaceIds: number[];
+}
+
+export interface MirrorSelectionAcrossAxisParams {
+  points: Point3D[];
+  edges: Edge[];
+  surfaces: SurfaceFace[];
+  selectedPointIds: number[];
+  selectedLineIds: number[];
+  selectedSurfaceIds: number[];
+  axis: 'x' | 'y';
+  anchor: Point3D;
+}
+
+export interface MirrorSelectionAcrossAxisResult {
+  nextPoints: Point3D[];
+  mirroredPointIds: number[];
+}
+
+function collectSelectionPointIds(params: {
+  points: Point3D[];
+  edges: Edge[];
+  surfaces: SurfaceFace[];
+  selectedPointIds: number[];
+  selectedLineIds: number[];
+  selectedSurfaceIds: number[];
+}): number[] {
+  const { points, edges, surfaces, selectedPointIds, selectedLineIds, selectedSurfaceIds } = params;
+  const sourcePointIds = new Set<number>();
+
+  selectedPointIds.forEach((idx) => {
+    if (Number.isInteger(idx) && idx >= 0 && idx < points.length) sourcePointIds.add(idx);
+  });
+
+  selectedLineIds.forEach((lineIdx) => {
+    const edge = edges[lineIdx];
+    if (!edge) return;
+    sourcePointIds.add(edge[0]);
+    sourcePointIds.add(edge[1]);
+  });
+
+  selectedSurfaceIds.forEach((surfaceIdx) => {
+    const surface = surfaces[surfaceIdx];
+    if (!surface) return;
+    surface.vertexIds.forEach((idx) => {
+      if (Number.isInteger(idx) && idx >= 0 && idx < points.length) sourcePointIds.add(idx);
+    });
+  });
+
+  return [...sourcePointIds].sort((a, b) => a - b);
+}
+
+export function moveSelectionByVector(params: MoveSelectionByVectorParams): MoveSelectionByVectorResult | null {
+  const { points, delta } = params;
+  const movedPointIds = collectSelectionPointIds(params);
+  if (!movedPointIds.length) return null;
+
+  const movedSet = new Set(movedPointIds);
+  const nextPoints = points.map((point, idx) => (
+    movedSet.has(idx)
+      ? { x: point.x + delta.x, y: point.y + delta.y, z: point.z + delta.z }
+      : point
+  ));
+
+  return {
+    nextPoints,
+    movedPointIds
+  };
+}
+
+export function rotateSelectionAroundZ(params: RotateSelectionAroundZParams): RotateSelectionAroundZResult | null {
+  const { points, angleDeg, anchor } = params;
+  const rotatedPointIds = collectSelectionPointIds(params);
+  if (!rotatedPointIds.length) return null;
+  const theta = (angleDeg * Math.PI) / 180;
+  const c = Math.cos(theta);
+  const s = Math.sin(theta);
+  const rotatedSet = new Set(rotatedPointIds);
+  const nextPoints = points.map((point, idx) => {
+    if (!rotatedSet.has(idx)) return point;
+    const dx = point.x - anchor.x;
+    const dy = point.y - anchor.y;
+    return {
+      x: anchor.x + dx * c - dy * s,
+      y: anchor.y + dx * s + dy * c,
+      z: point.z
+    };
+  });
+  return {
+    nextPoints,
+    rotatedPointIds
+  };
+}
+
+export function mirrorSelectionAcrossAxis(params: MirrorSelectionAcrossAxisParams): MirrorSelectionAcrossAxisResult | null {
+  const { points, axis, anchor } = params;
+  const mirroredPointIds = collectSelectionPointIds(params);
+  if (!mirroredPointIds.length) return null;
+  const mirroredSet = new Set(mirroredPointIds);
+  const nextPoints = points.map((point, idx) => {
+    if (!mirroredSet.has(idx)) return point;
+    if (axis === 'x') {
+      return {
+        x: point.x,
+        y: anchor.y - (point.y - anchor.y),
+        z: point.z
+      };
+    }
+    return {
+      x: anchor.x - (point.x - anchor.x),
+      y: point.y,
+      z: point.z
+    };
+  });
+  return {
+    nextPoints,
+    mirroredPointIds
+  };
+}
+
+export function duplicateSelectionByZRotation(params: DuplicateSelectionByZRotationParams): DuplicateSelectionByZRotationResult | null {
+  const { points, edges, surfaces, selectedPointIds, selectedLineIds, selectedSurfaceIds, angleDeg, anchor } = params;
+  const orderedPointIds = collectSelectionPointIds({
+    points,
+    edges,
+    surfaces,
+    selectedPointIds,
+    selectedLineIds,
+    selectedSurfaceIds
+  });
+  if (!orderedPointIds.length) return null;
+
+  const theta = (angleDeg * Math.PI) / 180;
+  const c = Math.cos(theta);
+  const s = Math.sin(theta);
+  const pointMap = new Map<number, number>();
+  const newPoints = orderedPointIds.map((srcIdx, offset) => {
+    pointMap.set(srcIdx, points.length + offset);
+    const src = points[srcIdx]!;
+    const dx = src.x - anchor.x;
+    const dy = src.y - anchor.y;
+    return {
+      x: anchor.x + dx * c - dy * s,
+      y: anchor.y + dx * s + dy * c,
+      z: src.z
+    };
+  });
+
+  const validLineIds = [...new Set(selectedLineIds)]
+    .filter((lineIdx) => !!edges[lineIdx])
+    .sort((a, b) => a - b);
+  const newEdges = validLineIds
+    .map((lineIdx) => {
+      const edge = edges[lineIdx]!;
+      const a = pointMap.get(edge[0]);
+      const b = pointMap.get(edge[1]);
+      if (a === undefined || b === undefined || a === b) return null;
+      return [a, b] as Edge;
+    })
+    .filter((edge): edge is Edge => edge !== null);
+
+  const validSurfaceIds = [...new Set(selectedSurfaceIds)]
+    .filter((surfaceIdx) => !!surfaces[surfaceIdx])
+    .sort((a, b) => a - b);
+  const newSurfaces = validSurfaceIds
+    .map((surfaceIdx, offset) => {
+      const surface = surfaces[surfaceIdx]!;
+      const nextVertexIds = surface.vertexIds
+        .map((idx) => pointMap.get(idx))
+        .filter((idx): idx is number => idx !== undefined);
+      if (nextVertexIds.length < 3 || new Set(nextVertexIds).size !== nextVertexIds.length) return null;
+      return {
+        name: `${surface.name ?? `Surface ${surfaceIdx}`} rotated copy ${offset + 1}`,
+        pts: nextVertexIds,
+        vertexIds: nextVertexIds
+      } as SurfaceFace;
+    })
+    .filter((surface): surface is SurfaceFace => surface !== null);
+
+  return {
+    newPoints,
+    newEdges,
+    newSurfaces,
+    pointIds: newPoints.map((_, offset) => points.length + offset),
+    lineIds: newEdges.map((_, offset) => edges.length + offset),
+    surfaceIds: newSurfaces.map((_, offset) => surfaces.length + offset)
+  };
+}
+
+export function duplicateSelectionByMirrorAxis(params: DuplicateSelectionByMirrorAxisParams): DuplicateSelectionByMirrorAxisResult | null {
+  const { points, edges, surfaces, selectedPointIds, selectedLineIds, selectedSurfaceIds, axis, anchor } = params;
+  const orderedPointIds = collectSelectionPointIds({
+    points,
+    edges,
+    surfaces,
+    selectedPointIds,
+    selectedLineIds,
+    selectedSurfaceIds
+  });
+  if (!orderedPointIds.length) return null;
+
+  const pointMap = new Map<number, number>();
+  const newPoints = orderedPointIds.map((srcIdx, offset) => {
+    pointMap.set(srcIdx, points.length + offset);
+    const src = points[srcIdx]!;
+    if (axis === 'x') {
+      return {
+        x: src.x,
+        y: anchor.y - (src.y - anchor.y),
+        z: src.z
+      };
+    }
+    return {
+      x: anchor.x - (src.x - anchor.x),
+      y: src.y,
+      z: src.z
+    };
+  });
+
+  const validLineIds = [...new Set(selectedLineIds)]
+    .filter((lineIdx) => !!edges[lineIdx])
+    .sort((a, b) => a - b);
+  const newEdges = validLineIds
+    .map((lineIdx) => {
+      const edge = edges[lineIdx]!;
+      const a = pointMap.get(edge[0]);
+      const b = pointMap.get(edge[1]);
+      if (a === undefined || b === undefined || a === b) return null;
+      return [a, b] as Edge;
+    })
+    .filter((edge): edge is Edge => edge !== null);
+
+  const validSurfaceIds = [...new Set(selectedSurfaceIds)]
+    .filter((surfaceIdx) => !!surfaces[surfaceIdx])
+    .sort((a, b) => a - b);
+  const newSurfaces = validSurfaceIds
+    .map((surfaceIdx, offset) => {
+      const surface = surfaces[surfaceIdx]!;
+      const nextVertexIds = surface.vertexIds
+        .map((idx) => pointMap.get(idx))
+        .filter((idx): idx is number => idx !== undefined);
+      if (nextVertexIds.length < 3 || new Set(nextVertexIds).size !== nextVertexIds.length) return null;
+      return {
+        name: `${surface.name ?? `Surface ${surfaceIdx}`} mirrored copy ${offset + 1}`,
+        pts: nextVertexIds,
+        vertexIds: nextVertexIds
+      } as SurfaceFace;
+    })
+    .filter((surface): surface is SurfaceFace => surface !== null);
+
+  return {
+    newPoints,
+    newEdges,
+    newSurfaces,
+    pointIds: newPoints.map((_, offset) => points.length + offset),
+    lineIds: newEdges.map((_, offset) => edges.length + offset),
+    surfaceIds: newSurfaces.map((_, offset) => surfaces.length + offset)
+  };
+}
+
+export function duplicateSelectionByVector(params: DuplicateSelectionByVectorParams): DuplicateSelectionByVectorResult | null {
+  const { points, edges, surfaces, selectedPointIds, selectedLineIds, selectedSurfaceIds, delta } = params;
+  const orderedPointIds = collectSelectionPointIds({
+    points,
+    edges,
+    surfaces,
+    selectedPointIds,
+    selectedLineIds,
+    selectedSurfaceIds
+  });
+  if (!orderedPointIds.length) return null;
+
+  const pointMap = new Map<number, number>();
+  const newPoints = orderedPointIds.map((srcIdx, offset) => {
+    pointMap.set(srcIdx, points.length + offset);
+    const src = points[srcIdx]!;
+    return {
+      x: src.x + delta.x,
+      y: src.y + delta.y,
+      z: src.z + delta.z
+    };
+  });
+
+  const validLineIds = [...new Set(selectedLineIds)]
+    .filter((lineIdx) => !!edges[lineIdx])
+    .sort((a, b) => a - b);
+  const newEdges = validLineIds
+    .map((lineIdx) => {
+      const edge = edges[lineIdx]!;
+      const a = pointMap.get(edge[0]);
+      const b = pointMap.get(edge[1]);
+      if (a === undefined || b === undefined || a === b) return null;
+      return [a, b] as Edge;
+    })
+    .filter((edge): edge is Edge => edge !== null);
+
+  const validSurfaceIds = [...new Set(selectedSurfaceIds)]
+    .filter((surfaceIdx) => !!surfaces[surfaceIdx])
+    .sort((a, b) => a - b);
+  const newSurfaces = validSurfaceIds
+    .map((surfaceIdx, offset) => {
+      const surface = surfaces[surfaceIdx]!;
+      const nextVertexIds = surface.vertexIds
+        .map((idx) => pointMap.get(idx))
+        .filter((idx): idx is number => idx !== undefined);
+      if (nextVertexIds.length < 3 || new Set(nextVertexIds).size !== nextVertexIds.length) return null;
+      return {
+        name: `${surface.name ?? `Surface ${surfaceIdx}`} copy ${offset + 1}`,
+        pts: nextVertexIds,
+        vertexIds: nextVertexIds
+      } as SurfaceFace;
+    })
+    .filter((surface): surface is SurfaceFace => surface !== null);
+
+  return {
+    newPoints,
+    newEdges,
+    newSurfaces,
+    pointIds: newPoints.map((_, offset) => points.length + offset),
+    lineIds: newEdges.map((_, offset) => edges.length + offset),
+    surfaceIds: newSurfaces.map((_, offset) => surfaces.length + offset)
+  };
+}
+
 // --- Datum Creation ---
 
 export interface AddDatumCsysParams {
@@ -1247,8 +1704,14 @@ export function handlePointClick(
   }
 
   if (creatorPick?.kind === 'surface' || toolCursor === 'surface') {
-    const nextDraft = uniqueAppend(surfaceDraft, idx);
-    const shouldCreate = surfaceCreateKind !== 'contour' && nextDraft.length >= requiredSurfacePoints;
+    const closesContour =
+      surfaceCreateKind === 'contour' &&
+      surfaceDraft.length >= 3 &&
+      surfaceDraft[0] === idx;
+    const nextDraft = closesContour ? surfaceDraft : uniqueAppend(surfaceDraft, idx);
+    const shouldCreate = surfaceCreateKind === 'contour'
+      ? closesContour
+      : nextDraft.length >= requiredSurfacePoints;
     return {
       pendingPointIdx: idx,
       creatorPick: shouldCreate ? null : { kind: 'surface', slot: nextDraft.length },

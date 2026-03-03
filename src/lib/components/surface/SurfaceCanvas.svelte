@@ -22,12 +22,22 @@
   export let onSvgPointerDown: (e: PointerEvent) => void;
   export let onSvgPointerMove: (e: PointerEvent) => void;
   export let onSvgPointerUp: (e: PointerEvent) => void;
-  export let contextTargetKind: 'point' | 'line' | 'empty' = 'empty';
+  export let contextTargetKind: 'point' | 'line' | 'surface' | 'empty' = 'empty';
   export let contextTargetIndex: number | null = null;
 
   export let sortedSurfaces: { i: number; pts: [number, number, number, number] | number[]; z: number; name: string }[] = [];
   export let sortedEdges: { i: number; a: number; b: number; z: number }[] = [];
+  export let offsetSourceLineA: number | null = null;
+  export let offsetSourceLineB: number | null = null;
+  export let offsetLinePickActive = false;
+  export let offsetSourceSurfaceA: number | null = null;
+  export let offsetSourceSurfaceB: number | null = null;
+  export let offsetSurfacePickActive = false;
   export let pointRenderIds: number[] = [];
+  export let draftCursor: { x: number; y: number } | null = null;
+  export let surfacePointPreview: { screen: { x: number; y: number }; world: { x: number; y: number; z: number }; surfaceIdx: number } | null = null;
+  export let lineDraftStartIdx: number | null = null;
+  export let surfaceDraftIds: number[] = [];
   export let projected: { x: number; y: number; z: number }[] = [];
   export let pointBaseRadius: number = 5;
   export let edgeHitWidth: number = 10;
@@ -55,6 +65,8 @@
 
   export let cylAxisSeg: { a: any; b: any } | null = null;
   export let intersection: { p: any; skew: number } | null = null;
+  export let offsetPreviewA: { a: any; b: any } | null = null;
+  export let offsetPreviewB: { a: any; b: any } | null = null;
   export let interpPoint: any = null;
   export let activeSnap: { kind: string; screen: { x: number; y: number } } | null = null;
   export let hoverTooltip: { x: number; y: number; title: string; lines: string[] } | null = null;
@@ -90,10 +102,14 @@
   export let onConnectToPoint: (idx: number) => void = () => {};
   export let onIsolateFromPoint: (idx: number) => void = () => {};
   export let onIsolateFromLine: (idx: number) => void = () => {};
+  export let onSetOffsetSurfaceA: (idx: number) => void = () => {};
+  export let onSetOffsetSurfaceB: (idx: number) => void = () => {};
+  export let onDeleteSurfaceOnly: (idx: number) => void = () => {};
   export let onClearIsolation: () => void = () => {};
   export let onPanBy: (dx: number, dy: number) => void = () => {};
   export let onRotateBy: (dx: number, dy: number) => void = () => {};
   export let onZoomBy: (factor: number) => void = () => {};
+  export let onSetViewPreset: (preset: 'iso' | 'top' | 'front' | 'right') => void = () => {};
 
   const inView = (x: number, y: number) => x >= -cullMargin && x <= w + cullMargin && y >= -cullMargin && y <= h + cullMargin;
   const segmentInView = (a: { x: number; y: number }, b: { x: number; y: number }) => {
@@ -156,13 +172,22 @@
       {lasso}
       {showSurfaces}
       {sortedSurfaces}
+      {offsetSourceSurfaceA}
+      {offsetSourceSurfaceB}
       {showDatums}
       {datumPlanePatches}
       {datumAxisSegments}
       {projected}
       {pointRenderIds}
+      {draftCursor}
+      {lineDraftStartIdx}
+      {surfaceDraftIds}
       {showEdges}
       {sortedEdges}
+      {offsetSourceLineA}
+      {offsetSourceLineB}
+      {offsetLinePickActive}
+      {offsetSurfacePickActive}
       {activeEdgeIdx}
       {selectedLineSet}
       {edgeHitWidth}
@@ -178,6 +203,8 @@
       {project}
       {cylAxisSeg}
       {intersection}
+      {offsetPreviewA}
+      {offsetPreviewB}
       {interpPoint}
       {showPoints}
       {evalRes}
@@ -211,6 +238,19 @@
         />
         <line x1={activeSnap.screen.x - 9} y1={activeSnap.screen.y} x2={activeSnap.screen.x + 9} y2={activeSnap.screen.y} stroke="rgba(34,211,238,0.9)" stroke-width="1.2" />
         <line x1={activeSnap.screen.x} y1={activeSnap.screen.y - 9} x2={activeSnap.screen.x} y2={activeSnap.screen.y + 9} stroke="rgba(34,211,238,0.9)" stroke-width="1.2" />
+      </g>
+    {/if}
+
+    {#if surfacePointPreview}
+      <g class="pointer-events-none">
+        <circle
+          cx={surfacePointPreview.screen.x}
+          cy={surfacePointPreview.screen.y}
+          r="5.5"
+          fill="rgba(16,185,129,0.14)"
+          stroke="rgba(16,185,129,0.95)"
+          stroke-width="1.5"
+        />
       </g>
     {/if}
 
@@ -316,6 +356,9 @@
     {onConnectToPoint}
     {onIsolateFromPoint}
     {onIsolateFromLine}
+    {onSetOffsetSurfaceA}
+    {onSetOffsetSurfaceB}
+    {onDeleteSurfaceOnly}
     {onClearIsolation}
     onClose={closeViewportMenu}
   />
@@ -327,6 +370,7 @@
     onZoomOut={() => onZoomBy(1 / 1.12)}
     onFit={fitToScreen}
     onReset={resetView}
+    onSetViewPreset={onSetViewPreset}
   />
 
 </div>

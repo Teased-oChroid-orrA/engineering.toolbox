@@ -150,13 +150,11 @@
           </div>
         </div>
 
-        <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-3">
-          <div class="text-[11px] text-cyan-200/80 uppercase tracking-widest">Connect Lines</div>
-          <div class="text-[11px] text-white/60">Click two points to connect a line. Points can be reused across many lines.</div>
-          <div class="rounded-lg border border-white/10 bg-black/20 p-2 max-h-44 overflow-auto flex flex-wrap gap-2">
-            {#if points.length === 0}
-              <div class="text-[11px] text-white/40">No points in grid.</div>
-            {:else}
+        {#if points.length > 0}
+          <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-3">
+            <div class="text-[11px] text-cyan-200/80 uppercase tracking-widest">Connect Lines</div>
+            <div class="text-[11px] text-white/60">Only shown when points exist. Click two points to connect a line.</div>
+            <div class="rounded-lg border border-white/10 bg-black/20 p-2 max-h-44 overflow-auto flex flex-wrap gap-2">
               {#each points as point, idx}
                 {@const selected = idx === lineStartIdx || idx === lineEndIdx}
                 <button
@@ -166,110 +164,101 @@
                   P{idx + 1} ({point.x}, {point.y}, {point.z})
                 </button>
               {/each}
-            {/if}
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-white/60 font-mono">
+              <span>A: {lineStartIdx === null ? '-' : `P${lineStartIdx + 1}`}</span>
+              <span>B: {lineEndIdx === null ? '-' : `P${lineEndIdx + 1}`}</span>
+            </div>
+            <button class="btn btn-sm variant-soft w-full" onclick={connectSelectedPoints} disabled={lineStartIdx === null || lineEndIdx === null || lineStartIdx === lineEndIdx || points.length < minLinePoints}>Connect Selected Points</button>
           </div>
-          <div class="flex items-center justify-between text-[11px] text-white/60 font-mono">
-            <span>A: {lineStartIdx === null ? '-' : `P${lineStartIdx + 1}`}</span>
-            <span>B: {lineEndIdx === null ? '-' : `P${lineEndIdx + 1}`}</span>
-          </div>
-          <button class="btn btn-sm variant-soft w-full" onclick={connectSelectedPoints} disabled={lineStartIdx === null || lineEndIdx === null || lineStartIdx === lineEndIdx || points.length < minLinePoints}>Connect Selected Points</button>
-        </div>
+        {/if}
       </div>
 
+      {#if surfaces.length > 0}
       <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
         <div class="text-[11px] text-cyan-200/80 uppercase tracking-widest">Surfaces In Grid</div>
         <div class="rounded-lg border border-white/10 bg-black/20 p-2 max-h-36 overflow-auto space-y-1">
-          {#if surfaces.length === 0}
-            <div class="text-[11px] text-white/40">No surfaces to delete.</div>
-          {:else}
-            {#each surfaces as sf, idx}
+          {#each surfaces as sf, idx}
+            <div class="flex items-center justify-between text-[11px] font-mono text-white/75">
+              <span>S{idx + 1}: {sf.pts.map((p) => `P${p + 1}`).join(' → ')}</span>
+              <button
+                class="px-2 py-0.5 rounded border border-orange-300/30 bg-orange-500/10 text-orange-100/90 hover:bg-orange-500/20"
+                onclick={() => onDeleteSurface(idx)}
+                title="Delete surface"
+              >
+                Delete
+              </button>
+            </div>
+          {/each}
+        </div>
+      </div>
+      {/if}
+
+      {#if points.length > 0 || edges.length > 0}
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {#if points.length > 0}
+        <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
+          <div class="text-[11px] text-cyan-200/80 uppercase tracking-widest">Points In Grid</div>
+          <div class="rounded-lg border border-white/10 bg-black/20 p-2 max-h-40 overflow-auto space-y-1">
+            {#each points as point, idx}
               <div class="flex items-center justify-between text-[11px] font-mono text-white/75">
-                <span>S{idx + 1}: {sf.pts.map((p) => `P${p + 1}`).join(' → ')}</span>
+                <span>P{idx + 1}: ({point.x}, {point.y}, {point.z})</span>
                 <button
-                  class="px-2 py-0.5 rounded border border-orange-300/30 bg-orange-500/10 text-orange-100/90 hover:bg-orange-500/20"
-                  onclick={() => onDeleteSurface(idx)}
-                  title="Delete surface"
+                  class="px-2 py-0.5 rounded border border-rose-300/30 bg-rose-500/10 text-rose-200/90 hover:bg-rose-500/20"
+                  onclick={() => onDeletePoint(idx)}
+                  title="Delete point (connected lines will be removed automatically)"
                 >
                   Delete
                 </button>
               </div>
             {/each}
-          {/if}
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
-          <div class="text-[11px] text-cyan-200/80 uppercase tracking-widest">Points In Grid</div>
-          <div class="rounded-lg border border-white/10 bg-black/20 p-2 max-h-40 overflow-auto space-y-1">
-            {#if points.length === 0}
-              <div class="text-[11px] text-white/40">No points to delete.</div>
-            {:else}
-              {#each points as point, idx}
-                <div class="flex items-center justify-between text-[11px] font-mono text-white/75">
-                  <span>P{idx + 1}: ({point.x}, {point.y}, {point.z})</span>
-                  <button
-                    class="px-2 py-0.5 rounded border border-rose-300/30 bg-rose-500/10 text-rose-200/90 hover:bg-rose-500/20"
-                    onclick={() => onDeletePoint(idx)}
-                    title="Delete point (connected lines will be removed automatically)"
-                  >
-                    Delete
-                  </button>
-                </div>
-              {/each}
-            {/if}
           </div>
         </div>
+        {/if}
 
+        {#if edges.length > 0}
         <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
           <div class="text-[11px] text-cyan-200/80 uppercase tracking-widest">Lines In Grid</div>
           <div class="rounded-lg border border-white/10 bg-black/20 p-2 max-h-40 overflow-auto space-y-1">
-            {#if edges.length === 0}
-              <div class="text-[11px] text-white/40">No lines to delete.</div>
-            {:else}
-              {#each edges as edge, idx}
-                <div class="flex items-center justify-between text-[11px] font-mono text-white/75">
-                  <span>L{idx + 1}: P{edge[0] + 1} -> P{edge[1] + 1}</span>
-                  <button
-                    class="px-2 py-0.5 rounded border border-amber-300/30 bg-amber-500/10 text-amber-100/90 hover:bg-amber-500/20"
-                    onclick={() => onDeleteLine(idx)}
-                    title="Delete line only (points remain)"
-                  >
-                    Delete
-                  </button>
-                </div>
-              {/each}
-            {/if}
+            {#each edges as edge, idx}
+              <div class="flex items-center justify-between text-[11px] font-mono text-white/75">
+                <span>L{idx + 1}: P{edge[0] + 1} -> P{edge[1] + 1}</span>
+                <button
+                  class="px-2 py-0.5 rounded border border-amber-300/30 bg-amber-500/10 text-amber-100/90 hover:bg-amber-500/20"
+                  onclick={() => onDeleteLine(idx)}
+                  title="Delete line only (points remain)"
+                >
+                  Delete
+                </button>
+              </div>
+            {/each}
           </div>
         </div>
+        {/if}
       </div>
+      {/if}
 
+      {#if points.length >= minSurfacePoints}
       <div class="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
         <div class="flex items-center justify-between">
           <div class="text-[11px] text-white/50 uppercase tracking-widest">Surface</div>
           <select class="select select-xs glass-input w-28" bind:value={surfaceCreateKind}><option value="triangle">Triangle</option><option value="quad">Quad</option><option value="contour">Contour</option></select>
         </div>
         <div class="rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-white/70">{surfaceFlowHint || 'Pick points or lines to build a valid surface draft.'}</div>
-        <div class="text-[11px] text-white/60">Select by points or by lines (line adds its endpoints to draft).</div>
+        <div class="text-[11px] text-white/60">Only shown when there are enough points for a surface.</div>
         <div class="rounded-lg border border-white/10 bg-black/20 p-2 max-h-28 overflow-auto flex flex-wrap gap-2">
-          {#if points.length === 0}
-            <div class="text-[11px] text-white/40">No points available.</div>
-          {:else}
-            {#each points as _, idx}
-              {@const active = surfaceDraft.includes(idx)}
-              <button
-                class={active ? 'px-2 py-1 rounded border border-cyan-300/70 bg-cyan-500/15 text-cyan-100 text-[11px] font-mono' : 'px-2 py-1 rounded border border-white/15 bg-white/5 hover:bg-white/10 text-white/70 text-[11px] font-mono'}
-                onclick={() => onToggleSurfacePoint(idx)}
-              >
-                P{idx + 1}
-              </button>
-            {/each}
-          {/if}
+          {#each points as _, idx}
+            {@const active = surfaceDraft.includes(idx)}
+            <button
+              class={active ? 'px-2 py-1 rounded border border-cyan-300/70 bg-cyan-500/15 text-cyan-100 text-[11px] font-mono' : 'px-2 py-1 rounded border border-white/15 bg-white/5 hover:bg-white/10 text-white/70 text-[11px] font-mono'}
+              onclick={() => onToggleSurfacePoint(idx)}
+            >
+              P{idx + 1}
+            </button>
+          {/each}
         </div>
-        <div class="rounded-lg border border-white/10 bg-black/20 p-2 max-h-24 overflow-auto flex flex-wrap gap-2">
-          {#if edges.length === 0}
-            <div class="text-[11px] text-white/40">No lines available.</div>
-          {:else}
+        {#if edges.length > 0}
+          <div class="rounded-lg border border-white/10 bg-black/20 p-2 max-h-24 overflow-auto flex flex-wrap gap-2">
             {#each edges as edge, idx}
               <button
                 class="px-2 py-1 rounded border border-white/15 bg-white/5 hover:bg-white/10 text-white/70 text-[11px] font-mono"
@@ -278,8 +267,8 @@
                 L{idx + 1} (P{edge[0] + 1}→P{edge[1] + 1})
               </button>
             {/each}
-          {/if}
-        </div>
+          </div>
+        {/if}
         <div class="flex items-center gap-2">
           <button class={creatorPick?.kind === 'surface' ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-70'} onclick={() => beginSurfacePick(surfaceDraft.length)} disabled={pointsCount < minSurfacePoints}>Pick sequence</button>
           <button class="btn btn-xs variant-soft opacity-80" onclick={() => { surfaceDraft = []; creatorPick = null; }}>Reset</button>
@@ -291,6 +280,7 @@
           <span>{#if surfaceCreateKind === 'contour'}min 3{:else}{surfaceDraft.length}/{surfaceDraftRequired}{/if}</span>
         </div>
       </div>
+      {/if}
     </div>
   </div>
 {/if}

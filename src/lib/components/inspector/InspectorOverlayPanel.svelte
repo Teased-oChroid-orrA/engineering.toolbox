@@ -1,7 +1,5 @@
 <script lang="ts">
   // @ts-nocheck
-  import InspectorOverlayStack from '$lib/components/inspector/InspectorOverlayStack.svelte';
-
   export let showRecipeModal = false;
   export let showSchemaModal = false;
   export let showRowDrawer = false;
@@ -97,7 +95,9 @@
   export let addClause: (kind: any) => void = () => {};
 </script>
 
-<InspectorOverlayStack
+{#await import('$lib/components/inspector/InspectorOverlayStack.svelte') then overlayStack}
+  {@const InspectorOverlayStack = overlayStack.default}
+  <InspectorOverlayStack
   bind:showRecipeModal
   bind:showSchemaModal
   bind:showRowDrawer
@@ -192,3 +192,4 @@
   {removeClause}
   {addClause}
 />
+{/await}

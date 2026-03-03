@@ -18,14 +18,14 @@
   export const renderMode: any = undefined;
   export const traceEnabled: boolean = false;
   export const cacheStats: any = undefined;
-  export const babylonInitNotice: string | null = null;
+  export const renderInitNotice: string | null = null;
   export const visualDiagnostics: any[] = [];
-  export const babylonDiagnostics: any[] = [];
+  export const renderDiagnostics: any[] = [];
   export const onExportSvg: () => Promise<void> = async () => {};
   export const onExportPdf: () => Promise<void> = async () => {};
   export const toggleRendererMode: () => void = () => {};
   export const toggleTraceMode: () => void = () => {};
-  export const handleBabylonInitFailure: (reason: string) => void = () => {};
+  export const handleRenderInitFailure: (reason: string) => void = () => {};
   export let dndEnabled: boolean = true;
   export const showInformationView: boolean = false;
   export const isFailed: boolean = false;
@@ -92,8 +92,8 @@
   <!-- Control bar -->
   <div class="control-bar">
     <div class="control-info">
-      <span class="control-label">Free Positioning Mode</span>
-      <span class="control-hint">Drag cards anywhere to customize layout</span>
+      <span class="control-label">Advanced Layout Mode</span>
+      <span class="control-hint">Drag cards anywhere to customize the workspace after the guided workflow is set.</span>
     </div>
     <button class="reset-button" on:click={handleResetLayout} title="Reset to default layout">
       Reset Layout

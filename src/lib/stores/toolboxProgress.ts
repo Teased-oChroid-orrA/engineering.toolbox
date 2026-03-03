@@ -120,17 +120,17 @@ const ROUTE_PROFILES: Record<string, RouteProgressProfile> = {
     completeAllMessage: 'Bushing toolbox ready.',
     delaysMs: [60, 480, 980]
   },
+  '/preload': {
+    steps: ['Resolve preload toolbox', 'Hydrate preload inputs', 'Render preload outputs'],
+    messages: ['Resolving preload toolbox...', 'Hydrating preload input state...', 'Rendering preload outputs...'],
+    completeAllMessage: 'Preload analysis ready.',
+    delaysMs: [60, 420, 860]
+  },
   '/shear': {
     steps: ['Resolve shear toolbox', 'Hydrate shear model', 'Render shear workspace'],
     messages: ['Resolving shear toolbox...', 'Hydrating shear model state...', 'Rendering shear workspace...'],
     completeAllMessage: 'Shear toolbox ready.',
     delaysMs: [60, 420, 860]
-  },
-  '/fastener': {
-    steps: ['Resolve fastener toolbox', 'Initialize fastener loads', 'Render fastener workspace'],
-    messages: ['Resolving fastener toolbox...', 'Initializing fastener loads and presets...', 'Rendering fastener workspace...'],
-    completeAllMessage: 'Fastener toolbox ready.',
-    delaysMs: [60, 520, 1020]
   },
   '/profile': {
     steps: ['Resolve profile toolbox', 'Hydrate section properties', 'Render profile outputs'],

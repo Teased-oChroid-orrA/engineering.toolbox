@@ -4,10 +4,9 @@
   import type { BushingInputs, BushingOutput } from '$lib/core/bushing';
   import BushingLameStressPlot from './BushingLameStressPlot.svelte';
   import BushingEnforcementDetails from './BushingEnforcementDetails.svelte';
-  import BushingResultInfoDialog from './BushingResultInfoDialog.svelte';
   import NativeDragLane from './NativeDragLane.svelte';
   import { bushingLogger } from '$lib/utils/loggers';
-  let { form, results }: { form: BushingInputs; results: BushingOutput } = $props();
+  let { form, results, guidedMode = true }: { form: BushingInputs; results: BushingOutput; guidedMode?: boolean } = $props();
   let infoDialog = $state<'safety' | 'fit' | null>(null);
   type SectionId = 'metrics' | 'lame';
   const SECTION_ORDER_KEY = 'scd.bushing.resultsSummary.sectionOrder.v1';
@@ -76,6 +75,32 @@
   }
 </script>
 <div class="space-y-3">
+  <Card class="border border-cyan-300/20 bg-cyan-500/8 bushing-pop-card bushing-depth-1">
+    <CardContent class="pt-4 text-sm">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div class="text-[10px] font-bold uppercase tracking-wide text-cyan-100/85">Decision Summary</div>
+          <div class="mt-1 text-base font-semibold text-slate-100">{results.governing.name}</div>
+        </div>
+        <Badge variant="outline" class={failed ? 'border-amber-400/40 text-amber-200' : 'border-emerald-400/40 text-emerald-200'}>
+          {failed ? 'Action Needed' : 'Within Limits'}
+        </Badge>
+      </div>
+      <div class="mt-2 text-xs text-slate-200/82">
+        Governing margin: <span class={failed ? valFail : valOk}>{fmt(results.governing.margin, 3)}</span>.
+        {#if failed}
+          Revisit geometry or profile inputs before relying on export.
+        {:else}
+          Review Drafting / Export, then open diagnostics only if you need deeper traceability.
+        {/if}
+      </div>
+      {#if guidedMode}
+        <div class="mt-2 rounded-md border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-white/75">
+          Guided workflow: confirm the governing reason first, then scan detailed fit physics below.
+        </div>
+      {/if}
+    </CardContent>
+  </Card>
   <div class="flex items-center justify-between">
     <h3 class="text-sm font-semibold text-slate-100">Results Summary</h3>
     <Badge variant="outline" class={failed ? 'border-amber-400/40 text-amber-200' : 'border-emerald-400/40 text-emerald-200'}>
@@ -149,11 +174,14 @@
             {/if}
             {#if results.tolerance.status === 'infeasible'}
               <div class="mt-2 rounded-md border border-amber-300/50 bg-amber-500/15 p-2 text-[11px] text-amber-100">
-                Tolerance bands are incompatible for full-range containment. Bore band width ({fmtBand(boreBandWidth)}) exceeds target interference width ({fmtBand(targetBandWidth)}), so solver collapses OD tolerance to a single value.
+                <div class="font-semibold">What failed: tolerance bands are incompatible for full-range containment.</div>
+                <div class="mt-1">Why: bore band width ({fmtBand(boreBandWidth)}) exceeds target interference width ({fmtBand(targetBandWidth)}), so no single OD band can satisfy every combination.</div>
+                <div class="mt-1">Next: widen the target interference band or narrow the bore tolerance band.</div>
               </div>
             {:else if results.tolerance.status === 'clamped'}
               <div class="mt-2 rounded-md border border-cyan-300/40 bg-cyan-500/12 p-2 text-[11px] text-cyan-100">
-                OD nominal is clamped to keep interference within requested tolerance band.
+                <div class="font-semibold">OD nominal was clamped to stay within the requested interference band.</div>
+                <div class="mt-1">Next: confirm the shifted OD is acceptable, or revisit the target interference window.</div>
               </div>
             {/if}
             {#if displayToleranceNotes.length}
@@ -201,14 +229,18 @@
   </NativeDragLane>
 </div>
 
-<BushingResultInfoDialog
-  open={infoDialog !== null}
-  mode={infoDialog}
-  {results}
-  {edgeFailed}
-  {wallFailed}
-  {fitFailed}
-  {fmt}
-  {focusSection}
-  onClose={() => (infoDialog = null)}
-/>
+{#if infoDialog !== null}
+  {#await import('./BushingResultInfoDialog.svelte') then mod}
+    <mod.default
+      open={infoDialog !== null}
+      mode={infoDialog}
+      {results}
+      {edgeFailed}
+      {wallFailed}
+      {fitFailed}
+      {fmt}
+      {focusSection}
+      onClose={() => (infoDialog = null)}
+    />
+  {/await}
+{/if}

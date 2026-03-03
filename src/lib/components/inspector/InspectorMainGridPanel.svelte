@@ -110,7 +110,7 @@
 </div>
 
 <div class="order-50">
-  <div class="space-y-3">
+  <div class="space-y-3 inspector-theme-stack">
     <div>
       <InspectorMetricsBar
         {columns}
@@ -167,3 +167,16 @@
     </div>
   </div>
 </div>
+
+<style>
+  .inspector-theme-stack :global(.glass-panel),
+  .inspector-theme-stack :global(.rounded-2xl),
+  .inspector-theme-stack :global(.rounded-xl) {
+    border-color: color-mix(in srgb, var(--accent-primary) 18%, rgba(255, 255, 255, 0.08));
+  }
+
+  .inspector-theme-stack :global([data-inspector-top-banner="true"]),
+  .inspector-theme-stack :global(.inspector-source-banner) {
+    color: color-mix(in srgb, white 62%, var(--accent-primary));
+  }
+</style>

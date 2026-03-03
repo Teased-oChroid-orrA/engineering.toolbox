@@ -457,7 +457,7 @@ Each batch must pass these gates before proceeding:
 - TypeScript
 - Svelte 5
 - D3.js (envelope visualization)
-- Babylon.js (future 3D)
+- D3/SVG orthographic rendering (shared app direction)
 - Playwright (testing)
 - jsPDF (PDF export)
 

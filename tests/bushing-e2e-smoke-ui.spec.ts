@@ -1,12 +1,14 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
 test.describe('bushing e2e smoke UI', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/#/bushing');
-    await expect(page.getByText('Bushing Toolbox')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Bushing Toolbox' })).toBeVisible();
   });
 
   test('loads drafting/export shell and toggles render mode', async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'Guided' })).toBeVisible();
     await expect(page.getByText('5. Drafting / Export')).toBeVisible();
     const toggle = page.getByRole('button', { name: /Draft Renderer:/ });
     await expect(toggle).toBeVisible();
@@ -16,22 +18,57 @@ test.describe('bushing e2e smoke UI', () => {
     await expect(page.getByRole('button', { name: 'Export PDF' })).toBeVisible();
   });
 
-  test('shows Babylon renderer status and viewport controls', async ({ page }) => {
-    await expect(page.getByText('Draft Engine: Babylon')).toBeVisible();
-    const activeBanner = page.getByText('Babylon renderer active');
-    await expect(page.getByText(/Babylon renderer active|Babylon init failed|Babylon init issue:/).first()).toBeVisible();
+  test('exports the live D3 SVG viewport instead of the legacy block sheet', async ({ page }) => {
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export SVG' }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe('bushing_drafting.svg');
+    const filePath = await download.path();
+    expect(filePath).toBeTruthy();
+    const svgText = await readFile(filePath!, 'utf8');
+    expect(svgText).toContain('Top View');
+    expect(svgText).toContain('Housing section');
+    expect(svgText).toContain('data-bushing-export-root="true"');
+  });
+
+  test('defaults to guided mode and exposes advanced controls only when requested', async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'Guided' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Advanced' })).toBeVisible();
+    await expect(page.getByText('Trace: Off')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Advanced' }).first().click();
+    await expect(page.getByText('Trace: Off')).toBeVisible();
+  });
+
+  test('shows D3 renderer status and viewport controls', async ({ page }) => {
+    await expect(page.getByText('Draft Engine: D3')).toBeVisible();
+    const activeBanner = page.getByText('D3 renderer active');
+    await expect(page.getByText(/D3 renderer active|Drafting needs attention.|Drafting has advisory notices./).first()).toBeVisible();
     if (await activeBanner.isVisible().catch(() => false)) {
-      await expect(page.getByRole('button', { name: 'Reset' })).toBeVisible();
-      await expect(page.getByRole('button', { name: '+' })).toBeVisible();
-      await expect(page.getByRole('button', { name: '-' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Reset View' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Zoom In' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Zoom Out' })).toBeVisible();
     }
   });
 
   test('switches profile type and keeps results visible', async ({ page }) => {
+    const viewport = page.locator('svg[viewBox="0 0 660 660"]').first();
+    await expect(viewport).toContainText('Housing section');
+    await expect(viewport).toContainText('Bushing face');
+    await expect(viewport).not.toContainText('Flange thk');
+    await expect(viewport).not.toContainText('Ext CS depth');
+
     await page.getByRole('button', { name: 'Flanged' }).first().click();
     await expect(page.getByText('Results Summary')).toBeVisible();
     await expect(page.getByText('Safety Margins (Yield)')).toBeVisible();
-    await expect(page.getByText('Fit Physics')).toBeVisible();
+    await expect(page.getByText(/^Fit Physics$/)).toBeVisible();
+    await expect(viewport).toContainText('Flange thk');
+    await expect(viewport).toContainText('Flange');
+    await expect(viewport).not.toContainText('Ext CS depth');
+
+    await page.getByRole('button', { name: "C'Sink" }).first().click();
+    await expect(viewport).toContainText('Ext CS depth');
+    await expect(viewport).not.toContainText('Flange thk');
   });
 
   test('internal countersink mode gates editable fields and syncs derived value', async ({ page }) => {
@@ -48,7 +85,7 @@ test.describe('bushing e2e smoke UI', () => {
       }));
     });
     await page.reload();
-    await expect(page.getByText('Bushing Toolbox')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Bushing Toolbox' })).toBeVisible();
 
     const csMode = page.locator("xpath=//label[normalize-space()='Internal CS Mode']/following::select[1]");
     const csDia = page.locator("xpath=//label[normalize-space()='CS Dia']/following-sibling::div//input[1]");
@@ -98,7 +135,7 @@ test.describe('bushing e2e smoke UI', () => {
       }));
     });
     await page.reload();
-    await expect(page.getByText('Bushing Toolbox')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Bushing Toolbox' })).toBeVisible();
 
     const extMode = page.locator("xpath=//label[normalize-space()='External CS Mode']/following::select[1]");
     const extDia = page.locator("xpath=//label[normalize-space()='External CS Dia']/following-sibling::div//input[1]");
@@ -147,19 +184,19 @@ test.describe('bushing e2e smoke UI', () => {
       }));
     });
     await page.reload();
-    await expect(page.getByText('Bushing Toolbox')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Bushing Toolbox' })).toBeVisible();
     await expect(page.getByText('Results Summary')).toBeVisible();
     await expect(page.locator('body')).not.toContainText('NaN');
     await expect(page.getByText('SECTION A-A')).toBeVisible();
   });
 
-  test('babylon viewport controls remain responsive when active', async ({ page }) => {
-    const activeBanner = page.getByText('Babylon renderer active');
-    await expect(page.getByText(/Babylon renderer active|Babylon init failed|Babylon init issue:/).first()).toBeVisible();
+  test('d3 viewport controls remain responsive when active', async ({ page }) => {
+    const activeBanner = page.getByText('D3 renderer active');
+    await expect(page.getByText(/D3 renderer active|Drafting needs attention.|Drafting has advisory notices./).first()).toBeVisible();
     if (await activeBanner.isVisible().catch(() => false)) {
-      await page.getByRole('button', { name: '+' }).click();
-      await page.getByRole('button', { name: '-' }).click();
-      await page.getByRole('button', { name: 'Reset' }).click();
+      await page.getByRole('button', { name: 'Zoom In' }).click();
+      await page.getByRole('button', { name: 'Zoom Out' }).click();
+      await page.getByRole('button', { name: 'Reset View' }).click();
     }
     await expect(page.getByText('Results Summary')).toBeVisible();
     await expect(page.getByText('SECTION A-A')).toBeVisible();
@@ -204,7 +241,7 @@ test.describe('bushing e2e smoke UI', () => {
     ).toEqual(['header', 'setup', 'guidance', 'geometry', 'profile', 'process']);
 
     await page.reload();
-    await expect(page.getByText('Bushing Toolbox')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Bushing Toolbox' })).toBeVisible();
     await page.waitForLoadState('domcontentloaded');
     await expect.poll(async () =>
       page.evaluate(() => {
@@ -230,7 +267,7 @@ test.describe('bushing e2e smoke UI', () => {
       localStorage.removeItem('scd.bushing.layout.v3.diagnostics');
     });
     await page.reload();
-    await expect(page.getByText('Bushing Toolbox')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Bushing Toolbox' })).toBeVisible();
 
     const edge = page.locator("[data-diag-card='edge']").first();
     const wall = page.locator("[data-diag-card='wall']").first();

@@ -218,7 +218,7 @@ bundle.tABDX8LL.js: 8,490.74 kB │ gzip: 1,965.29 kB
 **Analysis**:
 - The project uses `bundleStrategy: 'inline'` for file:// compatibility (Tauri requirement)
 - This creates a single large bundle instead of code-splitting
-- BabylonJS and D3 are likely major contributors
+- D3 and large CSS assets are likely major contributors
 
 **Recommendation**:
 ```javascript

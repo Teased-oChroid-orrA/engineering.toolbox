@@ -159,12 +159,11 @@ UI intentionally shows a single clamp message (duplicate note is removed).
 - `src/lib/core/bushing/schema.ts`
 - `src/lib/core/bushing/types.ts`
 
-- Drafting/Babylon:
-- `src/lib/drafting/bushing/BushingBabylonRuntime.ts`
-- `src/lib/drafting/bushing/BushingBabylonSceneMeshes.ts`
-- `src/lib/drafting/bushing/BushingBabylonMaterials.ts`
-- `src/lib/drafting/bushing/BushingBabylonView.ts`
-- `src/lib/drafting/bushing/BushingBabylonShared.ts`
+- Drafting/D3:
+- `src/lib/drafting/bushing/BushingD3Canvas.svelte`
+- `src/lib/drafting/bushing/BushingDrafting.svelte`
+- `src/lib/drafting/bushing/BushingDraftRenderer.ts`
+- `src/lib/drafting/bushing/BushingRenderTypes.ts`
 
 ## 14. Validation Commands
 - `npm run -s verify:bushing-solver`

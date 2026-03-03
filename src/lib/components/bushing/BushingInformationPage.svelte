@@ -3,8 +3,6 @@
   import type { BushingInputs, BushingOutput } from '$lib/core/bushing';
   import { BUSHING_FORMULA_INVENTORY } from '$lib/core/bushing/formulaInventory';
   import BushingLameStressPlot from './BushingLameStressPlot.svelte';
-  import katex from 'katex';
-  import 'katex/dist/katex.min.css';
 
   export let form: BushingInputs;
   export let results: BushingOutput;
@@ -14,33 +12,25 @@
   const k = (n: number | null | undefined, d = 3) => (!Number.isFinite(Number(n)) ? '---' : (Number(n) / 1000).toFixed(d));
   const pct = (n: number | null | undefined, d = 2) => (!Number.isFinite(Number(n)) ? '---' : `${(Number(n) * 100).toFixed(d)}%`);
 
-  function formulaToLatex(id: string): string {
+  function formulaToDisplay(id: string): string {
     switch (id) {
       case 'thermal_delta_interference':
-        return String.raw`\Delta_{\text{thermal}} = \left(\alpha_b - \alpha_h\right)\,D_{\text{bore}}\,\Delta T_F`;
+        return 'delta_thermal = (alpha_b - alpha_h) * D_bore * deltaT_F';
       case 'installed_outer_diameter':
-        return String.raw`OD_{\text{installed}} = D_{\text{bore}} + \Delta`;
+        return 'OD_installed = D_bore + delta';
       case 'contact_pressure':
-        return String.raw`p = \frac{\Delta}{T_b + T_h},\quad \Delta > 0`;
+        return 'p = delta / (T_b + T_h), for delta > 0';
       case 'hoop_stress_housing':
-        return String.raw`\sigma_{h} = p\left(\frac{D^2 + d^2}{D^2 - d^2}\right)`;
+        return 'sigma_h = p * ((D^2 + d^2) / (D^2 - d^2))';
       case 'hoop_stress_bushing':
-        return String.raw`\sigma_{b} = -p\left(\frac{d_o^2 + d_i^2}{d_o^2 - d_i^2}\right)`;
+        return 'sigma_b = -p * ((d_o^2 + d_i^2) / (d_o^2 - d_i^2))';
       case 'install_force':
-        return String.raw`F_{\text{install}} = \mu\,p\,\pi\,D_{\text{bore}}\,L`;
+        return 'F_install = mu * p * pi * D_bore * L';
       case 'margin_of_safety':
-        return String.raw`MS = \frac{\text{allowable}}{\text{demand}} - 1`;
+        return 'MS = allowable / demand - 1';
       default:
         return id;
     }
-  }
-
-  function renderLatex(tex: string, displayMode = true): string {
-    return katex.renderToString(tex, {
-      throwOnError: false,
-      displayMode,
-      strict: 'ignore'
-    });
   }
 </script>
 
@@ -76,7 +66,7 @@
     <CardContent class="space-y-2 text-sm">
       {#each BUSHING_FORMULA_INVENTORY as eq}
         <div class="rounded-md border border-white/10 bg-black/25 p-2">
-          <div class="text-cyan-100 [&_.katex-display]:my-1">{@html renderLatex(formulaToLatex(eq.id), true)}</div>
+          <pre class="overflow-x-auto whitespace-pre-wrap font-mono text-[12px] leading-5 text-cyan-100">{formulaToDisplay(eq.id)}</pre>
           <div class="mt-1 text-[11px] text-white/70">Units: {eq.units} | Note: {eq.note}</div>
           <div class="text-[11px] text-white/55">Source: {eq.location}</div>
         </div>
@@ -90,19 +80,17 @@
     </CardHeader>
     <CardContent class="space-y-2 text-sm text-white/85">
       <div class="rounded-md border border-white/10 bg-black/25 p-2">
-        <div class="text-cyan-100">{@html renderLatex(String.raw`\sigma_r(r)=\frac{a^2 p_i-b^2 p_o}{b^2-a^2}-\frac{a^2b^2(p_i-p_o)}{(b^2-a^2)\,r^2}`, true)}</div>
-        <div class="text-cyan-100">{@html renderLatex(String.raw`\sigma_\theta(r)=\frac{a^2 p_i-b^2 p_o}{b^2-a^2}+\frac{a^2b^2(p_i-p_o)}{(b^2-a^2)\,r^2}`, true)}</div>
-        <div class="text-cyan-100">{@html renderLatex(String.raw`\sigma_z(r)=k_{\text{constraint}}\,k_{\text{length}}\,\nu\left(\sigma_r(r)+\sigma_\theta(r)\right)`, true)}</div>
+        <pre class="overflow-x-auto whitespace-pre-wrap font-mono text-[12px] leading-5 text-cyan-100">sigma_r(r) = ((a^2*p_i - b^2*p_o) / (b^2 - a^2)) - ((a^2*b^2*(p_i - p_o)) / ((b^2 - a^2) * r^2))</pre>
+        <pre class="overflow-x-auto whitespace-pre-wrap font-mono text-[12px] leading-5 text-cyan-100">sigma_theta(r) = ((a^2*p_i - b^2*p_o) / (b^2 - a^2)) + ((a^2*b^2*(p_i - p_o)) / ((b^2 - a^2) * r^2))</pre>
+        <pre class="overflow-x-auto whitespace-pre-wrap font-mono text-[12px] leading-5 text-cyan-100">sigma_z(r) = k_constraint * k_length * nu * (sigma_r(r) + sigma_theta(r))</pre>
         <div class="text-[11px] text-white/70">
-          Boundary conditions used here:
-          bushing: \(p_i=0,\; p_o=p\);
-          housing: \(p_i=p,\; p_o=0\).
+          Boundary conditions used here: bushing uses p_i = 0 and p_o = p. Housing uses p_i = p and p_o = 0.
           Sign convention: tension positive, compressive radial pressure negative.
         </div>
         <div class="text-[11px] text-white/70">
           Current axial factors:
-          <span class="text-cyan-100 align-middle">{@html renderLatex(`k_{\\text{constraint}}=${results.physics.axialConstraintFactor.toFixed(2)}`, false)}</span>,
-          <span class="text-cyan-100 align-middle">{@html renderLatex(`k_{\\text{length}}=${results.physics.axialLengthFactor.toFixed(2)}`, false)}</span>.
+          <span class="font-mono text-cyan-100 align-middle">k_constraint={results.physics.axialConstraintFactor.toFixed(2)}</span>,
+          <span class="font-mono text-cyan-100 align-middle">k_length={results.physics.axialLengthFactor.toFixed(2)}</span>.
           End constraints and bushing length influence only the axial field in this implementation.
         </div>
       </div>

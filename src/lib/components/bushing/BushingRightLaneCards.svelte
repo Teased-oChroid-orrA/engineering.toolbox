@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { BushingInputs, BushingOutput } from '$lib/core/bushing';
-  import type { BabylonRenderDiagnostic } from '$lib/drafting/bushing/BushingBabylonRuntime';
+  import type { BushingRenderDiagnostic } from '$lib/drafting/bushing/BushingRenderTypes';
   import type { BushingRenderMode } from '$lib/drafting/bushing/bushingSceneModel';
   import { canMoveInList, moveCardInList } from './BushingCardLayoutController';
   import NativeDragLane from './NativeDragLane.svelte';
@@ -20,16 +20,16 @@
   export let cacheHits = 0;
   export let cacheMisses = 0;
   export let isInfinitePlate = false;
-  export let babylonInitNotice: string | null = null;
+  export let renderInitNotice: string | null = null;
   export let visualDiagnostics: any[] = [];
-  export let babylonDiagnostics: BabylonRenderDiagnostic[] = [];
+  export let renderDiagnostics: BushingRenderDiagnostic[] = [];
   export let onReorder: (items: Array<{ id: string }>) => void;
   export let onExportSvg: () => Promise<void>;
   export let onExportPdf: () => Promise<void>;
   export let onToggleRendererMode: () => void;
   export let onToggleTraceMode: () => void;
-  export let onBabylonDiagnostics: (diag: BabylonRenderDiagnostic[]) => void;
-  export let onBabylonInitFailure: (reason: string) => void;
+  export let onRenderDiagnostics: (diag: BushingRenderDiagnostic[]) => void;
+  export let onRenderInitFailure: (reason: string) => void;
 
   function ids(): string[] {
     return items.map((item) => item.id);
@@ -76,15 +76,15 @@
             {cacheHits}
             {cacheMisses}
             {isInfinitePlate}
-            {babylonInitNotice}
+            {renderInitNotice}
             {visualDiagnostics}
-            {babylonDiagnostics}
+            {renderDiagnostics}
             {onExportSvg}
             {onExportPdf}
             {onToggleRendererMode}
             {onToggleTraceMode}
-            {onBabylonDiagnostics}
-            {onBabylonInitFailure}
+            {onRenderDiagnostics}
+            {onRenderInitFailure}
           />
         {/snippet}
       </BushingDraggableCard>

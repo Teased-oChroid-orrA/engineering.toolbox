@@ -127,9 +127,9 @@ console.log(`  Found ${exportLetMatches.length} 'export let' and ${exportConstMa
 
 // Check if the props that should be const are const
 const propsToBeConst = ['form', 'results', 'draftingView', 'useLegacyRenderer', 'renderMode', 
-                         'traceEnabled', 'cacheStats', 'babylonInitNotice', 'visualDiagnostics', 
-                         'babylonDiagnostics', 'onExportSvg', 'onExportPdf', 'toggleRendererMode', 
-                         'toggleTraceMode', 'handleBabylonInitFailure', 'showInformationView', 'isFailed'];
+                         'traceEnabled', 'cacheStats', 'renderInitNotice', 'visualDiagnostics', 
+                         'renderDiagnostics', 'onExportSvg', 'onExportPdf', 'toggleRendererMode', 
+                         'toggleTraceMode', 'handleRenderInitFailure', 'showInformationView', 'isFailed'];
 
 for (const prop of propsToBeConst) {
   const letPattern = new RegExp(`export let ${prop}\\b`);

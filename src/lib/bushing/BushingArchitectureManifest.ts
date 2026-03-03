@@ -21,10 +21,11 @@ export const BUSHING_ARCHITECTURE_MANIFEST: BushingModuleBudget[] = [
   { path: 'src/lib/core/bushing/schema.ts', softMaxLoc: 220, required: true },
   { path: 'src/lib/core/bushing/viewModel.ts', softMaxLoc: 180, required: true },
   { path: 'src/lib/drafting/bushing/BushingDrafting.svelte', softMaxLoc: 260, required: true },
+  { path: 'src/lib/drafting/bushing/BushingD3Canvas.svelte', softMaxLoc: 320, required: true },
+  { path: 'src/lib/drafting/bushing/BushingRenderTypes.ts', softMaxLoc: 80, required: true },
   { path: 'src/lib/drafting/bushing/generate.ts', softMaxLoc: 280, required: true },
   { path: 'src/lib/drafting/bushing/bushingSceneModel.ts', softMaxLoc: 260, required: true },
   { path: 'src/lib/drafting/bushing/bushingSceneRenderer.ts', softMaxLoc: 220, required: true },
-  { path: 'src/lib/drafting/bushing/BushingBabylonGeometry.ts', softMaxLoc: 220, required: true },
-  { path: 'src/lib/drafting/bushing/BushingBabylonRuntime.ts', softMaxLoc: 320, required: true },
-  { path: 'src/lib/drafting/bushing/BushingBabylonParity.ts', softMaxLoc: 240, required: true }
+  { path: 'tests/bushing-d3-render-contract.spec.ts', softMaxLoc: 220, required: true },
+  { path: 'tests/bushing-export-d3-compat.spec.ts', softMaxLoc: 220, required: true }
 ];

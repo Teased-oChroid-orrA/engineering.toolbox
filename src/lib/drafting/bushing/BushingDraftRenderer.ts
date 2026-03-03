@@ -2,7 +2,7 @@ import { renderBushingSceneGroup, type SceneViewport } from './bushingSceneRende
 import type { BushingRenderMode, BushingScene } from './bushingSceneModel';
 import type { SectionArcPrimitive, SectionLinePrimitive, SectionLoop } from './sectionProfile';
 
-export type BushingDraftEngine = 'svg' | 'babylon';
+export type BushingDraftEngine = 'svg' | 'd3';
 
 export type CanonicalLoopPrimitive =
   | {
@@ -61,7 +61,7 @@ function mapLoop(scene: BushingScene, loop: SectionLoop): CanonicalLoop {
 
 export function toCanonicalDraftScene(scene: BushingScene): CanonicalDraftScene {
   // Canonical scene is derived from section profile primitives, not SVG path output.
-  // Babylon migration uses this as independent input to avoid coupling to legacy section views.
+  // The D3 renderer uses this as independent input to avoid coupling to legacy section views.
   return {
     width: scene.width,
     height: scene.height,

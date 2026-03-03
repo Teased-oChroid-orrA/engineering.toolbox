@@ -4,10 +4,6 @@
   import InspectorHeaderPromptModal from './InspectorHeaderPromptModal.svelte';
   import InspectorColumnPickerModal from './InspectorColumnPickerModal.svelte';
   import InspectorShortcutsModal from './InspectorShortcutsModal.svelte';
-  import InspectorRecipesModal from './InspectorRecipesModal.svelte';
-  import InspectorSchemaModal from './InspectorSchemaModal.svelte';
-  import InspectorSvarBuilderModal from './InspectorSvarBuilderModal.svelte';
-  import InspectorRegexGeneratorModal from './InspectorRegexGeneratorModal.svelte';
   import InspectorOverlayPortal from './InspectorOverlayPortal.svelte';
   import { newClause, type BuildMode, type Clause, type ClauseKind, type GenTab } from './InspectorRegexController';
   import type { Recipe } from './InspectorRecipesController';
@@ -110,74 +106,84 @@
 </script>
 
 <InspectorOverlayPortal>
-  <InspectorRecipesModal
-    open={showRecipeModal}
-    {uiAnimDur}
-    floatingStyle={floatingStyle('recipes')}
-    {recipeNotice}
-    {recipeName}
-    {recipeTags}
-    {hasLoaded}
-    {importMode}
-    {recipes}
-    onClose={() => (showRecipeModal = false)}
-    onReset={() => resetModalPos('recipes')}
-    onBeginDrag={(e: MouseEvent) => beginDragModal('recipes', e)}
-    onSetRecipeName={(v: string) => (recipeName = v)}
-    onSetRecipeTags={(v: string) => (recipeTags = v)}
-    onSave={saveCurrentAsRecipe}
-    onExport={exportRecipesCurrent}
-    onImport={importRecipesFile}
-    onSetImportMode={(v: 'current' | 'file') => (importMode = v)}
-    onToggleFavorite={toggleRecipeFavorite}
-    onApply={applyRecipe}
-    onDelete={deleteRecipe}
-  />
+  {#if showRecipeModal}
+    {#await import('./InspectorRecipesModal.svelte') then recipeModal}
+      {@const InspectorRecipesModal = recipeModal.default}
+      <InspectorRecipesModal
+        open={showRecipeModal}
+        {uiAnimDur}
+        floatingStyle={floatingStyle('recipes')}
+        {recipeNotice}
+        {recipeName}
+        {recipeTags}
+        {hasLoaded}
+        {importMode}
+        {recipes}
+        onClose={() => (showRecipeModal = false)}
+        onReset={() => resetModalPos('recipes')}
+        onBeginDrag={(e: MouseEvent) => beginDragModal('recipes', e)}
+        onSetRecipeName={(v: string) => (recipeName = v)}
+        onSetRecipeTags={(v: string) => (recipeTags = v)}
+        onSave={saveCurrentAsRecipe}
+        onExport={exportRecipesCurrent}
+        onImport={importRecipesFile}
+        onSetImportMode={(v: 'current' | 'file') => (importMode = v)}
+        onToggleFavorite={toggleRecipeFavorite}
+        onApply={applyRecipe}
+        onDelete={deleteRecipe}
+      />
+    {/await}
+  {/if}
 </InspectorOverlayPortal>
 
 <InspectorOverlayPortal>
-  <InspectorSchemaModal
-    open={showSchemaModal}
-    {uiAnimDur}
-    floatingStyle={floatingStyle('schema')}
-    {datasetLabel}
-    {schemaSampleN}
-    {totalFilteredCount}
-    {totalRowCount}
-    {schemaScopeLabel}
-    {schemaError}
-    {hasLoaded}
-    {schemaLoading}
-    {schemaSampleTier}
-    {schemaSearch}
-    {schemaSuggested}
-    {schemaOutliers}
-    {schemaRelationshipHints}
-    {schemaDrift}
-    {colTypes}
-    {headers}
-    {schemaFiltered}
-    catSelected={catF.selected}
-    onClose={() => (showSchemaModal = false)}
-    onReset={() => resetModalPos('schema')}
-    onBeginDrag={(e: MouseEvent) => beginDragModal('schema', e)}
-    onRefresh={() => void computeSchemaStats()}
-    onSetSampleTier={(v: string) => (schemaSampleTier = v as any)}
-    onSetSampleN={(v: number) => (schemaSampleN = v)}
-    onSetSearch={(v: string) => (schemaSearch = v)}
-    onSetDriftBaseline={setSchemaDriftBaseline}
-    onActionTarget={schemaActionTarget}
-    onActionCategory={schemaActionCategory}
-    onActionNumeric={schemaActionNumericRange}
-    onActionDate={schemaActionDateRange}
-    onAddTopToCategory={(idx: number, val: string) => {
-      schemaActionCategory(idx, false);
-      const s2 = new Set(catF.selected);
-      s2.add(val);
-      catF.selected = s2;
-      void runFilterNow();
-    }}
-  />
+  {#if showSchemaModal}
+    {#await import('./InspectorSchemaModal.svelte') then schemaModal}
+      {@const InspectorSchemaModal = schemaModal.default}
+      <InspectorSchemaModal
+        open={showSchemaModal}
+        {uiAnimDur}
+        floatingStyle={floatingStyle('schema')}
+        {datasetLabel}
+        {schemaSampleN}
+        {totalFilteredCount}
+        {totalRowCount}
+        {schemaScopeLabel}
+        {schemaError}
+        {hasLoaded}
+        {schemaLoading}
+        {schemaSampleTier}
+        {schemaSearch}
+        {schemaSuggested}
+        {schemaOutliers}
+        {schemaRelationshipHints}
+        {schemaDrift}
+        {colTypes}
+        {headers}
+        {schemaFiltered}
+        catSelected={catF.selected}
+        onClose={() => (showSchemaModal = false)}
+        onReset={() => resetModalPos('schema')}
+        onBeginDrag={(e: MouseEvent) => beginDragModal('schema', e)}
+        onRefresh={() => void computeSchemaStats()}
+        onSetSampleTier={(v: string) => (schemaSampleTier = v as any)}
+        onSetSampleN={(v: number) => (schemaSampleN = v)}
+        onSetSearch={(v: string) => (schemaSearch = v)}
+        onSetDriftBaseline={setSchemaDriftBaseline}
+        onActionTarget={schemaActionTarget}
+        onActionCategory={schemaActionCategory}
+        onActionNumeric={schemaActionNumericRange}
+        onActionDate={schemaActionDateRange}
+        onAddTopToCategory={(idx: number, val: string) => {
+          schemaActionCategory(idx, false);
+          const s2 = new Set(catF.selected);
+          s2.add(val);
+          catF.selected = s2;
+          void runFilterNow();
+        }}
+      />
+    {/await}
+  {/if}
 </InspectorOverlayPortal>
 
 <InspectorOverlayPortal>
@@ -205,60 +211,70 @@
 <InspectorOverlayPortal><InspectorHeaderPromptModal open={showHeaderPrompt} {uiAnimDur} {headerHeuristicReason} {headerConfidence} {autoDecision} onCancel={cancelHeaderPrompt} onChoose={applyHeaderChoice} /></InspectorOverlayPortal>
 <InspectorOverlayPortal><InspectorColumnPickerModal open={showColumnPicker} {uiAnimDur} {headers} {visibleColumns} {columnPickerNotice} onClose={() => (showColumnPicker = false)} onSmartSelect={smartSelectColumns} onSelectAll={selectAllColumns} onAutoDefault={clearColumnSelection} onToggle={toggleVisibleCol} /></InspectorOverlayPortal>
 <InspectorOverlayPortal>
-  <InspectorSvarBuilderModal
-    open={showSvarBuilder}
-    {uiAnimDur}
-    floatingStyle={floatingStyle('svar')}
-    {hasLoaded}
-    {svarFields}
-    {svarOptions}
-    {svarFilterSet}
-    onClose={() => (showSvarBuilder = false)}
-    onReset={() => resetModalPos('svar')}
-    onBeginDrag={(e: MouseEvent) => beginDragModal('svar', e)}
-    onApply={applySvarBuilderToFilters}
-    onChange={(ev: any) => {
-      const next = ev?.value ?? ev?.detail?.value;
-      if (next) svarFilterSet = next as IFilterSet;
-    }}
-  />
+  {#if showSvarBuilder}
+    {#await import('./InspectorSvarBuilderModal.svelte') then svarBuilderModal}
+      {@const InspectorSvarBuilderModal = svarBuilderModal.default}
+      <InspectorSvarBuilderModal
+        open={showSvarBuilder}
+        {uiAnimDur}
+        floatingStyle={floatingStyle('svar')}
+        {hasLoaded}
+        {svarFields}
+        {svarOptions}
+        {svarFilterSet}
+        onClose={() => (showSvarBuilder = false)}
+        onReset={() => resetModalPos('svar')}
+        onBeginDrag={(e: MouseEvent) => beginDragModal('svar', e)}
+        onApply={applySvarBuilderToFilters}
+        onChange={(ev: any) => {
+          const next = ev?.value ?? ev?.detail?.value;
+          if (next) svarFilterSet = next as IFilterSet;
+        }}
+      />
+    {/await}
+  {/if}
 </InspectorOverlayPortal>
 <InspectorOverlayPortal>
-  <InspectorRegexGeneratorModal
-    open={showRegexGenerator}
-    {uiAnimDur}
-    {genTab}
-    {genFlagI}
-    {genFlagM}
-    {genFlagS}
-    {genOut}
-    {genErr}
-    {genWarn}
-    {regexTemplates}
-    {testText}
-    {testMatches}
-    {genBuildMode}
-    {genClauses}
-    {genAddKind}
-    onClose={() => (showRegexGenerator = false)}
-    onSetTab={(v: GenTab) => (genTab = v)}
-    onToggleFlag={(k: 'i' | 'm' | 's') => {
-      if (k === 'i') genFlagI = !genFlagI;
-      if (k === 'm') genFlagM = !genFlagM;
-      if (k === 's') genFlagS = !genFlagS;
-    }}
-    onApplyRegex={applyGeneratedRegex}
-    onSetTestText={(v: string) => (testText = v)}
-    onSetBuildMode={(v: BuildMode) => (genBuildMode = v)}
-    onMoveClause={moveClause}
-    onRemoveClause={removeClause}
-    onUpdateClauseKind={(idx: number, v: ClauseKind) => (genClauses[idx].kind = v)}
-    onUpdateClauseField={(idx: number, key: string, v: any) => ((genClauses[idx] as any)[key] = v)}
-    onAddClause={(v: ClauseKind) => addClause(v)}
-      onClearClauses={() => {
-        genClauses = [newClause('contains', '')];
-        testText = '';
-      }}
-  />
+  {#if showRegexGenerator}
+    {#await import('./InspectorRegexGeneratorModal.svelte') then regexModal}
+      {@const InspectorRegexGeneratorModal = regexModal.default}
+      <InspectorRegexGeneratorModal
+        open={showRegexGenerator}
+        {uiAnimDur}
+        {genTab}
+        {genFlagI}
+        {genFlagM}
+        {genFlagS}
+        {genOut}
+        {genErr}
+        {genWarn}
+        {regexTemplates}
+        {testText}
+        {testMatches}
+        {genBuildMode}
+        {genClauses}
+        {genAddKind}
+        onClose={() => (showRegexGenerator = false)}
+        onSetTab={(v: GenTab) => (genTab = v)}
+        onToggleFlag={(k: 'i' | 'm' | 's') => {
+          if (k === 'i') genFlagI = !genFlagI;
+          if (k === 'm') genFlagM = !genFlagM;
+          if (k === 's') genFlagS = !genFlagS;
+        }}
+        onApplyRegex={applyGeneratedRegex}
+        onSetTestText={(v: string) => (testText = v)}
+        onSetBuildMode={(v: BuildMode) => (genBuildMode = v)}
+        onMoveClause={moveClause}
+        onRemoveClause={removeClause}
+        onUpdateClauseKind={(idx: number, v: ClauseKind) => (genClauses[idx].kind = v)}
+        onUpdateClauseField={(idx: number, key: string, v: any) => ((genClauses[idx] as any)[key] = v)}
+        onAddClause={(v: ClauseKind) => addClause(v)}
+        onClearClauses={() => {
+          genClauses = [newClause('contains', '')];
+          testText = '';
+        }}
+      />
+    {/await}
+  {/if}
 </InspectorOverlayPortal>
 <InspectorOverlayPortal><InspectorShortcutsModal open={showShortcuts} {uiAnimDur} floatingStyle={floatingStyle('shortcuts')} onClose={() => (showShortcuts = false)} onReset={() => resetModalPos('shortcuts')} onBeginDrag={(e: MouseEvent) => beginDragModal('shortcuts', e)} /></InspectorOverlayPortal>

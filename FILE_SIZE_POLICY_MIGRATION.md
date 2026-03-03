@@ -137,8 +137,8 @@ Create `.sizepolicy.json` in repository root:
         "function": 150
       }
     },
-    "babylonRuntime": {
-      "patterns": ["**/BushingBabylonRuntime.ts", "**/babylon/**/*.ts"],
+    "renderViewport": {
+      "patterns": ["**/BushingD3Canvas.svelte", "**/BushingDrafting.svelte"],
       "blockLimits": {
         "function": 150
       }

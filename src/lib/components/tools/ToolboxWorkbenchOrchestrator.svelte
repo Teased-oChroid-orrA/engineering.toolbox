@@ -554,7 +554,7 @@
 </script>
 
 <div data-route-ready="weight-balance">
-  <div class="min-h-screen p-8 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+  <div class="wb-theme-app min-h-screen p-8">
     <div class="max-w-7xl mx-auto">
       <WbWorkbenchHeader
         {aircraft}
@@ -633,9 +633,9 @@
       </div>
 
       {#if results}
-        <div class="mt-6 bg-slate-800/50 border border-slate-700 rounded-lg p-6">
+        <div class="wb-theme-panel mt-6 rounded-lg p-6">
           <h2 class="text-xl font-semibold text-white mb-4">CG Envelope Chart</h2>
-          <div class="rounded-lg overflow-hidden border border-slate-600" bind:this={envelopeContainer}></div>
+          <div class="wb-theme-frame rounded-lg overflow-hidden" bind:this={envelopeContainer}></div>
         </div>
       {/if}
     </div>
@@ -718,3 +718,21 @@
   onApplyFuelProfile={applyFuelProfile}
   onExportFuelBurn={exportFuelBurnReport}
 />
+
+<style>
+  .wb-theme-app {
+    background:
+      radial-gradient(circle at 14% 18%, color-mix(in srgb, var(--accent-primary) 12%, transparent), transparent 32%),
+      linear-gradient(135deg, color-mix(in srgb, var(--bg-primary) 88%, black), color-mix(in srgb, var(--bg-secondary) 92%, black), color-mix(in srgb, var(--bg-primary) 86%, black));
+  }
+
+  .wb-theme-panel {
+    background: color-mix(in srgb, var(--bg-secondary) 66%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent-primary) 18%, rgba(255, 255, 255, 0.08));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 8%, transparent);
+  }
+
+  .wb-theme-frame {
+    border: 1px solid color-mix(in srgb, var(--accent-primary) 16%, rgba(148, 163, 184, 0.18));
+  }
+</style>

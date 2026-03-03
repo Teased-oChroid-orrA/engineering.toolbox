@@ -165,10 +165,10 @@ Apply different limits based on file patterns:
       "function": 150    // Complex solver logic allowed
     }
   },
-  "babylonRuntime": {
-    "patterns": ["**/BushingBabylonRuntime.ts", "**/babylon/**/*.ts"],
+  "renderViewport": {
+    "patterns": ["**/BushingD3Canvas.svelte", "**/BushingDrafting.svelte"],
     "blockLimits": {
-      "function": 150    // 3D rendering setup can be complex
+      "function": 150    // Rendering setup can be moderately complex
     }
   }
 }

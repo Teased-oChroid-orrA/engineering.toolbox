@@ -69,7 +69,7 @@ Updated Tauri workflow to cache both paths:
 **Tests included:**
 - Bushing solver logic
 - Formula audits and physics checks
-- Parity checks (D3 vs Babylon)
+- D3 render contract checks
 - Section profile validation
 - Pipeline cache behavior
 - Render stress tests (pure logic)

@@ -1,14 +1,7 @@
 <script lang="ts">
   import SurfaceWorkflowGuideCard from './SurfaceWorkflowGuideCard.svelte';
   import SurfaceStatusRail from './SurfaceStatusRail.svelte';
-  import SurfaceFitPanel from './SurfaceFitPanel.svelte';
-  import SurfaceDatumSliceExportPanel from './SurfaceDatumSliceExportPanel.svelte';
   import SurfaceSlicingRecommendationRail from './SurfaceSlicingRecommendationRail.svelte';
-  import SurfaceInterpolationPanel from './SurfaceInterpolationPanel.svelte';
-  import SurfaceOffsetIntersectionPanel from './SurfaceOffsetIntersectionPanel.svelte';
-  import SurfaceRecipesPanel from './SurfaceRecipesPanel.svelte';
-  import CurveEdgesLoftPanel from './CurveEdgesLoftPanel.svelte';
-  import SurfaceSamplerPanel from './SurfaceSamplerPanel.svelte';
   export let rightRailCollapsed = false;
   export let coreMode = true;
   export let advancedOpen = false;
@@ -20,15 +13,6 @@
   export let SURFACE_ANALYTICS_ENABLED = false;
   export let interpPct = 50;
   export let interpPoint: any = null;
-  export let edges: any[] = [];
-  export let points: any[] = [];
-  export let selEdgeA: number | null = 0;
-  export let selEdgeB: number | null = 1;
-  export let offsetDist = 5;
-  export let refPointIdx = 0;
-  export let intersection: any = null;
-  export let intersectionBusy = false;
-  export let intersectionDiagnostics: any = null;
   export let evalUseSelection = true;
   export let heatmapOn = false;
   export let evalTol = 0;
@@ -86,8 +70,11 @@
   export let samplerNv = 12;
   export let samplerEdgeSegs = 8;
   export let samplerErr: string | null = null;
+  export let uxLevel: 'beginner' | 'expert' = 'beginner';
+  export let activeWorkflowHint = '';
 
   export let onSetRightRailCollapsed: (v: boolean) => void = () => {};
+  export let onSetUxLevel: (level: 'beginner' | 'expert') => void = () => {};
   export let onOpenCreateGeometry: () => void = () => {};
   export let onOpenDatums: () => void = () => {};
   export let onOpenSettings: () => void = () => {};
@@ -102,7 +89,6 @@
   export let computeSectionSlices: () => Promise<void> | void = () => {};
   export let computeDatumSlices: () => Promise<void> | void = () => {};
   export let exportDatumSliceCombined: () => void = () => {};
-  export let calcOffsetIntersection: () => Promise<void> | void = () => {};
   export let saveCurrentRecipe: () => void = () => {};
   export let deleteSelectedRecipe: () => void = () => {};
   export let selectRecipe: (id: string) => void = () => {};
@@ -142,6 +128,11 @@
       <button class="btn btn-xs variant-soft" title="Collapse tools panel" onclick={() => onSetRightRailCollapsed(true)}>Collapse</button>
     </div>
 
+    <div class="flex items-center gap-1 rounded-2xl border border-white/10 bg-white/5 p-1">
+      <button class={`flex-1 rounded-xl px-3 py-2 text-[11px] ${uxLevel === 'beginner' ? 'bg-cyan-400/15 text-cyan-100' : 'text-white/60'}`} onclick={() => onSetUxLevel('beginner')}>Beginner</button>
+      <button class={`flex-1 rounded-xl px-3 py-2 text-[11px] ${uxLevel === 'expert' ? 'bg-cyan-400/15 text-cyan-100' : 'text-white/60'}`} onclick={() => onSetUxLevel('expert')}>Expert</button>
+    </div>
+
     <div class="rounded-2xl border border-white/10 bg-white/5 p-4 text-[11px] text-white/55 surface-panel-slide surface-pop-card surface-depth-1">
       {#if coreMode}
         Core Mode is active. Advanced controls are hidden for focused workflow.
@@ -150,67 +141,82 @@
       {/if}
     </div>
 
-    <div class="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-2 text-[11px] text-white/70 surface-panel-slide surface-pop-card surface-depth-1">
-      <div class="text-[10px] uppercase tracking-widest text-white/50">Core Flow</div>
-      <div>1. Add explicit points.</div>
-      <div>2. Create lines from existing points.</div>
-      <div>3. Create triangle/quad/contour surfaces.</div>
+    <div class="rounded-2xl border border-white/10 bg-black/20 p-4 text-[11px] text-white/70 surface-panel-slide surface-pop-card surface-depth-1">
+      <div class="text-[10px] uppercase tracking-widest text-white/50">Next Step</div>
+      <div class="mt-2">{activeWorkflowHint}</div>
     </div>
 
-    <SurfaceWorkflowGuideCard pointsCount={pointsCount} {datumSliceBusy} />
+    {#if uxLevel === 'expert'}
+      <div class="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-2 text-[11px] text-white/70 surface-panel-slide surface-pop-card surface-depth-1">
+        <div class="text-[10px] uppercase tracking-widest text-white/50">Core Flow</div>
+        <div>1. Add explicit points.</div>
+        <div>2. Create lines from existing points.</div>
+        <div>3. Create triangle/quad/contour surfaces.</div>
+      </div>
+    {/if}
+
+    {#if uxLevel === 'expert'}
+      <SurfaceWorkflowGuideCard pointsCount={pointsCount} {datumSliceBusy} />
+    {/if}
     <SurfaceStatusRail warnings={statusWarnings} clearWarnings={onClearWarnings} />
 
     {#if SURFACE_ANALYTICS_ENABLED}
-      <SurfaceFitPanel
-        bind:evalUseSelection
-        bind:heatmapOn
-        bind:evalTol
-        bind:evalSigmaMult
-        {computeSurfaceEval}
-        {evalBusy}
-        {evalErr}
-        {evalRes}
-        bind:pendingPointIdx
-        bind:cylUseSelection
-        bind:cylShowAxis
-        {computeCylinderFit}
-        {cylBusy}
-        {cylErr}
-        {cylRes}
-        bind:cylRefineK
-        {cylSelectOutliers}
-        {cylKeepInliers}
-        {cylRemoveOutliers}
-        {cylThresholdAbs}
-        activeFitPointIds={currentActiveFitPointIds}
-        {selectedPointIds}
-        {cylFitPointIds}
-        bind:sliceAxis
-        bind:sliceBins
-        bind:sliceThickness
-        bind:sliceMetric
-        {computeSectionSlices}
-        {sliceBusy}
-        {sliceErr}
-        {sliceRes}
-        pointsCount={pointsCount}
-      />
+      {#await import('./SurfaceFitPanel.svelte') then fitPanel}
+        {@const FitPanel = fitPanel.default}
+        <FitPanel
+          bind:evalUseSelection
+          bind:heatmapOn
+          bind:evalTol
+          bind:evalSigmaMult
+          {computeSurfaceEval}
+          {evalBusy}
+          {evalErr}
+          {evalRes}
+          bind:pendingPointIdx
+          bind:cylUseSelection
+          bind:cylShowAxis
+          {computeCylinderFit}
+          {cylBusy}
+          {cylErr}
+          {cylRes}
+          bind:cylRefineK
+          {cylSelectOutliers}
+          {cylKeepInliers}
+          {cylRemoveOutliers}
+          {cylThresholdAbs}
+          activeFitPointIds={currentActiveFitPointIds}
+          {selectedPointIds}
+          {cylFitPointIds}
+          bind:sliceAxis
+          bind:sliceBins
+          bind:sliceThickness
+          bind:sliceMetric
+          {computeSectionSlices}
+          {sliceBusy}
+          {sliceErr}
+          {sliceRes}
+          pointsCount={pointsCount}
+        />
+      {/await}
 
-      <SurfaceDatumSliceExportPanel
-        {datumPlaneChoices}
-        bind:datumSlicePlaneIdx
-        bind:datumSliceMode
-        bind:datumSliceSpacing
-        bind:datumSliceCount
-        bind:datumSliceThickness
-        bind:datumSliceUseSelection
-        bind:includeOptionalSliceColumns
-        {datumSliceBusy}
-        {datumSliceErr}
-        {datumSliceRes}
-        computeDatumPlaneSlices={computeDatumSlices}
-        {exportDatumSliceCombined}
-      />
+      {#await import('./SurfaceDatumSliceExportPanel.svelte') then datumSlicePanel}
+        {@const DatumSliceExportPanel = datumSlicePanel.default}
+        <DatumSliceExportPanel
+          {datumPlaneChoices}
+          bind:datumSlicePlaneIdx
+          bind:datumSliceMode
+          bind:datumSliceSpacing
+          bind:datumSliceCount
+          bind:datumSliceThickness
+          bind:datumSliceUseSelection
+          bind:includeOptionalSliceColumns
+          {datumSliceBusy}
+          {datumSliceErr}
+          {datumSliceRes}
+          computeDatumPlaneSlices={computeDatumSlices}
+          {exportDatumSliceCombined}
+        />
+      {/await}
 
       <SurfaceSlicingRecommendationRail
         model={sliceSyncModel}
@@ -220,20 +226,10 @@
       />
     {/if}
 
-    <SurfaceInterpolationPanel bind:interpPct {interpPoint} />
-    <SurfaceOffsetIntersectionPanel
-      {edges}
-      {points}
-      bind:selEdgeA
-      bind:selEdgeB
-      bind:offsetDist
-      bind:refPointIdx
-      {intersection}
-      {intersectionBusy}
-      {intersectionDiagnostics}
-      {calcOffsetIntersection}
-    />
-
+    {#await import('./SurfaceInterpolationPanel.svelte') then interpolationPanel}
+      {@const InterpolationPanel = interpolationPanel.default}
+      <InterpolationPanel bind:interpPct {interpPoint} />
+    {/await}
     {#if !coreMode}
       <div class="rounded-2xl border border-white/10 bg-black/15 overflow-hidden">
         <button class="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-white/5" onclick={onToggleAdvancedOpen} title="Advanced controls">
@@ -242,54 +238,63 @@
         </button>
         {#if advancedOpen}
           <div class="p-4 space-y-4 border-t border-white/10">
-            <SurfaceRecipesPanel
-              {recipes}
-              bind:selectedRecipeId
-              bind:recipeNameDraft
-              bind:stepConfirmed={recipeStepConfirmed}
-              runState={recipeRun}
-              onSaveCurrent={saveCurrentRecipe}
-              onDeleteSelected={deleteSelectedRecipe}
-              onSelectRecipe={selectRecipe}
-              onToggleStep={toggleSelectedRecipeStep}
-              onStartRun={startRecipeRun}
-              onRunNext={runRecipeNextStep}
-              onCancelRun={cancelRecipeRun}
-            />
+            {#await import('./SurfaceRecipesPanel.svelte') then recipesPanel}
+              {@const RecipesPanel = recipesPanel.default}
+              <RecipesPanel
+                {recipes}
+                bind:selectedRecipeId
+                bind:recipeNameDraft
+                bind:stepConfirmed={recipeStepConfirmed}
+                runState={recipeRun}
+                onSaveCurrent={saveCurrentRecipe}
+                onDeleteSelected={deleteSelectedRecipe}
+                onSelectRecipe={selectRecipe}
+                onToggleStep={toggleSelectedRecipeStep}
+                onStartRun={startRecipeRun}
+                onRunNext={runRecipeNextStep}
+                onCancelRun={cancelRecipeRun}
+              />
+            {/await}
 
-            <CurveEdgesLoftPanel
-              {edges}
-              {activeEdgeIdx}
-              {setActiveEdgeIdx}
-              {deleteEdge}
-              {curves}
-              {activeCurveIdx}
-              {setActiveCurveIdx}
-              {deleteCurve}
-              {createCurve}
-              {curveMode}
-              toggleCurveMode={() => {
-                if (toolCursor === 'curve') setToolCursor('select');
-                else setToolCursor('curve');
-              }}
-              {loftA}
-              {loftB}
-              {setLoftA}
-              {setLoftB}
-              {rebuildLoftSegments}
-              {loftSegmentsCount}
-              {loftErr}
-            />
+            {#await import('./CurveEdgesLoftPanel.svelte') then loftPanel}
+              {@const LoftPanel = loftPanel.default}
+              <LoftPanel
+                {edges}
+                {activeEdgeIdx}
+                {setActiveEdgeIdx}
+                {deleteEdge}
+                {curves}
+                {activeCurveIdx}
+                {setActiveCurveIdx}
+                {deleteCurve}
+                {createCurve}
+                {curveMode}
+                toggleCurveMode={() => {
+                  if (toolCursor === 'curve') setToolCursor('select');
+                  else setToolCursor('curve');
+                }}
+                {loftA}
+                {loftB}
+                {setLoftA}
+                {setLoftB}
+                {rebuildLoftSegments}
+                {loftSegmentsCount}
+                {loftErr}
+              />
+            {/await}
 
-            <SurfaceSamplerPanel
-              bind:samplerAppend
-              bind:samplerMode
-              bind:samplerNu
-              bind:samplerNv
-              bind:samplerEdgeSegs
-              bind:samplerErr
-              onGenerate={generateSamplerPoints}
-            />
+            {#await import('./SurfaceSamplerPanel.svelte') then samplerPanel}
+              {@const SamplerPanel = samplerPanel.default}
+              <SamplerPanel
+                bind:samplerAppend
+                bind:samplerMode
+                bind:samplerNu
+                bind:samplerNv
+                bind:samplerEdgeSegs
+                bind:samplerErr
+                onGenerate={generateSamplerPoints}
+              />
+            {/await}
           </div>
         {/if}
       </div>

@@ -281,23 +281,38 @@ export interface SurfaceState {
 }
 
 export function createInitialState(): SurfaceState {
+  const defaultPoints: Point3D[] = [
+    { x: -140, y: -120, z: 0 },
+    { x: 0, y: -135, z: 28 },
+    { x: 145, y: -110, z: -8 },
+    { x: -150, y: -10, z: 34 },
+    { x: -10, y: -18, z: 72 },
+    { x: 150, y: 10, z: 18 },
+    { x: -132, y: 118, z: -12 },
+    { x: 12, y: 140, z: 42 },
+    { x: 160, y: 112, z: 8 }
+  ];
+  const defaultEdges: Edge[] = [
+    [0, 1], [1, 2],
+    [3, 4], [4, 5],
+    [6, 7], [7, 8],
+    [0, 3], [3, 6],
+    [1, 4], [4, 7],
+    [2, 5], [5, 8]
+  ];
+  const defaultSurfaces: SurfaceFace[] = [
+    { name: 'Surface 0', pts: [0, 1, 4, 3], vertexIds: [0, 1, 4, 3] },
+    { name: 'Surface 1', pts: [1, 2, 5, 4], vertexIds: [1, 2, 5, 4] },
+    { name: 'Surface 2', pts: [3, 4, 7, 6], vertexIds: [3, 4, 7, 6] },
+    { name: 'Surface 3', pts: [4, 5, 8, 7], vertexIds: [4, 5, 8, 7] }
+  ];
   return {
     lastAction: 'init',
     
-    points: [
-      { x: 0, y: 0, z: 0 },
-      { x: 120, y: -10, z: 5 },
-      { x: 100, y: 110, z: -10 },
-      { x: -10, y: 90, z: 30 }
-    ],
-    edges: [
-      [0, 1],
-      [1, 2],
-      [2, 3],
-      [3, 0]
-    ],
+    points: defaultPoints,
+    edges: defaultEdges,
     curves: [],
-    surfaces: [],
+    surfaces: defaultSurfaces,
     csys: [{
       name: 'Global',
       origin: { x: 0, y: 0, z: 0 },
@@ -353,8 +368,8 @@ export function createInitialState(): SurfaceState {
     createPtX: 0,
     createPtY: 0,
     createPtZ: 0,
-    createLineA: 0,
-    createLineB: 1,
+    createLineA: null,
+    createLineB: null,
     surfaceDraft: [],
     surfaceCreateKind: 'quad',
     createMode: 'idle',

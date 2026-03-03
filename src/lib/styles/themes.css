@@ -1,44 +1,89 @@
-/* Theme System - Light/Dark/Teal variations */
+/* Global Theme System - unified on Surface theme profiles */
 
 :root,
-[data-theme="dark"] {
+[data-theme="technical"] {
   --bg-primary: #0f172a;
   --bg-secondary: #1e293b;
   --text-primary: #f1f5f9;
   --text-secondary: #cbd5e1;
   --border-primary: rgba(255, 255, 255, 0.1);
-  --accent-primary: #3b82f6;
+  --accent-primary: #38bdf8;
+  --theme-border: rgba(255, 255, 255, 0.1);
+  --theme-btn-bg: rgba(2, 6, 23, 0.52);
+  --theme-btn-hover: rgba(255, 255, 255, 0.06);
+  --theme-border-hover: rgba(125, 211, 252, 0.28);
+  --theme-btn-active: rgba(56, 189, 248, 0.16);
+  --theme-border-active: rgba(56, 189, 248, 0.45);
+  --theme-text: rgba(241, 245, 249, 0.72);
+  --theme-text-active: rgba(207, 250, 254, 0.96);
+  --theme-app-glow:
+    radial-gradient(circle at 12% 18%, rgba(45, 212, 191, 0.1), transparent 34%),
+    radial-gradient(circle at 84% 10%, rgba(56, 189, 248, 0.08), transparent 28%);
 }
 
-[data-theme="light"] {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --text-primary: #0f172a;
-  --text-secondary: #334155;
-  --border-primary: rgba(0, 0, 0, 0.1);
-  --accent-primary: #2563eb;
+[data-theme="studio"] {
+  --bg-primary: #140b1f;
+  --bg-secondary: #231236;
+  --text-primary: #fdf2f8;
+  --text-secondary: #f5d0fe;
+  --border-primary: rgba(244, 114, 182, 0.18);
+  --accent-primary: #ec4899;
+  --theme-border: rgba(244, 114, 182, 0.18);
+  --theme-btn-bg: rgba(30, 11, 41, 0.52);
+  --theme-btn-hover: rgba(251, 207, 232, 0.08);
+  --theme-border-hover: rgba(244, 114, 182, 0.32);
+  --theme-btn-active: rgba(236, 72, 153, 0.16);
+  --theme-border-active: rgba(236, 72, 153, 0.45);
+  --theme-text: rgba(253, 242, 248, 0.76);
+  --theme-text-active: rgba(255, 228, 240, 0.98);
+  --theme-app-glow:
+    radial-gradient(circle at 14% 20%, rgba(236, 72, 153, 0.12), transparent 34%),
+    radial-gradient(circle at 82% 14%, rgba(192, 132, 252, 0.09), transparent 26%);
 }
 
-[data-theme="teal-dark"] {
-  --bg-primary: #0a1f1f;
-  --bg-secondary: #0f2d2d;
-  --text-primary: #e0f2f1;
-  --text-secondary: #b2dfdb;
-  --border-primary: rgba(20, 184, 166, 0.3);
-  --accent-primary: #14b8a6;
+[data-theme="high-contrast"] {
+  --bg-primary: #060606;
+  --bg-secondary: #111111;
+  --text-primary: #f8fafc;
+  --text-secondary: #e5e7eb;
+  --border-primary: rgba(250, 204, 21, 0.22);
+  --accent-primary: #facc15;
+  --theme-border: rgba(250, 204, 21, 0.2);
+  --theme-btn-bg: rgba(10, 10, 10, 0.72);
+  --theme-btn-hover: rgba(255, 255, 255, 0.08);
+  --theme-border-hover: rgba(250, 204, 21, 0.4);
+  --theme-btn-active: rgba(250, 204, 21, 0.2);
+  --theme-border-active: rgba(250, 204, 21, 0.58);
+  --theme-text: rgba(248, 250, 252, 0.8);
+  --theme-text-active: rgba(255, 251, 235, 0.98);
+  --theme-app-glow:
+    radial-gradient(circle at 12% 18%, rgba(250, 204, 21, 0.08), transparent 30%);
 }
 
-[data-theme="teal-light"] {
-  --bg-primary: #f0fdfa;
-  --bg-secondary: #ccfbf1;
-  --text-primary: #134e4a;
-  --text-secondary: #115e59;
-  --border-primary: rgba(20, 184, 166, 0.3);
-  --accent-primary: #0d9488;
+[data-theme="aurora"] {
+  --bg-primary: #06111f;
+  --bg-secondary: #0d1c30;
+  --text-primary: #ecfeff;
+  --text-secondary: #d1fae5;
+  --border-primary: rgba(110, 231, 183, 0.18);
+  --accent-primary: #34d399;
+  --theme-border: rgba(110, 231, 183, 0.18);
+  --theme-btn-bg: rgba(4, 18, 30, 0.56);
+  --theme-btn-hover: rgba(207, 250, 254, 0.08);
+  --theme-border-hover: rgba(52, 211, 153, 0.34);
+  --theme-btn-active: rgba(16, 185, 129, 0.18);
+  --theme-border-active: rgba(52, 211, 153, 0.48);
+  --theme-text: rgba(236, 254, 255, 0.76);
+  --theme-text-active: rgba(220, 252, 231, 0.98);
+  --theme-app-glow:
+    radial-gradient(circle at 12% 18%, rgba(56, 189, 248, 0.11), transparent 32%),
+    radial-gradient(circle at 84% 12%, rgba(52, 211, 153, 0.09), transparent 26%);
 }
 
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
+  background-image: var(--theme-app-glow);
+  background-attachment: fixed;
   transition: background-color 0.3s ease, color 0.3s ease;
 }

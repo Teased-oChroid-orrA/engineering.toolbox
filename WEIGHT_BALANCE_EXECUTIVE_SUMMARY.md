@@ -224,7 +224,7 @@ Users are solely responsible for ensuring safe aircraft operation.
 | Aspect | Bushing Toolbox | Surface Toolbox | W&B Module |
 |--------|----------------|-----------------|------------|
 | Calculation Type | Lamé stress model | Best-fit interpolation | Tabular method |
-| Rendering | SVG + Babylon | D3 vector | D3 envelope |
+| Rendering | D3/SVG engineering views | D3 vector | D3 envelope |
 | Validation | Golden files | Feature contracts | Golden files |
 | Regulatory | Engineering standards | — | FAA regulations |
 | Export | SVG/PDF | CSV/JSON | PDF + SVG |

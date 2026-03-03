@@ -2,12 +2,18 @@ export type SurfaceWorkspaceUiState = {
   coreMode: boolean;
   advancedOpen: boolean;
   rightRailCollapsed?: boolean;
+  uxLevel?: 'beginner' | 'expert';
+  viewportHudDock?: 'left' | 'right';
+  viewportHudExpanded?: boolean;
+  viewportHudTab?: 'build' | 'offset' | 'precision';
   zoomK?: number;
   pan?: { x: number; y: number };
   rot?: { alpha: number; beta: number };
   rendererMode?: 'svg';
   rendererTheme?: 'technical' | 'studio' | 'high-contrast' | 'aurora';
   performanceMode?: boolean;
+  offsetGuidanceMode?: 'manual' | 'single_click_guided';
+  hasSeenOffsetGuidanceHint?: boolean;
 };
 
 const CORE_MODE_KEY = 'sc.surface.coreMode';
@@ -88,12 +94,16 @@ export function markCoreModePromptSeen() {
 type SessionRoot = Record<string, SurfaceWorkspaceUiState>;
 
 function readSessionRoot(): SessionRoot {
-  const w = safeWindow() as any;
+  const w = safeWindow();
   if (!w) return {};
-  const cur = w[SESSION_STATE_ROOT_KEY];
-  if (cur && typeof cur === 'object') return cur as SessionRoot;
-  w[SESSION_STATE_ROOT_KEY] = {};
-  return w[SESSION_STATE_ROOT_KEY] as SessionRoot;
+  try {
+    const raw = w.sessionStorage.getItem(SESSION_STATE_ROOT_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed as SessionRoot : {};
+  } catch {
+    return {};
+  }
 }
 
 export function readWorkspaceUiState(workspaceKey: string): SurfaceWorkspaceUiState | null {
@@ -105,6 +115,13 @@ export function readWorkspaceUiState(workspaceKey: string): SurfaceWorkspaceUiSt
 }
 
 export function writeWorkspaceUiState(workspaceKey: string, state: SurfaceWorkspaceUiState) {
-  const root = readSessionRoot();
-  root[workspaceKey] = state;
+  const w = safeWindow();
+  if (!w) return;
+  try {
+    const root = readSessionRoot();
+    root[workspaceKey] = state;
+    w.sessionStorage.setItem(SESSION_STATE_ROOT_KEY, JSON.stringify(root));
+  } catch {
+    // no-op
+  }
 }

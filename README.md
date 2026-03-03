@@ -4,7 +4,7 @@
 
 ## Overview
 
-Structural Companion Desktop is a SvelteKit + Tauri desktop application for structural engineering design and analysis, focusing on fastener design (Bushing Toolbox) and surface modeling (Surface Toolbox). Built with Svelte 5, TypeScript, Babylon.js (3D), D3 (drafting), and Rust (Tauri backend).
+Structural Companion Desktop is a SvelteKit + Tauri desktop application for structural engineering design and analysis, focused on bushing analysis, surface modeling, and related engineering workflows. Built with Svelte 5, TypeScript, D3/SVG engineering rendering, and Rust (Tauri backend).
 
 ## Development Workflow & CI Protection
 
@@ -65,7 +65,7 @@ Interference-fit bushing/housing design solver using Lamé thick-cylinder stress
 - Three profile modes: straight, flanged, countersink (internal/external)
 - Fit/tolerance closure with auto-adjust logic
 - Stress and margin checks (hoop stress, edge distance, wall thickness)
-- Dual rendering: SVG (legacy) + Babylon.js (active migration)
+- D3/SVG drafting with orthographic engineering views
 - Export to SVG/PDF
 
 ### Surface Toolbox

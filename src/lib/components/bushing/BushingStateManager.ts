@@ -1,6 +1,6 @@
 import { writable, derived, type Readable } from 'svelte/store';
 import type { BushingInputs } from '$lib/core/bushing';
-import type { BabylonRenderDiagnostic } from '$lib/drafting/bushing/BushingBabylonRuntime';
+import type { BushingRenderDiagnostic } from '$lib/drafting/bushing/BushingRenderTypes';
 import type { BushingRenderMode } from '$lib/drafting/bushing/bushingSceneModel';
 import { MATERIALS } from '$lib/core/bushing/materials';
 import { evaluateBushingPipeline, getBushingPipelineCacheStats } from './BushingComputeController';
@@ -17,8 +17,8 @@ export type BushingState = {
   useLegacyRenderer: boolean;
   renderMode: BushingRenderMode;
   traceEnabled: boolean;
-  babylonInitNotice: string | null;
-  babylonDiagnostics: BabylonRenderDiagnostic[];
+  renderInitNotice: string | null;
+  renderDiagnostics: BushingRenderDiagnostic[];
   showInformationView: boolean;
 };
 
@@ -82,8 +82,8 @@ export function createBushingStateManager() {
     useLegacyRenderer: false,
     renderMode: 'section',
     traceEnabled: false,
-    babylonInitNotice: null,
-    babylonDiagnostics: [],
+    renderInitNotice: null,
+    renderDiagnostics: [],
     showInformationView: false
   });
 
@@ -146,25 +146,25 @@ export function createBushingStateManager() {
     });
   }
 
-  function handleBabylonInitFailure(reason: string) {
+  function handleRenderInitFailure(reason: string) {
     state.update((s) => {
-      s.babylonInitNotice = reason || 'Babylon initialization failed.';
+      s.renderInitNotice = reason || 'Renderer initialization failed.';
       if (typeof window !== 'undefined') {
-        const payload = { at: new Date().toISOString(), reason: s.babylonInitNotice };
+        const payload = { at: new Date().toISOString(), reason: s.renderInitNotice };
         try {
-          const prior = Number(safeGetItem('scd.bushing.babylonInitFailCount') ?? '0');
-          safeSetItem('scd.bushing.babylonInitFailCount', String(prior + 1));
-          safeSetItem('scd.bushing.babylonInitLast', JSON.stringify(payload));
+          const prior = Number(safeGetItem('scd.bushing.renderInitFailCount') ?? '0');
+          safeSetItem('scd.bushing.renderInitFailCount', String(prior + 1));
+          safeSetItem('scd.bushing.renderInitLast', JSON.stringify(payload));
         } catch {}
-        bushingLogger.warn('Babylon init failed', payload);
+        bushingLogger.warn('Renderer init failed', payload);
       }
       return s;
     });
   }
 
-  function setBabylonDiagnostics(diag: BabylonRenderDiagnostic[]) {
+  function setRenderDiagnostics(diag: BushingRenderDiagnostic[]) {
     state.update((s) => {
-      s.babylonDiagnostics = diag;
+      s.renderDiagnostics = diag;
       return s;
     });
   }
@@ -185,8 +185,8 @@ export function createBushingStateManager() {
     updateForm,
     toggleRendererMode,
     toggleTraceMode,
-    handleBabylonInitFailure,
-    setBabylonDiagnostics,
+    handleRenderInitFailure,
+    setRenderDiagnostics,
     setShowInformationView
   };
 }

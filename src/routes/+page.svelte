@@ -19,12 +19,12 @@
       bg: 'bg-indigo-500/10 border-indigo-500/20'
     },
     {
-      title: 'Fastener Toolbox',
-      desc: 'Sequential fastener load-transfer path analysis across multi-row joints.',
-      href: '#/fastener',
-      icon: '⛓',
-      color: 'text-amber-300',
-      bg: 'bg-amber-500/10 border-amber-500/20'
+      title: 'Preload Analysis',
+      desc: 'Explicit fastened-joint preload, stiffness, separation, slip, and strength checks.',
+      href: '#/preload',
+      icon: '⏚',
+      color: 'text-cyan-300',
+      bg: 'bg-cyan-500/10 border-cyan-500/20'
     },
     
   ];

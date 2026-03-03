@@ -9,10 +9,12 @@
   // Svelte 5: Convert props to $props()
   let {
     results,
-    dndEnabled = true
+    dndEnabled = true,
+    uxMode = 'guided'
   }: {
     results: BushingOutput;
     dndEnabled?: boolean;
+    uxMode?: 'guided' | 'advanced';
   } = $props();
   
   // Svelte 5: Convert local state to $state
@@ -72,11 +74,26 @@
 
   function focusSection(id: string) {
     if (!id || id.trim() === '') return; // Guard against empty strings
-    const el = document.getElementById(id);
+    const fallbackSelector =
+      id === 'bushing-geometry-card'
+        ? "[data-dnd-card='geometry'], #bushing-geometry-card"
+        : id === 'bushing-profile-card'
+          ? "[data-dnd-card='profile'], #bushing-profile-card"
+          : id === 'bushing-process-card'
+            ? "[data-dnd-card='process'], #bushing-process-card"
+            : `#${id}`;
+    const el = document.querySelector<HTMLElement>(fallbackSelector);
     if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    el.classList.add('ring-2', 'ring-amber-300/80');
-    setTimeout(() => el.classList.remove('ring-2', 'ring-amber-300/80'), 1500);
+    let parent = el.parentElement;
+    while (parent) {
+      if (parent instanceof HTMLDetailsElement) parent.open = true;
+      parent = parent.parentElement;
+    }
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      el.classList.add('ring-2', 'ring-amber-300/80');
+      setTimeout(() => el.classList.remove('ring-2', 'ring-amber-300/80'), 1500);
+    });
     infoDialog = null;
   }
   
@@ -84,9 +101,34 @@
     e.stopPropagation();
     infoDialog = type;
   }
+
+  let warningActions = $derived.by(() => {
+    const actions = new Map<string, { label: string; target: string }>();
+    for (const warning of results.warningCodes) {
+      if (warning.code.includes('EDGE_DISTANCE')) actions.set('geometry', { label: 'Jump to Geometry', target: 'bushing-geometry-card' });
+      if (warning.code.includes('WALL_BELOW_MIN')) actions.set('profile', { label: 'Jump to Profile', target: 'bushing-profile-card' });
+      if (warning.code.includes('INTERFERENCE') || warning.code.includes('TOLERANCE')) {
+        actions.set('process', { label: 'Jump to Process', target: 'bushing-process-card' });
+      }
+    }
+    return [...actions.values()];
+  });
 </script>
 
 <div class="space-y-4">
+  <div class="rounded-xl border border-cyan-300/20 bg-cyan-500/8 p-3 text-xs text-cyan-100/85 bushing-pop-card bushing-depth-1">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="font-semibold uppercase tracking-wide text-[10px]">Diagnostic Ladder</div>
+      <div class="text-[10px] text-white/60">{results.warnings?.length ?? 0} warning(s)</div>
+    </div>
+    <div class="mt-2 space-y-1">
+      <div>Level 1: {hasWarnings ? 'Warnings present' : 'No active warnings'}</div>
+      <div>Level 2: Governing check is <span class="font-semibold text-white/85">{results.governing.name}</span></div>
+      {#if uxMode === 'guided'}
+        <div>Level 3: Open detailed diagnostics only if the governing reason is unclear.</div>
+      {/if}
+    </div>
+  </div>
   <details id="bushing-diagnostics-card" class="glass-card rounded-xl border border-white/10 p-3 bushing-pop-card bushing-depth-2 bushing-results-card" open>
     <summary class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-indigo-200/95">
       Detailed Diagnostics
@@ -124,6 +166,11 @@
                 <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Min (Seq)</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.edgeDistance.edMinSequence)}</span></div>
                 <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Min (Strength)</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.edgeDistance.edMinStrength)}</span></div>
                 <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Mode</span><span class="font-mono text-slate-100 font-semibold">{results.edgeDistance.governing}</span></div>
+                <div class="pt-1">
+                  <button class="rounded border border-cyan-300/35 bg-cyan-500/10 px-2 py-1 text-[10px] text-cyan-100 hover:bg-cyan-500/20" onclick={(e) => { e.stopPropagation(); focusSection('bushing-geometry-card'); }}>
+                    Jump to Geometry
+                  </button>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -148,6 +195,11 @@
                 <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Straight</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.sleeveWall)}</span></div>
                 <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Neck</span><span class="font-mono text-slate-100 font-semibold">{fmt(results.neckWall)}</span></div>
                 <div class="flex justify-between"><span class="text-slate-100/95 font-medium">Governing</span><span class="font-mono text-slate-100 font-semibold">{results.governing.name}</span></div>
+                <div class="pt-1">
+                  <button class="rounded border border-cyan-300/35 bg-cyan-500/10 px-2 py-1 text-[10px] text-cyan-100 hover:bg-cyan-500/20" onclick={(e) => { e.stopPropagation(); focusSection('bushing-profile-card'); }}>
+                    Jump to Profile
+                  </button>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -160,7 +212,19 @@
           </div>
           <Card id="bushing-warnings-card" class="border border-amber-300/55 bg-amber-500/15 bushing-pop-card bushing-depth-1">
             <CardContent class="pt-4 text-sm space-y-2">
-              <div class="text-[10px] font-bold uppercase text-amber-200">Warnings</div>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="text-[10px] font-bold uppercase text-amber-200">Warnings</div>
+                <div class="flex flex-wrap gap-2">
+                  {#each warningActions as action}
+                    <button class="rounded border border-amber-200/35 bg-black/20 px-2 py-1 text-[10px] text-amber-50 hover:bg-black/35" onclick={() => focusSection(action.target)}>
+                      {action.label}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+              <div class="rounded-md border border-amber-200/20 bg-black/20 px-2 py-1 text-[11px] text-amber-50/90">
+                Review the plain-language warnings first, then jump directly to the source section that controls the outcome.
+              </div>
               {#each results.warnings as w}
                 <div class="flex items-start gap-2 rounded-md border border-amber-200/35 bg-black/35 px-2 py-1.5 bushing-pop-sub bushing-depth-0 text-amber-50">
                   <span class="text-amber-200">⚠</span><span class="font-medium">{w}</span>

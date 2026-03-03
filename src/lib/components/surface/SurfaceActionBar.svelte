@@ -2,7 +2,6 @@
   import SurfaceSelectionControls from './SurfaceSelectionControls.svelte';
   import SurfaceFileMenu from './SurfaceFileMenu.svelte';
   import type { ToolCursorMode } from './controllers/SurfaceCursorController';
-import type { RendererTheme } from '$lib/surface/renderer/types';
 
   export let actionsBarEl: HTMLElement | null = null;
   export let coreMode = true;
@@ -22,7 +21,6 @@ import type { RendererTheme } from '$lib/surface/renderer/types';
   export let canDeleteSelection = false;
   export let minPointsFor = { line: 2, surface: 3 };
   export let pointsCount = 0;
-  export let rendererTheme: RendererTheme = 'technical';
   export let performanceMode = false;
 
   export let onToggleCoreMode: () => void = () => {};
@@ -44,7 +42,6 @@ import type { RendererTheme } from '$lib/surface/renderer/types';
   export let onUndo: () => void = () => {};
   export let onRedo: () => void = () => {};
   export let onOpenDeletePreview: () => void = () => {};
-  export let onSetRendererTheme: (theme: RendererTheme) => void = () => {};
   export let onTogglePerformanceMode: () => void = () => {};
 </script>
 
@@ -169,17 +166,6 @@ import type { RendererTheme } from '$lib/surface/renderer/types';
 
   <div class="glass-panel surface-pop-card surface-depth-1 rounded-xl px-2 py-2 flex items-center gap-2">
     <div class="text-[10px] text-white/50 uppercase tracking-widest px-1">Renderer</div>
-    <select
-      class="select select-xs glass-input w-28"
-      bind:value={rendererTheme}
-      onchange={(event) => onSetRendererTheme((event.currentTarget as HTMLSelectElement).value as RendererTheme)}
-      title="Renderer theme profile"
-    >
-      <option value="technical">Technical</option>
-      <option value="studio">Studio</option>
-      <option value="high-contrast">High Contrast</option>
-      <option value="aurora">Aurora</option>
-    </select>
     <button
       class={performanceMode ? 'btn btn-xs variant-soft' : 'btn btn-xs variant-soft opacity-75'}
       onclick={onTogglePerformanceMode}

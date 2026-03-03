@@ -4,7 +4,6 @@ const cases = [
   { hash: '#/', marker: '[data-route-ready="dashboard"]' },
   { hash: '#/bushing', marker: '[data-route-ready="bushing"]' },
   { hash: '#/shear', marker: '[data-route-ready="shear"]' },
-  { hash: '#/fastener', marker: '[data-route-ready="fastener"]' },
   { hash: '#/profile', marker: '[data-route-ready="profile"]' },
   { hash: '#/properties', marker: '[data-route-ready="properties"]' },
   { hash: '#/buckling', marker: '[data-route-ready="buckling"]' },

@@ -6,7 +6,7 @@
     open: boolean;
     x: number;
     y: number;
-    targetKind?: 'point' | 'line' | 'empty';
+    targetKind?: 'point' | 'line' | 'surface' | 'empty';
     targetIndex?: number | null;
     onFitToScreen?: () => void;
     onResetView?: () => void;
@@ -16,6 +16,9 @@
     onConnectToPoint?: (idx: number) => void;
     onIsolateFromPoint?: (idx: number) => void;
     onIsolateFromLine?: (idx: number) => void;
+    onSetOffsetSurfaceA?: (idx: number) => void;
+    onSetOffsetSurfaceB?: (idx: number) => void;
+    onDeleteSurfaceOnly?: (idx: number) => void;
     onClearIsolation?: () => void;
     onClose: () => void;
   };
@@ -34,6 +37,9 @@
     onConnectToPoint,
     onIsolateFromPoint,
     onIsolateFromLine,
+    onSetOffsetSurfaceA,
+    onSetOffsetSurfaceB,
+    onDeleteSurfaceOnly,
     onClearIsolation,
     onClose
   }: Props = $props();
@@ -135,6 +141,35 @@
         }}
       >
         Delete line only
+      </button>
+    {:else if targetKind === 'surface' && targetIndex !== null}
+      <div class="px-3 py-1 text-[11px] text-cyan-200/80">Surface S{targetIndex + 1}</div>
+      <button
+        class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-sm text-white/80"
+        onclick={() => {
+          onSetOffsetSurfaceA?.(targetIndex);
+          onClose();
+        }}
+      >
+        Use as offset surface A
+      </button>
+      <button
+        class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-sm text-white/80"
+        onclick={() => {
+          onSetOffsetSurfaceB?.(targetIndex);
+          onClose();
+        }}
+      >
+        Use as offset surface B
+      </button>
+      <button
+        class="w-full text-left px-3 py-2 rounded-lg hover:bg-red-500/15 text-sm text-rose-200"
+        onclick={() => {
+          onDeleteSurfaceOnly?.(targetIndex);
+          onClose();
+        }}
+      >
+        Delete surface only
       </button>
     {:else}
       <button

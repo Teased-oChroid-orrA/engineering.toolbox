@@ -1,9 +1,11 @@
-export type AppTheme = 'modern' | 'seafoam';
-export type AppMode = 'light' | 'dark';
+export type AppTheme = 'technical' | 'studio' | 'high-contrast' | 'aurora';
+export type AppMode = 'dark';
 
 export const THEMES: { id: AppTheme; label: string }[] = [
-  { id: 'modern', label: 'Modern' },
-  { id: 'seafoam', label: 'Seafoam (Teal)' }
+  { id: 'technical', label: 'Technical' },
+  { id: 'studio', label: 'Studio' },
+  { id: 'high-contrast', label: 'High Contrast' },
+  { id: 'aurora', label: 'Aurora' }
 ];
 
 const KEY_THEME = 'scd.theme';
@@ -16,8 +18,8 @@ function getRoot(): HTMLElement | null {
 
 export function getThemeFromDom(): { theme: AppTheme; mode: AppMode } {
   const root = getRoot();
-  const theme = (root?.getAttribute('data-theme') as AppTheme) || 'modern';
-  const mode = (root?.getAttribute('data-mode') as AppMode) || 'dark';
+  const theme = (root?.getAttribute('data-theme') as AppTheme) || 'technical';
+  const mode = 'dark';
   return { theme, mode };
 }
 
@@ -36,8 +38,7 @@ export function setMode(mode: AppMode) {
 }
 
 export function toggleMode() {
-  const { mode } = getThemeFromDom();
-  setMode(mode === 'dark' ? 'light' : 'dark');
+  setMode('dark');
 }
 
 export function initTheme() {
@@ -48,7 +49,7 @@ export function initTheme() {
   // Otherwise, read persisted settings.
   try {
     const theme = (localStorage.getItem(KEY_THEME) as AppTheme | null) || null;
-    const mode = (localStorage.getItem(KEY_MODE) as AppMode | null) || null;
+    const mode = (localStorage.getItem(KEY_MODE) as AppMode | null) || 'dark';
     if (theme) root.setAttribute('data-theme', theme);
     if (mode) root.setAttribute('data-mode', mode);
   } catch {

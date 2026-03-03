@@ -3,7 +3,7 @@
   import { makeFriendlyMessage, getQuickFix } from '$lib/core/bushing/errorMessageUtils';
 
   // Svelte 5 props destructuring
-  let { form, results }: { form: BushingInputs; results: BushingOutput } = $props();
+  let { form, results, uxMode = 'guided' }: { form: BushingInputs; results: BushingOutput; uxMode?: 'guided' | 'advanced' } = $props();
 
   // Svelte 5 $derived rune for computed state
   let guidance = $derived.by(() => {
@@ -36,6 +36,26 @@
         lines
       };
     }
+    if (uxMode === 'guided' && results.tolerance.status === 'infeasible') {
+      return {
+        tone: 'warning',
+        title: 'Revisit Fit Intent',
+        lines: [
+          'The current bore and interference bands cannot both be satisfied.',
+          'Narrow the bore tolerance or widen the interference target before continuing.'
+        ]
+      };
+    }
+    if (uxMode === 'guided' && results.tolerance.status === 'clamped') {
+      return {
+        tone: 'info',
+        title: 'Review Normalized Fit',
+        lines: [
+          'The solver clamped the OD nominal to keep the fit inside the requested window.',
+          'Confirm the resulting OD band is acceptable before changing advanced process controls.'
+        ]
+      };
+    }
     if (form.idType === 'countersink' || form.bushingType === 'countersink') {
       return {
         tone: 'info',
@@ -45,8 +65,14 @@
     }
     return {
       tone: 'ok',
-      title: 'Core Flow',
-      lines: ['Set Setup and Geometry first, then choose profile, then review results.', 'Use Drafting/Export once governing margin is positive.']
+      title: uxMode === 'guided' ? 'Next Step' : 'Core Flow',
+      lines:
+        uxMode === 'guided'
+          ? [
+              'Set units and materials first, then define bore and interference intent.',
+              'Review the fit summary before opening advanced process overrides.'
+            ]
+          : ['Set Setup and Geometry first, then choose profile, then review results.', 'Use Drafting/Export once governing margin is positive.']
     };
   });
 </script>

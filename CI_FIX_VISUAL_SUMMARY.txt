@@ -37,7 +37,7 @@ AFTER:
 │ Tests Run:                                                           │
 │   ✓ bushing-solver.spec.ts (pure logic)                             │
 │   ✓ bushing-formula-audit.spec.ts (physics checks)                  │
-│   ✓ bushing-parity.spec.ts (D3 vs Babylon)                          │
+│   ✓ bushing-d3-render-contract.spec.ts (D3 render contract)         │
 │   ✓ bushing-section-profile.spec.ts (geometry)                      │
 │   ✓ ... 26 other pure logic tests                                   │
 │                                                                      │
@@ -168,7 +168,7 @@ Local Testing:
   
   Running 30 tests using 1 worker
   
-  ✓  1 bushing babylon parity harness
+  ✓  1 bushing d3 render contract harness
   ✓  2 bushing countersink consistency  
   ✓  3 bushing drafting parity
   ...
