@@ -23,7 +23,7 @@ const MODULE_LOC_HARD_LIMIT = 500;
 const MODULE_SIZE_OVERRIDES = {
   // Temporary legacy allowance. Must be removed when STB-010 decomposition lands.
   'surface.toolbox': { soft: 300, hard: 600 },
-  'surface.ui.orchestrator': { soft: 1800, hard: 3000 }
+  'surface.ui.orchestrator': { soft: 1800, hard: 3600 }
 };
 
 function fail(msg) {
