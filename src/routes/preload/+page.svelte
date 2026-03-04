@@ -17,7 +17,7 @@
     solveFastenerGroupPattern,
     solveFastenerGroupPatternCases,
     PRELOAD_FASTENER_CATALOG,
-    PRELOAD_REFERENCE_FASTENER_CATALOGS,
+    PRELOAD_IMPORT_PROVENANCE,
     getPreloadFastener,
     getPreloadMaterial,
     PRELOAD_MATERIAL_LIBRARY,
@@ -206,6 +206,7 @@
   let solverError = '';
   let selectedInstallationModel: FastenedJointPreloadInput['installation']['model'] = form.installation.model;
   let visualizationMode: 'classical_cone' | 'equivalent_annulus' = 'classical_cone';
+  let showAdvancedInputs = false;
   let summarySvg: SVGSVGElement | null = null;
   let jointSectionSvg: SVGSVGElement | null = null;
 
@@ -1129,9 +1130,36 @@
 <div class="grid h-[calc(100vh-6rem)] grid-cols-1 gap-4 overflow-hidden p-1 lg:grid-cols-[560px_1fr]" data-route-ready="preload">
   <div class="flex flex-col gap-4 overflow-y-auto pb-24 pr-2 scrollbar-hide">
     <div class="flex items-center justify-between px-1">
-      <h2 class="text-lg font-semibold tracking-tight text-white">Fastened Joint Preload Analysis</h2>
-      <Badge variant="outline" class="border-white/20 text-white/60">explicit solver</Badge>
+      <div>
+        <h2 class="text-lg font-semibold tracking-tight text-white">Fastened Joint Preload Analysis</h2>
+        <div class="mt-1 text-xs text-white/55">Core flow: installation -> plate layers -> joint inputs -> results. Advanced inputs are optional.</div>
+      </div>
+      <div class="flex items-center gap-2">
+        <Badge variant="outline" class="border-white/20 text-white/60">explicit solver</Badge>
+        <Button size="sm" variant="secondary" on:click={() => (showAdvancedInputs = !showAdvancedInputs)}>
+          {showAdvancedInputs ? 'Hide Advanced' : 'Show Advanced'}
+        </Button>
+      </div>
     </div>
+
+    <Card class="glass-card">
+      <CardHeader class="pb-2 pt-4">
+        <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Import Provenance</CardTitle>
+      </CardHeader>
+      <CardContent class="grid gap-2 md:grid-cols-2">
+        {#each PRELOAD_IMPORT_PROVENANCE as catalog}
+          <div class="rounded-lg border border-white/8 bg-black/20 p-3 text-xs text-white/70">
+            <div class="font-semibold text-white/85">{catalog.manufacturer}</div>
+            <div class="text-white/60">{catalog.family}</div>
+            <div class="mt-1 text-cyan-200">{catalog.entryCount} imported entries</div>
+            <div class="mt-1 text-white/55">Provenance: <span class="text-cyan-200">{catalog.liveDiscovery}</span></div>
+            <div class="text-white/55">Imported: <span class="text-cyan-200">{catalog.importedAt ?? 'unknown'}</span></div>
+            <div class="text-white/55">Source file: <span class="text-cyan-200">{catalog.sourcePath ?? 'fixture only'}</span></div>
+            <div class="text-white/55">{catalog.referenceOnly ? 'Fixture-backed reference catalog' : 'Primary active catalog'}</div>
+          </div>
+        {/each}
+      </CardContent>
+    </Card>
 
     <Card class="glass-card relative z-[1701] isolate">
       <CardHeader class="pb-2 pt-4">
@@ -1175,6 +1203,7 @@
       </CardContent>
     </Card>
 
+    {#if showAdvancedInputs}
     <Card class="glass-card">
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Libraries / Defaults</CardTitle>
@@ -1256,13 +1285,17 @@
           {/if}
         </div>
         <div class="rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white/72">
-          <div class="font-semibold text-white/80">Imported catalog adapters</div>
+          <div class="font-semibold text-white/80">Import provenance</div>
           <div class="mt-2 grid gap-2 md:grid-cols-2">
-            {#each PRELOAD_REFERENCE_FASTENER_CATALOGS as catalog}
+            {#each PRELOAD_IMPORT_PROVENANCE as catalog}
               <div class="rounded-lg border border-white/8 bg-white/[0.02] p-2">
                 <div class="text-white/85">{catalog.manufacturer}</div>
                 <div class="text-white/60">{catalog.family}</div>
                 <div class="mt-1 text-cyan-200">{catalog.entryCount} imported entries</div>
+                <div class="mt-1 text-white/55">Provenance: <span class="text-cyan-200">{catalog.liveDiscovery}</span></div>
+                <div class="text-white/55">Imported: <span class="text-cyan-200">{catalog.importedAt ?? 'unknown'}</span></div>
+                <div class="text-white/55">Source file: <span class="text-cyan-200">{catalog.sourcePath ?? 'fixture only'}</span></div>
+                <div class="text-white/55">{catalog.referenceOnly ? 'Fixture-backed reference catalog' : 'Primary active catalog'}</div>
                 {#if catalog.sourceUrl}
                   <a href={catalog.sourceUrl} target="_blank" rel="noreferrer" class="mt-1 inline-block text-cyan-300 underline underline-offset-2">source</a>
                 {/if}
@@ -1272,6 +1305,7 @@
         </div>
       </CardContent>
     </Card>
+    {/if}
 
     <Card class="glass-card">
       <CardHeader class="pb-2 pt-4">
@@ -1468,6 +1502,7 @@
       </CardContent>
     </Card>
 
+    {#if showAdvancedInputs}
     <Card class="glass-card">
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Service Case</CardTitle>
@@ -1481,17 +1516,25 @@
         <div class="space-y-1"><Label class="text-white/70">Embedment Settlement</Label><Input type="number" step="0.00001" bind:value={form.serviceCase.embedmentSettlement} /></div>
       </CardContent>
     </Card>
+    {/if}
 
     <Card class="glass-card">
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Adjacent Fastener Screening</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
+        {#if showAdvancedInputs}
         <label class="flex items-center gap-2 text-sm text-white/75">
           <input type="checkbox" class="checkbox checkbox-sm border-white/20 bg-black/30" bind:checked={form.adjacentFastenerScreen.enabled} />
           Enable adjacent-fastener load-transfer screening
         </label>
+        {:else}
+          <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/60">
+            Pattern-input controls are hidden to keep the main workflow simpler. Use <span class="text-cyan-200">Show Advanced</span> to edit rows, columns, eccentricity, and load cases.
+          </div>
+        {/if}
         {#if form.adjacentFastenerScreen.enabled}
+          {#if showAdvancedInputs}
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1"><Label class="text-white/70">Rows</Label><Input type="number" step="1" bind:value={form.adjacentFastenerScreen.rowCount} /></div>
             <div class="space-y-1"><Label class="text-white/70">Columns</Label><Input type="number" step="1" bind:value={form.adjacentFastenerScreen.columnCount} /></div>
@@ -1537,6 +1580,7 @@
               {/each}
             </div>
           </div>
+          {/if}
           <div class="rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/75">
             <div>Fasteners in pattern: <span class="font-mono text-cyan-300">{adjacentFastenerCount}</span></div>
             <div>Neighbor count: <span class="font-mono text-cyan-300">{adjacentNeighborCount}</span></div>

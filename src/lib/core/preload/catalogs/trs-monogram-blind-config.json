@@ -3,10 +3,11 @@
     "manufacturer": "TRS / Monogram Aerospace",
     "family": "Blind fastener reference families",
     "sourceUrl": "https://trsaero.com/monogramaerospace/support/product-part-numbers-technical-drawings/",
-    "importedAt": "2026-03-04T01:46:16.341Z",
+    "importedAt": "2026-03-04T03:18:51.059Z",
     "sourcePath": "trs-monogram-blind-source.json",
     "adapter": "trs_monogram_blind",
-    "referenceOnly": true
+    "referenceOnly": true,
+    "liveDiscovery": "local_html_snapshot_links:4"
   },
   "entries": [
     {
@@ -14,7 +15,7 @@
       "materialId": "ti6al4v",
       "headStyle": "Flush blind bolt",
       "threadDetail": "Blind-bolt internal thread family",
-      "sourceUrl": "https://trsaero.com/monogramaerospace/support/product-part-numbers-technical-drawings/",
+      "sourceUrl": "https://trsaero.com/monogramaerospace/support/product-part-numbers-technical-drawings/bl256",
       "notes": "Composite blind bolt. TRS reference-table family extracted from the public product-part-number list.",
       "materialIsAssumed": false
     },
@@ -23,7 +24,7 @@
       "materialId": "a286",
       "headStyle": "Protruding blind bolt",
       "threadDetail": "Blind-bolt internal thread family",
-      "sourceUrl": "https://trsaero.com/monogramaerospace/support/product-part-numbers-technical-drawings/",
+      "sourceUrl": "https://trsaero.com/monogramaerospace/support/product-part-numbers-technical-drawings/bl284",
       "notes": "Composite blind bolt. TRS reference-table family extracted from the public product-part-number list.",
       "materialIsAssumed": false
     },
@@ -32,7 +33,7 @@
       "materialId": "steel4340",
       "headStyle": "Flush blind fastener",
       "threadDetail": "Blind-fastener pull stem family",
-      "sourceUrl": "https://trsaero.com/monogramaerospace/support/product-part-numbers-technical-drawings/",
+      "sourceUrl": "https://trsaero.com/monogramaerospace/support/product-part-numbers-technical-drawings/mbf2114",
       "notes": "Monogram blind fastener. Representative Monogram blind-fastener family from the TRS support table.",
       "materialIsAssumed": false
     },
@@ -41,7 +42,7 @@
       "materialId": "steel4340",
       "headStyle": "Protruding blind fastener",
       "threadDetail": "Blind-fastener pull stem family",
-      "sourceUrl": "https://trsaero.com/monogramaerospace/support/product-part-numbers-technical-drawings/",
+      "sourceUrl": "https://trsaero.com/monogramaerospace/support/product-part-numbers-technical-drawings/mbf2115",
       "notes": "Monogram blind fastener. Representative Monogram blind-fastener family from the TRS support table.",
       "materialIsAssumed": false
     }

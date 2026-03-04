@@ -19,13 +19,14 @@ test('preload route renders solver outputs and report action', async ({ page }) 
   await expect(page.getByRole('button', { name: 'Export Audit CSV' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Export Audit JSON' })).toBeVisible();
   await expect(page.getByText('Reserve Envelopes (min / nominal / max)')).toBeVisible();
+  await page.getByRole('button', { name: 'Show Advanced' }).click();
   await expect(page.getByText('Adjacent Fastener Screening')).toBeVisible();
   await expect(page.getByText('Load cases')).toBeVisible();
   await expect(page.getByLabel('Preload bolt pattern map')).toBeVisible();
   await expect(page.getByLabel('Preload fastener-group case envelopes')).toBeVisible();
   await expect(page.getByLabel('Preload geometry influence matrix heatmap')).toBeVisible();
   await expect(page.getByText('Physical layers remain plates.')).toBeVisible();
-  await expect(page.getByText('Imported catalog adapters')).toBeVisible();
+  await expect(page.getByText('Import provenance')).toBeVisible();
   await expect(page.getByText('TRS / Monogram Aerospace')).toBeVisible();
 });
 

@@ -2,6 +2,7 @@
   "manufacturer": "Jet-Tek",
   "seriesFamily": "Hi-Lok standard configuration pins",
   "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
+  "htmlSnapshot": "jet-tek-hilok-overview.html",
   "dashVariants": [
     { "dash": "5", "nominalDiameterIn": 0.15625, "threadCallout": ".1640-32 UNJ", "collarPart": "HL70" },
     { "dash": "6", "nominalDiameterIn": 0.1875, "threadCallout": ".1900-32 UNJF", "collarPart": "HL70" },

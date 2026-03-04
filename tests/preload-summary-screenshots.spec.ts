@@ -57,6 +57,7 @@ test('captures preload joint section visualization panel', async ({ page }) => {
 
 test('captures preload influence matrix heatmap panel', async ({ page }) => {
   await preparePreloadScreenshot(page);
+  await page.getByRole('button', { name: 'Show Advanced' }).click();
   const panel = page.getByLabel('Preload geometry influence matrix heatmap');
   await capturePanel(page, panel, '/Users/nautilus/Desktop/engineering.toolbox/implementation/screenshots/preload-influence-matrix-heatmap.png');
 });

@@ -42,6 +42,14 @@ export type PreloadFastenerLibraryItem = {
 };
 
 const importedHiLokCatalog = hiLokStandardConfig as {
+  source: {
+    manufacturer: string;
+    family: string;
+    sourceUrl: string;
+    importedAt?: string;
+    sourcePath?: string;
+    liveDiscovery?: string;
+  };
   dashVariants: PreloadFastenerLibraryItem['dashVariants'];
   gripTable: PreloadFastenerLibraryItem['gripTable'];
   entries: Array<{
@@ -60,6 +68,10 @@ const importedTrsBlindCatalog = trsMonogramBlindConfig as {
     manufacturer: string;
     family: string;
     sourceUrl: string;
+    importedAt?: string;
+    sourcePath?: string;
+    liveDiscovery?: string;
+    referenceOnly?: boolean;
   };
   entries: Array<{
     id: string;
@@ -177,18 +189,28 @@ export const PRELOAD_FASTENER_CATALOG: PreloadFastenerLibraryItem[] = PRELOAD_FA
 
 export const PRELOAD_REFERENCE_FASTENER_CATALOGS = [
   {
-    manufacturer: importedHiLokCatalog ? 'Jet-Tek' : 'Unknown',
-    family: 'Hi-Lok standard configuration pins',
-    sourceUrl: PRELOAD_FASTENER_LIBRARY[0]?.sourceUrl ?? '',
-    entryCount: importedHiLokCatalog.entries.length
+    manufacturer: importedHiLokCatalog.source.manufacturer,
+    family: importedHiLokCatalog.source.family,
+    sourceUrl: importedHiLokCatalog.source.sourceUrl,
+    entryCount: importedHiLokCatalog.entries.length,
+    importedAt: importedHiLokCatalog.source.importedAt ?? null,
+    sourcePath: importedHiLokCatalog.source.sourcePath ?? null,
+    liveDiscovery: importedHiLokCatalog.source.liveDiscovery ?? 'unknown',
+    referenceOnly: false
   },
   {
     manufacturer: importedTrsBlindCatalog.source.manufacturer,
     family: importedTrsBlindCatalog.source.family,
     sourceUrl: importedTrsBlindCatalog.source.sourceUrl,
-    entryCount: importedTrsBlindCatalog.entries.length
+    entryCount: importedTrsBlindCatalog.entries.length,
+    importedAt: importedTrsBlindCatalog.source.importedAt ?? null,
+    sourcePath: importedTrsBlindCatalog.source.sourcePath ?? null,
+    liveDiscovery: importedTrsBlindCatalog.source.liveDiscovery ?? 'unknown',
+    referenceOnly: Boolean(importedTrsBlindCatalog.source.referenceOnly)
   }
 ] as const;
+
+export const PRELOAD_IMPORT_PROVENANCE = PRELOAD_REFERENCE_FASTENER_CATALOGS;
 
 export function getPreloadMaterial(id: string | undefined): PreloadMaterialLibraryItem {
   return PRELOAD_MATERIAL_LIBRARY.find((item) => item.id === id) ?? PRELOAD_MATERIAL_LIBRARY[0];

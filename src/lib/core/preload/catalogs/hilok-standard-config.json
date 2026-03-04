@@ -3,9 +3,9 @@
     "manufacturer": "Jet-Tek",
     "family": "Hi-Lok standard configuration pins",
     "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
-    "importedAt": "2026-03-04T01:46:16.337Z",
+    "importedAt": "2026-03-04T03:18:51.050Z",
     "sourcePath": "jet-tek-hilok-standard-source.json",
-    "liveDiscovery": "live_html_tables:0;live_html_links:218"
+    "liveDiscovery": "local_html_snapshot_links:14"
   },
   "entries": [
     {
@@ -112,7 +112,7 @@
       "materialId": "inconel718",
       "headStyle": "Protruding tension head",
       "threadDetail": "UNJ tension-pin thread family",
-      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/hl50/",
       "notes": "Inconel high-temperature tension baseline; verify dash-specific geometry from the manufacturer table.",
       "materialIsAssumed": true
     },
@@ -121,7 +121,7 @@
       "materialId": "inconel718",
       "headStyle": "100° flush tension head",
       "threadDetail": "UNJ tension-pin thread family",
-      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/hl51/",
       "notes": "Inconel high-temperature flush baseline; verify dash-specific geometry from the manufacturer table.",
       "materialIsAssumed": true
     },

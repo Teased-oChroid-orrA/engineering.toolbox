@@ -4,17 +4,12 @@ export async function readJsonSource(sourcePath) {
   return JSON.parse(await readFile(sourcePath, 'utf8'));
 }
 
-export async function fetchHtml(url) {
-  const response = await fetch(url, {
-    headers: {
-      'user-agent': 'engineering-toolbox-catalog-import/1.0'
-    },
-    signal: AbortSignal.timeout(8000)
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+export async function readOptionalTextSource(sourcePath) {
+  try {
+    return await readFile(sourcePath, 'utf8');
+  } catch {
+    return null;
   }
-  return response.text();
 }
 
 export function normalizeUrl(baseUrl, href) {
