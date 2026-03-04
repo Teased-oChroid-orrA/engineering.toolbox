@@ -63,6 +63,8 @@
   const defaultMemberSegments: MemberSegmentInput[] = [
     {
       id: 'plate-a',
+      plateWidth: 2.5,
+      plateLength: 3.5,
       compressionModel: 'cylindrical_annulus',
       length: 0.3,
       modulus: 10_600_000,
@@ -71,6 +73,8 @@
     },
     {
       id: 'plate-b',
+      plateWidth: 2.5,
+      plateLength: 3.5,
       compressionModel: 'cylindrical_annulus',
       length: 0.3,
       modulus: 10_600_000,
@@ -80,6 +84,16 @@
   ];
 
   const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+
+  function normalizeMemberSegment(segment: MemberSegmentInput): MemberSegmentInput {
+    const plateWidth = Number(('plateWidth' in segment ? segment.plateWidth : undefined) ?? 2.5);
+    const plateLength = Number(('plateLength' in segment ? segment.plateLength : undefined) ?? 3.5);
+    return {
+      ...segment,
+      plateWidth: Number.isFinite(plateWidth) && plateWidth > 0 ? plateWidth : 2.5,
+      plateLength: Number.isFinite(plateLength) && plateLength > 0 ? plateLength : 3.5
+    } as MemberSegmentInput;
+  }
 
   const defaultForm = (): PreloadForm => ({
     nominalDiameter: 0.5,
@@ -195,7 +209,9 @@
           ...baseline,
           ...parsed,
           boltSegments: Array.isArray(parsed.boltSegments) ? parsed.boltSegments : baseline.boltSegments,
-          memberSegments: Array.isArray(parsed.memberSegments) ? parsed.memberSegments : baseline.memberSegments,
+          memberSegments: Array.isArray(parsed.memberSegments)
+            ? (parsed.memberSegments as MemberSegmentInput[]).map(normalizeMemberSegment)
+            : baseline.memberSegments,
           adjacentFastenerScreen: {
             ...baseline.adjacentFastenerScreen,
             ...((parsed as Partial<PreloadForm>).adjacentFastenerScreen ?? {}),
@@ -411,6 +427,8 @@
     if (compressionModel === 'cylindrical_annulus') {
       segment = {
         id,
+        plateWidth: 2.5,
+        plateLength: 3.5,
         compressionModel,
         length: 0.25,
         modulus: 10_600_000,
@@ -420,6 +438,8 @@
     } else if (compressionModel === 'conical_frustum_annulus') {
       segment = {
         id,
+        plateWidth: 2.5,
+        plateLength: 3.5,
         compressionModel,
         length: 0.25,
         modulus: 10_600_000,
@@ -430,6 +450,8 @@
     } else {
       segment = {
         id,
+        plateWidth: 2.5,
+        plateLength: 3.5,
         compressionModel,
         length: 0.25,
         modulus: 10_600_000,
@@ -467,6 +489,8 @@
   function changeCompressionModel(index: number, compressionModel: MemberSegmentInput['compressionModel']) {
     const current = form.memberSegments[index];
     const id = current.id;
+    const plateWidth = current.plateWidth;
+    const plateLength = current.plateLength;
     const length = current.length;
     const modulus = current.modulus;
     const thermalExpansionCoeff = current.thermalExpansionCoeff;
@@ -474,6 +498,8 @@
     if (compressionModel === 'cylindrical_annulus') {
       next = {
         id,
+        plateWidth,
+        plateLength,
         compressionModel,
         length,
         modulus,
@@ -484,6 +510,8 @@
     } else if (compressionModel === 'conical_frustum_annulus') {
       next = {
         id,
+        plateWidth,
+        plateLength,
         compressionModel,
         length,
         modulus,
@@ -497,6 +525,8 @@
     } else {
       next = {
         id,
+        plateWidth,
+        plateLength,
         compressionModel,
         length,
         modulus,
@@ -521,6 +551,8 @@
     const issues: string[] = [];
     if (!segment.id.trim()) issues.push('ID is required.');
     if (!(segment.length > 0)) issues.push('Length must be positive.');
+    if (!(segment.plateWidth > 0)) issues.push('Plate width must be positive.');
+    if (!(segment.plateLength > 0)) issues.push('Plate plan length must be positive.');
     if (!(segment.modulus > 0)) issues.push('Modulus must be positive.');
     if (segment.compressionModel === 'cylindrical_annulus') {
       if (!(segment.outerDiameter > 0)) issues.push('Outer diameter must be positive.');
@@ -695,11 +727,11 @@
   function compressionModelLabel(compressionModel: MemberSegmentInput['compressionModel']) {
     switch (compressionModel) {
       case 'cylindrical_annulus':
-        return 'Uniform cylindrical compression zone';
+        return 'Uniform compression proxy';
       case 'conical_frustum_annulus':
-        return 'Tapered compression zone';
+        return 'Tapered compression proxy';
       case 'explicit_area':
-        return 'Direct equivalent area';
+        return 'Direct equivalent area proxy';
       default:
         return compressionModel;
     }
@@ -1329,9 +1361,9 @@
                   class="min-w-[180px]"
                   value={segment.compressionModel}
                   items={[
-                    { value: 'cylindrical_annulus', label: 'Uniform cylindrical compression zone' },
-                    { value: 'conical_frustum_annulus', label: 'Tapered compression zone' },
-                    { value: 'explicit_area', label: 'Direct equivalent area' }
+                    { value: 'cylindrical_annulus', label: 'Uniform compression proxy' },
+                    { value: 'conical_frustum_annulus', label: 'Tapered compression proxy' },
+                    { value: 'explicit_area', label: 'Direct equivalent area proxy' }
                   ]}
                   on:change={(event) => changeCompressionModel(index, String(event.detail) as MemberSegmentInput['compressionModel'])}
                 />
@@ -1344,6 +1376,8 @@
             <div class="grid grid-cols-2 gap-3">
               <div class="space-y-1"><Label class="text-white/60">ID</Label><Input bind:value={segment.id} /></div>
               <div class="space-y-1"><Label class="text-white/60">Plate Thickness</Label><Input type="number" step="0.0001" bind:value={segment.length} /></div>
+              <div class="space-y-1"><Label class="text-white/60">Plate Width</Label><Input type="number" step="0.0001" bind:value={segment.plateWidth} /></div>
+              <div class="space-y-1"><Label class="text-white/60">Plate Plan Length</Label><Input type="number" step="0.0001" bind:value={segment.plateLength} /></div>
               <div class="space-y-1"><Label class="text-white/60">Modulus</Label><Input type="number" step="1000" bind:value={segment.modulus} /></div>
               <div class="space-y-1"><Label class="text-white/60">Thermal α</Label><Input type="number" step="0.0000001" bind:value={segment.thermalExpansionCoeff} /></div>
 
@@ -1360,13 +1394,16 @@
                 <div class="space-y-1"><Label class="text-white/60">Note</Label><Input bind:value={segment.note} /></div>
               {/if}
             </div>
+            <div class="mt-2 rounded-lg border border-white/8 bg-white/[0.02] p-2 text-xs text-white/60">
+              Physical layer: rectangular plate footprint <span class="font-mono text-white/80">{fmt(segment.plateWidth, 3)} × {fmt(segment.plateLength, 3)}</span> with thickness <span class="font-mono text-white/80">{fmt(segment.length, 3)}</span>. The selected compression model only controls the effective compressed-zone stiffness abstraction.
+            </div>
             <div class="mt-3 rounded-lg border border-cyan-400/15 bg-cyan-500/5 p-2 text-xs text-cyan-100">
               {#if memberPreview(segment)}
                 Segment stiffness preview: <span class="font-mono">{fmt(memberPreview(segment)?.stiffness, 3)}</span>
                 <span class="text-white/55"> • compliance {fmt(memberPreview(segment)?.compliance, 8)}</span>
                 <div class="mt-1 text-white/65">Effective compression model: {compressionModelLabel(segment.compressionModel)}</div>
               {:else}
-                Segment stiffness preview unavailable until the current area-model inputs are valid.
+                Segment stiffness preview unavailable until the current compression-model proxy inputs are valid.
               {/if}
             </div>
             {#if memberValidation(segment).length}
@@ -1379,9 +1416,9 @@
           </div>
         {/each}
         <div class="flex flex-wrap gap-2">
-          <Button size="sm" variant="secondary" on:click={() => addMemberSegment('cylindrical_annulus')}>Add Plate Layer (Uniform)</Button>
-          <Button size="sm" variant="secondary" on:click={() => addMemberSegment('conical_frustum_annulus')}>Add Plate Layer (Tapered)</Button>
-          <Button size="sm" variant="secondary" on:click={() => addMemberSegment('explicit_area')}>Add Plate Layer (Explicit Area)</Button>
+          <Button size="sm" variant="secondary" on:click={() => addMemberSegment('cylindrical_annulus')}>Add Plate Layer (Uniform Proxy)</Button>
+          <Button size="sm" variant="secondary" on:click={() => addMemberSegment('conical_frustum_annulus')}>Add Plate Layer (Tapered Proxy)</Button>
+          <Button size="sm" variant="secondary" on:click={() => addMemberSegment('explicit_area')}>Add Plate Layer (Area Proxy)</Button>
         </div>
       </CardContent>
     </Card>

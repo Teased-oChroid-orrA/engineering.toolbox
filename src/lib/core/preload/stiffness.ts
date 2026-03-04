@@ -140,6 +140,8 @@ function buildWasherSegments(
   const nutInner = washer.underNutInnerDiameter ?? washer.innerDiameter;
   const topWashers = Array.from({ length: underHeadCount }, (_, index) => ({
     id: `washer-head-${index + 1}`,
+    plateWidth: headOuter,
+    plateLength: headOuter,
     compressionModel: 'cylindrical_annulus' as const,
     length: washer.thicknessPerWasher,
     modulus: washer.modulus,
@@ -149,6 +151,8 @@ function buildWasherSegments(
   }));
   const bottomWashers = Array.from({ length: underNutCount }, (_, index) => ({
     id: `washer-nut-${index + 1}`,
+    plateWidth: nutOuter,
+    plateLength: nutOuter,
     compressionModel: 'cylindrical_annulus' as const,
     length: washer.thicknessPerWasher,
     modulus: washer.modulus,
@@ -161,6 +165,8 @@ function buildWasherSegments(
   }
   return Array.from({ length: totalCount }, (_, index) => ({
     id: `washer-${index + 1}`,
+    plateWidth: washer.outerDiameter,
+    plateLength: washer.outerDiameter,
     compressionModel: 'cylindrical_annulus' as const,
     length: washer.thicknessPerWasher,
     modulus: washer.modulus,

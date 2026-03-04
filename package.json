@@ -10,6 +10,7 @@
     "tauri:dev": "tauri dev",
     "build": "node ./scripts/preflight-check.mjs && node --max-old-space-size=8192 ./node_modules/vite/bin/vite.js build && node ./scripts/fix-build-paths.mjs && node ./scripts/build-verify.mjs",
     "preview": "vite preview",
+    "import:preload-catalogs": "node ./scripts/import-preload-fastener-catalogs.mjs",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && node ./scripts/feature-contract-surface-toolbox.mjs && node ./scripts/verify-cross-tool-motion-depth.mjs && node ./scripts/verify-surface-architecture.mjs && node ./scripts/verify-bushing-architecture.mjs && node ./scripts/verify-dnd-integrity.mjs",
     "ci-check": "node ./scripts/ci-check.mjs",
     "verify:surface-architecture": "node ./scripts/verify-surface-architecture.mjs",

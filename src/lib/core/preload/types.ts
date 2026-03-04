@@ -15,6 +15,8 @@ export type BoltSegmentInput = {
 export type MemberSegmentInput =
   | {
       id: string;
+      plateWidth: number;
+      plateLength: number;
       compressionModel: 'cylindrical_annulus';
       length: number;
       modulus: number;
@@ -24,6 +26,8 @@ export type MemberSegmentInput =
     }
   | {
       id: string;
+      plateWidth: number;
+      plateLength: number;
       compressionModel: 'conical_frustum_annulus';
       length: number;
       modulus: number;
@@ -34,6 +38,8 @@ export type MemberSegmentInput =
     }
   | {
       id: string;
+      plateWidth: number;
+      plateLength: number;
       compressionModel: 'explicit_area';
       length: number;
       modulus: number;

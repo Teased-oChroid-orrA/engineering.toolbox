@@ -123,11 +123,11 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
     .map((segment, index) => {
       const label =
         segment.compressionModel === 'cylindrical_annulus'
-          ? `Uniform cylindrical compression zone: Do=${fmt(segment.outerDiameter, 4)}, Di=${fmt(segment.innerDiameter, 4)}`
+          ? `Uniform compression proxy: Do=${fmt(segment.outerDiameter, 4)}, Di=${fmt(segment.innerDiameter, 4)}`
           : segment.compressionModel === 'conical_frustum_annulus'
-            ? `Tapered compression zone: Do0=${fmt(segment.outerDiameterStart, 4)}, Do1=${fmt(segment.outerDiameterEnd, 4)}, Di=${fmt(segment.innerDiameter, 4)}`
-            : `Direct equivalent area: Aeff=${fmt(segment.effectiveArea, 6)}`;
-      return `<tr><td>${esc(segment.id || `member-${index + 1}`)}</td><td>${esc(segment.compressionModel)}</td><td>${fmt(segment.length, 4)}</td><td>${fmt(segment.modulus, 0)}</td><td>${label}</td></tr>`;
+            ? `Tapered compression proxy: Do0=${fmt(segment.outerDiameterStart, 4)}, Do1=${fmt(segment.outerDiameterEnd, 4)}, Di=${fmt(segment.innerDiameter, 4)}`
+            : `Direct equivalent area proxy: Aeff=${fmt(segment.effectiveArea, 6)}`;
+      return `<tr><td>${esc(segment.id || `member-${index + 1}`)}</td><td>${esc(segment.compressionModel)}</td><td>${fmt(segment.length, 4)}</td><td>${fmt(segment.modulus, 0)}</td><td>Plate ${fmt(segment.plateWidth, 4)} × ${fmt(segment.plateLength, 4)} • ${label}</td></tr>`;
     })
     .join('');
 

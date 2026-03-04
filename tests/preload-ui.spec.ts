@@ -10,7 +10,7 @@ test('preload route renders solver outputs and report action', async ({ page }) 
   await expect(page.getByLabel('Preload joint section panel')).toBeVisible();
   await expect(page.getByText('Computed State')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add Bolt Segment' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Add Plate Layer (Tapered)' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add Plate Layer (Tapered Proxy)' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Duplicate bolt segment' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Duplicate member segment' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Export Joint Section SVG' })).toBeVisible();

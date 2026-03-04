@@ -42,6 +42,8 @@ const baseInput: FastenedJointPreloadInput = {
   memberSegments: [
     {
       id: 'plate-a',
+      plateWidth: 2.5,
+      plateLength: 3.5,
       compressionModel: 'cylindrical_annulus',
       length: 0.25,
       modulus: 10_600_000,
@@ -50,6 +52,8 @@ const baseInput: FastenedJointPreloadInput = {
     },
     {
       id: 'plate-b',
+      plateWidth: 2.5,
+      plateLength: 3.5,
       compressionModel: 'conical_frustum_annulus',
       length: 0.35,
       modulus: 10_600_000,
@@ -115,6 +119,8 @@ test.describe('preload solver G1 core', () => {
   test('conical-frustum annulus uses exact integrated compliance, not a hidden average-area shortcut', () => {
     const segment = solveMemberSegmentStiffness({
       id: 'cone',
+      plateWidth: 2.5,
+      plateLength: 3.5,
       compressionModel: 'conical_frustum_annulus',
       length: 0.5,
       modulus: 10_000_000,
