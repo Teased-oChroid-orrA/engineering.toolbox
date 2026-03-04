@@ -1,5 +1,6 @@
 import { MATERIALS as BUSHING_MATERIALS } from '$lib/core/bushing/materials';
 import hiLokStandardConfig from './catalogs/hilok-standard-config.json' with { type: 'json' };
+import trsMonogramBlindConfig from './catalogs/trs-monogram-blind-config.json' with { type: 'json' };
 
 export type PreloadMaterialLibraryItem = {
   id: string;
@@ -16,7 +17,7 @@ export type PreloadMaterialLibraryItem = {
 export type PreloadFastenerLibraryItem = {
   id: string;
   label: string;
-  family: 'hi_lok';
+  family: 'hi_lok' | 'blind_fastener_reference';
   materialId: string;
   nominalDiameterIn: number | null;
   gripRangeNote: string;
@@ -43,6 +44,23 @@ export type PreloadFastenerLibraryItem = {
 const importedHiLokCatalog = hiLokStandardConfig as {
   dashVariants: PreloadFastenerLibraryItem['dashVariants'];
   gripTable: PreloadFastenerLibraryItem['gripTable'];
+  entries: Array<{
+    id: string;
+    materialId: string;
+    headStyle: string;
+    threadDetail: string;
+    sourceUrl: string;
+    notes: string;
+    materialIsAssumed: boolean;
+  }>;
+};
+
+const importedTrsBlindCatalog = trsMonogramBlindConfig as {
+  source: {
+    manufacturer: string;
+    family: string;
+    sourceUrl: string;
+  };
   entries: Array<{
     id: string;
     materialId: string;
@@ -156,6 +174,21 @@ export const PRELOAD_FASTENER_LIBRARY: PreloadFastenerLibraryItem[] = importedHi
 }));
 
 export const PRELOAD_FASTENER_CATALOG: PreloadFastenerLibraryItem[] = PRELOAD_FASTENER_LIBRARY;
+
+export const PRELOAD_REFERENCE_FASTENER_CATALOGS = [
+  {
+    manufacturer: importedHiLokCatalog ? 'Jet-Tek' : 'Unknown',
+    family: 'Hi-Lok standard configuration pins',
+    sourceUrl: PRELOAD_FASTENER_LIBRARY[0]?.sourceUrl ?? '',
+    entryCount: importedHiLokCatalog.entries.length
+  },
+  {
+    manufacturer: importedTrsBlindCatalog.source.manufacturer,
+    family: importedTrsBlindCatalog.source.family,
+    sourceUrl: importedTrsBlindCatalog.source.sourceUrl,
+    entryCount: importedTrsBlindCatalog.entries.length
+  }
+] as const;
 
 export function getPreloadMaterial(id: string | undefined): PreloadMaterialLibraryItem {
   return PRELOAD_MATERIAL_LIBRARY.find((item) => item.id === id) ?? PRELOAD_MATERIAL_LIBRARY[0];

@@ -25,6 +25,16 @@ test('preload route renders solver outputs and report action', async ({ page }) 
   await expect(page.getByLabel('Preload fastener-group case envelopes')).toBeVisible();
   await expect(page.getByLabel('Preload geometry influence matrix heatmap')).toBeVisible();
   await expect(page.getByText('Physical layers remain plates.')).toBeVisible();
+  await expect(page.getByText('Imported catalog adapters')).toBeVisible();
+  await expect(page.getByText('TRS / Monogram Aerospace')).toBeVisible();
+});
+
+test('changing the compression proxy keeps solver outputs visible', async ({ page }) => {
+  await page.goto('/#/preload');
+  const memberSelect = page.getByText('Clamped Plate Layers').locator('..').locator('..').locator('select').first();
+  await memberSelect.selectOption('conical_frustum_annulus');
+  await expect(page.getByLabel('Preload summary panel')).toBeVisible();
+  await expect(page.getByText('Unsupported area model')).toHaveCount(0);
 });
 
 test('preload summary SVG export uses the live summary panel', async ({ page }) => {

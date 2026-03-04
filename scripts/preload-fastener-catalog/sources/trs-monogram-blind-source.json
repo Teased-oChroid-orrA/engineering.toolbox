@@ -1,0 +1,39 @@
+{
+  "manufacturer": "TRS / Monogram Aerospace",
+  "seriesFamily": "Blind fastener reference families",
+  "sourceUrl": "https://trsaero.com/monogramaerospace/support/product-part-numbers-technical-drawings/",
+  "rows": [
+    {
+      "partPrefix": "BL256",
+      "description": "Composite blind bolt",
+      "materialId": "ti6al4v",
+      "headStyle": "Flush blind bolt",
+      "threadFamily": "Blind-bolt internal thread family",
+      "notes": "TRS reference-table family extracted from the public product-part-number list."
+    },
+    {
+      "partPrefix": "BL284",
+      "description": "Composite blind bolt",
+      "materialId": "a286",
+      "headStyle": "Protruding blind bolt",
+      "threadFamily": "Blind-bolt internal thread family",
+      "notes": "TRS reference-table family extracted from the public product-part-number list."
+    },
+    {
+      "partPrefix": "MBF2114",
+      "description": "Monogram blind fastener",
+      "materialId": "steel4340",
+      "headStyle": "Flush blind fastener",
+      "threadFamily": "Blind-fastener pull stem family",
+      "notes": "Representative Monogram blind-fastener family from the TRS support table."
+    },
+    {
+      "partPrefix": "MBF2115",
+      "description": "Monogram blind fastener",
+      "materialId": "steel4340",
+      "headStyle": "Protruding blind fastener",
+      "threadFamily": "Blind-fastener pull stem family",
+      "notes": "Representative Monogram blind-fastener family from the TRS support table."
+    }
+  ]
+}

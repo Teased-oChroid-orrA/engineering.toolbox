@@ -1,3 +1,30 @@
+import { readFile } from 'node:fs/promises';
+
+export async function readJsonSource(sourcePath) {
+  return JSON.parse(await readFile(sourcePath, 'utf8'));
+}
+
+export async function fetchHtml(url) {
+  const response = await fetch(url, {
+    headers: {
+      'user-agent': 'engineering-toolbox-catalog-import/1.0'
+    },
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+  }
+  return response.text();
+}
+
+export function normalizeUrl(baseUrl, href) {
+  try {
+    return new URL(href, baseUrl).toString();
+  } catch {
+    return null;
+  }
+}
+
 export function buildStandardGripTable(gripCodes) {
   const count = Math.max(1, Number(gripCodes) || 1);
   return Array.from({ length: count }, (_, index) => ({
@@ -5,6 +32,31 @@ export function buildStandardGripTable(gripCodes) {
     nominalGripIn: (index + 1) / 16,
     incrementIn: 1 / 16
   }));
+}
+
+export function buildCatalogArtifact({
+  manufacturer,
+  family,
+  sourceUrl,
+  sourcePath,
+  entries,
+  dashVariants = [],
+  gripTable = [],
+  metadata = {}
+}) {
+  return validateCatalogArtifact({
+    source: {
+      manufacturer,
+      family,
+      sourceUrl,
+      importedAt: new Date().toISOString(),
+      sourcePath,
+      ...metadata
+    },
+    entries,
+    dashVariants,
+    gripTable
+  });
 }
 
 export function validateCatalogArtifact(artifact) {

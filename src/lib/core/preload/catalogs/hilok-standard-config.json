@@ -3,9 +3,138 @@
     "manufacturer": "Jet-Tek",
     "family": "Hi-Lok standard configuration pins",
     "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
-    "importedAt": "2026-03-04T00:01:31.285Z",
-    "sourcePath": "jet-tek-hilok-standard-source.json"
+    "importedAt": "2026-03-04T01:46:16.337Z",
+    "sourcePath": "jet-tek-hilok-standard-source.json",
+    "liveDiscovery": "live_html_tables:0;live_html_links:218"
   },
+  "entries": [
+    {
+      "id": "HL10",
+      "materialId": "ti6al4v",
+      "headStyle": "Protruding shear head",
+      "threadDetail": "UNJ shear-pin thread family",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/hl10/",
+      "notes": "Commonly published as a protruding shear-head Hi-Lok pin; verify dash-specific diameter and grip from the manufacturer table.",
+      "materialIsAssumed": false
+    },
+    {
+      "id": "HL11",
+      "materialId": "ti6al4v",
+      "headStyle": "100° reduced flush shear head",
+      "threadDetail": "UNJ shear-pin thread family",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/hl11/",
+      "notes": "Commonly published as a 100° flush shear-head Hi-Lok pin; verify dash-specific diameter and grip from the manufacturer table.",
+      "materialIsAssumed": false
+    },
+    {
+      "id": "HL18",
+      "materialId": "steel4340",
+      "headStyle": "Protruding shear head",
+      "threadDetail": "UNJ shear-pin thread family",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/hl18/",
+      "notes": "Manufacturer listing shows alloy-steel protruding shear head; verify dash-specific geometry from the manufacturer table.",
+      "materialIsAssumed": false
+    },
+    {
+      "id": "HL19",
+      "materialId": "steel4340",
+      "headStyle": "100° reduced flush shear head",
+      "threadDetail": "UNJ shear-pin thread family",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/hl19/",
+      "notes": "Manufacturer listing shows alloy steel, 100° reduced flush shear head; verify dash-specific geometry from the manufacturer table.",
+      "materialIsAssumed": false
+    },
+    {
+      "id": "HL20",
+      "materialId": "steel4340",
+      "headStyle": "Protruding tension head",
+      "threadDetail": "UNJ tension-pin thread family",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/hl20/",
+      "notes": "Manufacturer listing shows alloy steel, protruding tension head; verify dash-specific geometry from the manufacturer table.",
+      "materialIsAssumed": false
+    },
+    {
+      "id": "HL21",
+      "materialId": "steel4340",
+      "headStyle": "100° flush tension head",
+      "threadDetail": "UNJ tension-pin thread family",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/hl21/",
+      "notes": "Manufacturer listing shows alloy steel, 100° flush tension head; verify dash-specific geometry from the manufacturer table.",
+      "materialIsAssumed": false
+    },
+    {
+      "id": "HL30",
+      "materialId": "a286",
+      "headStyle": "Protruding shear head",
+      "threadDetail": "UNJ shear-pin thread family",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/hl30/",
+      "notes": "A-286 series baseline; verify dash-specific geometry from the manufacturer table.",
+      "materialIsAssumed": true
+    },
+    {
+      "id": "HL31",
+      "materialId": "a286",
+      "headStyle": "100° reduced flush shear head",
+      "threadDetail": "UNJ shear-pin thread family",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/hl31/",
+      "notes": "A-286 reduced flush baseline; verify dash-specific geometry from the manufacturer table.",
+      "materialIsAssumed": true
+    },
+    {
+      "id": "HL40",
+      "materialId": "a286",
+      "headStyle": "Protruding shear head",
+      "threadDetail": "UNJ shear-pin thread family",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/hl40/",
+      "notes": "A-286 high-temperature protruding shear baseline; verify dash-specific geometry from the manufacturer table.",
+      "materialIsAssumed": false
+    },
+    {
+      "id": "HL41",
+      "materialId": "a286",
+      "headStyle": "100° reduced flush shear head",
+      "threadDetail": "UNJ shear-pin thread family",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/hl41/",
+      "notes": "A-286 high-temperature reduced flush baseline; verify dash-specific geometry from the manufacturer table.",
+      "materialIsAssumed": false
+    },
+    {
+      "id": "HL48",
+      "materialId": "a286",
+      "headStyle": "Protruding tension head",
+      "threadDetail": "UNJ tension-pin thread family",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/hl48/",
+      "notes": "A-286 protruding tension baseline; verify dash-specific geometry from the manufacturer table.",
+      "materialIsAssumed": false
+    },
+    {
+      "id": "HL50",
+      "materialId": "inconel718",
+      "headStyle": "Protruding tension head",
+      "threadDetail": "UNJ tension-pin thread family",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
+      "notes": "Inconel high-temperature tension baseline; verify dash-specific geometry from the manufacturer table.",
+      "materialIsAssumed": true
+    },
+    {
+      "id": "HL51",
+      "materialId": "inconel718",
+      "headStyle": "100° flush tension head",
+      "threadDetail": "UNJ tension-pin thread family",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
+      "notes": "Inconel high-temperature flush baseline; verify dash-specific geometry from the manufacturer table.",
+      "materialIsAssumed": true
+    },
+    {
+      "id": "HL86",
+      "materialId": "mp35n",
+      "headStyle": "Tension collar mating baseline",
+      "threadDetail": "Common tension-series collar reference",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/hl86/",
+      "notes": "Used as a common collar baseline for tension-series dash mapping; verify actual mating collar per selected dash and oversize condition.",
+      "materialIsAssumed": true
+    }
+  ],
   "dashVariants": [
     {
       "dash": "5",
@@ -170,134 +299,6 @@
       "gripCode": "24",
       "nominalGripIn": 1.5,
       "incrementIn": 0.0625
-    }
-  ],
-  "entries": [
-    {
-      "id": "HL10",
-      "materialId": "ti6al4v",
-      "headStyle": "Protruding shear head",
-      "threadDetail": "UNJ shear-pin thread family",
-      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
-      "notes": "Commonly published as a protruding shear-head Hi-Lok pin; verify dash-specific diameter and grip from the manufacturer table.",
-      "materialIsAssumed": false
-    },
-    {
-      "id": "HL11",
-      "materialId": "ti6al4v",
-      "headStyle": "100° reduced flush shear head",
-      "threadDetail": "UNJ shear-pin thread family",
-      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
-      "notes": "Commonly published as a 100° flush shear-head Hi-Lok pin; verify dash-specific diameter and grip from the manufacturer table.",
-      "materialIsAssumed": false
-    },
-    {
-      "id": "HL18",
-      "materialId": "steel4340",
-      "headStyle": "Protruding shear head",
-      "threadDetail": "UNJ shear-pin thread family",
-      "sourceUrl": "https://jet-tek.com/hl18/",
-      "notes": "Manufacturer listing shows alloy-steel protruding shear head; verify dash-specific geometry from the manufacturer table.",
-      "materialIsAssumed": false
-    },
-    {
-      "id": "HL19",
-      "materialId": "steel4340",
-      "headStyle": "100° reduced flush shear head",
-      "threadDetail": "UNJ shear-pin thread family",
-      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
-      "notes": "Manufacturer listing shows alloy steel, 100° reduced flush shear head; verify dash-specific geometry from the manufacturer table.",
-      "materialIsAssumed": false
-    },
-    {
-      "id": "HL20",
-      "materialId": "steel4340",
-      "headStyle": "Protruding tension head",
-      "threadDetail": "UNJ tension-pin thread family",
-      "sourceUrl": "https://jet-tek.com/hl20/",
-      "notes": "Manufacturer listing shows alloy steel, protruding tension head; verify dash-specific geometry from the manufacturer table.",
-      "materialIsAssumed": false
-    },
-    {
-      "id": "HL21",
-      "materialId": "steel4340",
-      "headStyle": "100° flush tension head",
-      "threadDetail": "UNJ tension-pin thread family",
-      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
-      "notes": "Manufacturer listing shows alloy steel, 100° flush tension head; verify dash-specific geometry from the manufacturer table.",
-      "materialIsAssumed": false
-    },
-    {
-      "id": "HL30",
-      "materialId": "a286",
-      "headStyle": "Protruding shear head",
-      "threadDetail": "UNJ shear-pin thread family",
-      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
-      "notes": "A-286 series baseline; verify dash-specific geometry from the manufacturer table.",
-      "materialIsAssumed": true
-    },
-    {
-      "id": "HL31",
-      "materialId": "a286",
-      "headStyle": "100° reduced flush shear head",
-      "threadDetail": "UNJ shear-pin thread family",
-      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
-      "notes": "A-286 reduced flush baseline; verify dash-specific geometry from the manufacturer table.",
-      "materialIsAssumed": true
-    },
-    {
-      "id": "HL40",
-      "materialId": "a286",
-      "headStyle": "Protruding shear head",
-      "threadDetail": "UNJ shear-pin thread family",
-      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
-      "notes": "A-286 high-temperature protruding shear baseline; verify dash-specific geometry from the manufacturer table.",
-      "materialIsAssumed": false
-    },
-    {
-      "id": "HL41",
-      "materialId": "a286",
-      "headStyle": "100° reduced flush shear head",
-      "threadDetail": "UNJ shear-pin thread family",
-      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
-      "notes": "A-286 high-temperature reduced flush baseline; verify dash-specific geometry from the manufacturer table.",
-      "materialIsAssumed": false
-    },
-    {
-      "id": "HL48",
-      "materialId": "a286",
-      "headStyle": "Protruding tension head",
-      "threadDetail": "UNJ tension-pin thread family",
-      "sourceUrl": "https://jet-tek.com/hl48/",
-      "notes": "A-286 protruding tension baseline; verify dash-specific geometry from the manufacturer table.",
-      "materialIsAssumed": false
-    },
-    {
-      "id": "HL50",
-      "materialId": "inconel718",
-      "headStyle": "Protruding tension head",
-      "threadDetail": "UNJ tension-pin thread family",
-      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
-      "notes": "Inconel high-temperature tension baseline; verify dash-specific geometry from the manufacturer table.",
-      "materialIsAssumed": true
-    },
-    {
-      "id": "HL51",
-      "materialId": "inconel718",
-      "headStyle": "100° flush tension head",
-      "threadDetail": "UNJ tension-pin thread family",
-      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
-      "notes": "Inconel high-temperature flush baseline; verify dash-specific geometry from the manufacturer table.",
-      "materialIsAssumed": true
-    },
-    {
-      "id": "HL86",
-      "materialId": "mp35n",
-      "headStyle": "Tension collar mating baseline",
-      "threadDetail": "Common tension-series collar reference",
-      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
-      "notes": "Used as a common collar baseline for tension-series dash mapping; verify actual mating collar per selected dash and oversize condition.",
-      "materialIsAssumed": true
     }
   ]
 }

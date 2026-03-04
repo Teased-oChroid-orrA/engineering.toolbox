@@ -17,6 +17,7 @@
     solveFastenerGroupPattern,
     solveFastenerGroupPatternCases,
     PRELOAD_FASTENER_CATALOG,
+    PRELOAD_REFERENCE_FASTENER_CATALOGS,
     getPreloadFastener,
     getPreloadMaterial,
     PRELOAD_MATERIAL_LIBRARY,
@@ -93,6 +94,15 @@
       plateWidth: Number.isFinite(plateWidth) && plateWidth > 0 ? plateWidth : 2.5,
       plateLength: Number.isFinite(plateLength) && plateLength > 0 ? plateLength : 3.5
     } as MemberSegmentInput;
+  }
+
+  function readSelectValue(event: CustomEvent<unknown>, fallback: string): string {
+    const detail = event.detail as string | number | { value?: string | number } | null | undefined;
+    if (typeof detail === 'string' || typeof detail === 'number') return String(detail);
+    if (detail && typeof detail === 'object' && 'value' in detail && detail.value != null) {
+      return String(detail.value);
+    }
+    return fallback;
   }
 
   const defaultForm = (): PreloadForm => ({
@@ -1245,6 +1255,21 @@
             <div class="mt-2 text-amber-200">Material family shown is a series-level assumption only. Confirm exact dash-table data before release use.</div>
           {/if}
         </div>
+        <div class="rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white/72">
+          <div class="font-semibold text-white/80">Imported catalog adapters</div>
+          <div class="mt-2 grid gap-2 md:grid-cols-2">
+            {#each PRELOAD_REFERENCE_FASTENER_CATALOGS as catalog}
+              <div class="rounded-lg border border-white/8 bg-white/[0.02] p-2">
+                <div class="text-white/85">{catalog.manufacturer}</div>
+                <div class="text-white/60">{catalog.family}</div>
+                <div class="mt-1 text-cyan-200">{catalog.entryCount} imported entries</div>
+                {#if catalog.sourceUrl}
+                  <a href={catalog.sourceUrl} target="_blank" rel="noreferrer" class="mt-1 inline-block text-cyan-300 underline underline-offset-2">source</a>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        </div>
       </CardContent>
     </Card>
 
@@ -1365,7 +1390,11 @@
                     { value: 'conical_frustum_annulus', label: 'Tapered compression proxy' },
                     { value: 'explicit_area', label: 'Direct equivalent area proxy' }
                   ]}
-                  on:change={(event) => changeCompressionModel(index, String(event.detail) as MemberSegmentInput['compressionModel'])}
+                  on:change={(event) =>
+                    changeCompressionModel(
+                      index,
+                      readSelectValue(event, segment.compressionModel) as MemberSegmentInput['compressionModel']
+                    )}
                 />
                 <Button size="sm" variant="ghost" class="min-w-8 px-2 text-[10px]" aria-label="Move member segment up" on:click={() => moveMemberSegment(index, -1)} disabled={index === 0}>^</Button>
                 <Button size="sm" variant="ghost" class="min-w-8 px-2 text-[10px]" aria-label="Move member segment down" on:click={() => moveMemberSegment(index, 1)} disabled={index === form.memberSegments.length - 1}>v</Button>
@@ -1396,6 +1425,22 @@
             </div>
             <div class="mt-2 rounded-lg border border-white/8 bg-white/[0.02] p-2 text-xs text-white/60">
               Physical layer: rectangular plate footprint <span class="font-mono text-white/80">{fmt(segment.plateWidth, 3)} × {fmt(segment.plateLength, 3)}</span> with thickness <span class="font-mono text-white/80">{fmt(segment.length, 3)}</span>. The selected compression model only controls the effective compressed-zone stiffness abstraction.
+            </div>
+            <div class="mt-2 rounded-lg border border-white/8 bg-white/[0.02] p-2">
+              <div class="mb-1 text-[10px] font-semibold uppercase tracking-widest text-cyan-200">Row Footprint</div>
+              <svg viewBox="0 0 160 72" class="h-16 w-full">
+                <rect x="18" y="12" width="90" height="46" rx="6" fill="rgba(34,211,238,0.12)" stroke="rgba(34,211,238,0.55)" />
+                <circle cx="63" cy="35" r="9" fill="rgba(8,16,32,0.95)" stroke="rgba(250,204,21,0.65)" />
+                <line x1="118" y1="14" x2="142" y2="14" stroke="rgba(255,255,255,0.45)" stroke-width="1.5" />
+                <line x1="118" y1="58" x2="142" y2="58" stroke="rgba(255,255,255,0.45)" stroke-width="1.5" />
+                <line x1="136" y1="14" x2="136" y2="58" stroke="rgba(255,255,255,0.45)" stroke-width="1.5" />
+                <text x="146" y="37" fill="rgba(255,255,255,0.8)" font-size="8" dominant-baseline="middle">W {fmt(segment.plateWidth, 3)}</text>
+                <line x1="20" y1="66" x2="108" y2="66" stroke="rgba(255,255,255,0.45)" stroke-width="1.5" />
+                <line x1="20" y1="62" x2="20" y2="70" stroke="rgba(255,255,255,0.45)" stroke-width="1.5" />
+                <line x1="108" y1="62" x2="108" y2="70" stroke="rgba(255,255,255,0.45)" stroke-width="1.5" />
+                <text x="64" y="70" fill="rgba(255,255,255,0.8)" font-size="8" text-anchor="middle">L {fmt(segment.plateLength, 3)}</text>
+              </svg>
+              <div class="mt-1 text-[10px] text-white/55">Centered-hole rectangular plate footprint used as the physical row assumption.</div>
             </div>
             <div class="mt-3 rounded-lg border border-cyan-400/15 bg-cyan-500/5 p-2 text-xs text-cyan-100">
               {#if memberPreview(segment)}
