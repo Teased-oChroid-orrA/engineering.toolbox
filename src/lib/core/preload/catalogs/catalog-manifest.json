@@ -1,0 +1,29 @@
+{
+  "generatedAt": "2026-03-04T03:33:56.005Z",
+  "workflow": {
+    "mode": "offline_only",
+    "steps": [
+      "Drop or update vendor HTML snapshots under scripts/preload-fastener-catalog/sources/",
+      "Update companion source JSON fixtures if needed",
+      "Run npm run import:preload-catalogs"
+    ]
+  },
+  "artifacts": [
+    {
+      "artifact": "src/lib/core/preload/catalogs/hilok-standard-config.json",
+      "sourceJson": "scripts/preload-fastener-catalog/sources/jet-tek-hilok-standard-source.json",
+      "sourceSnapshot": "scripts/preload-fastener-catalog/sources/jet-tek-hilok-overview.html",
+      "importedAt": "2026-03-04T03:33:55.996Z",
+      "provenance": "local_html_snapshot_links:14",
+      "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/"
+    },
+    {
+      "artifact": "src/lib/core/preload/catalogs/trs-monogram-blind-config.json",
+      "sourceJson": "scripts/preload-fastener-catalog/sources/trs-monogram-blind-source.json",
+      "sourceSnapshot": "scripts/preload-fastener-catalog/sources/trs-monogram-blind-overview.html",
+      "importedAt": "2026-03-04T03:33:56.005Z",
+      "provenance": "local_html_snapshot_links:4",
+      "sourceUrl": "https://trsaero.com/monogramaerospace/support/product-part-numbers-technical-drawings/"
+    }
+  ]
+}

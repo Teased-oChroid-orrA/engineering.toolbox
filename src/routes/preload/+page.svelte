@@ -1203,12 +1203,14 @@
       </CardContent>
     </Card>
 
-    {#if showAdvancedInputs}
     <Card class="glass-card">
       <CardHeader class="pb-2 pt-4">
-        <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Libraries / Defaults</CardTitle>
+        <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Catalog Defaults</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
+        <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/60">
+          Select a catalog-backed fastener and material baseline here. Only move to custom hand-entry when the catalog defaults do not match your release configuration.
+        </div>
         <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
           <div class="space-y-1">
             <Label class="text-white/70">Fastener family</Label>
@@ -1284,28 +1286,8 @@
             <div class="mt-2 text-amber-200">Material family shown is a series-level assumption only. Confirm exact dash-table data before release use.</div>
           {/if}
         </div>
-        <div class="rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white/72">
-          <div class="font-semibold text-white/80">Import provenance</div>
-          <div class="mt-2 grid gap-2 md:grid-cols-2">
-            {#each PRELOAD_IMPORT_PROVENANCE as catalog}
-              <div class="rounded-lg border border-white/8 bg-white/[0.02] p-2">
-                <div class="text-white/85">{catalog.manufacturer}</div>
-                <div class="text-white/60">{catalog.family}</div>
-                <div class="mt-1 text-cyan-200">{catalog.entryCount} imported entries</div>
-                <div class="mt-1 text-white/55">Provenance: <span class="text-cyan-200">{catalog.liveDiscovery}</span></div>
-                <div class="text-white/55">Imported: <span class="text-cyan-200">{catalog.importedAt ?? 'unknown'}</span></div>
-                <div class="text-white/55">Source file: <span class="text-cyan-200">{catalog.sourcePath ?? 'fixture only'}</span></div>
-                <div class="text-white/55">{catalog.referenceOnly ? 'Fixture-backed reference catalog' : 'Primary active catalog'}</div>
-                {#if catalog.sourceUrl}
-                  <a href={catalog.sourceUrl} target="_blank" rel="noreferrer" class="mt-1 inline-block text-cyan-300 underline underline-offset-2">source</a>
-                {/if}
-              </div>
-            {/each}
-          </div>
-        </div>
       </CardContent>
     </Card>
-    {/if}
 
     <Card class="glass-card">
       <CardHeader class="pb-2 pt-4">
