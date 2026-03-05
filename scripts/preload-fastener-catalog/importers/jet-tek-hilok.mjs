@@ -41,7 +41,19 @@ export async function importJetTekHiLokStandardConfig({ sourcePath }) {
     nominalDiameterIn: Number(variant.nominalDiameterIn),
     threadCallout: String(variant.threadCallout),
     gripVariation: '1/16 in grip variation',
-    collarPart: String(variant.collarPart)
+    collarPart: String(variant.collarPart),
+    geometry: {
+      headFaceDiametersIn: {
+        protrudingShear: Number(variant.headFaceProtrudingShearIn ?? 0),
+        reducedFlushShear: Number(variant.headFaceReducedFlushShearIn ?? 0),
+        protrudingTension: Number(variant.headFaceProtrudingTensionIn ?? 0),
+        flushTension: Number(variant.headFaceFlushTensionIn ?? 0)
+      },
+      nutFaceDiameterIn: Number(variant.nutFaceDiameterIn ?? 0),
+      washerOuterDiameterIn: Number(variant.washerOuterDiameterIn ?? 0),
+      washerInnerDiameterIn: Number(variant.washerInnerDiameterIn ?? 0),
+      collarOuterDiameterIn: Number(variant.collarOuterDiameterIn ?? 0)
+    }
   }));
 
   const gripTable = buildStandardGripTable(raw.gripCodes);

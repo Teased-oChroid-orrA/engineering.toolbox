@@ -1,4 +1,8 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
+  import { fly } from 'svelte/transition';
+  import { onDestroy, onMount } from 'svelte';
   import {
     Badge,
     Button,
@@ -29,11 +33,31 @@
   } from '$lib/core/preload';
 
   const STORAGE_KEY = 'scd.preload.inputs.v1';
+  const STEP_SNAPSHOT_KEY = 'scd.preload.step-snapshots.v1';
+  const STEP_HINTS_KEY = 'scd.preload.step-hints.v1';
+  const STEP_TELEMETRY_KEY = 'scd.preload.step-telemetry.v1';
+  const STEP_PREFS_KEY = 'scd.preload.step-prefs.v1';
+  type WorkflowStep = 'fastener' | 'materials' | 'geometry' | 'review';
   type PreloadForm = Omit<FastenedJointPreloadInput, 'serviceCase' | 'washerStack'> & {
     washerStack: NonNullable<FastenedJointPreloadInput['washerStack']>;
     serviceCase: NonNullable<FastenedJointPreloadInput['serviceCase']>;
+    useCustomBoltSegments: boolean;
+    useCustomPlateLayers: boolean;
+    defaultPlateWidth: number;
+    defaultPlateLength: number;
+    defaultTopPlateThickness: number;
+    defaultBottomPlateThickness: number;
+    defaultPlateCompressionModel: MemberSegmentInput['compressionModel'];
+    useSamePlateMaterial: boolean;
+    useSameWasherMaterial: boolean;
     selectedPlateMaterialId: string;
+    selectedTopPlateMaterialId: string;
+    selectedBottomPlateMaterialId: string;
     selectedWasherMaterialId: string;
+    selectedHeadWasherMaterialId: string;
+    selectedNutWasherMaterialId: string;
+    washerGeometryManualOverride: boolean;
+    conicalGeometryManualOverride: boolean;
     selectedFastenerId: string;
     selectedFastenerDash: string;
     selectedFastenerGrip: string;
@@ -85,6 +109,87 @@
   ];
 
   const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+
+  function estimateThreadedArea(nominalDiameter: number) {
+    const d = Math.max(0.05, Number(nominalDiameter));
+    return Math.max(0.0001, Math.PI * 0.25 * Math.pow(d * 0.84, 2));
+  }
+
+  function buildAutoBoltSegments(
+    nominalDiameter: number,
+    boltModulus: number,
+    gripLength: number,
+    engagedThreadLength: number
+  ): BoltSegmentInput[] {
+    const shankLength = Math.max(0.05, Number(gripLength));
+    const threadedLength = Math.max(0.05, Number(engagedThreadLength));
+    return [
+      {
+        id: 'grip-shank',
+        length: shankLength,
+        area: Math.max(0.0001, Math.PI * 0.25 * nominalDiameter * nominalDiameter),
+        modulus: boltModulus
+      },
+      {
+        id: 'engaged-thread',
+        length: threadedLength,
+        area: estimateThreadedArea(nominalDiameter),
+        modulus: boltModulus
+      }
+    ];
+  }
+
+  function buildAutoPlateLayers(
+    plateWidth: number,
+    plateLength: number,
+    topThickness: number,
+    bottomThickness: number,
+    modulus: number,
+    nominalDiameter: number,
+    compressionModel: MemberSegmentInput['compressionModel']
+  ): MemberSegmentInput[] {
+    const safePlateWidth = Math.max(0.1, Number(plateWidth));
+    const safePlateLength = Math.max(0.1, Number(plateLength));
+    const proxyOuterDiameter = Math.min(Math.max(safePlateWidth, safePlateLength), Math.max(nominalDiameter * 2.6, nominalDiameter + 0.5));
+    const makeLayer = (id: string, thickness: number): MemberSegmentInput => {
+      if (compressionModel === 'conical_frustum_annulus') {
+        return {
+          id,
+          plateWidth: safePlateWidth,
+          plateLength: safePlateLength,
+          compressionModel,
+          length: Math.max(0.02, Number(thickness)),
+          modulus,
+          outerDiameterStart: Math.max(nominalDiameter + 0.2, proxyOuterDiameter * 0.82),
+          outerDiameterEnd: proxyOuterDiameter,
+          innerDiameter: nominalDiameter
+        };
+      }
+      if (compressionModel === 'explicit_area') {
+        return {
+          id,
+          plateWidth: safePlateWidth,
+          plateLength: safePlateLength,
+          compressionModel,
+          length: Math.max(0.02, Number(thickness)),
+          modulus,
+          effectiveArea: Math.max(0.0001, safePlateWidth * safePlateLength * 0.22),
+          note: 'Auto-derived from rectangular plate footprint'
+        };
+      }
+      return {
+        id,
+        plateWidth: safePlateWidth,
+        plateLength: safePlateLength,
+        compressionModel,
+        length: Math.max(0.02, Number(thickness)),
+        modulus,
+        outerDiameter: proxyOuterDiameter,
+        innerDiameter: nominalDiameter
+      };
+    };
+    return [makeLayer('top-plate', topThickness), makeLayer('bottom-plate', bottomThickness)];
+  }
 
   function normalizeMemberSegment(segment: MemberSegmentInput): MemberSegmentInput {
     const plateWidth = Number(('plateWidth' in segment ? segment.plateWidth : undefined) ?? 2.5);
@@ -140,7 +245,13 @@
       thermalExpansionCoeff: 6.2e-6
     },
     selectedPlateMaterialId: 'al2024',
+    selectedTopPlateMaterialId: 'al2024',
+    selectedBottomPlateMaterialId: 'al2024',
     selectedWasherMaterialId: 'washer_steel',
+    selectedHeadWasherMaterialId: 'washer_steel',
+    selectedNutWasherMaterialId: 'washer_steel',
+    washerGeometryManualOverride: false,
+    conicalGeometryManualOverride: false,
     selectedFastenerId: 'HL48',
     selectedFastenerDash: '8',
     selectedFastenerGrip: '8',
@@ -199,16 +310,61 @@
       temperatureChange: 40,
       embedmentSettlement: 0.00008
     }
+    ,
+    useCustomBoltSegments: false,
+    useCustomPlateLayers: false,
+    defaultPlateWidth: 2.5,
+    defaultPlateLength: 3.5,
+    defaultTopPlateThickness: 0.3,
+    defaultBottomPlateThickness: 0.3,
+    defaultPlateCompressionModel: 'cylindrical_annulus',
+    useSamePlateMaterial: true,
+    useSameWasherMaterial: true
   });
 
-  let form: PreloadForm = defaultForm();
-  let exportError = '';
-  let solverError = '';
-  let selectedInstallationModel: FastenedJointPreloadInput['installation']['model'] = form.installation.model;
-  let visualizationMode: 'classical_cone' | 'equivalent_annulus' = 'classical_cone';
-  let showAdvancedInputs = false;
-  let summarySvg: SVGSVGElement | null = null;
-  let jointSectionSvg: SVGSVGElement | null = null;
+  let form: PreloadForm = $state(defaultForm());
+  let exportError = $state('');
+  let solverError = $state('');
+  let output = $state<ReturnType<typeof computeFastenedJointPreload> | null>(null);
+  let selectedInstallationModel = $state<FastenedJointPreloadInput['installation']['model']>('exact_torque');
+  let visualizationMode = $state<'classical_cone' | 'equivalent_annulus'>('classical_cone');
+  let workflowStep = $state<WorkflowStep>('fastener');
+  let showAdvancedInputs = $state<boolean>(false);
+  const workflowOrder: WorkflowStep[] = ['fastener', 'materials', 'geometry', 'review'];
+  type StepSnapshot = { form: PreloadForm; savedAt: number };
+  type StepPrefs = {
+    autoAdvance: boolean;
+    walkthrough: boolean;
+    autoBearingArea: boolean;
+  };
+  type StepTelemetry = { totalMs: number; enteredAt: number | null };
+  let stepSnapshots: Partial<Record<WorkflowStep, StepSnapshot[]>> = $state({});
+  let stepHintsSeen: Partial<Record<WorkflowStep, boolean>> = $state({});
+  let stepCompletedAt: Partial<Record<WorkflowStep, number>> = $state({});
+  let stepPrefs: StepPrefs = $state({
+    autoAdvance: false,
+    walkthrough: true,
+    autoBearingArea: true
+  });
+  let stepTelemetry: Record<WorkflowStep, StepTelemetry> = $state({
+    fastener: { totalMs: 0, enteredAt: null },
+    materials: { totalMs: 0, enteredAt: null },
+    geometry: { totalMs: 0, enteredAt: null },
+    review: { totalMs: 0, enteredAt: null }
+  });
+  let stepEnteredAt = $state<number>(Date.now());
+  let previousTrackedStep = $state<WorkflowStep>('fastener');
+  let snapshotTimer = $state<ReturnType<typeof setTimeout> | null>(null);
+  let stepToastTimer: ReturnType<typeof setTimeout> | null = null;
+  let stepToast: { open: boolean; text: string; tone: 'info' | 'ok' | 'warn' } = $state({
+    open: false,
+    text: '',
+    tone: 'info'
+  });
+  let formSignature = $state<string>('');
+  let stepPrefsSignature = $state<string>('');
+  let summarySvg = $state<SVGSVGElement | null>(null);
+  let jointSectionSvg = $state<SVGSVGElement | null>(null);
 
   if (typeof window !== 'undefined') {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -246,6 +402,261 @@
     }
   }
 
+  function readStepPersistence() {
+    if (typeof window === 'undefined') return;
+    try {
+      const snapshotsRaw = localStorage.getItem(STEP_SNAPSHOT_KEY);
+      if (snapshotsRaw) stepSnapshots = JSON.parse(snapshotsRaw) as Partial<Record<WorkflowStep, StepSnapshot[]>>;
+      const hintsRaw = localStorage.getItem(STEP_HINTS_KEY);
+      if (hintsRaw) stepHintsSeen = JSON.parse(hintsRaw) as Partial<Record<WorkflowStep, boolean>>;
+      const telemetryRaw = localStorage.getItem(STEP_TELEMETRY_KEY);
+      if (telemetryRaw) {
+        const parsed = JSON.parse(telemetryRaw) as Partial<Record<WorkflowStep, StepTelemetry>>;
+        stepTelemetry = {
+          fastener: parsed.fastener ?? stepTelemetry.fastener,
+          materials: parsed.materials ?? stepTelemetry.materials,
+          geometry: parsed.geometry ?? stepTelemetry.geometry,
+          review: parsed.review ?? stepTelemetry.review
+        };
+      }
+      const prefsRaw = localStorage.getItem(STEP_PREFS_KEY);
+      if (prefsRaw) {
+        const parsedPrefs = JSON.parse(prefsRaw) as Partial<StepPrefs>;
+        stepPrefs = {
+          autoAdvance: parsedPrefs.autoAdvance ?? stepPrefs.autoAdvance,
+          walkthrough: parsedPrefs.walkthrough ?? stepPrefs.walkthrough,
+          autoBearingArea: parsedPrefs.autoBearingArea ?? stepPrefs.autoBearingArea
+        };
+      }
+    } catch {
+      stepSnapshots = {};
+      stepHintsSeen = {};
+    }
+  }
+
+  function persistStepState() {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(STEP_SNAPSHOT_KEY, JSON.stringify(stepSnapshots));
+    localStorage.setItem(STEP_HINTS_KEY, JSON.stringify(stepHintsSeen));
+    localStorage.setItem(STEP_TELEMETRY_KEY, JSON.stringify(stepTelemetry));
+    localStorage.setItem(STEP_PREFS_KEY, JSON.stringify(stepPrefs));
+  }
+
+  function saveStepSnapshot(step: WorkflowStep) {
+    const history = stepSnapshots[step] ?? [];
+    const latest = history[history.length - 1];
+    const nextSnapshot = {
+      form: clone(form),
+      savedAt: Date.now()
+    };
+    if (latest && JSON.stringify(latest.form) === JSON.stringify(nextSnapshot.form)) return;
+    stepSnapshots = {
+      ...stepSnapshots,
+      [step]: [...history.slice(-4), nextSnapshot]
+    };
+    persistStepState();
+  }
+
+  function revertStepSnapshot(step: WorkflowStep) {
+    const history = stepSnapshots[step] ?? [];
+    const snapshot = history[history.length - 1];
+    if (!snapshot) return;
+    form = clone(snapshot.form);
+    selectedInstallationModel = form.installation.model;
+  }
+
+  function revertPreviousStepSnapshot(step: WorkflowStep) {
+    const history = stepSnapshots[step] ?? [];
+    const snapshot = history[history.length - 2];
+    if (!snapshot) return;
+    form = clone(snapshot.form);
+    selectedInstallationModel = form.installation.model;
+  }
+
+  function fieldId(id: string) {
+    return `preload-${id}`;
+  }
+
+  type StepFieldCheck = { id: string; label: string; valid: boolean };
+  function stepChecklist(step: WorkflowStep): StepFieldCheck[] {
+    if (step === 'fastener') {
+      const installationValid =
+        form.installation.model !== 'exact_torque' ||
+        (form.installation.appliedTorque > 0 &&
+          form.installation.threadPitch > 0 &&
+          form.installation.threadPitchDiameter > 0 &&
+          form.installation.bearingMeanDiameter > 0);
+      return [
+        { id: fieldId('fastener-family'), label: 'Fastener family', valid: Boolean(form.selectedFastenerId) },
+        { id: fieldId('fastener-dash'), label: 'Dash diameter', valid: Boolean(form.selectedFastenerDash) },
+        { id: fieldId('fastener-grip'), label: 'Grip code', valid: Boolean(form.selectedFastenerGrip) },
+        { id: fieldId('fastener-material'), label: 'Fastener material', valid: Boolean(form.selectedFastenerMaterialId) },
+        { id: fieldId('installation-model'), label: 'Installation model inputs', valid: installationValid }
+      ];
+    }
+    if (step === 'materials') {
+      return [
+        {
+          id: fieldId('plate-material'),
+          label: 'Plate material(s)',
+          valid: form.useSamePlateMaterial
+            ? Boolean(form.selectedPlateMaterialId)
+            : Boolean(form.selectedTopPlateMaterialId && form.selectedBottomPlateMaterialId)
+        },
+        {
+          id: fieldId('washer-material'),
+          label: 'Washer material(s)',
+          valid: form.useSameWasherMaterial
+            ? Boolean(form.selectedWasherMaterialId)
+            : Boolean(form.selectedHeadWasherMaterialId && form.selectedNutWasherMaterialId)
+        }
+      ];
+    }
+    if (step === 'geometry') {
+      const checklist: StepFieldCheck[] = [
+        { id: fieldId('nominal-dia'), label: 'Nominal diameter', valid: form.nominalDiameter > 0 },
+        { id: fieldId('stress-area'), label: 'Tensile stress area', valid: form.tensileStressArea > 0 },
+        {
+          id: fieldId('bearing-area'),
+          label: 'Governing bearing area',
+          valid: stepPrefs.autoBearingArea ? autoComputedBearingArea > 0 : Number(form.underHeadBearingArea ?? 0) > 0
+        }
+      ];
+      if (!form.useCustomPlateLayers) {
+        checklist.push(
+          { id: fieldId('plate-width'), label: 'Plate width', valid: form.defaultPlateWidth > 0 },
+          { id: fieldId('plate-length'), label: 'Plate length', valid: form.defaultPlateLength > 0 },
+          { id: fieldId('top-thk'), label: 'Top plate thickness', valid: form.defaultTopPlateThickness > 0 },
+          { id: fieldId('bot-thk'), label: 'Bottom plate thickness', valid: form.defaultBottomPlateThickness > 0 }
+        );
+      } else {
+        checklist.push({
+          id: fieldId('plate-layers'),
+          label: 'Custom plate rows',
+          valid: form.memberSegments.length > 0 && form.memberSegments.every((segment) => memberValidation(segment).length === 0)
+        });
+      }
+      return checklist;
+    }
+    return [
+      { id: fieldId('review-main'), label: 'Solver output', valid: Boolean(output) && !solverError },
+      {
+        id: fieldId('adjacent-screening'),
+        label: 'Pattern screening',
+        valid: !form.adjacentFastenerScreen.enabled || Boolean(fastenerGroupResult)
+      }
+    ];
+  }
+
+  function focusByFieldId(id: string) {
+    if (typeof document === 'undefined') return;
+    const element = document.getElementById(id);
+    if (!element) return;
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const focusTarget = element.matches('input,select,button,[tabindex]')
+      ? element
+      : (element.querySelector('input,select,button,[tabindex]') as HTMLElement | null);
+    focusTarget?.focus();
+  }
+
+  function focusFirstInvalidField(step: WorkflowStep) {
+    const firstInvalid = stepChecklist(step).find((item) => !item.valid);
+    if (!firstInvalid) return;
+    focusByFieldId(firstInvalid.id);
+  }
+
+  function handleNextClick() {
+    if (canGoNext) {
+      setWorkflowStep(nextStepTarget);
+      return;
+    }
+    showStepToast('Complete required fields to continue.', 'warn');
+    focusFirstInvalidField(workflowStep);
+  }
+
+  function showStepToast(text: string, tone: 'info' | 'ok' | 'warn' = 'info') {
+    if (stepToastTimer) clearTimeout(stepToastTimer);
+    stepToast = { open: true, text, tone };
+    stepToastTimer = setTimeout(() => {
+      stepToast = { open: false, text: '', tone: 'info' };
+    }, 2600);
+  }
+
+  function stepHintText(step: WorkflowStep) {
+    if (step === 'fastener') {
+      return 'Tip: Pick family, dash, grip, then installation model.';
+    }
+    if (step === 'materials') {
+      return 'Tip: Keep same-material toggles on unless top/bottom or washer sides differ.';
+    }
+    if (step === 'geometry') {
+      return 'Tip: Start with auto plate layers; enable custom layers only for non-standard stacks.';
+    }
+    return 'Tip: Validate solver output, pattern screening, and exports before sign-off.';
+  }
+
+  function showStepHintToast(step: WorkflowStep) {
+    if (!stepPrefs.walkthrough) return;
+    showStepToast(stepHintText(step), 'info');
+    stepHintsSeen = { ...stepHintsSeen, [step]: true };
+    persistStepState();
+  }
+
+  function walkthroughTarget(step: WorkflowStep) {
+    const checklist = stepChecklist(step);
+    return checklist.find((item) => !item.valid) ?? checklist[0] ?? null;
+  }
+
+  function stepLabel(step: WorkflowStep) {
+    return step === 'fastener' ? 'Fastener' : step === 'materials' ? 'Materials' : step === 'geometry' ? 'Geometry' : 'Review';
+  }
+
+  function blockedStepsBeforeReview() {
+    return workflowOrder
+      .filter((step) => step !== 'review')
+      .filter((step) => !isStepValid(step))
+      .map((step) => ({
+        step,
+        label: stepLabel(step),
+        remaining: stepChecklist(step).filter((item) => !item.valid)
+      }));
+  }
+
+  onMount(() => {
+    readStepPersistence();
+    stepEnteredAt = Date.now();
+    previousTrackedStep = workflowStep;
+    stepTelemetry[workflowStep] = { ...stepTelemetry[workflowStep], enteredAt: stepEnteredAt };
+    persistStepState();
+    if (!(stepHintsSeen[workflowStep] ?? false)) showStepHintToast(workflowStep);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.altKey) return;
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        handleNextClick();
+      } else if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        if (canGoBack) setWorkflowStep(previousWorkflowStep(workflowStep));
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      if (stepToastTimer) clearTimeout(stepToastTimer);
+    };
+  });
+
+  onDestroy(() => {
+    const now = Date.now();
+    const elapsed = Math.max(0, now - stepEnteredAt);
+    stepTelemetry[workflowStep] = {
+      totalMs: stepTelemetry[workflowStep].totalMs + elapsed,
+      enteredAt: null
+    };
+    if (snapshotTimer) clearTimeout(snapshotTimer);
+    persistStepState();
+  });
+
   function setInstallationModel(model: FastenedJointPreloadInput['installation']['model']) {
     if (model === form.installation.model) return;
     if (model === 'exact_torque') {
@@ -277,29 +688,42 @@
     };
   }
 
-  let lastPlateMaterialId = '';
-  let lastWasherMaterialId = '';
-  let lastFastenerId = '';
-  let lastFastenerMaterialId = '';
+  let lastPlateMaterialSignature = $state('');
+  let lastWasherMaterialSignature = $state('');
+  let lastFastenerId = $state('');
+  let lastFastenerMaterialId = $state('');
 
-  function applyPlateMaterialDefaults(materialId: string) {
-    const material = getPreloadMaterial(materialId);
-    form.memberSegments = form.memberSegments.map((segment) => ({
-      ...segment,
-      modulus: material.modulusPsi,
-      thermalExpansionCoeff: material.thermalExpansionCoeff
-    }));
-    if (material.bearingAllowablePsi) {
-      form.memberBearingAllowable = material.bearingAllowablePsi;
-    }
+  function applyPlateMaterialDefaults() {
+    const topMaterial = getPreloadMaterial(form.useSamePlateMaterial ? form.selectedPlateMaterialId : form.selectedTopPlateMaterialId);
+    const bottomMaterial = getPreloadMaterial(form.useSamePlateMaterial ? form.selectedPlateMaterialId : form.selectedBottomPlateMaterialId);
+    form.memberSegments = form.memberSegments.map((segment, index) => {
+      const material = index === 0 ? topMaterial : bottomMaterial;
+      return {
+        ...segment,
+        modulus: material.modulusPsi,
+        thermalExpansionCoeff: material.thermalExpansionCoeff
+      };
+    });
+    const governingBearing = Math.min(
+      topMaterial.bearingAllowablePsi ?? Number.POSITIVE_INFINITY,
+      bottomMaterial.bearingAllowablePsi ?? Number.POSITIVE_INFINITY
+    );
+    if (Number.isFinite(governingBearing)) form.memberBearingAllowable = governingBearing;
   }
 
-  function applyWasherMaterialDefaults(materialId: string) {
-    const material = getPreloadMaterial(materialId);
+  function applyWasherMaterialDefaults() {
+    const headMaterial = getPreloadMaterial(form.useSameWasherMaterial ? form.selectedWasherMaterialId : form.selectedHeadWasherMaterialId);
+    const nutMaterial = getPreloadMaterial(form.useSameWasherMaterial ? form.selectedWasherMaterialId : form.selectedNutWasherMaterialId);
+    const modulus = form.useSameWasherMaterial
+      ? headMaterial.modulusPsi
+      : (headMaterial.modulusPsi + nutMaterial.modulusPsi) / 2;
+    const headAlpha = headMaterial.thermalExpansionCoeff ?? 6.2e-6;
+    const nutAlpha = nutMaterial.thermalExpansionCoeff ?? 6.2e-6;
+    const thermalExpansionCoeff = form.useSameWasherMaterial ? headAlpha : (headAlpha + nutAlpha) / 2;
     form.washerStack = {
       ...form.washerStack,
-      modulus: material.modulusPsi,
-      thermalExpansionCoeff: material.thermalExpansionCoeff
+      modulus,
+      thermalExpansionCoeff
     };
   }
 
@@ -359,36 +783,234 @@
     };
   }
 
-  $: if (selectedInstallationModel !== form.installation.model) setInstallationModel(selectedInstallationModel);
-  $: if (form.selectedPlateMaterialId !== lastPlateMaterialId) {
-    lastPlateMaterialId = form.selectedPlateMaterialId;
-    applyPlateMaterialDefaults(form.selectedPlateMaterialId);
-  }
-  $: if (form.selectedWasherMaterialId !== lastWasherMaterialId) {
-    lastWasherMaterialId = form.selectedWasherMaterialId;
-    applyWasherMaterialDefaults(form.selectedWasherMaterialId);
-  }
-  $: if (form.selectedFastenerId !== lastFastenerId) {
-    lastFastenerId = form.selectedFastenerId;
-    const fastener = getPreloadFastener(form.selectedFastenerId);
-    if (!fastener.dashVariants.some((variant) => variant.dash === form.selectedFastenerDash)) {
-      form.selectedFastenerDash = fastener.dashVariants[0]?.dash ?? '8';
+  run(() => {
+    if (selectedInstallationModel !== form.installation.model) setInstallationModel(selectedInstallationModel);
+  });
+  run(() => {
+    const signature = form.useSamePlateMaterial
+      ? `same:${form.selectedPlateMaterialId}`
+      : `split:${form.selectedTopPlateMaterialId}:${form.selectedBottomPlateMaterialId}`;
+    if (signature !== lastPlateMaterialSignature) {
+      lastPlateMaterialSignature = signature;
+      applyPlateMaterialDefaults();
     }
-    if (!fastener.gripTable.some((entry) => entry.gripCode === form.selectedFastenerGrip)) {
-      form.selectedFastenerGrip = fastener.gripTable[0]?.gripCode ?? '1';
+  });
+  run(() => {
+    const signature = form.useSameWasherMaterial
+      ? `same:${form.selectedWasherMaterialId}`
+      : `split:${form.selectedHeadWasherMaterialId}:${form.selectedNutWasherMaterialId}`;
+    if (signature !== lastWasherMaterialSignature) {
+      lastWasherMaterialSignature = signature;
+      applyWasherMaterialDefaults();
     }
-    if (fastener.materialId !== form.selectedFastenerMaterialId) {
-      form.selectedFastenerMaterialId = fastener.materialId;
+  });
+  run(() => {
+    if (form.selectedFastenerId !== lastFastenerId) {
+      lastFastenerId = form.selectedFastenerId;
+      const fastener = getPreloadFastener(form.selectedFastenerId);
+      if (!fastener.dashVariants.some((variant) => variant.dash === form.selectedFastenerDash)) {
+        form.selectedFastenerDash = fastener.dashVariants[0]?.dash ?? '8';
+      }
+      if (!fastener.gripTable.some((entry) => entry.gripCode === form.selectedFastenerGrip)) {
+        form.selectedFastenerGrip = fastener.gripTable[0]?.gripCode ?? '1';
+      }
+      if (fastener.materialId !== form.selectedFastenerMaterialId) {
+        form.selectedFastenerMaterialId = fastener.materialId;
+      }
     }
-  }
-  $: if (form.selectedFastenerMaterialId !== lastFastenerMaterialId) {
-    lastFastenerMaterialId = form.selectedFastenerMaterialId;
-    applyFastenerMaterialDefaults(form.selectedFastenerMaterialId);
-  }
-  $: if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
+  });
+  run(() => {
+    if (form.selectedFastenerMaterialId !== lastFastenerMaterialId) {
+      lastFastenerMaterialId = form.selectedFastenerMaterialId;
+      applyFastenerMaterialDefaults(form.selectedFastenerMaterialId);
+    }
+  });
+  run(() => {
+    if (form.useSamePlateMaterial) {
+      form.selectedTopPlateMaterialId = form.selectedPlateMaterialId;
+      form.selectedBottomPlateMaterialId = form.selectedPlateMaterialId;
+    }
+  });
+  run(() => {
+    if (form.useSameWasherMaterial) {
+      form.selectedHeadWasherMaterialId = form.selectedWasherMaterialId;
+      form.selectedNutWasherMaterialId = form.selectedWasherMaterialId;
+    }
+  });
+  run(() => {
+    if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
+  });
 
-  let output: ReturnType<typeof computeFastenedJointPreload> | null = null;
-  $: {
+  function isFastenerStepValid(): boolean {
+    if (!form.selectedFastenerId || !form.selectedFastenerDash || !form.selectedFastenerGrip) return false;
+    if (form.useCustomBoltSegments) return form.boltSegments.every((segment) => boltValidation(segment).length === 0);
+    if (form.installation.model === 'exact_torque') {
+      return (
+        form.nominalDiameter > 0 &&
+        form.tensileStressArea > 0 &&
+        form.installation.appliedTorque > 0 &&
+        form.installation.threadPitch > 0 &&
+        form.installation.threadPitchDiameter > 0 &&
+        form.installation.bearingMeanDiameter > 0
+      );
+    }
+    if (form.installation.model === 'nut_factor') {
+      return form.nominalDiameter > 0 && form.tensileStressArea > 0 && form.installation.appliedTorque > 0 && (form.installation.nutFactor ?? 0) > 0;
+    }
+    return form.nominalDiameter > 0 && form.tensileStressArea > 0 && (form.installation.targetPreload ?? 0) > 0;
+  }
+
+  function isMaterialsStepValid(): boolean {
+    const plateOk = form.useSamePlateMaterial
+      ? Boolean(form.selectedPlateMaterialId)
+      : Boolean(form.selectedTopPlateMaterialId && form.selectedBottomPlateMaterialId);
+    const washerOk = form.useSameWasherMaterial
+      ? Boolean(form.selectedWasherMaterialId)
+      : Boolean(form.selectedHeadWasherMaterialId && form.selectedNutWasherMaterialId);
+    return plateOk && washerOk;
+  }
+
+  function isGeometryStepValid(): boolean {
+    if (form.useCustomPlateLayers) {
+      return form.memberSegments.length > 0 && form.memberSegments.every((segment) => memberValidation(segment).length === 0);
+    }
+    return (
+      form.defaultPlateWidth > 0 &&
+      form.defaultPlateLength > 0 &&
+      form.defaultTopPlateThickness > 0 &&
+      form.defaultBottomPlateThickness > 0 &&
+      form.nominalDiameter > 0
+    );
+  }
+
+  function isStepValid(step: WorkflowStep): boolean {
+    if (step === 'fastener') return isFastenerStepValid();
+    if (step === 'materials') return isMaterialsStepValid();
+    if (step === 'geometry') return isGeometryStepValid();
+    return Boolean(output) && !solverError;
+  }
+
+  function canNavigateToStep(step: WorkflowStep): boolean {
+    const targetIndex = workflowOrder.indexOf(step);
+    for (let i = 0; i < targetIndex; i += 1) {
+      if (!isStepValid(workflowOrder[i])) return false;
+    }
+    return true;
+  }
+
+  function setWorkflowStep(nextStep: WorkflowStep) {
+    if (!canNavigateToStep(nextStep)) return;
+    const isStepChange = workflowStep !== nextStep;
+    workflowStep = nextStep;
+    if (isStepChange) showStepHintToast(nextStep);
+  }
+
+  function previousWorkflowStep(step: WorkflowStep): WorkflowStep {
+    const idx = workflowOrder.indexOf(step);
+    return workflowOrder[Math.max(0, idx - 1)];
+  }
+
+  function nextWorkflowStep(step: WorkflowStep): WorkflowStep {
+    const idx = workflowOrder.indexOf(step);
+    return workflowOrder[Math.min(workflowOrder.length - 1, idx + 1)];
+  }
+
+  let currentStepValid = $derived(isStepValid(workflowStep));
+  let canGoBack = $derived(workflowStep !== 'fastener');
+  let nextStepTarget = $derived(nextWorkflowStep(workflowStep));
+  let canGoNext = $derived(workflowOrder.indexOf(workflowStep) < workflowOrder.length - 1 && currentStepValid && canNavigateToStep(nextStepTarget));
+  let currentChecklist = $derived(stepChecklist(workflowStep));
+  let currentChecklistDone = $derived(currentChecklist.filter((item) => item.valid).length);
+  let currentChecklistTotal = $derived(currentChecklist.length);
+  let currentSnapshotHistory = $derived(stepSnapshots[workflowStep] ?? []);
+  let currentSnapshot = $derived(currentSnapshotHistory.length ? currentSnapshotHistory[currentSnapshotHistory.length - 1] : null);
+  let walkthroughItem = $derived(stepPrefs.walkthrough ? walkthroughTarget(workflowStep) : null);
+  let blockedPrereqs = $derived(blockedStepsBeforeReview());
+  let validStepCount = $derived(workflowOrder.filter((step) => isStepValid(step)).length);
+  let validityProgressPct = $derived(Math.max(0, Math.min(100, (validStepCount / workflowOrder.length) * 100)));
+  let telemetryMinutes = $derived(Math.round(((stepTelemetry[workflowStep]?.totalMs ?? 0) + (Date.now() - stepEnteredAt)) / 600) / 100);
+  let activeStepIndex = $derived(workflowOrder.indexOf(workflowStep));
+  let stepChips = $derived(workflowOrder.map((step, index) => {
+    let state: 'complete' | 'active' | 'ready' | 'available' | 'locked' = 'locked';
+    if (index < activeStepIndex && isStepValid(step)) state = 'complete';
+    else if (step === workflowStep) state = currentStepValid ? 'ready' : 'active';
+    else if (canNavigateToStep(step)) state = 'available';
+    return {
+      step,
+      label:
+        step === 'fastener'
+          ? 'Fastener'
+          : step === 'materials'
+            ? 'Materials'
+            : step === 'geometry'
+              ? 'Geometry'
+              : 'Review',
+      state
+    };
+  }));
+  run(() => {
+    if (workflowStep !== previousTrackedStep) {
+      const now = Date.now();
+      const elapsed = Math.max(0, now - stepEnteredAt);
+      stepTelemetry[previousTrackedStep] = {
+        totalMs: stepTelemetry[previousTrackedStep].totalMs + elapsed,
+        enteredAt: null
+      };
+      saveStepSnapshot(previousTrackedStep);
+      previousTrackedStep = workflowStep;
+      stepEnteredAt = now;
+      stepTelemetry[workflowStep] = { ...stepTelemetry[workflowStep], enteredAt: now };
+      persistStepState();
+    }
+  });
+  run(() => {
+    if (isStepValid(workflowStep) && !(stepHintsSeen[workflowStep] ?? false)) {
+      stepHintsSeen = { ...stepHintsSeen, [workflowStep]: true };
+      persistStepState();
+    }
+  });
+  run(() => {
+    for (const step of workflowOrder) {
+      if (isStepValid(step) && !stepCompletedAt[step]) {
+        stepCompletedAt = { ...stepCompletedAt, [step]: Date.now() };
+      }
+    }
+  });
+  run(() => {
+    formSignature = JSON.stringify(form);
+  });
+  run(() => {
+    if (formSignature) {
+      if (snapshotTimer) clearTimeout(snapshotTimer);
+      snapshotTimer = setTimeout(() => {
+        saveStepSnapshot(workflowStep);
+      }, 450);
+    }
+  });
+  run(() => {
+    stepPrefsSignature = JSON.stringify(stepPrefs);
+  });
+  run(() => {
+    if (typeof window !== 'undefined' && stepPrefsSignature) {
+      localStorage.setItem(STEP_PREFS_KEY, stepPrefsSignature);
+    }
+  });
+  run(() => {
+    if (
+      stepPrefs.autoAdvance &&
+      workflowStep !== 'review' &&
+      currentStepValid &&
+      canNavigateToStep(nextStepTarget)
+    ) {
+      const current = workflowStep;
+      const next = nextStepTarget;
+      setTimeout(() => {
+        if (workflowStep === current && currentStepValid) setWorkflowStep(next);
+      }, 220);
+    }
+  });
+
+  run(() => {
     solverError = '';
     try {
       output = computeFastenedJointPreload(form);
@@ -396,7 +1018,7 @@
       output = null;
       solverError = error instanceof Error ? error.message : 'Preload solver failed.';
     }
-  }
+  });
 
   function addBoltSegment() {
     form.boltSegments = [
@@ -735,14 +1357,113 @@
     return Math.sqrt(innerDiameter * innerDiameter + (4 * Number(area)) / Math.PI);
   }
 
+  function annularFrictionMeanDiameter(outerDiameter: number, innerDiameter: number) {
+    if (!(outerDiameter > innerDiameter) || !(innerDiameter >= 0)) return null;
+    const ro = outerDiameter / 2;
+    const ri = innerDiameter / 2;
+    const numerator = Math.pow(ro, 3) - Math.pow(ri, 3);
+    const denominator = Math.pow(ro, 2) - Math.pow(ri, 2);
+    if (!(denominator > 0)) return null;
+    const meanRadius = (2 / 3) * (numerator / denominator);
+    return 2 * meanRadius;
+  }
+
+  function enforceAnnulusGap(outer: number, inner: number, minGap = 0.001) {
+    const safeInner = Math.max(0, Number(inner) || 0);
+    const safeOuter = Number(outer) || 0;
+    if (safeOuter > safeInner + minGap) return { outer: safeOuter, inner: safeInner, changed: false };
+    return { outer: safeInner + minGap, inner: safeInner, changed: true };
+  }
+
+  function deriveAutoWasherGeometry() {
+    const d = Number(selectedFastenerDashVariant?.nominalDiameterIn ?? form.nominalDiameter);
+    const nominal = Number.isFinite(d) && d > 0 ? d : 0.25;
+    const styleRaw = String(selectedFastener?.headStyle ?? '').toLowerCase();
+    const isFlush = styleRaw.includes('flush');
+    const isTension = styleRaw.includes('tension');
+    const headStyleKey: 'protrudingShear' | 'reducedFlushShear' | 'protrudingTension' | 'flushTension' =
+      isTension ? (isFlush ? 'flushTension' : 'protrudingTension') : (isFlush ? 'reducedFlushShear' : 'protrudingShear');
+    const dashGeom = selectedFastenerDashVariant?.geometry;
+    const clearance = Math.max(0.005, nominal * 0.06);
+    const inner = Number.isFinite(Number(dashGeom?.washerInnerDiameterIn)) && Number(dashGeom?.washerInnerDiameterIn) > nominal
+      ? Number(dashGeom?.washerInnerDiameterIn)
+      : nominal + clearance;
+    const existingOuter = Number(dashGeom?.washerOuterDiameterIn ?? form.washerStack.outerDiameter);
+    const outerCandidate = Math.max(
+      Number.isFinite(existingOuter) && existingOuter > 0 ? existingOuter : 0,
+      nominal * 2.6,
+      inner + 0.08
+    );
+    const enforced = enforceAnnulusGap(outerCandidate, inner, 0.001);
+    const nutFace = Number(dashGeom?.nutFaceDiameterIn ?? 0);
+    const headFace = Number(dashGeom?.headFaceDiametersIn?.[headStyleKey] ?? 0);
+    const topFaceEnforced = enforceAnnulusGap(
+      Number.isFinite(headFace) && headFace > 0 ? headFace : enforced.outer,
+      enforced.inner,
+      0.001
+    );
+    const bottomFaceEnforced = enforceAnnulusGap(
+      Number.isFinite(nutFace) && nutFace > 0 ? nutFace : enforced.outer,
+      enforced.inner,
+      0.001
+    );
+    return {
+      outer: enforced.outer,
+      inner: enforced.inner,
+      topFaceOuter: topFaceEnforced.outer,
+      bottomFaceOuter: bottomFaceEnforced.outer
+    };
+  }
+
+  function sanitizeMemberSegment(segment: MemberSegmentInput): { segment: MemberSegmentInput; changed: boolean } {
+    if (segment.compressionModel === 'cylindrical_annulus') {
+      const next = enforceAnnulusGap(Number(segment.outerDiameter), Number(segment.innerDiameter));
+      if (!next.changed) return { segment, changed: false };
+      return {
+        segment: {
+          ...segment,
+          outerDiameter: next.outer,
+          innerDiameter: next.inner
+        },
+        changed: true
+      };
+    }
+    if (segment.compressionModel === 'conical_frustum_annulus') {
+      const start = enforceAnnulusGap(Number(segment.outerDiameterStart), Number(segment.innerDiameter));
+      const end = enforceAnnulusGap(Number(segment.outerDiameterEnd), Number(segment.innerDiameter));
+      if (!start.changed && !end.changed) return { segment, changed: false };
+      return {
+        segment: {
+          ...segment,
+          outerDiameterStart: start.outer,
+          outerDiameterEnd: end.outer,
+          innerDiameter: Math.max(start.inner, end.inner)
+        },
+        changed: true
+      };
+    }
+    return { segment, changed: false };
+  }
+
+  function deriveConicalProxyDiameters(segment: Extract<MemberSegmentInput, { compressionModel: 'conical_frustum_annulus' }>) {
+    const inner = Math.max(0, Number(segment.innerDiameter) || 0);
+    const thickness = Math.max(0.001, Number(segment.length) || 0.001);
+    const cap = Math.max(inner + 0.001, Math.min(Number(segment.plateWidth) || 0, Number(segment.plateLength) || 0));
+    const startSeed = Math.max(inner + 0.05, form.nominalDiameter * 1.6);
+    const start = Math.min(cap, startSeed);
+    const spread = 2 * thickness * Math.tan((Math.max(5, Math.min(45, Number(form.compressionConeHalfAngleDeg ?? 30))) * Math.PI) / 180);
+    const end = Math.min(cap, Math.max(start + 0.001, start + spread));
+    return { start, end };
+  }
+
   function compressionModelLabel(compressionModel: MemberSegmentInput['compressionModel']) {
     switch (compressionModel) {
       case 'cylindrical_annulus':
-        return 'Uniform compression proxy';
+        return 'Uniform zone (constant effective diameter)';
       case 'conical_frustum_annulus':
-        return 'Tapered compression proxy';
+        return 'Tapered zone (cone-like spread)';
       case 'explicit_area':
-        return 'Direct equivalent area proxy';
+        return 'Direct area (equivalent compressed area)';
       default:
         return compressionModel;
     }
@@ -765,56 +1486,242 @@
           ? 'text-emerald-300'
           : 'text-white/60';
 
-  $: selectedPlateMaterial = getPreloadMaterial(form.selectedPlateMaterialId);
-  $: selectedWasherMaterial = getPreloadMaterial(form.selectedWasherMaterialId);
-  $: selectedFastener = getPreloadFastener(form.selectedFastenerId);
-  $: selectedFastenerDashVariant =
-    selectedFastener.dashVariants.find((variant) => variant.dash === form.selectedFastenerDash) ??
-    selectedFastener.dashVariants[0] ??
-    null;
-  $: selectedFastenerGripVariant =
-    selectedFastener.gripTable.find((entry) => entry.gripCode === form.selectedFastenerGrip) ??
-    selectedFastener.gripTable[0] ??
-    null;
-  $: selectedFastenerMaterial = getPreloadMaterial(form.selectedFastenerMaterialId);
+  type GuideCheckStatus = 'ok' | 'warn' | 'todo';
+  type GuideDerivedCheck = {
+    id: string;
+    principle: string;
+    source: 'Bolt Council 2nd Ed.' | 'VT Multi-Bolt Joint Chapter';
+    status: GuideCheckStatus;
+    mappedInputs: string[];
+    rationale: string;
+    action?: string;
+  };
+  const guideTone = (status: GuideCheckStatus) =>
+    status === 'ok'
+      ? 'border-emerald-300/35 bg-emerald-500/10 text-emerald-100'
+      : status === 'warn'
+        ? 'border-amber-300/35 bg-amber-500/10 text-amber-100'
+        : 'border-white/20 bg-white/[0.03] text-white/75';
 
-  $: clampInstalled = output?.installation.preload ?? 0;
-  $: clampService = Math.max(0, output?.service?.clampForceService ?? 0);
-  $: clampMax = Math.max(clampInstalled, clampService, 1);
-  $: separationUtil = Math.max(0, Math.min(1.4, output?.checks.serviceLimits.separation.utilization ?? 0));
-  $: slipUtil = Math.max(0, Math.min(1.4, output?.checks.serviceLimits.slip.utilization ?? 0));
-  $: scatterMin = output?.installation.preloadMin ?? 0;
-  $: scatterMax = output?.installation.preloadMax ?? 0;
-  $: representativeCone = form.memberSegments.find((segment) => segment.compressionModel === 'conical_frustum_annulus') ?? null;
-  $: washerTopCount = Math.max(0, Math.round(form.washerStack.underHeadCount ?? 0));
-  $: washerBottomCount = Math.max(0, Math.round(form.washerStack.underNutCount ?? 0));
-  $: effectiveWasherCount = form.washerStack.enabled ? washerTopCount + washerBottomCount : 0;
-  $: topBearingFaceOuterDiameter =
-    form.washerStack.enabled && Number(form.washerStack.underHeadOuterDiameter ?? form.washerStack.outerDiameter) > 0
+  let selectedPlateMaterial = $derived(getPreloadMaterial(form.selectedPlateMaterialId));
+  let selectedWasherMaterial = $derived(getPreloadMaterial(form.selectedWasherMaterialId));
+  let selectedFastener = $derived(getPreloadFastener(form.selectedFastenerId));
+  let selectedFastenerDashVariant =
+    $derived(selectedFastener.dashVariants.find((variant) => variant.dash === form.selectedFastenerDash) ??
+    selectedFastener.dashVariants[0] ??
+    null);
+  let selectedFastenerGripVariant =
+    $derived(selectedFastener.gripTable.find((entry) => entry.gripCode === form.selectedFastenerGrip) ??
+    selectedFastener.gripTable[0] ??
+    null);
+  let selectedFastenerMaterial = $derived(getPreloadMaterial(form.selectedFastenerMaterialId));
+  run(() => {
+    if (selectedFastenerDashVariant && !form.useCustomBoltSegments) {
+      form.nominalDiameter = selectedFastenerDashVariant.nominalDiameterIn;
+      form.tensileStressArea = estimateThreadedArea(selectedFastenerDashVariant.nominalDiameterIn);
+    }
+  });
+  run(() => {
+    if (!form.useCustomBoltSegments) {
+      const gripLength = selectedFastenerGripVariant?.nominalGripIn ?? 0.5;
+      form.boltSegments = buildAutoBoltSegments(
+        form.nominalDiameter,
+        form.boltModulus,
+        gripLength,
+        Number(form.engagedThreadLength ?? 0.45)
+      );
+    }
+  });
+  run(() => {
+    if (!form.useCustomPlateLayers) {
+      form.memberSegments = buildAutoPlateLayers(
+        form.defaultPlateWidth,
+        form.defaultPlateLength,
+        form.defaultTopPlateThickness,
+        form.defaultBottomPlateThickness,
+        selectedPlateMaterial.modulusPsi,
+        form.nominalDiameter,
+        form.defaultPlateCompressionModel
+      );
+    }
+  });
+  run(() => {
+    let changed = false;
+    const nextSegments = form.memberSegments.map((segment) => {
+      const sanitized = sanitizeMemberSegment(segment);
+      if (sanitized.changed) changed = true;
+      return sanitized.segment;
+    });
+    if (changed) form.memberSegments = nextSegments;
+  });
+  run(() => {
+    if (form.conicalGeometryManualOverride) return;
+    let changed = false;
+    const nextSegments = form.memberSegments.map((segment) => {
+      if (segment.compressionModel !== 'conical_frustum_annulus') return segment;
+      const auto = deriveConicalProxyDiameters(segment);
+      if (
+        Math.abs(Number(segment.outerDiameterStart) - auto.start) <= 1e-9 &&
+        Math.abs(Number(segment.outerDiameterEnd) - auto.end) <= 1e-9
+      ) {
+        return segment;
+      }
+      changed = true;
+      return {
+        ...segment,
+        outerDiameterStart: auto.start,
+        outerDiameterEnd: auto.end
+      };
+    });
+    if (changed) form.memberSegments = nextSegments;
+  });
+  run(() => {
+    const current = form.washerStack;
+    const autoGeom = deriveAutoWasherGeometry();
+    const globalInnerSource = Number.isFinite(Number(current.innerDiameter)) ? Number(current.innerDiameter) : autoGeom.inner;
+    const globalOuterSource = Number.isFinite(Number(current.outerDiameter)) && Number(current.outerDiameter) > 0
+      ? Number(current.outerDiameter)
+      : autoGeom.outer;
+    const global = enforceAnnulusGap(globalOuterSource, globalInnerSource);
+    const headOuterSource = Number.isFinite(Number(current.underHeadOuterDiameter))
+      ? Number(current.underHeadOuterDiameter)
+      : global.outer;
+    const headInnerSource = Number.isFinite(Number(current.underHeadInnerDiameter))
+      ? Number(current.underHeadInnerDiameter)
+      : global.inner;
+    const nutOuterSource = Number.isFinite(Number(current.underNutOuterDiameter))
+      ? Number(current.underNutOuterDiameter)
+      : global.outer;
+    const nutInnerSource = Number.isFinite(Number(current.underNutInnerDiameter))
+      ? Number(current.underNutInnerDiameter)
+      : global.inner;
+    const head = enforceAnnulusGap(headOuterSource, headInnerSource);
+    const nut = enforceAnnulusGap(nutOuterSource, nutInnerSource);
+    if (!head.changed && !nut.changed && !global.changed) return;
+    form.washerStack = {
+      ...current,
+      outerDiameter: global.outer,
+      innerDiameter: global.inner,
+      underHeadOuterDiameter: head.outer,
+      underHeadInnerDiameter: head.inner,
+      underNutOuterDiameter: nut.outer,
+      underNutInnerDiameter: nut.inner
+    };
+  });
+  run(() => {
+    if (form.washerGeometryManualOverride) return;
+    const current = form.washerStack;
+    const autoGeom = deriveAutoWasherGeometry();
+    const next = {
+      ...current,
+      outerDiameter: autoGeom.outer,
+      innerDiameter: autoGeom.inner,
+      underHeadOuterDiameter: autoGeom.topFaceOuter,
+      underHeadInnerDiameter: autoGeom.inner,
+      underNutOuterDiameter: autoGeom.bottomFaceOuter,
+      underNutInnerDiameter: autoGeom.inner
+    };
+    const currSig = JSON.stringify({
+      outerDiameter: current.outerDiameter,
+      innerDiameter: current.innerDiameter,
+      underHeadOuterDiameter: current.underHeadOuterDiameter,
+      underHeadInnerDiameter: current.underHeadInnerDiameter,
+      underNutOuterDiameter: current.underNutOuterDiameter,
+      underNutInnerDiameter: current.underNutInnerDiameter
+    });
+    const nextSig = JSON.stringify({
+      outerDiameter: next.outerDiameter,
+      innerDiameter: next.innerDiameter,
+      underHeadOuterDiameter: next.underHeadOuterDiameter,
+      underHeadInnerDiameter: next.underHeadInnerDiameter,
+      underNutOuterDiameter: next.underNutOuterDiameter,
+      underNutInnerDiameter: next.underNutInnerDiameter
+    });
+    if (currSig !== nextSig) form.washerStack = next;
+  });
+
+  let clampInstalled = $derived(output?.installation.preload ?? 0);
+  let clampService = $derived(Math.max(0, output?.service?.clampForceService ?? 0));
+  let clampMax = $derived(Math.max(clampInstalled, clampService, 1));
+  let separationUtil = $derived(Math.max(0, Math.min(1.4, output?.checks.serviceLimits.separation.utilization ?? 0)));
+  let slipUtil = $derived(Math.max(0, Math.min(1.4, output?.checks.serviceLimits.slip.utilization ?? 0)));
+  let scatterMin = $derived(output?.installation.preloadMin ?? 0);
+  let scatterMax = $derived(output?.installation.preloadMax ?? 0);
+  let representativeCone = $derived(form.memberSegments.find((segment) => segment.compressionModel === 'conical_frustum_annulus') ?? null);
+  let washerTopCount = $derived(Math.max(0, Math.round(form.washerStack.underHeadCount ?? 0)));
+  let washerBottomCount = $derived(Math.max(0, Math.round(form.washerStack.underNutCount ?? 0)));
+  let effectiveWasherCount = $derived(form.washerStack.enabled ? washerTopCount + washerBottomCount : 0);
+  let inferredBearingOuterDiameter =
+    $derived(form.installation.model === 'exact_torque' && Number(form.installation.bearingMeanDiameter) > 0
+      ? Math.max(
+          form.nominalDiameter,
+          2 * Number(form.installation.bearingMeanDiameter) - form.nominalDiameter
+        )
+      : Math.max(form.nominalDiameter * 1.8, form.nominalDiameter + 0.08));
+  let styleRaw = $derived(String(selectedFastener?.headStyle ?? '').toLowerCase());
+  let isFlushHead = $derived(styleRaw.includes('flush'));
+  let isTensionHead = $derived(styleRaw.includes('tension'));
+  let activeHeadStyleKey = $derived<'protrudingShear' | 'reducedFlushShear' | 'protrudingTension' | 'flushTension'>(
+    isTensionHead ? (isFlushHead ? 'flushTension' : 'protrudingTension') : (isFlushHead ? 'reducedFlushShear' : 'protrudingShear')
+  );
+  let dashGeometry = $derived(selectedFastenerDashVariant?.geometry ?? null);
+  let fastenerHeadFaceOuterDiameter = $derived(
+    Number(dashGeometry?.headFaceDiametersIn?.[activeHeadStyleKey] ?? inferredBearingOuterDiameter)
+  );
+  let fastenerNutFaceOuterDiameter = $derived(
+    Number(dashGeometry?.nutFaceDiameterIn ?? inferredBearingOuterDiameter)
+  );
+  let topBearingFaceInnerDiameter =
+    $derived(form.washerStack.enabled && washerTopCount > 0
+      ? Number(form.washerStack.underHeadInnerDiameter ?? form.washerStack.innerDiameter)
+      : form.nominalDiameter);
+  let bottomBearingFaceInnerDiameter =
+    $derived(form.washerStack.enabled && washerBottomCount > 0
+      ? Number(form.washerStack.underNutInnerDiameter ?? form.washerStack.innerDiameter)
+      : form.nominalDiameter);
+  let topBearingFaceOuterDiameter =
+    $derived(form.washerStack.enabled && washerTopCount > 0 && Number(form.washerStack.underHeadOuterDiameter ?? form.washerStack.outerDiameter) > 0
       ? Number(form.washerStack.underHeadOuterDiameter ?? form.washerStack.outerDiameter)
-      : Math.sqrt(
-          Math.max(
-            form.nominalDiameter * form.nominalDiameter +
-              (4 * Math.max(0, Number(form.underHeadBearingArea ?? 0))) / Math.PI,
-            form.nominalDiameter * form.nominalDiameter
-          )
-        );
-  $: bottomBearingFaceOuterDiameter =
-    form.washerStack.enabled && Number(form.washerStack.underNutOuterDiameter ?? form.washerStack.outerDiameter) > 0
+      : fastenerHeadFaceOuterDiameter);
+  let bottomBearingFaceOuterDiameter =
+    $derived(form.washerStack.enabled && washerBottomCount > 0 && Number(form.washerStack.underNutOuterDiameter ?? form.washerStack.outerDiameter) > 0
       ? Number(form.washerStack.underNutOuterDiameter ?? form.washerStack.outerDiameter)
-      : Math.sqrt(
-          Math.max(
-            form.nominalDiameter * form.nominalDiameter +
-              (4 * Math.max(0, Number(form.underHeadBearingArea ?? 0))) / Math.PI,
-            form.nominalDiameter * form.nominalDiameter
-          )
-        );
-  $: compressionConeHalfAngleDeg = Math.max(10, Math.min(45, Number(form.compressionConeHalfAngleDeg ?? 30)));
-  $: compressionConeSlope = Math.tan((compressionConeHalfAngleDeg * Math.PI) / 180);
-  $: if (form.washerStack.enabled && form.washerStack.count !== effectiveWasherCount) {
-    form.washerStack.count = effectiveWasherCount;
-  }
-  $: stackRows = [
+      : fastenerNutFaceOuterDiameter);
+  let topBearingFaceArea = $derived(annulusArea(topBearingFaceOuterDiameter, topBearingFaceInnerDiameter) ?? 0);
+  let bottomBearingFaceArea = $derived(annulusArea(bottomBearingFaceOuterDiameter, bottomBearingFaceInnerDiameter) ?? 0);
+  let topBearingMeanDiameter =
+    $derived(annularFrictionMeanDiameter(topBearingFaceOuterDiameter, topBearingFaceInnerDiameter) ??
+    form.nominalDiameter);
+  let bottomBearingMeanDiameter =
+    $derived(annularFrictionMeanDiameter(bottomBearingFaceOuterDiameter, bottomBearingFaceInnerDiameter) ??
+    form.nominalDiameter);
+  let effectiveBearingMeanDiameter = $derived(Math.min(topBearingMeanDiameter, bottomBearingMeanDiameter));
+  let autoComputedBearingArea =
+    $derived(topBearingFaceArea > 0 && bottomBearingFaceArea > 0
+      ? Math.min(topBearingFaceArea, bottomBearingFaceArea)
+      : Math.max(topBearingFaceArea, bottomBearingFaceArea, 0));
+  run(() => {
+    if (stepPrefs.autoBearingArea && Math.abs(Number(form.underHeadBearingArea ?? 0) - autoComputedBearingArea) > 1e-9) {
+      form.underHeadBearingArea = autoComputedBearingArea;
+    }
+  });
+  run(() => {
+    if (
+      stepPrefs.autoBearingArea &&
+      form.installation.model === 'exact_torque' &&
+      Math.abs(Number(form.installation.bearingMeanDiameter ?? 0) - effectiveBearingMeanDiameter) > 1e-9
+    ) {
+      form.installation.bearingMeanDiameter = effectiveBearingMeanDiameter;
+    }
+  });
+  let compressionConeHalfAngleDeg = $derived(Math.max(10, Math.min(45, Number(form.compressionConeHalfAngleDeg ?? 30))));
+  let compressionConeSlope = $derived(Math.tan((compressionConeHalfAngleDeg * Math.PI) / 180));
+  run(() => {
+    if (form.washerStack.enabled && form.washerStack.count !== effectiveWasherCount) {
+      form.washerStack.count = effectiveWasherCount;
+    }
+  });
+  let stackRows = $derived([
     ...(form.washerStack.enabled
       ? Array.from({ length: washerTopCount }, (_, index) => ({
           id: `washer-head-${index + 1}`,
@@ -853,18 +1760,18 @@
           innerDiameter: Number(form.washerStack.underNutInnerDiameter ?? form.washerStack.innerDiameter)
         }))
       : [])
-  ].filter((row) => Number.isFinite(row.length) && row.length > 0);
-  $: stackTotalLength = Math.max(
+  ].filter((row) => Number.isFinite(row.length) && row.length > 0));
+  let stackTotalLength = $derived(Math.max(
     0.0001,
     stackRows.reduce((sum, row) => sum + row.length, 0)
-  );
-  $: adjacentFastenerCount = Math.max(
+  ));
+  let adjacentFastenerCount = $derived(Math.max(
     1,
     Math.round(form.adjacentFastenerScreen.rowCount) * Math.round(form.adjacentFastenerScreen.columnCount)
-  );
-  $: adjacentNeighborCount = Math.max(0, adjacentFastenerCount - 1);
-  $: fastenerGroupCaseResult =
-    form.adjacentFastenerScreen.enabled && output
+  ));
+  let adjacentNeighborCount = $derived(Math.max(0, adjacentFastenerCount - 1));
+  let fastenerGroupCaseResult =
+    $derived(form.adjacentFastenerScreen.enabled && output
       ? solveFastenerGroupPatternCases({
           rowCount: form.adjacentFastenerScreen.rowCount,
           columnCount: form.adjacentFastenerScreen.columnCount,
@@ -882,43 +1789,59 @@
           memberStiffness: output.stiffness.members.stiffness,
           preloadPerFastener: output.service?.preloadEffective ?? output.installation.preload
         }, form.adjacentFastenerScreen.loadCases)
-      : null;
-  $: activeFastenerGroupCase =
-    fastenerGroupCaseResult?.cases.find((entry) => entry.caseId === fastenerGroupCaseResult.governingCaseId) ??
+      : null);
+  let activeFastenerGroupCase =
+    $derived(fastenerGroupCaseResult?.cases.find((entry) => entry.caseId === fastenerGroupCaseResult.governingCaseId) ??
     fastenerGroupCaseResult?.cases[0] ??
-    null;
-  $: fastenerGroupResult = activeFastenerGroupCase?.result ?? null;
-  $: adjacentTransferAttenuation = fastenerGroupResult
+    null);
+  let fastenerGroupResult = $derived(activeFastenerGroupCase?.result ?? null);
+  let adjacentTransferAttenuation = $derived(fastenerGroupResult
     ? Math.max(...fastenerGroupResult.fasteners.slice(1).map((row) => row.edgeAmplification), 0)
-    : 0;
-  $: adjacentAxialPerNeighbor = fastenerGroupResult?.fasteners[1]?.axialLoad ?? 0;
-  $: adjacentTransversePerNeighbor = fastenerGroupResult
+    : 0);
+  let adjacentAxialPerNeighbor = $derived(fastenerGroupResult?.fasteners[1]?.axialLoad ?? 0);
+  let adjacentTransversePerNeighbor = $derived(fastenerGroupResult
     ? Math.hypot(fastenerGroupResult.fasteners[1]?.totalShearX ?? 0, fastenerGroupResult.fasteners[1]?.totalShearY ?? 0)
-    : 0;
-  $: currentFastenerEquivalentLoad = fastenerGroupResult?.fasteners[0]?.equivalentDemand ?? Math.hypot(
+    : 0);
+  let currentFastenerEquivalentLoad = $derived(fastenerGroupResult?.fasteners[0]?.equivalentDemand ?? Math.hypot(
     output?.service?.boltLoadService ?? output?.installation.preload ?? 0,
     output?.service?.externalTransverseLoad ?? 0
-  );
-  $: adjacentFastenerEquivalentLoad = fastenerGroupResult?.fasteners[1]?.equivalentDemand ?? 0;
-  $: criticalFastenerLabel = fastenerGroupResult
+  ));
+  let adjacentFastenerEquivalentLoad = $derived(fastenerGroupResult?.fasteners[1]?.equivalentDemand ?? 0);
+  let criticalFastenerLabel = $derived(fastenerGroupResult
     ? `F${fastenerGroupResult.criticalFastenerIndex + 1}`
-    : 'Current fastener';
-  $: governingLoadCaseLabel = fastenerGroupCaseResult?.governingCaseLabel ?? '—';
-  $: caseEnvelopeScale = Math.max(
+    : 'Current fastener');
+  let governingLoadCaseLabel = $derived(fastenerGroupCaseResult?.governingCaseLabel ?? '—');
+  let caseEnvelopeScale = $derived(Math.max(
     1,
     ...(fastenerGroupCaseResult?.cases.map((entry) => entry.result.criticalEquivalentDemand) ?? [1])
-  );
-  $: fastenerCaseEnvelopeRows =
-    fastenerGroupCaseResult?.cases.map((entry, index) => ({
+  ));
+  let fastenerCaseEnvelopeRows =
+    $derived(fastenerGroupCaseResult?.cases.map((entry, index) => ({
       index,
       label: entry.label,
       criticalFastenerLabel: `F${entry.result.criticalFastenerIndex + 1}`,
       demand: entry.result.criticalEquivalentDemand,
       ratio: entry.result.criticalEquivalentDemand / caseEnvelopeScale,
       isGoverning: entry.caseId === fastenerGroupCaseResult.governingCaseId
-    })) ?? [];
-  $: coneReachLength = Math.min(stackTotalLength / 2, (Math.max(topBearingFaceOuterDiameter, bottomBearingFaceOuterDiameter) - form.nominalDiameter) / Math.max(compressionConeSlope, 1e-6));
-  $: jointDisplayMaxDiameter = Math.max(
+    })) ?? []);
+  let coneReachLength = $derived(Math.min(stackTotalLength / 2, (Math.max(topBearingFaceOuterDiameter, bottomBearingFaceOuterDiameter) - form.nominalDiameter) / Math.max(compressionConeSlope, 1e-6)));
+  let heatmapValues = $derived(fastenerGroupResult ? fastenerGroupResult.geometryInfluenceMatrix.flat() : []);
+  let heatmapMin = $derived(heatmapValues.length ? Math.min(...heatmapValues) : 0);
+  let heatmapMax = $derived(heatmapValues.length ? Math.max(...heatmapValues) : 1);
+  let heatmapIsFlat = $derived(heatmapValues.length ? Math.abs(heatmapMax - heatmapMin) < 1e-9 : false);
+  let envelopeChartHeight = $derived(Math.max(196, 70 + fastenerCaseEnvelopeRows.length * 34));
+  let envelopeChartInnerHeight = $derived(Math.max(116, 26 + fastenerCaseEnvelopeRows.length * 28));
+
+  function heatmapDisplayRatio(rowIndex: number, columnIndex: number, cell: number): number {
+    if (!fastenerGroupResult) return 0;
+    if (!heatmapIsFlat) {
+      return heatmapMax > heatmapMin ? (cell - heatmapMin) / (heatmapMax - heatmapMin) : 1;
+    }
+    const size = Math.max(1, fastenerGroupResult.geometryInfluenceMatrix.length - 1);
+    const distance = Math.abs(rowIndex - columnIndex);
+    return rowIndex === columnIndex ? 1 : Math.max(0.2, 1 - distance / size);
+  }
+  let jointDisplayMaxDiameter = $derived(Math.max(
     topBearingFaceOuterDiameter,
     bottomBearingFaceOuterDiameter,
     ...stackRows.map((row) =>
@@ -927,8 +1850,8 @@
         : row.outerDiameter
     ),
     form.nominalDiameter + 2 * compressionConeSlope * coneReachLength
-  );
-  $: jointViewport = {
+  ));
+  let jointViewport = $derived({
     left: 22,
     top: 68,
     width: 516,
@@ -938,9 +1861,9 @@
     rowBottom: 430,
     halfWidthLimit: 124,
     legendX: 372
-  };
-  $: jointVerticalScale = (jointViewport.rowBottom - jointViewport.rowTop) / Math.max(stackTotalLength, 0.0001);
-  $: jointHorizontalScale = (jointViewport.halfWidthLimit * 2) / Math.max(jointDisplayMaxDiameter, 0.001);
+  });
+  let jointVerticalScale = $derived((jointViewport.rowBottom - jointViewport.rowTop) / Math.max(stackTotalLength, 0.0001));
+  let jointHorizontalScale = $derived((jointViewport.halfWidthLimit * 2) / Math.max(jointDisplayMaxDiameter, 0.001));
   const jointY = (position: number) => jointViewport.rowTop + position * jointVerticalScale;
   const jointDiameterPx = (diameter: number) => Math.max(4, diameter * jointHorizontalScale);
   const jointRadiusPx = (diameter: number) => Math.max(2, (diameter * jointHorizontalScale) / 2);
@@ -1002,18 +1925,18 @@
     const memberIndex = Math.max(0, index - washerTopCount);
     return `Member ${String.fromCharCode(65 + memberIndex)}`;
   };
-  $: jointBoltWidthPx = Math.max(10, jointDiameterPx(form.nominalDiameter));
-  $: headBlock = {
+  let jointBoltWidthPx = $derived(Math.max(10, jointDiameterPx(form.nominalDiameter)));
+  let headBlock = $derived({
     width: Math.max(jointBoltWidthPx * 1.8, jointDiameterPx(topBearingFaceOuterDiameter)),
     height: 34,
     y: 102
-  };
-  $: nutBlock = {
+  });
+  let nutBlock = $derived({
     width: Math.max(jointBoltWidthPx * 1.8, jointDiameterPx(bottomBearingFaceOuterDiameter)),
     height: 34,
     y: 430
-  };
-  $: stackVisualRows = (() => {
+  });
+  let stackVisualRows = $derived((() => {
     let cursor = 0;
     return stackRows.map((row) => {
       const equivalentAnnulusOuterDiameter =
@@ -1042,15 +1965,15 @@
         stiffnessContribution
       };
     });
-  })();
-  $: stackTableRows = stackVisualRows.map((row) => ({
+  })());
+  let stackTableRows = $derived(stackVisualRows.map((row) => ({
     id: row.id,
     kind: row.kind,
     thickness: row.length,
     displayOuterDiameter: row.displayOuterDiameter,
     stiffnessContribution: row.stiffnessContribution
-  }));
-  $: coneVisualTop = stackVisualRows.length
+  })));
+  let coneVisualTop = $derived(stackVisualRows.length
     ? (() => {
         const apex = stackTotalLength / 2;
         const start = 0;
@@ -1070,8 +1993,8 @@
             };
           });
       })()
-    : [];
-  $: coneVisualBottom = stackVisualRows.length
+    : []);
+  let coneVisualBottom = $derived(stackVisualRows.length
     ? (() => {
         const apex = stackTotalLength / 2;
         const start = Math.max(apex, stackTotalLength - coneReachLength);
@@ -1091,10 +2014,10 @@
             };
           });
       })()
-    : [];
-  $: topConeEnvelopePoints = buildConeEnvelopePoints(coneVisualTop);
-  $: bottomConeEnvelopePoints = buildConeEnvelopePoints(coneVisualBottom);
-  $: stackRenderRows = stackVisualRows.map((row, index) => ({
+    : []);
+  let topConeEnvelopePoints = $derived(buildConeEnvelopePoints(coneVisualTop));
+  let bottomConeEnvelopePoints = $derived(buildConeEnvelopePoints(coneVisualBottom));
+  let stackRenderRows = $derived(stackVisualRows.map((row, index) => ({
     ...row,
     ...rowTint(row, index),
     displayLabel: rowDisplayLabel(row, index),
@@ -1102,21 +2025,21 @@
     pixelHeight: Math.max(row.kind === 'washer' ? 14 : 6, (row.end - row.start) * jointVerticalScale),
     outerWidthPx: Math.max(10, jointDiameterPx(row.displayOuterDiameter)),
     innerWidthPx: Math.max(4, jointDiameterPx(row.innerDiameter))
-  }));
-  $: splitPlaneY = (() => {
+  })));
+  let splitPlaneY = $derived((() => {
     const topMember = stackVisualRows.find((row) => row.id === 'plate-a');
     return topMember ? jointY(topMember.end) : null;
-  })();
-  $: threadTickYs = (() => {
+  })());
+  let threadTickYs = $derived((() => {
     const start = jointY(stackTotalLength) + 6;
     const end = nutBlock.y + nutBlock.height - 10;
     const ticks: number[] = [];
     for (let y = start + 18; y <= end - 10; y += 12) ticks.push(y);
     return ticks;
-  })();
-  $: rightThreadHelixPath = buildThreadHelixPath('right', threadTickYs, jointBoltWidthPx);
-  $: leftThreadHelixPath = buildThreadHelixPath('left', threadTickYs, jointBoltWidthPx);
-  $: reserveEnvelopeRows = output
+  })());
+  let rightThreadHelixPath = $derived(buildThreadHelixPath('right', threadTickYs, jointBoltWidthPx));
+  let leftThreadHelixPath = $derived(buildThreadHelixPath('left', threadTickYs, jointBoltWidthPx));
+  let reserveEnvelopeRows = $derived(output
     ? [
         { label: 'Separation', envelope: output.checks.envelopes.separationUtilization, color: '#34d399' },
         { label: 'Slip', envelope: output.checks.envelopes.slipUtilization, color: '#22d3ee' },
@@ -1124,7 +2047,96 @@
         { label: 'Bearing', envelope: output.checks.envelopes.bearingUtilization, color: '#f59e0b' },
         { label: 'Fatigue', envelope: output.checks.envelopes.fatigueUtilization, color: '#fb7185' }
       ]
-    : [];
+    : []);
+  let guideDerivedChecks = $derived.by<GuideDerivedCheck[]>(() => {
+    const checks: GuideDerivedCheck[] = [];
+    const hasExactTorque = form.installation.model === 'exact_torque';
+    const scatterSet = Number(form.installationScatterPercent ?? 0) > 0;
+    const frictionSet = Number(form.fayingSurfaceSlipCoeff ?? 0) > 0 && Number(form.frictionInterfaceCount ?? 0) > 0;
+    const hasServiceLoads =
+      Number(form.serviceCase?.externalAxialLoad ?? 0) !== 0 ||
+      Number(form.serviceCase?.externalTransverseLoad ?? 0) !== 0;
+    const hasStiffness = Boolean(output) && (output?.stiffness.bolt.stiffness ?? 0) > 0 && (output?.stiffness.members.stiffness ?? 0) > 0;
+    const hasPattern = Boolean(form.adjacentFastenerScreen.enabled);
+    const hasPatternCases = (form.adjacentFastenerScreen.loadCases?.length ?? 0) > 0;
+    const hasEdgeEffects =
+      Number(form.adjacentFastenerScreen.bypassLoadFactor ?? 0) > 0 ||
+      Number(form.adjacentFastenerScreen.edgeDistanceX ?? 0) > 0 ||
+      Number(form.adjacentFastenerScreen.edgeDistanceY ?? 0) > 0;
+
+    checks.push({
+      id: 'install-method-quality',
+      source: 'Bolt Council 2nd Ed.',
+      principle: 'Installation method quality controls preload reliability',
+      status: hasExactTorque ? 'ok' : 'warn',
+      mappedInputs: ['installation.model', 'installation.appliedTorque', 'installation.prevailingTorque'],
+      rationale: hasExactTorque
+        ? 'Exact torque decomposition is active; preload is not treated as a single coarse K-factor guess.'
+        : 'Nut-factor/direct-preload mode is active; reliability depends more on field calibration and verification.',
+      action: hasExactTorque ? undefined : 'Use exact torque mode when installation friction terms are known.'
+    });
+
+    checks.push({
+      id: 'friction-scatter',
+      source: 'Bolt Council 2nd Ed.',
+      principle: 'Friction + tightening scatter dominate preload variability',
+      status: scatterSet && frictionSet ? 'ok' : 'warn',
+      mappedInputs: ['installationScatterPercent', 'fayingSurfaceSlipCoeff', 'frictionInterfaceCount'],
+      rationale: scatterSet && frictionSet
+        ? 'Preload scatter and faying friction are explicitly represented in the reserve envelope.'
+        : 'At least one uncertainty/friction term is missing or zero, reducing confidence in reserve predictions.',
+      action: scatterSet && frictionSet ? undefined : 'Set realistic scatter and friction values for your tooling + surface condition.'
+    });
+
+    checks.push({
+      id: 'load-path',
+      source: 'Bolt Council 2nd Ed.',
+      principle: 'Joint behavior must be evaluated under actual service load path',
+      status: hasServiceLoads ? 'ok' : 'todo',
+      mappedInputs: ['serviceCase.externalAxialLoad', 'serviceCase.externalTransverseLoad', 'serviceCase.temperatureChange'],
+      rationale: hasServiceLoads
+        ? 'Service loading is defined and checks (separation/slip/fatigue) are evaluated against it.'
+        : 'No nonzero service load is defined; checks may reflect installation-only state.',
+      action: hasServiceLoads ? undefined : 'Enter expected axial/transverse service loads before sign-off.'
+    });
+
+    checks.push({
+      id: 'stiffness-sharing',
+      source: 'Bolt Council 2nd Ed.',
+      principle: 'Bolt/member stiffness ratio governs load transfer and separation risk',
+      status: hasStiffness ? 'ok' : 'todo',
+      mappedInputs: ['boltSegments', 'memberSegments', 'washerStack'],
+      rationale: hasStiffness
+        ? `Stiffness solved (Cb=${fmt(output?.stiffness.jointConstant, 3)}); redistribution is explicitly computed.`
+        : 'Stiffness result unavailable, so redistribution quality cannot be confirmed.',
+      action: hasStiffness ? undefined : 'Complete bolt/member segment data so joint stiffness can be solved.'
+    });
+
+    checks.push({
+      id: 'multifastener-distribution',
+      source: 'VT Multi-Bolt Joint Chapter',
+      principle: 'Critical-fastener ranking requires group geometry + edge/eccentric effects',
+      status: hasPattern && hasPatternCases && hasEdgeEffects ? 'ok' : hasPattern ? 'warn' : 'todo',
+      mappedInputs: [
+        'adjacentFastenerScreen.rowCount/columnCount',
+        'adjacentFastenerScreen.edgeDistanceX/Y',
+        'adjacentFastenerScreen.eccentricityX/Y',
+        'adjacentFastenerScreen.bypassLoadFactor',
+        'adjacentFastenerScreen.loadCases'
+      ],
+      rationale: hasPattern && hasPatternCases && hasEdgeEffects
+        ? `Pattern solver is active with case envelope; current critical fastener: ${criticalFastenerLabel}.`
+        : hasPattern
+          ? 'Pattern solver is on, but edge/bypass/eccentric definitions are too weak for robust critical-fastener ranking.'
+          : 'Pattern solver is disabled, so adjacent-fastener load migration is not being assessed.',
+      action:
+        hasPattern && hasPatternCases && hasEdgeEffects
+          ? undefined
+          : 'Enable pattern screening and populate edge distances, eccentricity, bypass factor, and multiple load cases.'
+    });
+
+    return checks;
+  });
 </script>
 
 <div class="grid h-[calc(100vh-6rem)] grid-cols-1 gap-4 overflow-hidden p-1 lg:grid-cols-[560px_1fr]" data-route-ready="preload">
@@ -1136,14 +2148,87 @@
       </div>
       <div class="flex items-center gap-2">
         <Badge variant="outline" class="border-white/20 text-white/60">explicit solver</Badge>
-        <Button size="sm" variant="secondary" on:click={() => (showAdvancedInputs = !showAdvancedInputs)}>
+        <Button
+          size="sm"
+          variant="secondary"
+          on:click={() => {
+            const next = !showAdvancedInputs;
+            showAdvancedInputs = next;
+            if (next) setWorkflowStep('review');
+          }}
+        >
           {showAdvancedInputs ? 'Hide Advanced' : 'Show Advanced'}
         </Button>
       </div>
     </div>
 
     <Card class="glass-card">
-      <CardHeader class="pb-2 pt-4">
+      <CardHeader class="pb-2 pt-4 flex flex-col items-stretch justify-start gap-2">
+        <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Workflow</CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-3">
+        <div class="space-y-1">
+          <div class="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/55">
+            <span>Validity Progress</span>
+            <span>{validStepCount}/{workflowOrder.length}</span>
+          </div>
+          <div class="h-2 rounded-full border border-white/15 bg-black/25">
+            <div
+              class="h-full rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-300 transition-[width] duration-300 ease-out"
+              style={`width: ${validityProgressPct.toFixed(1)}%`}
+            ></div>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2 xl:grid-cols-4">
+          <Button aria-label="Pick Fastener" size="sm" variant={workflowStep === 'fastener' ? 'primary' : 'secondary'} on:click={() => setWorkflowStep('fastener')}>1. Pick Fastener</Button>
+          <Button aria-label="Pick Materials" size="sm" variant={workflowStep === 'materials' ? 'primary' : 'secondary'} on:click={() => setWorkflowStep('materials')} disabled={!canNavigateToStep('materials')}>2. Pick Materials</Button>
+          <Button aria-label="Define Geometry" size="sm" variant={workflowStep === 'geometry' ? 'primary' : 'secondary'} on:click={() => setWorkflowStep('geometry')} disabled={!canNavigateToStep('geometry')}>3. Define Geometry</Button>
+          <Button aria-label="Review" size="sm" variant={workflowStep === 'review' ? 'primary' : 'secondary'} on:click={() => setWorkflowStep('review')} disabled={!canNavigateToStep('review')}>4. Review</Button>
+        </div>
+        <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/65">
+          {#if workflowStep === 'fastener'}
+            Start from the catalog-backed fastener. The route derives nominal diameter, grip shank, and engaged thread automatically unless you explicitly switch to custom segmentation.
+          {:else if workflowStep === 'materials'}
+            Select the fastener, plate, and washer materials. The solver updates modulus, thermal expansion, and allowables from the selected library entries.
+          {:else if workflowStep === 'geometry'}
+            Define the rectangular clamped plate geometry and choose the compression proxy. Only enable custom plate rows if the stack is more complex than a simple two-plate joint.
+          {:else}
+            Review the joint section, preload chart, spring analogy, and fastener-pattern screening. Open advanced only when you need service/load-case detail.
+          {/if}
+        </div>
+        {#if !currentStepValid}
+          <div class="rounded-lg border border-amber-400/30 bg-amber-500/10 p-2 text-xs text-amber-100">
+            Complete required inputs in this step to unlock the next step.
+          </div>
+        {/if}
+        <div class="flex items-center justify-between">
+          <div class="text-xs text-white/50">Advanced is optional. Shortcuts: <span class="text-cyan-200">Alt + ← / Alt + →</span>.</div>
+          <div class="flex gap-2">
+            <Button size="sm" variant="ghost" on:click={() => setWorkflowStep(previousWorkflowStep(workflowStep))} disabled={!canGoBack}>Back</Button>
+            <Button size="sm" variant="secondary" on:click={handleNextClick}>Next</Button>
+          </div>
+        </div>
+        {#if workflowStep !== 'review' && blockedPrereqs.length}
+          <div class="rounded-lg border border-amber-400/20 bg-amber-500/8 p-2 text-xs text-amber-100">
+            <div class="font-semibold">Review readiness blockers</div>
+            <div class="mt-1 space-y-1">
+              {#each blockedPrereqs as blocker}
+                <div>
+                  <button class="text-amber-200 underline underline-offset-2" onclick={() => setWorkflowStep(blocker.step)}>
+                    {blocker.label}
+                  </button>
+                  <span class="text-amber-100/90"> · {blocker.remaining.length} remaining</span>
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/if}
+      </CardContent>
+    </Card>
+
+    {#if showAdvancedInputs}
+    <Card class="glass-card">
+      <CardHeader class="pb-2 pt-4 !flex-col !items-stretch !justify-start">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Import Provenance</CardTitle>
       </CardHeader>
       <CardContent class="grid gap-2 md:grid-cols-2">
@@ -1160,8 +2245,109 @@
         {/each}
       </CardContent>
     </Card>
+    {/if}
 
-    <Card class="glass-card relative z-[1701] isolate">
+    <Card class="glass-card">
+      <CardHeader class="pb-2 pt-4 flex flex-col items-stretch justify-start gap-2">
+        <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">
+          {workflowStep === 'fastener'
+            ? 'Step 1 · Pick Fastener'
+            : workflowStep === 'materials'
+              ? 'Step 2 · Pick Materials'
+              : workflowStep === 'geometry'
+                ? 'Step 3 · Define Geometry'
+                : 'Step 4 · Review'}
+        </CardTitle>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-white/70">
+          <div>
+            Required fields complete:
+            <span class="font-semibold text-cyan-200">{currentChecklistDone}/{currentChecklistTotal}</span>
+          </div>
+          <div class="text-white/55">Time on step: {telemetryMinutes.toFixed(2)} min</div>
+          {#if stepCompletedAt[workflowStep]}
+            <div class="text-[10px] text-white/50">Completed: {new Date(stepCompletedAt[workflowStep]!).toLocaleTimeString()}</div>
+          {/if}
+        </div>
+        {#if currentSnapshot}
+          <div class="text-[10px] text-white/50">Autosave snapshot: {new Date(currentSnapshot.savedAt).toLocaleTimeString()}</div>
+        {/if}
+        <div class="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            on:click={() => showStepHintToast(workflowStep)}
+          >
+            Show tip
+          </Button>
+          <Button size="sm" variant="secondary" on:click={() => revertStepSnapshot(workflowStep)} disabled={!currentSnapshot}>
+            Revert Step
+          </Button>
+          <Button size="sm" variant="ghost" on:click={() => revertPreviousStepSnapshot(workflowStep)} disabled={currentSnapshotHistory.length < 2}>
+            Restore Previous
+          </Button>
+        </div>
+        {#if stepToast.open}
+          <div
+            in:fly={{ duration: 160, y: -8, opacity: 0.3 }}
+            out:fly={{ duration: 180, y: -4, opacity: 0.1 }}
+            class={`rounded-lg border p-2 text-xs ${
+              stepToast.tone === 'ok'
+                ? 'border-emerald-300/30 bg-emerald-500/12 text-emerald-100'
+                : stepToast.tone === 'warn'
+                  ? 'border-amber-300/35 bg-amber-500/12 text-amber-100'
+                  : 'border-cyan-300/25 bg-cyan-500/10 text-cyan-100'
+            }`}
+          >
+            {stepToast.text}
+          </div>
+        {/if}
+        <div class="rounded-lg border border-white/10 bg-black/15 p-2 text-xs text-white/70">
+          <div class="mb-1 font-semibold text-white/80">Step Checklist</div>
+          <div class="grid gap-1">
+            {#each currentChecklist as item}
+              <button
+                id={`${item.id}-jump`}
+                class={`inline-flex min-w-0 items-center gap-1 rounded-md border px-2 py-1 text-left text-[11px] break-words ${item.valid ? 'border-emerald-300/35 bg-emerald-500/10 text-emerald-100' : 'border-amber-300/35 bg-amber-500/10 text-amber-100'} ${walkthroughItem?.id === item.id ? 'ring-2 ring-cyan-300/55' : ''}`}
+                onclick={() => focusByFieldId(item.id)}
+              >
+                {item.valid ? '✓' : '•'} {item.label}
+              </button>
+            {/each}
+          </div>
+        </div>
+        <div class="grid gap-2 rounded-lg border border-white/10 bg-black/15 p-2 text-xs text-white/65 sm:grid-cols-2">
+          <label class="inline-flex items-center gap-2">
+            <input type="checkbox" class="checkbox checkbox-xs border-white/25 bg-black/30" bind:checked={stepPrefs.autoAdvance} />
+            Auto-advance when step becomes valid
+          </label>
+          <label class="inline-flex items-center gap-2">
+            <input type="checkbox" class="checkbox checkbox-xs border-white/25 bg-black/30" bind:checked={stepPrefs.walkthrough} />
+            Walkthrough highlight
+          </label>
+          <label class="inline-flex items-center gap-2">
+            <input type="checkbox" class="checkbox checkbox-xs border-white/25 bg-black/30" bind:checked={stepPrefs.autoBearingArea} />
+            Auto bearing area
+          </label>
+        </div>
+      </CardHeader>
+      <CardContent class="space-y-3">
+        {#if currentChecklist.some((item) => !item.valid)}
+          <div class="rounded-lg border border-amber-400/30 bg-amber-500/12 p-2 text-xs text-amber-100">
+            <span class="font-semibold">Missing:</span>
+            {#each currentChecklist.filter((item) => !item.valid) as missing, idx}
+              <button class="ml-2 underline underline-offset-2" onclick={() => focusByFieldId(missing.id)}>{missing.label}</button>{idx < currentChecklist.filter((item) => !item.valid).length - 1 ? ',' : ''}
+            {/each}
+          </div>
+        {/if}
+        {#key workflowStep}
+        <div
+          class="space-y-3"
+          in:fly={{ duration: 180, y: 10, opacity: 0.2 }}
+          out:fly={{ duration: 120, y: -8, opacity: 0.1 }}
+        >
+
+    {#if workflowStep === 'fastener'}
+    <Card class="glass-card !border-0 !bg-transparent !shadow-none wizard-subcard">
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Installation Model</CardTitle>
       </CardHeader>
@@ -1169,6 +2355,7 @@
         <div class="space-y-1">
           <Label class="text-white/70">Model</Label>
           <Select
+            id={fieldId('installation-model')}
             bind:value={selectedInstallationModel}
             items={[
               { value: 'exact_torque', label: 'Exact torque decomposition' },
@@ -1186,7 +2373,13 @@
             <div class="space-y-1"><Label class="text-white/70">Bearing μ</Label><Input type="number" step="0.01" bind:value={form.installation.bearingFrictionCoeff} /></div>
             <div class="space-y-1"><Label class="text-white/70">Pitch</Label><Input type="number" step="0.0001" bind:value={form.installation.threadPitch} /></div>
             <div class="space-y-1"><Label class="text-white/70">Pitch Dia</Label><Input type="number" step="0.0001" bind:value={form.installation.threadPitchDiameter} /></div>
-            <div class="space-y-1"><Label class="text-white/70">Bearing Mean Dia</Label><Input type="number" step="0.0001" bind:value={form.installation.bearingMeanDiameter} /></div>
+            <div class="space-y-1">
+              <Label class="text-white/70">Bearing Mean Dia</Label>
+              <Input type="number" step="0.0001" bind:value={form.installation.bearingMeanDiameter} disabled={stepPrefs.autoBearingArea} />
+              {#if stepPrefs.autoBearingArea}
+                <div class="text-[10px] text-white/55">Auto from governing bearing annulus: {fmt(effectiveBearingMeanDiameter, 4)}</div>
+              {/if}
+            </div>
             <div class="space-y-1"><Label class="text-white/70">Thread Half-Angle</Label><Input type="number" step="0.1" bind:value={form.installation.threadHalfAngleDeg} /></div>
           </div>
         {:else if form.installation.model === 'nut_factor'}
@@ -1202,71 +2395,138 @@
         {/if}
       </CardContent>
     </Card>
+    {/if}
 
-    <Card class="glass-card">
+    {#if workflowStep === 'fastener' || workflowStep === 'materials'}
+    <Card class="glass-card !border-0 !bg-transparent !shadow-none wizard-subcard">
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Catalog Defaults</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
-        <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/60">
-          Select a catalog-backed fastener and material baseline here. Only move to custom hand-entry when the catalog defaults do not match your release configuration.
-        </div>
-        <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
-          <div class="space-y-1">
-            <Label class="text-white/70">Fastener family</Label>
-            <Select
-              bind:value={form.selectedFastenerId}
-              items={PRELOAD_FASTENER_CATALOG.map((item) => ({ value: item.id, label: item.label }))}
-            />
-            <div class="text-xs text-white/50">{selectedFastener.notes}</div>
+        {#if workflowStep === 'fastener'}
+          <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/60">
+            Step 1 only selects the fastener definition. Materials for plates/washers are handled in Step 2.
           </div>
-          <div class="space-y-1">
-            <Label class="text-white/70">Hi-Lok dash diameter</Label>
-            <Select
-              bind:value={form.selectedFastenerDash}
-              items={selectedFastener.dashVariants.map((variant) => ({
-                value: variant.dash,
-                label: `-${variant.dash} • ${fmt(variant.nominalDiameterIn, 4)} in • ${variant.threadCallout}`
-              }))}
-            />
-            <div class="text-xs text-white/50">Series/dash import resolves the exact displayed nominal diameter and thread callout for the selected pin family.</div>
+          <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
+            <div class="space-y-1">
+              <Label class="text-white/70">Fastener family</Label>
+              <Select
+                id={fieldId('fastener-family')}
+                bind:value={form.selectedFastenerId}
+                items={PRELOAD_FASTENER_CATALOG.map((item) => ({ value: item.id, label: item.label }))}
+              />
+              <div class="text-xs text-white/50">{selectedFastener.notes}</div>
+            </div>
+            <div class="space-y-1">
+              <Label class="text-white/70">Hi-Lok dash diameter</Label>
+              <Select
+                id={fieldId('fastener-dash')}
+                bind:value={form.selectedFastenerDash}
+                items={selectedFastener.dashVariants.map((variant) => ({
+                  value: variant.dash,
+                  label: `-${variant.dash} • ${fmt(variant.nominalDiameterIn, 4)} in • ${variant.threadCallout}`
+                }))}
+              />
+              <div class="text-xs text-white/50">Series/dash import resolves the exact displayed nominal diameter and thread callout for the selected pin family.</div>
+            </div>
+            <div class="space-y-1">
+              <Label class="text-white/70">Hi-Lok grip code</Label>
+              <Select
+                id={fieldId('fastener-grip')}
+                bind:value={form.selectedFastenerGrip}
+                items={selectedFastener.gripTable.map((entry) => ({
+                  value: entry.gripCode,
+                  label: `-${entry.gripCode} • ${fmt(entry.nominalGripIn, 4)} in nominal grip`
+                }))}
+              />
+              <div class="text-xs text-white/50">Grip table is imported in 1/16 in increments; verify the exact manufacturer dash/grip line before release use.</div>
+            </div>
+            <div class="space-y-1">
+              <Label class="text-white/70">Fastener material</Label>
+              <Select
+                id={fieldId('fastener-material')}
+                bind:value={form.selectedFastenerMaterialId}
+                items={PRELOAD_MATERIAL_LIBRARY.map((item) => ({ value: item.id, label: item.name }))}
+              />
+              <div class="text-xs text-white/50">Updates bolt modulus and fastener strength defaults. Explicit geometry remains user-entered.</div>
+            </div>
           </div>
-          <div class="space-y-1">
-            <Label class="text-white/70">Hi-Lok grip code</Label>
-            <Select
-              bind:value={form.selectedFastenerGrip}
-              items={selectedFastener.gripTable.map((entry) => ({
-                value: entry.gripCode,
-                label: `-${entry.gripCode} • ${fmt(entry.nominalGripIn, 4)} in nominal grip`
-              }))}
-            />
-            <div class="text-xs text-white/50">Grip table is imported in 1/16 in increments; verify the exact manufacturer dash/grip line before release use.</div>
+        {:else}
+          <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/60">
+            Step 2 assigns materials. By default all plate layers share one material and both washer sides share one material.
           </div>
-          <div class="space-y-1">
-            <Label class="text-white/70">Fastener material</Label>
-            <Select
-              bind:value={form.selectedFastenerMaterialId}
-              items={PRELOAD_MATERIAL_LIBRARY.map((item) => ({ value: item.id, label: item.name }))}
-            />
-            <div class="text-xs text-white/50">Updates bolt modulus and fastener strength defaults. Explicit geometry remains user-entered.</div>
+          <div class="space-y-3 rounded-xl border border-white/10 bg-black/20 p-3">
+            <label class="flex items-center gap-2 text-sm text-white/75">
+              <input type="checkbox" class="checkbox checkbox-sm border-white/20 bg-black/30" bind:checked={form.useSamePlateMaterial} />
+              Use same material for all plate layers
+            </label>
+            {#if form.useSamePlateMaterial}
+              <div class="space-y-1">
+                <Label class="text-white/70">Plate material (all layers)</Label>
+                <Select
+                  id={fieldId('plate-material')}
+                  bind:value={form.selectedPlateMaterialId}
+                  items={PRELOAD_MATERIAL_LIBRARY.map((item) => ({ value: item.id, label: item.name }))}
+                />
+              </div>
+            {:else}
+              <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                <div class="space-y-1">
+                  <Label class="text-white/70">Top plate material</Label>
+                  <Select
+                    id={fieldId('plate-material')}
+                    bind:value={form.selectedTopPlateMaterialId}
+                    items={PRELOAD_MATERIAL_LIBRARY.map((item) => ({ value: item.id, label: item.name }))}
+                  />
+                </div>
+                <div class="space-y-1">
+                  <Label class="text-white/70">Bottom plate material</Label>
+                  <Select
+                    bind:value={form.selectedBottomPlateMaterialId}
+                    items={PRELOAD_MATERIAL_LIBRARY.map((item) => ({ value: item.id, label: item.name }))}
+                  />
+                </div>
+              </div>
+            {/if}
           </div>
-          <div class="space-y-1">
-            <Label class="text-white/70">Plate material</Label>
-            <Select
-              bind:value={form.selectedPlateMaterialId}
-              items={PRELOAD_MATERIAL_LIBRARY.map((item) => ({ value: item.id, label: item.name }))}
-            />
-            <div class="text-xs text-white/50">Updates clamped plate layer modulus, thermal expansion, and bearing allowable defaults.</div>
+          <div class="space-y-3 rounded-xl border border-white/10 bg-black/20 p-3">
+            <label class="flex items-center gap-2 text-sm text-white/75">
+              <input type="checkbox" class="checkbox checkbox-sm border-white/20 bg-black/30" bind:checked={form.useSameWasherMaterial} />
+              Use same material for head-side and nut-side washers
+            </label>
+            {#if form.useSameWasherMaterial}
+              <div class="space-y-1">
+                <Label class="text-white/70">Washer material (both sides)</Label>
+                <Select
+                  id={fieldId('washer-material')}
+                  bind:value={form.selectedWasherMaterialId}
+                  items={PRELOAD_MATERIAL_LIBRARY.map((item) => ({ value: item.id, label: item.name }))}
+                />
+              </div>
+            {:else}
+              <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                <div class="space-y-1">
+                  <Label class="text-white/70">Head-side washer material</Label>
+                  <Select
+                    id={fieldId('washer-material')}
+                    bind:value={form.selectedHeadWasherMaterialId}
+                    items={PRELOAD_MATERIAL_LIBRARY.map((item) => ({ value: item.id, label: item.name }))}
+                  />
+                </div>
+                <div class="space-y-1">
+                  <Label class="text-white/70">Nut-side washer material</Label>
+                  <Select
+                    bind:value={form.selectedNutWasherMaterialId}
+                    items={PRELOAD_MATERIAL_LIBRARY.map((item) => ({ value: item.id, label: item.name }))}
+                  />
+                </div>
+              </div>
+              <div class="text-xs text-white/50">
+                Solver currently uses one equivalent washer stiffness, so mixed washer materials are combined into an explicit averaged equivalent.
+              </div>
+            {/if}
           </div>
-          <div class="space-y-1">
-            <Label class="text-white/70">Washer material</Label>
-            <Select
-              bind:value={form.selectedWasherMaterialId}
-              items={PRELOAD_MATERIAL_LIBRARY.map((item) => ({ value: item.id, label: item.name }))}
-            />
-            <div class="text-xs text-white/50">Updates explicit washer-stack modulus and thermal expansion defaults.</div>
-          </div>
-        </div>
+        {/if}
         <div class="rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white/72">
           <div class="font-semibold text-white/80">Selected fastener catalog entry</div>
           <div class="mt-2">Head style: <span class="text-cyan-200">{selectedFastener.headStyle}</span></div>
@@ -1288,15 +2548,28 @@
         </div>
       </CardContent>
     </Card>
+    {/if}
 
-    <Card class="glass-card">
+    {#if workflowStep === 'geometry'}
+    <Card class="glass-card !border-0 !bg-transparent !shadow-none wizard-subcard">
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Joint Inputs</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
+        {#if form.useCustomPlateLayers}
+          <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/60">
+            Plate width/plan length/top thickness/bottom thickness are currently defined directly in <span class="text-cyan-200">Clamped Plate Layers</span> because custom layer editing is enabled.
+          </div>
+        {/if}
         <div class="grid grid-cols-2 gap-3">
-          <div class="space-y-1"><Label class="text-white/70">Nominal Dia</Label><Input type="number" step="0.0001" bind:value={form.nominalDiameter} /></div>
-          <div class="space-y-1"><Label class="text-white/70">Tensile Stress Area</Label><Input type="number" step="0.0001" bind:value={form.tensileStressArea} /></div>
+          <div class="space-y-1"><Label class="text-white/70">Nominal Dia</Label><Input id={fieldId('nominal-dia')} type="number" step="0.0001" bind:value={form.nominalDiameter} disabled={!form.useCustomBoltSegments} /></div>
+          <div class="space-y-1"><Label class="text-white/70">Tensile Stress Area</Label><Input id={fieldId('stress-area')} type="number" step="0.0001" bind:value={form.tensileStressArea} disabled={!form.useCustomBoltSegments} /></div>
+          {#if !form.useCustomPlateLayers}
+            <div class="space-y-1"><Label class="text-white/70">Plate Width</Label><Input id={fieldId('plate-width')} type="number" step="0.0001" bind:value={form.defaultPlateWidth} /></div>
+            <div class="space-y-1"><Label class="text-white/70">Plate Plan Length</Label><Input id={fieldId('plate-length')} type="number" step="0.0001" bind:value={form.defaultPlateLength} /></div>
+            <div class="space-y-1"><Label class="text-white/70">Top Plate Thickness</Label><Input id={fieldId('top-thk')} type="number" step="0.0001" bind:value={form.defaultTopPlateThickness} /></div>
+            <div class="space-y-1"><Label class="text-white/70">Bottom Plate Thickness</Label><Input id={fieldId('bot-thk')} type="number" step="0.0001" bind:value={form.defaultBottomPlateThickness} /></div>
+          {/if}
           <div class="space-y-1"><Label class="text-white/70">Scatter %</Label><Input type="number" step="0.1" bind:value={form.installationScatterPercent} /></div>
           <div class="space-y-1"><Label class="text-white/70">Cone Half-Angle (visual)</Label><Input type="number" step="0.1" bind:value={form.compressionConeHalfAngleDeg} /></div>
           <div class="space-y-1"><Label class="text-white/70">Slip Coeff</Label><Input type="number" step="0.01" bind:value={form.fayingSurfaceSlipCoeff} /></div>
@@ -1305,13 +2578,23 @@
           <div class="space-y-1"><Label class="text-white/70">Ultimate Strength</Label><Input type="number" step="1000" bind:value={form.boltUltimateStrength} /></div>
           <div class="space-y-1"><Label class="text-white/70">Endurance Limit</Label><Input type="number" step="1000" bind:value={form.boltEnduranceLimit} /></div>
           <div class="space-y-1"><Label class="text-white/70">Bearing Allowable</Label><Input type="number" step="1000" bind:value={form.memberBearingAllowable} /></div>
-          <div class="space-y-1"><Label class="text-white/70">Under-Head Bearing Area</Label><Input type="number" step="0.0001" bind:value={form.underHeadBearingArea} /></div>
+          <div class="space-y-1">
+            <Label class="text-white/70">Under-Head / Nut Governing Bearing Area</Label>
+            <Input id={fieldId('bearing-area')} type="number" step="0.0001" bind:value={form.underHeadBearingArea} disabled={stepPrefs.autoBearingArea} />
+            <div class="text-[10px] text-white/55">
+              {stepPrefs.autoBearingArea
+                ? `Auto: min(head ${fmt(topBearingFaceArea, 4)}, nut ${fmt(bottomBearingFaceArea, 4)}) = ${fmt(autoComputedBearingArea, 4)}`
+                : 'Manual override enabled.'}
+            </div>
+          </div>
           <div class="space-y-1"><Label class="text-white/70">Engaged Thread Length</Label><Input type="number" step="0.0001" bind:value={form.engagedThreadLength} /></div>
         </div>
       </CardContent>
     </Card>
+    {/if}
 
-    <Card class="glass-card">
+    {#if workflowStep === 'materials'}
+    <Card class="glass-card !border-0 !bg-transparent !shadow-none wizard-subcard">
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Washer / Under-Head Stack</CardTitle>
       </CardHeader>
@@ -1321,17 +2604,26 @@
           Include explicit washer stack in member compliance
         </label>
         {#if form.washerStack.enabled}
+          <label class="flex items-center gap-2 text-xs text-white/70">
+            <input type="checkbox" class="checkbox checkbox-xs border-white/25 bg-black/30" bind:checked={form.washerGeometryManualOverride} />
+            Manual washer/head/nut face geometry override (Advanced)
+          </label>
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1"><Label class="text-white/70">Under Head Count</Label><Input type="number" step="1" bind:value={form.washerStack.underHeadCount} /></div>
             <div class="space-y-1"><Label class="text-white/70">Under Nut Count</Label><Input type="number" step="1" bind:value={form.washerStack.underNutCount} /></div>
             <div class="space-y-1"><Label class="text-white/70">Thickness / Washer</Label><Input type="number" step="0.0001" bind:value={form.washerStack.thicknessPerWasher} /></div>
             <div class="space-y-1"><Label class="text-white/70">Modulus</Label><Input type="number" step="1000" bind:value={form.washerStack.modulus} /></div>
-            <div class="space-y-1"><Label class="text-white/70">Head Outer Dia</Label><Input type="number" step="0.0001" bind:value={form.washerStack.underHeadOuterDiameter} /></div>
-            <div class="space-y-1"><Label class="text-white/70">Head Inner Dia</Label><Input type="number" step="0.0001" bind:value={form.washerStack.underHeadInnerDiameter} /></div>
-            <div class="space-y-1"><Label class="text-white/70">Nut Outer Dia</Label><Input type="number" step="0.0001" bind:value={form.washerStack.underNutOuterDiameter} /></div>
-            <div class="space-y-1"><Label class="text-white/70">Nut Inner Dia</Label><Input type="number" step="0.0001" bind:value={form.washerStack.underNutInnerDiameter} /></div>
+            <div class="space-y-1"><Label class="text-white/70">Head Outer Dia</Label><Input type="number" step="0.0001" bind:value={form.washerStack.underHeadOuterDiameter} disabled={!form.washerGeometryManualOverride} /></div>
+            <div class="space-y-1"><Label class="text-white/70">Head Inner Dia</Label><Input type="number" step="0.0001" bind:value={form.washerStack.underHeadInnerDiameter} disabled={!form.washerGeometryManualOverride} /></div>
+            <div class="space-y-1"><Label class="text-white/70">Nut Outer Dia</Label><Input type="number" step="0.0001" bind:value={form.washerStack.underNutOuterDiameter} disabled={!form.washerGeometryManualOverride} /></div>
+            <div class="space-y-1"><Label class="text-white/70">Nut Inner Dia</Label><Input type="number" step="0.0001" bind:value={form.washerStack.underNutInnerDiameter} disabled={!form.washerGeometryManualOverride} /></div>
             <div class="space-y-1"><Label class="text-white/70">Thermal α</Label><Input type="number" step="0.0000001" bind:value={form.washerStack.thermalExpansionCoeff} /></div>
           </div>
+          {#if !form.washerGeometryManualOverride}
+            <div class="rounded-lg border border-cyan-400/15 bg-cyan-500/8 p-2 text-xs text-cyan-100">
+              Face diameters are auto-derived from selected fastener diameter + washer stack and kept physically valid (inner &lt; outer).
+            </div>
+          {/if}
           <div class="text-xs text-white/55">Washer annuli are inserted explicitly into the joint stack. Current total washers: {effectiveWasherCount}. They are not approximated as a hidden correction factor.</div>
           {#if output}
             <div class="rounded-lg border border-cyan-400/15 bg-cyan-500/5 p-2 text-xs text-cyan-100">
@@ -1342,69 +2634,121 @@
         {/if}
       </CardContent>
     </Card>
+    {/if}
 
-    <Card class="glass-card">
+    {#if workflowStep === 'fastener'}
+    <Card class="glass-card !border-0 !bg-transparent !shadow-none wizard-subcard">
       <CardHeader class="pb-2 pt-4">
-        <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Bolt Segments</CardTitle>
+        <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Bolt Geometry</CardTitle>
       </CardHeader>
       <CardContent class="space-y-3">
-        {#each form.boltSegments as segment, index}
-          <div class={`rounded-xl border p-3 ${boltValidation(segment).length ? 'border-amber-400/30 bg-amber-500/8' : 'border-white/10 bg-black/20'}`}>
-            <div class="mb-3 flex items-center justify-between gap-2">
-              <div class="text-xs font-semibold text-white/75">{segment.id}</div>
-              <div class="flex items-center gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
-                <Button size="sm" variant="ghost" class="min-w-8 px-2 text-[10px]" aria-label="Move bolt segment up" on:click={() => moveBoltSegment(index, -1)} disabled={index === 0}>^</Button>
-                <Button size="sm" variant="ghost" class="min-w-8 px-2 text-[10px]" aria-label="Move bolt segment down" on:click={() => moveBoltSegment(index, 1)} disabled={index === form.boltSegments.length - 1}>v</Button>
-                <Button size="sm" variant="ghost" class="min-w-10 px-2 text-[10px]" aria-label="Duplicate bolt segment" on:click={() => duplicateBoltSegment(index)}>dup</Button>
-                <Button size="sm" variant="ghost" class="min-w-8 px-2 text-[10px]" aria-label="Remove bolt segment" on:click={() => removeBoltSegment(index)} disabled={form.boltSegments.length <= 1}>x</Button>
+        <label class="flex items-center gap-2 text-sm text-white/75">
+          <input type="checkbox" class="checkbox checkbox-sm border-white/20 bg-black/30" bind:checked={form.useCustomBoltSegments} />
+          Use custom bolt segmentation (otherwise derive grip shank + engaged thread automatically from the selected fastener and grip)
+        </label>
+        {#if form.useCustomBoltSegments}
+          {#each form.boltSegments as segment, index}
+            <div class={`rounded-xl border p-3 ${boltValidation(segment).length ? 'border-amber-400/30 bg-amber-500/8' : 'border-white/10 bg-black/20'}`}>
+              <div class="mb-3 flex items-center justify-between gap-2">
+                <div class="text-xs font-semibold text-white/75">{segment.id}</div>
+                <div class="flex items-center gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
+                  <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move bolt segment up" on:click={() => moveBoltSegment(index, -1)} disabled={index === 0}>Up</Button>
+                  <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move bolt segment down" on:click={() => moveBoltSegment(index, 1)} disabled={index === form.boltSegments.length - 1}>Down</Button>
+                  <Button size="sm" variant="ghost" class="min-w-16 px-2 text-[10px]" aria-label="Duplicate bolt segment" on:click={() => duplicateBoltSegment(index)}>Duplicate</Button>
+                  <Button size="sm" variant="ghost" class="min-w-14 px-2 text-[10px]" aria-label="Remove bolt segment" on:click={() => removeBoltSegment(index)} disabled={form.boltSegments.length <= 1}>Remove</Button>
+                </div>
               </div>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div class="space-y-1"><Label class="text-white/60">ID</Label><Input bind:value={segment.id} /></div>
-              <div class="space-y-1"><Label class="text-white/60">Length</Label><Input type="number" step="0.0001" bind:value={segment.length} /></div>
-              <div class="space-y-1"><Label class="text-white/60">Area</Label><Input type="number" step="0.0001" bind:value={segment.area} /></div>
-              <div class="space-y-1"><Label class="text-white/60">Modulus</Label><Input type="number" step="1000" bind:value={segment.modulus} /></div>
-            </div>
-            <div class="mt-3 rounded-lg border border-cyan-400/15 bg-cyan-500/5 p-2 text-xs text-cyan-100">
-              {#if segmentPreview(segment)}
-                Segment stiffness preview: <span class="font-mono">{fmt(segmentPreview(segment), 3)}</span>
-              {:else}
-                Segment stiffness preview unavailable until length, area, and modulus are all positive.
+              <div class="grid grid-cols-2 gap-3">
+                <div class="space-y-1"><Label class="text-white/60">ID</Label><Input bind:value={segment.id} /></div>
+                <div class="space-y-1"><Label class="text-white/60">Length</Label><Input type="number" step="0.0001" bind:value={segment.length} /></div>
+                <div class="space-y-1"><Label class="text-white/60">Area</Label><Input type="number" step="0.0001" bind:value={segment.area} /></div>
+                <div class="space-y-1"><Label class="text-white/60">Modulus</Label><Input type="number" step="1000" bind:value={segment.modulus} /></div>
+              </div>
+              <div class="mt-3 rounded-lg border border-cyan-400/15 bg-cyan-500/5 p-2 text-xs text-cyan-100">
+                {#if segmentPreview(segment)}
+                  Segment stiffness preview: <span class="font-mono">{fmt(segmentPreview(segment), 3)}</span>
+                {:else}
+                  Segment stiffness preview unavailable until length, area, and modulus are all positive.
+                {/if}
+              </div>
+              {#if boltValidation(segment).length}
+                <ul class="mt-3 list-disc space-y-1 pl-5 text-xs text-amber-200">
+                  {#each boltValidation(segment) as issue}
+                    <li>{issue}</li>
+                  {/each}
+                </ul>
               {/if}
             </div>
-            {#if boltValidation(segment).length}
-              <ul class="mt-3 list-disc space-y-1 pl-5 text-xs text-amber-200">
-                {#each boltValidation(segment) as issue}
-                  <li>{issue}</li>
-                {/each}
-              </ul>
-            {/if}
+          {/each}
+          <Button size="sm" variant="secondary" on:click={addBoltSegment}>Add Bolt Segment</Button>
+        {:else}
+          <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/60">
+            The selected catalog fastener automatically defines a smooth grip segment and an engaged threaded segment. Switch on custom segmentation only when you need to override the catalog-derived split.
           </div>
-        {/each}
-        <Button size="sm" variant="secondary" on:click={addBoltSegment}>Add Bolt Segment</Button>
+          <div class="space-y-2">
+            {#each form.boltSegments as segment}
+              <div class="rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white/72">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="font-semibold text-white/82">{segment.id}</div>
+                  <div class="text-cyan-200">Auto-derived</div>
+                </div>
+                <div class="mt-2 grid grid-cols-2 gap-2">
+                  <div>Length <span class="font-mono text-white/85">{fmt(segment.length, 4)}</span></div>
+                  <div>Area <span class="font-mono text-white/85">{fmt(segment.area, 4)}</span></div>
+                  <div>Modulus <span class="font-mono text-white/85">{fmt(segment.modulus, 0)}</span></div>
+                  <div>
+                    k <span class="font-mono text-cyan-200">{segmentPreview(segment) ? fmt(segmentPreview(segment), 3) : '—'}</span>
+                  </div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
       </CardContent>
     </Card>
+    {/if}
 
-    <Card class="glass-card">
+    {#if workflowStep === 'geometry'}
+    <Card class="glass-card !border-0 !bg-transparent !shadow-none wizard-subcard">
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Clamped Plate Layers</CardTitle>
       </CardHeader>
       <CardContent class="space-y-3">
         <div class="rounded-lg border border-cyan-400/15 bg-cyan-500/5 p-3 text-xs text-cyan-100">
-          Physical layers remain plates. The selector below changes only the effective compression-zone stiffness model used for each plate layer.
+          Physical layers remain rectangular plates. The selector below changes only the compression proxy used to estimate the compressed zone inside each plate.
         </div>
+        <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/70">
+          <div class="font-semibold text-white/85">Compression proxy quick guide</div>
+          <div class="mt-1"><span class="text-cyan-200">Uniform zone</span>: one constant effective compressed diameter through thickness.</div>
+          <div><span class="text-cyan-200">Tapered zone</span>: effective compressed diameter expands through thickness (classical cone-like proxy).</div>
+          <div><span class="text-cyan-200">Direct area</span>: you directly enter the equivalent compressed area and skip diameter proxies.</div>
+        </div>
+        <label class="flex items-center gap-2 text-sm text-white/75" id={fieldId('plate-layers')}>
+          <input type="checkbox" class="checkbox checkbox-sm border-white/20 bg-black/30" bind:checked={form.useCustomPlateLayers} />
+          Use custom plate layers (otherwise derive two rectangular clamped plates from the main geometry inputs and selected material)
+        </label>
+        {#if form.useCustomPlateLayers}
+        <label class="flex items-center gap-2 text-xs text-white/70">
+          <input type="checkbox" class="checkbox checkbox-xs border-white/25 bg-black/30" bind:checked={form.conicalGeometryManualOverride} />
+          Manual conical proxy diameters override (Advanced)
+        </label>
+        {#if !form.conicalGeometryManualOverride}
+          <div class="rounded-lg border border-cyan-400/15 bg-cyan-500/8 p-2 text-xs text-cyan-100">
+            For tapered proxy rows, start/end effective zone diameters are auto-derived from hole diameter, row thickness, and cone half-angle.
+          </div>
+        {/if}
         {#each form.memberSegments as segment, index}
           <div class={`rounded-xl border p-3 ${memberValidation(segment).length ? 'border-amber-400/30 bg-amber-500/8' : 'border-white/10 bg-black/20'}`}>
             <div class="mb-3 flex items-center justify-between gap-2">
               <div class="text-xs font-semibold text-white/75">{segment.id}</div>
               <div class="flex flex-wrap items-center gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
                 <Select
-                  class="min-w-[180px]"
+                  class="min-w-[220px]"
                   value={segment.compressionModel}
                   items={[
-                    { value: 'cylindrical_annulus', label: 'Uniform compression proxy' },
-                    { value: 'conical_frustum_annulus', label: 'Tapered compression proxy' },
-                    { value: 'explicit_area', label: 'Direct equivalent area proxy' }
+                    { value: 'cylindrical_annulus', label: 'Uniform zone (constant effective diameter)' },
+                    { value: 'conical_frustum_annulus', label: 'Tapered zone (cone-like spread)' },
+                    { value: 'explicit_area', label: 'Direct area (enter equivalent compressed area)' }
                   ]}
                   on:change={(event) =>
                     changeCompressionModel(
@@ -1412,31 +2756,33 @@
                       readSelectValue(event, segment.compressionModel) as MemberSegmentInput['compressionModel']
                     )}
                 />
-                <Button size="sm" variant="ghost" class="min-w-8 px-2 text-[10px]" aria-label="Move member segment up" on:click={() => moveMemberSegment(index, -1)} disabled={index === 0}>^</Button>
-                <Button size="sm" variant="ghost" class="min-w-8 px-2 text-[10px]" aria-label="Move member segment down" on:click={() => moveMemberSegment(index, 1)} disabled={index === form.memberSegments.length - 1}>v</Button>
-                <Button size="sm" variant="ghost" class="min-w-10 px-2 text-[10px]" aria-label="Duplicate member segment" on:click={() => duplicateMemberSegment(index)}>dup</Button>
-                <Button size="sm" variant="ghost" class="min-w-8 px-2 text-[10px]" aria-label="Remove member segment" on:click={() => removeMemberSegment(index)} disabled={form.memberSegments.length <= 1}>x</Button>
+                {#if form.useCustomPlateLayers}
+                  <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move member segment up" on:click={() => moveMemberSegment(index, -1)} disabled={index === 0}>Up</Button>
+                  <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move member segment down" on:click={() => moveMemberSegment(index, 1)} disabled={index === form.memberSegments.length - 1}>Down</Button>
+                  <Button size="sm" variant="ghost" class="min-w-16 px-2 text-[10px]" aria-label="Duplicate member segment" on:click={() => duplicateMemberSegment(index)}>Duplicate</Button>
+                  <Button size="sm" variant="ghost" class="min-w-14 px-2 text-[10px]" aria-label="Remove member segment" on:click={() => removeMemberSegment(index)} disabled={form.memberSegments.length <= 1}>Remove</Button>
+                {/if}
               </div>
             </div>
             <div class="grid grid-cols-2 gap-3">
-              <div class="space-y-1"><Label class="text-white/60">ID</Label><Input bind:value={segment.id} /></div>
-              <div class="space-y-1"><Label class="text-white/60">Plate Thickness</Label><Input type="number" step="0.0001" bind:value={segment.length} /></div>
-              <div class="space-y-1"><Label class="text-white/60">Plate Width</Label><Input type="number" step="0.0001" bind:value={segment.plateWidth} /></div>
-              <div class="space-y-1"><Label class="text-white/60">Plate Plan Length</Label><Input type="number" step="0.0001" bind:value={segment.plateLength} /></div>
-              <div class="space-y-1"><Label class="text-white/60">Modulus</Label><Input type="number" step="1000" bind:value={segment.modulus} /></div>
-              <div class="space-y-1"><Label class="text-white/60">Thermal α</Label><Input type="number" step="0.0000001" bind:value={segment.thermalExpansionCoeff} /></div>
+              <div class="space-y-1"><Label class="text-white/60">ID</Label><Input bind:value={segment.id} disabled={!form.useCustomPlateLayers} /></div>
+              <div class="space-y-1"><Label class="text-white/60">Plate Thickness</Label><Input type="number" step="0.0001" bind:value={segment.length} disabled={!form.useCustomPlateLayers} /></div>
+              <div class="space-y-1"><Label class="text-white/60">Plate Width</Label><Input type="number" step="0.0001" bind:value={segment.plateWidth} disabled={!form.useCustomPlateLayers} /></div>
+              <div class="space-y-1"><Label class="text-white/60">Plate Plan Length</Label><Input type="number" step="0.0001" bind:value={segment.plateLength} disabled={!form.useCustomPlateLayers} /></div>
+              <div class="space-y-1"><Label class="text-white/60">Modulus</Label><Input type="number" step="1000" bind:value={segment.modulus} disabled={!form.useCustomPlateLayers} /></div>
+              <div class="space-y-1"><Label class="text-white/60">Thermal α</Label><Input type="number" step="0.0000001" bind:value={segment.thermalExpansionCoeff} disabled={!form.useCustomPlateLayers} /></div>
 
               {#if segment.compressionModel === 'cylindrical_annulus'}
-                <div class="space-y-1"><Label class="text-white/60">Effective Outer Dia</Label><Input type="number" step="0.0001" bind:value={segment.outerDiameter} /></div>
-                <div class="space-y-1"><Label class="text-white/60">Bolt Hole Dia</Label><Input type="number" step="0.0001" bind:value={segment.innerDiameter} /></div>
+                <div class="space-y-1"><Label class="text-white/60">Effective compressed-zone OD</Label><Input type="number" step="0.0001" bind:value={segment.outerDiameter} disabled={!form.useCustomPlateLayers} /></div>
+                <div class="space-y-1"><Label class="text-white/60">Bolt hole dia</Label><Input type="number" step="0.0001" bind:value={segment.innerDiameter} disabled={!form.useCustomPlateLayers} /></div>
               {:else if segment.compressionModel === 'conical_frustum_annulus'}
-                <div class="space-y-1"><Label class="text-white/60">Effective Outer Dia (start)</Label><Input type="number" step="0.0001" bind:value={segment.outerDiameterStart} /></div>
-                <div class="space-y-1"><Label class="text-white/60">Effective Outer Dia (end)</Label><Input type="number" step="0.0001" bind:value={segment.outerDiameterEnd} /></div>
-                <div class="space-y-1"><Label class="text-white/60">Bolt Hole Dia</Label><Input type="number" step="0.0001" bind:value={segment.innerDiameter} /></div>
+                <div class="space-y-1"><Label class="text-white/60">Effective zone OD (start face)</Label><Input type="number" step="0.0001" bind:value={segment.outerDiameterStart} disabled={!form.useCustomPlateLayers || !form.conicalGeometryManualOverride} /></div>
+                <div class="space-y-1"><Label class="text-white/60">Effective zone OD (end face)</Label><Input type="number" step="0.0001" bind:value={segment.outerDiameterEnd} disabled={!form.useCustomPlateLayers || !form.conicalGeometryManualOverride} /></div>
+                <div class="space-y-1"><Label class="text-white/60">Bolt hole dia</Label><Input type="number" step="0.0001" bind:value={segment.innerDiameter} disabled={!form.useCustomPlateLayers} /></div>
                 <div class="rounded-lg border border-cyan-400/20 bg-cyan-500/5 p-2 text-xs text-cyan-100">Exact annular-frustum compliance integration is used for the compressed-zone representation only. The physical part is still a plate layer.</div>
               {:else}
-                <div class="space-y-1"><Label class="text-white/60">Explicit Equivalent Area</Label><Input type="number" step="0.0001" bind:value={segment.effectiveArea} /></div>
-                <div class="space-y-1"><Label class="text-white/60">Note</Label><Input bind:value={segment.note} /></div>
+                <div class="space-y-1"><Label class="text-white/60">Explicit Equivalent Area</Label><Input type="number" step="0.0001" bind:value={segment.effectiveArea} disabled={!form.useCustomPlateLayers} /></div>
+                <div class="space-y-1"><Label class="text-white/60">Note</Label><Input bind:value={segment.note} disabled={!form.useCustomPlateLayers} /></div>
               {/if}
             </div>
             <div class="mt-2 rounded-lg border border-white/8 bg-white/[0.02] p-2 text-xs text-white/60">
@@ -1462,9 +2808,18 @@
               {#if memberPreview(segment)}
                 Segment stiffness preview: <span class="font-mono">{fmt(memberPreview(segment)?.stiffness, 3)}</span>
                 <span class="text-white/55"> • compliance {fmt(memberPreview(segment)?.compliance, 8)}</span>
-                <div class="mt-1 text-white/65">Effective compression model: {compressionModelLabel(segment.compressionModel)}</div>
+                <div class="mt-1 text-white/65">Compression proxy: {compressionModelLabel(segment.compressionModel)}</div>
               {:else}
                 Segment stiffness preview unavailable until the current compression-model proxy inputs are valid.
+              {/if}
+            </div>
+            <div class="mt-2 rounded-lg border border-white/8 bg-white/[0.02] p-2 text-[11px] text-white/62">
+              {#if segment.compressionModel === 'cylindrical_annulus'}
+                Uniform zone: keeps one effective compressed diameter through the plate thickness.
+              {:else if segment.compressionModel === 'conical_frustum_annulus'}
+                Tapered zone: lets the effective compressed diameter widen through the plate thickness.
+              {:else}
+                Direct area: you enter the equivalent compressed area directly instead of using a diameter-based proxy.
               {/if}
             </div>
             {#if memberValidation(segment).length}
@@ -1481,11 +2836,53 @@
           <Button size="sm" variant="secondary" on:click={() => addMemberSegment('conical_frustum_annulus')}>Add Plate Layer (Tapered Proxy)</Button>
           <Button size="sm" variant="secondary" on:click={() => addMemberSegment('explicit_area')}>Add Plate Layer (Area Proxy)</Button>
         </div>
+        {:else}
+          <div class="space-y-2">
+            {#each form.memberSegments as segment}
+              <div class="rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white/72">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="font-semibold text-white/82">{segment.id}</div>
+                  <div class="text-cyan-200">{compressionModelLabel(segment.compressionModel)}</div>
+                </div>
+                <div class="mt-2 grid grid-cols-2 gap-2">
+                  <div>Thickness <span class="font-mono text-white/85">{fmt(segment.length, 4)}</span></div>
+                  <div>Width <span class="font-mono text-white/85">{fmt(segment.plateWidth, 4)}</span></div>
+                  <div>Plan length <span class="font-mono text-white/85">{fmt(segment.plateLength, 4)}</span></div>
+                  <div>Modulus <span class="font-mono text-white/85">{fmt(segment.modulus, 0)}</span></div>
+                </div>
+                <div class="mt-2 rounded-lg border border-cyan-400/15 bg-cyan-500/5 p-2 text-cyan-100">
+                  {#if segment.compressionModel === 'cylindrical_annulus'}
+                    Uniform zone: constant effective compressed diameter through the plate thickness.
+                  {:else if segment.compressionModel === 'conical_frustum_annulus'}
+                    Tapered zone: cone-like effective diameter spread through the plate thickness.
+                  {:else}
+                    Direct area: explicit equivalent compressed area replaces the diameter proxy.
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+          <div class="space-y-1">
+            <Label class="text-white/70">Default compression proxy for auto-generated plate layers</Label>
+            <Select
+              bind:value={form.defaultPlateCompressionModel}
+              items={[
+                { value: 'cylindrical_annulus', label: 'Uniform zone (constant effective diameter)' },
+                { value: 'conical_frustum_annulus', label: 'Tapered zone (cone-like spread)' },
+                { value: 'explicit_area', label: 'Direct area (enter equivalent compressed area)' }
+              ]}
+            />
+          </div>
+          <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/60">
+            Two plate rows are generated automatically from the main geometry inputs. Turn on custom plate layers only when the joint stack is more complex than a simple two-plate clampup.
+          </div>
+        {/if}
       </CardContent>
     </Card>
+    {/if}
 
-    {#if showAdvancedInputs}
-    <Card class="glass-card">
+    {#if showAdvancedInputs && workflowStep === 'review'}
+    <Card class="glass-card !border-0 !bg-transparent !shadow-none wizard-subcard">
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Service Case</CardTitle>
       </CardHeader>
@@ -1500,23 +2897,46 @@
     </Card>
     {/if}
 
-    <Card class="glass-card">
+    {#if workflowStep === 'review'}
+    <Card class="glass-card !border-0 !bg-transparent !shadow-none wizard-subcard">
+      <CardHeader class="pb-2 pt-4">
+        <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Guide-Derived Checks</CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-2">
+        <div class="rounded-lg border border-white/10 bg-black/20 p-2 text-xs text-white/65">
+          Mapped to installation guidance (Bolt Council) plus multi-fastener distribution behavior (VT chapter).
+        </div>
+        {#each guideDerivedChecks as check}
+          <div class={`rounded-lg border p-2 text-xs ${guideTone(check.status)}`}>
+            <div class="flex items-center justify-between gap-2">
+              <div class="font-semibold">{check.principle}</div>
+              <Badge variant="outline" class="border-white/20 text-[10px]">{check.source}</Badge>
+            </div>
+            <div class="mt-1 text-white/80">{check.rationale}</div>
+            <div class="mt-1 text-[10px] text-white/60">Mapped inputs: {check.mappedInputs.join(' • ')}</div>
+            {#if check.action}
+              <div class="mt-1 text-[10px] text-amber-100">Action: {check.action}</div>
+            {/if}
+          </div>
+        {/each}
+      </CardContent>
+    </Card>
+
+    <Card class="glass-card !border-0 !bg-transparent !shadow-none wizard-subcard" id={fieldId('adjacent-screening')}>
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Adjacent Fastener Screening</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
-        {#if showAdvancedInputs}
         <label class="flex items-center gap-2 text-sm text-white/75">
           <input type="checkbox" class="checkbox checkbox-sm border-white/20 bg-black/30" bind:checked={form.adjacentFastenerScreen.enabled} />
-          Enable adjacent-fastener load-transfer screening
+          Enable fastener-pattern load-transfer screening
         </label>
-        {:else}
+        {#if !showAdvancedInputs}
           <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/60">
             Pattern-input controls are hidden to keep the main workflow simpler. Use <span class="text-cyan-200">Show Advanced</span> to edit rows, columns, eccentricity, and load cases.
           </div>
         {/if}
-        {#if form.adjacentFastenerScreen.enabled}
-          {#if showAdvancedInputs}
+        {#if showAdvancedInputs}
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1"><Label class="text-white/70">Rows</Label><Input type="number" step="1" bind:value={form.adjacentFastenerScreen.rowCount} /></div>
             <div class="space-y-1"><Label class="text-white/70">Columns</Label><Input type="number" step="1" bind:value={form.adjacentFastenerScreen.columnCount} /></div>
@@ -1546,10 +2966,10 @@
                   <div class="mb-2 flex items-center justify-between gap-2">
                     <Input bind:value={loadCase.label} class="max-w-[220px]" />
                     <div class="flex items-center gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
-                      <Button size="sm" variant="ghost" class="min-w-8 px-2 text-[10px]" on:click={() => moveLoadCase(index, -1)} disabled={index === 0}>^</Button>
-                      <Button size="sm" variant="ghost" class="min-w-8 px-2 text-[10px]" on:click={() => moveLoadCase(index, 1)} disabled={index === form.adjacentFastenerScreen.loadCases.length - 1}>v</Button>
-                      <Button size="sm" variant="ghost" class="min-w-10 px-2 text-[10px]" on:click={() => duplicateLoadCase(index)}>dup</Button>
-                      <Button size="sm" variant="ghost" class="min-w-8 px-2 text-[10px]" on:click={() => removeLoadCase(index)} disabled={form.adjacentFastenerScreen.loadCases.length <= 1}>x</Button>
+                      <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move load case up" on:click={() => moveLoadCase(index, -1)} disabled={index === 0}>Up</Button>
+                      <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move load case down" on:click={() => moveLoadCase(index, 1)} disabled={index === form.adjacentFastenerScreen.loadCases.length - 1}>Down</Button>
+                      <Button size="sm" variant="ghost" class="min-w-16 px-2 text-[10px]" aria-label="Duplicate load case" on:click={() => duplicateLoadCase(index)}>Duplicate</Button>
+                      <Button size="sm" variant="ghost" class="min-w-14 px-2 text-[10px]" aria-label="Remove load case" on:click={() => removeLoadCase(index)} disabled={form.adjacentFastenerScreen.loadCases.length <= 1}>Remove</Button>
                     </div>
                   </div>
                   <div class="grid grid-cols-2 gap-2">
@@ -1562,7 +2982,8 @@
               {/each}
             </div>
           </div>
-          {/if}
+        {/if}
+        {#if form.adjacentFastenerScreen.enabled}
           <div class="rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/75">
             <div>Fasteners in pattern: <span class="font-mono text-cyan-300">{adjacentFastenerCount}</span></div>
             <div>Neighbor count: <span class="font-mono text-cyan-300">{adjacentNeighborCount}</span></div>
@@ -1577,17 +2998,17 @@
           {#if fastenerCaseEnvelopeRows.length}
             <div class="rounded-lg border border-white/10 bg-black/20 p-3">
               <div class="mb-2 text-[10px] uppercase tracking-widest text-white/45">Per-case critical envelopes</div>
-              <svg viewBox="0 0 320 170" class="h-auto w-full rounded-lg border border-white/8 bg-black/20 p-2" aria-label="Preload fastener-group case envelopes">
-                <rect x="16" y="16" width="288" height="138" rx="12" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.08)" />
+              <svg viewBox={`0 0 320 ${envelopeChartHeight}`} class="h-auto w-full rounded-lg border border-white/8 bg-black/20 p-2" aria-label="Preload fastener-group case envelopes">
+                <rect x="16" y="16" width="288" height={envelopeChartHeight - 32} rx="12" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.08)" />
                 {#each fastenerCaseEnvelopeRows as row}
-                  {@const y = 42 + row.index * 24}
-                  <text x="26" y={y + 4} fill={row.isGoverning ? 'rgba(253,230,138,0.92)' : 'rgba(255,255,255,0.70)'} font-size="10">{row.label}</text>
-                  <line x1="98" y1={y} x2="256" y2={y} stroke="rgba(255,255,255,0.10)" stroke-width="2" stroke-linecap="round" />
-                  <line x1="98" y1={y} x2={98 + row.ratio * 158} y2={y} stroke={row.isGoverning ? '#fde68a' : '#22d3ee'} stroke-width="5" stroke-linecap="round" />
-                  <circle cx={98 + row.ratio * 158} cy={y} r="4" fill={row.isGoverning ? '#fde68a' : '#67e8f9'} />
-                  <text x="268" y={y + 4} text-anchor="end" fill="rgba(255,255,255,0.62)" font-size="9">{row.criticalFastenerLabel} • {fmt(row.demand, 2)}</text>
+                  {@const y = 42 + row.index * 28}
+                  <text x="26" y={y} fill={row.isGoverning ? 'rgba(253,230,138,0.92)' : 'rgba(255,255,255,0.78)'} font-size="10" font-weight={row.isGoverning ? '700' : '400'}>{row.label}</text>
+                  <text x="26" y={y + 12} fill="rgba(255,255,255,0.48)" font-size="8">{row.criticalFastenerLabel}</text>
+                  <rect x="108" y={y - 8} width="140" height="12" rx="6" fill="rgba(255,255,255,0.08)" />
+                  <rect x="108" y={y - 8} width={Math.max(6, row.ratio * 140)} height="12" rx="6" fill={row.isGoverning ? '#fde68a' : '#22d3ee'} />
+                  <text x="286" y={y + 1} text-anchor="end" fill="rgba(255,255,255,0.70)" font-size="9">{fmt(row.demand, 2)}</text>
                 {/each}
-                <text x="24" y="150" fill="rgba(255,255,255,0.55)" font-size="10">Each bar shows the peak equivalent fastener demand within that load case. The longest bar is the governing case.</text>
+                <text x="24" y={envelopeChartHeight - 22} fill="rgba(255,255,255,0.55)" font-size="10">Each bar shows the peak equivalent fastener demand in that load case. The highlighted bar is the governing case.</text>
               </svg>
             </div>
           {/if}
@@ -1647,12 +3068,13 @@
                     {@const size = 248 / Math.max(fastenerGroupResult.geometryInfluenceMatrix.length, 1)}
                     {@const x = 40 + columnIndex * size}
                     {@const y = 24 + rowIndex * size}
+                    {@const normalized = heatmapDisplayRatio(rowIndex, columnIndex, cell)}
                     <rect
                       x={x}
                       y={y}
                       width={size}
                       height={size}
-                      fill={`rgba(${Math.round(34 + 150 * cell)}, ${Math.round(99 + 120 * cell)}, ${Math.round(235 - 40 * cell)}, ${0.18 + cell * 0.65})`}
+                      fill={`rgba(${Math.round(34 + 210 * normalized)}, ${Math.round(90 + 150 * (1 - Math.abs(normalized - 0.5) * 0.7))}, ${Math.round(240 - 180 * normalized)}, ${0.16 + normalized * 0.72})`}
                       stroke="rgba(255,255,255,0.06)"
                     />
                   {/each}
@@ -1662,16 +3084,51 @@
                   <text x={52 + fastener.index * size} y="16" fill="rgba(255,255,255,0.5)" font-size="9">F{fastener.index + 1}</text>
                   <text x="10" y={40 + fastener.index * size} fill="rgba(255,255,255,0.5)" font-size="9">F{fastener.index + 1}</text>
                 {/each}
-                <text x="40" y="296" fill="rgba(255,255,255,0.55)" font-size="10">Brighter cells = stronger geometric coupling / influence between fastener pairs.</text>
+                <text x="40" y="296" fill="rgba(255,255,255,0.55)" font-size="10">Color is normalized across the current matrix. Dark = weakest coupling, hot = strongest coupling.</text>
               </svg>
             </div>
           {/if}
         {/if}
       </CardContent>
     </Card>
+    {/if}
+        </div>
+        {/key}
+      </CardContent>
+    </Card>
   </div>
 
   <div class="flex flex-col gap-4 overflow-y-auto pb-24 pr-2 scrollbar-hide">
+    {#if workflowStep !== 'review'}
+      <Card class="glass-card">
+        <CardHeader class="pb-2 pt-4">
+          <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-emerald-300">Review Step</CardTitle>
+        </CardHeader>
+        <CardContent class="space-y-4">
+          <div class="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/72">
+            Complete the first three workflow stages, then switch to <span class="text-cyan-200">4. Review</span> to inspect the joint section, preload chart, spring analogy, and fastener-pattern outputs.
+          </div>
+          {#if output}
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div class="text-[10px] uppercase tracking-widest text-white/45">Installed preload</div>
+                <div class="mt-2 text-lg font-semibold text-cyan-300">{fmt(output.installation.preload, 2)}</div>
+              </div>
+              <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div class="text-[10px] uppercase tracking-widest text-white/45">Joint constant</div>
+                <div class="mt-2 text-lg font-semibold text-cyan-300">{fmt(output.stiffness.jointConstant, 4)}</div>
+              </div>
+              <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div class="text-[10px] uppercase tracking-widest text-white/45">Current status</div>
+                <div class="mt-2 text-sm font-semibold {output.service?.hasSeparated ? 'text-rose-300' : 'text-emerald-300'}">
+                  {output.service?.hasSeparated ? 'Separated' : 'Still clamped'}
+                </div>
+              </div>
+            </div>
+          {/if}
+        </CardContent>
+      </Card>
+    {:else}
     <Card class="glass-card">
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-emerald-300">Joint Section Model</CardTitle>
@@ -1700,8 +3157,9 @@
           <svg bind:this={jointSectionSvg} viewBox="0 0 560 560" class="h-auto w-full rounded-xl border border-white/10 bg-black/20 p-2" aria-label="Preload joint section panel">
             <defs>
               <linearGradient id="joint-frustum-fill" x1="0" x2="1">
-                <stop offset="0%" stop-color="rgba(34,211,238,0.10)" />
-                <stop offset="100%" stop-color="rgba(34,211,238,0.30)" />
+                <stop offset="0%" stop-color="rgba(14,165,233,0.18)" />
+                <stop offset="50%" stop-color="rgba(34,211,238,0.34)" />
+                <stop offset="100%" stop-color="rgba(14,165,233,0.18)" />
               </linearGradient>
               <linearGradient id="joint-bolt-fill" x1="0" x2="1">
                 <stop offset="0%" stop-color="rgba(148,163,184,0.58)" />
@@ -1808,6 +3266,7 @@
                   points={topConeEnvelopePoints}
                   fill="url(#joint-frustum-fill)"
                   stroke="rgba(34,211,238,0.52)"
+                  stroke-width="2"
                 />
               {/if}
               {#if bottomConeEnvelopePoints}
@@ -1815,6 +3274,7 @@
                   points={bottomConeEnvelopePoints}
                   fill="url(#joint-frustum-fill)"
                   stroke="rgba(34,211,238,0.52)"
+                  stroke-width="2"
                 />
               {/if}
             {/if}
@@ -2035,30 +3495,47 @@
       </CardHeader>
       <CardContent class="space-y-3">
         {#if output}
-          <svg viewBox="0 0 560 210" class="h-auto w-full rounded-xl border border-white/10 bg-black/20 p-2" aria-label="Preload spring analogy panel">
+          <svg viewBox="0 0 560 250" class="h-auto w-full rounded-xl border border-white/10 bg-black/20 p-2" aria-label="Preload spring analogy panel">
             <text x="18" y="24" fill="rgba(255,255,255,0.82)" font-size="15" font-weight="700">Equivalent Springs</text>
-            <text x="18" y="42" fill="rgba(255,255,255,0.55)" font-size="11">Classical spring analogy: bolt in tension at the center, clamped members in compression at the sides.</text>
-
-            <rect x="92" y="60" width="376" height="12" rx="6" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" />
-            <rect x="92" y="150" width="376" height="12" rx="6" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" />
-
-            {#each [150, 280, 410] as springX, springIndex}
+            <text x="18" y="42" fill="rgba(255,255,255,0.55)" font-size="11">The bolt acts like one tensile spring. The clamped parts act like two mirrored compression spring branches reacting at the bearing faces.</text>
+            <rect x="110" y="52" width="340" height="14" rx="7" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" />
+            <rect x="110" y="184" width="340" height="14" rx="7" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" />
+            <line x1="280" y1="56" x2="280" y2="194" stroke="rgba(255,255,255,0.08)" stroke-dasharray="4 4" />
+            {#each [170, 390] as springX}
               <path
-                d={`M ${springX} 72
-                    C ${springX + 14} 82, ${springX - 14} 92, ${springX} 102
-                    C ${springX + 14} 112, ${springX - 14} 122, ${springX} 132
-                    C ${springX + 14} 142, ${springX - 14} 150, ${springX} 158`}
+                d={`M ${springX} 68
+                    C ${springX + 16} 76, ${springX - 16} 84, ${springX} 92
+                    C ${springX + 16} 100, ${springX - 16} 108, ${springX} 116
+                    C ${springX + 16} 124, ${springX - 16} 132, ${springX} 140
+                    C ${springX + 16} 148, ${springX - 16} 156, ${springX} 164
+                    C ${springX + 16} 172, ${springX - 16} 178, ${springX} 184`}
                 fill="none"
-                stroke={springIndex === 1 ? '#cbd5e1' : '#34d399'}
-                stroke-width={springIndex === 1 ? 3 : 2.4}
+                stroke="#34d399"
+                stroke-width="2.8"
                 stroke-linecap="round"
               />
             {/each}
-            <line x1="280" y1="58" x2="280" y2="174" stroke="rgba(255,255,255,0.10)" stroke-dasharray="4 4" />
-            <text x="150" y="184" text-anchor="middle" fill="rgba(52,211,153,0.82)" font-size="11">Member spring branch</text>
-            <text x="280" y="184" text-anchor="middle" fill="rgba(203,213,225,0.88)" font-size="11">Bolt spring</text>
-            <text x="410" y="184" text-anchor="middle" fill="rgba(52,211,153,0.82)" font-size="11">Member spring branch</text>
-            <text x="18" y="202" fill="rgba(255,255,255,0.60)" font-size="10">k_b = {fmt(output.stiffness.bolt.stiffness, 2)} • k_m = {fmt(output.stiffness.members.stiffness, 2)} • C = {fmt(output.stiffness.jointConstant, 4)}</text>
+            <path
+              d="M 280 68
+                 C 300 78, 260 88, 280 98
+                 C 300 108, 260 118, 280 128
+                 C 300 138, 260 148, 280 158
+                 C 300 168, 260 176, 280 184"
+              fill="none"
+              stroke="#cbd5e1"
+              stroke-width="3.4"
+              stroke-linecap="round"
+            />
+            <line x1="170" y1="112" x2="250" y2="112" stroke="rgba(52,211,153,0.24)" stroke-width="2" />
+            <line x1="310" y1="112" x2="390" y2="112" stroke="rgba(52,211,153,0.24)" stroke-width="2" />
+            <polygon points="280,36 272,50 288,50" fill="#fde68a" />
+            <polygon points="280,214 272,200 288,200" fill="#a7f3d0" />
+            <text x="280" y="30" text-anchor="middle" fill="#fde68a" font-size="10">Preload stretches bolt</text>
+            <text x="280" y="230" text-anchor="middle" fill="#a7f3d0" font-size="10">Members compress equally at the faces</text>
+            <text x="170" y="206" text-anchor="middle" fill="rgba(52,211,153,0.82)" font-size="11">Member branch A</text>
+            <text x="280" y="206" text-anchor="middle" fill="rgba(203,213,225,0.88)" font-size="11">Bolt spring</text>
+            <text x="390" y="206" text-anchor="middle" fill="rgba(52,211,153,0.82)" font-size="11">Member branch B</text>
+            <text x="18" y="244" fill="rgba(255,255,255,0.60)" font-size="10">k_b = {fmt(output.stiffness.bolt.stiffness, 2)} • k_m = {fmt(output.stiffness.members.stiffness, 2)} • C = {fmt(output.stiffness.jointConstant, 4)}</text>
           </svg>
           <div class="rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white/70">
             <div class="font-semibold uppercase tracking-widest text-[10px] text-white/50">Axial Load Transfer</div>
@@ -2080,7 +3557,7 @@
       </CardContent>
     </Card>
 
-    <Card class="glass-card">
+    <Card class="glass-card" id={fieldId('review-main')}>
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-emerald-300">Computed State</CardTitle>
       </CardHeader>
@@ -2150,5 +3627,6 @@
         {/if}
       </CardContent>
     </Card>
+    {/if}
   </div>
 </div>

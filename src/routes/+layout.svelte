@@ -1,7 +1,7 @@
 <script lang="ts">
   import '../app.css';
   import '$lib/styles/themes.css';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { onMount } from 'svelte';
   import { themeStore } from '$lib/stores/themeStore';
   import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
@@ -32,8 +32,8 @@
 	{ href: '#/surface', label: 'Surface', path: '/surface' }
   ];
 
-  let pathname = $derived($page.url.pathname);
-  let hash = $derived($page.url.hash);
+  let pathname = $derived(page.url.pathname);
+  let hash = $derived(page.url.hash);
   let routePath = $derived.by(() => {
     // Extract path from hash (e.g., '#/inspector' -> '/inspector')
     const hashPath = hash.startsWith('#/') ? hash.slice(1) : '';
@@ -477,6 +477,7 @@
 
       <AppBar.Trail>
         <div class="flex items-center gap-2" data-main-nav-root="true">
+          <ThemeToggle compact={true} />
           {#if activeToolMenu}
             <div class="relative">
               <button
@@ -577,18 +578,13 @@
     </div>
   {/if}
   {#if startupNotice.open}
-    <div class="pointer-events-none fixed bottom-4 right-4 z-[1600] max-w-md rounded-xl border border-cyan-300/30 bg-surface-900/92 px-3 py-2 text-[11px] text-cyan-100 shadow-2xl">
-      <div class="mb-1 text-[10px] uppercase tracking-widest text-cyan-200/80">Startup Telemetry</div>
-      <div>{startupNotice.text}</div>
+    <div class="mx-auto mt-2 max-w-7xl px-4">
+      <div class="rounded-xl border border-cyan-300/30 bg-surface-900/92 px-3 py-2 text-[11px] text-cyan-100 shadow-xl">
+        <div class="mb-1 text-[10px] uppercase tracking-widest text-cyan-200/80">Startup Telemetry</div>
+        <div>{startupNotice.text}</div>
+      </div>
     </div>
   {/if}
-
-  <div class="pointer-events-none fixed bottom-4 left-1/2 z-[1550] -translate-x-1/2">
-    <div class="pointer-events-auto rounded-2xl border border-white/10 bg-slate-950/84 px-3 py-2 shadow-2xl backdrop-blur-md">
-      <div class="mb-2 text-center text-[10px] uppercase tracking-[0.18em] text-white/48">Global Theme</div>
-      <ThemeToggle compact={true} />
-    </div>
-  </div>
 
   <div
     id="app-content-root"

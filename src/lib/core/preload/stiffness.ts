@@ -28,13 +28,15 @@ function solveBoltSegment(segment: BoltSegmentInput): SegmentStiffnessResult {
   };
 }
 
-function areaFromDiameter(outerDiameter: number, innerDiameter = 0): number {
-  assertPositive('outerDiameter', outerDiameter);
+function areaFromDiameter(outerDiameter: number, innerDiameter = 0, context = 'annulus'): number {
+  assertPositive(`${context}.outerDiameter`, outerDiameter);
   if (!Number.isFinite(innerDiameter) || innerDiameter < 0) {
-    throw new Error('innerDiameter must be a finite non-negative number.');
+    throw new Error(`${context}.innerDiameter must be a finite non-negative number.`);
   }
   if (innerDiameter >= outerDiameter) {
-    throw new Error('innerDiameter must be smaller than outerDiameter.');
+    throw new Error(
+      `${context}.innerDiameter (${innerDiameter.toFixed(6)}) must be smaller than outerDiameter (${outerDiameter.toFixed(6)}).`
+    );
   }
   return (PI / 4) * (outerDiameter * outerDiameter - innerDiameter * innerDiameter);
 }
@@ -42,7 +44,7 @@ function areaFromDiameter(outerDiameter: number, innerDiameter = 0): number {
 function solveCylindricalAnnulus(segment: Extract<MemberSegmentInput, { compressionModel: 'cylindrical_annulus' }>): MemberSegmentStiffnessResult {
   assertPositive(`${segment.id}.length`, segment.length);
   assertPositive(`${segment.id}.modulus`, segment.modulus);
-  const area = areaFromDiameter(segment.outerDiameter, segment.innerDiameter);
+  const area = areaFromDiameter(segment.outerDiameter, segment.innerDiameter, segment.id);
   const compliance = segment.length / (segment.modulus * area);
   const integral = segment.length / area;
   return {
@@ -75,7 +77,7 @@ function solveConicalFrustumAnnulus(segment: Extract<MemberSegmentInput, { compr
   let exactAreaIntegral: number;
 
   if (Math.abs(slope) <= EPS) {
-    const area = areaFromDiameter(d0, di);
+    const area = areaFromDiameter(d0, di, segment.id);
     exactAreaIntegral = segment.length / area;
   } else {
     const denom = 2 * slope * di;

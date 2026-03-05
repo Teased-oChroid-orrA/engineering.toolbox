@@ -35,7 +35,7 @@
 :root {
   color-scheme: dark;
   --surface-font-display: "Sora", "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
-  --surface-font-data: "IBM Plex Mono", "SF Mono", "Roboto Mono", "Menlo", monospace;
+  --surface-font-data: "IBM Plex Mono", "Roboto Mono", "Menlo", "Consolas", monospace;
   --surface-motion-fast: 180ms;
   --surface-motion-standard: 220ms;
   --surface-motion-deliberate: 300ms;

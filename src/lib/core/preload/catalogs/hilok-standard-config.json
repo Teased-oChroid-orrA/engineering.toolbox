@@ -3,7 +3,7 @@
     "manufacturer": "Jet-Tek",
     "family": "Hi-Lok standard configuration pins",
     "sourceUrl": "https://jet-tek.com/product-specialties/hi-lok-fasteners-hi-lok/",
-    "importedAt": "2026-03-04T03:33:55.996Z",
+    "importedAt": "2026-03-05T05:00:25.855Z",
     "sourcePath": "jet-tek-hilok-standard-source.json",
     "liveDiscovery": "local_html_snapshot_links:14"
   },
@@ -141,42 +141,114 @@
       "nominalDiameterIn": 0.15625,
       "threadCallout": ".1640-32 UNJ",
       "gripVariation": "1/16 in grip variation",
-      "collarPart": "HL70"
+      "collarPart": "HL70",
+      "geometry": {
+        "headFaceDiametersIn": {
+          "protrudingShear": 0.3,
+          "reducedFlushShear": 0.255,
+          "protrudingTension": 0.312,
+          "flushTension": 0.266
+        },
+        "nutFaceDiameterIn": 0.281,
+        "washerOuterDiameterIn": 0.375,
+        "washerInnerDiameterIn": 0.172,
+        "collarOuterDiameterIn": 0.29
+      }
     },
     {
       "dash": "6",
       "nominalDiameterIn": 0.1875,
       "threadCallout": ".1900-32 UNJF",
       "gripVariation": "1/16 in grip variation",
-      "collarPart": "HL70"
+      "collarPart": "HL70",
+      "geometry": {
+        "headFaceDiametersIn": {
+          "protrudingShear": 0.344,
+          "reducedFlushShear": 0.297,
+          "protrudingTension": 0.359,
+          "flushTension": 0.312
+        },
+        "nutFaceDiameterIn": 0.328,
+        "washerOuterDiameterIn": 0.438,
+        "washerInnerDiameterIn": 0.203,
+        "collarOuterDiameterIn": 0.336
+      }
     },
     {
       "dash": "8",
       "nominalDiameterIn": 0.25,
       "threadCallout": ".2500-28 UNJF",
       "gripVariation": "1/16 in grip variation",
-      "collarPart": "HL86"
+      "collarPart": "HL86",
+      "geometry": {
+        "headFaceDiametersIn": {
+          "protrudingShear": 0.469,
+          "reducedFlushShear": 0.406,
+          "protrudingTension": 0.5,
+          "flushTension": 0.438
+        },
+        "nutFaceDiameterIn": 0.438,
+        "washerOuterDiameterIn": 0.563,
+        "washerInnerDiameterIn": 0.266,
+        "collarOuterDiameterIn": 0.45
+      }
     },
     {
       "dash": "10",
       "nominalDiameterIn": 0.3125,
       "threadCallout": ".3125-24 UNJF",
       "gripVariation": "1/16 in grip variation",
-      "collarPart": "HL86"
+      "collarPart": "HL86",
+      "geometry": {
+        "headFaceDiametersIn": {
+          "protrudingShear": 0.594,
+          "reducedFlushShear": 0.516,
+          "protrudingTension": 0.625,
+          "flushTension": 0.547
+        },
+        "nutFaceDiameterIn": 0.531,
+        "washerOuterDiameterIn": 0.688,
+        "washerInnerDiameterIn": 0.328,
+        "collarOuterDiameterIn": 0.545
+      }
     },
     {
       "dash": "12",
       "nominalDiameterIn": 0.375,
       "threadCallout": ".3750-24 UNJF",
       "gripVariation": "1/16 in grip variation",
-      "collarPart": "HL108"
+      "collarPart": "HL108",
+      "geometry": {
+        "headFaceDiametersIn": {
+          "protrudingShear": 0.719,
+          "reducedFlushShear": 0.625,
+          "protrudingTension": 0.75,
+          "flushTension": 0.656
+        },
+        "nutFaceDiameterIn": 0.625,
+        "washerOuterDiameterIn": 0.813,
+        "washerInnerDiameterIn": 0.391,
+        "collarOuterDiameterIn": 0.64
+      }
     },
     {
       "dash": "16",
       "nominalDiameterIn": 0.5,
       "threadCallout": ".5000-20 UNJF",
       "gripVariation": "1/16 in grip variation",
-      "collarPart": "HL120"
+      "collarPart": "HL120",
+      "geometry": {
+        "headFaceDiametersIn": {
+          "protrudingShear": 0.938,
+          "reducedFlushShear": 0.813,
+          "protrudingTension": 0.969,
+          "flushTension": 0.844
+        },
+        "nutFaceDiameterIn": 0.812,
+        "washerOuterDiameterIn": 1,
+        "washerInnerDiameterIn": 0.516,
+        "collarOuterDiameterIn": 0.828
+      }
     }
   ],
   "gripTable": [

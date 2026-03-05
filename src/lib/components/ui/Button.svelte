@@ -1,12 +1,32 @@
 <script lang="ts">
+  import { createEventDispatcher } from 'svelte';
   import { cn } from '$lib/utils';
 
-  export let variant: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' = 'primary';
-  export let size: 'sm' | 'md' | 'lg' | 'icon' = 'md';
-  let className: string | undefined | null = undefined;
-  export { className as class };
-  export let type: 'button' | 'submit' | 'reset' = 'button';
-  export let disabled = false;
+  
+  interface Props {
+    variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
+    size?: 'sm' | 'md' | 'lg' | 'icon';
+    class?: string | undefined | null;
+    type?: 'button' | 'submit' | 'reset';
+    disabled?: boolean;
+    children?: import('svelte').Snippet;
+    [key: string]: any
+  }
+
+  let {
+    variant = 'primary',
+    size = 'md',
+    class: className = undefined,
+    type = 'button',
+    disabled = false,
+    children,
+    ...rest
+  }: Props = $props();
+  const dispatch = createEventDispatcher<{ click: MouseEvent }>();
+
+  function handleClick(event: MouseEvent) {
+    dispatch('click', event);
+  }
 
   const base =
     'inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-semibold tracking-tight transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/40 disabled:pointer-events-none disabled:opacity-50 hover:brightness-110 hover:scale-[1.01] active:scale-[0.99]';
@@ -27,6 +47,6 @@
   };
 </script>
 
-<button {type} class={cn(base, variants[variant], sizes[size], className)} {disabled} {...$$restProps}>
-  <slot />
+<button {type} class={cn(base, variants[variant], sizes[size], className)} {disabled} onclick={handleClick} {...rest}>
+  {@render children?.()}
 </button>

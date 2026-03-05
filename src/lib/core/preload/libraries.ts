@@ -31,6 +31,18 @@ export type PreloadFastenerLibraryItem = {
     threadCallout: string;
     gripVariation: string;
     collarPart: string;
+    geometry?: {
+      headFaceDiametersIn?: {
+        protrudingShear?: number;
+        reducedFlushShear?: number;
+        protrudingTension?: number;
+        flushTension?: number;
+      };
+      nutFaceDiameterIn?: number;
+      washerOuterDiameterIn?: number;
+      washerInnerDiameterIn?: number;
+      collarOuterDiameterIn?: number;
+    };
   }>;
   gripTable: Array<{
     gripCode: string;

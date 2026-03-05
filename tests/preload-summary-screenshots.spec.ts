@@ -1,9 +1,24 @@
 import { expect, test } from '@playwright/test';
 
+async function goToPreloadReview(page: import('@playwright/test').Page) {
+  await page.locator('button', { hasText: '4. Review' }).first().click();
+  if ((await page.getByLabel('Preload summary panel').count()) === 0) {
+    for (let i = 0; i < 3; i += 1) {
+      const next = page.getByRole('button', { name: 'Next' }).first();
+      if (await next.isVisible()) await next.click();
+    }
+    await page.locator('button', { hasText: '4. Review' }).first().click();
+  }
+}
+
 async function preparePreloadScreenshot(page: import('@playwright/test').Page) {
   await page.goto('/');
   await page.evaluate(() => {
     localStorage.removeItem('scd.preload.inputs.v1');
+    localStorage.removeItem('scd.preload.step-snapshots.v1');
+    localStorage.removeItem('scd.preload.step-hints.v1');
+    localStorage.removeItem('scd.preload.step-telemetry.v1');
+    localStorage.removeItem('scd.preload.step-prefs.v1');
   });
   await page.goto('/#/preload');
   await page.waitForSelector('[data-route-ready="preload"]');
@@ -45,18 +60,21 @@ async function capturePanel(
 
 test('captures preload summary visualization panel', async ({ page }) => {
   await preparePreloadScreenshot(page);
+  await goToPreloadReview(page);
   const panel = page.getByLabel('Preload summary panel');
   await capturePanel(page, panel, '/Users/nautilus/Desktop/engineering.toolbox/implementation/screenshots/preload-summary-panel.png');
 });
 
 test('captures preload joint section visualization panel', async ({ page }) => {
   await preparePreloadScreenshot(page);
+  await goToPreloadReview(page);
   const panel = page.getByLabel('Preload joint section panel');
   await capturePanel(page, panel, '/Users/nautilus/Desktop/engineering.toolbox/implementation/screenshots/preload-joint-section-panel.png');
 });
 
 test('captures preload influence matrix heatmap panel', async ({ page }) => {
   await preparePreloadScreenshot(page);
+  await goToPreloadReview(page);
   await page.getByRole('button', { name: 'Show Advanced' }).click();
   const panel = page.getByLabel('Preload geometry influence matrix heatmap');
   await capturePanel(page, panel, '/Users/nautilus/Desktop/engineering.toolbox/implementation/screenshots/preload-influence-matrix-heatmap.png');
