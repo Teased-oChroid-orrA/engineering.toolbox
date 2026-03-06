@@ -220,6 +220,7 @@
 
         let progress = 4;
         let done = false;
+        let shellMounted = false;
         let trickle = null;
         let lastStepCount = 0;
         let lastWaitPulseAt = Date.now();
@@ -287,6 +288,14 @@
           pct.textContent = `${progress}%`;
           if (message) msg.textContent = message;
         };
+
+        window.addEventListener('app-shell-mounted', () => {
+          shellMounted = true;
+          apply(72, 'UI shell mounted.');
+          if (diagEl.textContent.includes('Waiting')) {
+            diagEl.textContent = 'UI shell mounted · waiting for toolbox route readiness.';
+          }
+        });
 
         const finish = (message = 'Ready') => {
           if (done) return;
@@ -398,8 +407,23 @@
         }, 9000);
 
         setTimeout(() => {
-          if (!done) finish('Ready (fallback).');
+          if (done) return;
+          const marker = document.querySelector('[data-route-ready]:not(#static-route-ready-marker)');
+          if (shellMounted || marker) {
+            finish('Workspace ready.');
+            return;
+          }
+          if (trickle) clearInterval(trickle);
+          apply(99, 'Startup delayed on this system...');
+          stepEl.textContent = 'Step 3/3 · Waiting for UI runtime...';
+          diagEl.textContent =
+            'Runtime did not confirm startup. Press R to reload, or restart the app.';
         }, 40000);
+
+        window.addEventListener('keydown', (ev) => {
+          if (done) return;
+          if (ev.key === 'r' || ev.key === 'R') window.location.reload();
+        });
       })();
     </script>
     <div style="display: contents">%sveltekit.body%</div>

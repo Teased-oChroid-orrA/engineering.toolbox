@@ -254,6 +254,7 @@
     });
 
     if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('app-shell-mounted'));
       window.dispatchEvent(
         new CustomEvent('app-progress', {
           detail: { progress: 38, message: 'Mounting navigation and toolbars...' }
