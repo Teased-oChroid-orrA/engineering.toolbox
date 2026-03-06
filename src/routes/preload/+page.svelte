@@ -15,6 +15,7 @@
     Select
   } from '$lib/components/ui';
   import { exportPdfFromHtml, exportSvg } from '$lib/drafting/core/export';
+  import { safeModeStore } from '$lib/stores/safeModeStore';
   import {
     buildPreloadEquationSheetHtml,
     computeFastenedJointPreload,
@@ -365,6 +366,7 @@
   let stepPrefsSignature = $state<string>('');
   let summarySvg = $state<SVGSVGElement | null>(null);
   let jointSectionSvg = $state<SVGSVGElement | null>(null);
+  let loadFullWorkspace = $state(false);
 
   if (typeof window !== 'undefined') {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -393,9 +395,19 @@
           serviceCase: {
             ...baseline.serviceCase,
             ...(parsed.serviceCase ?? {})
+          },
+          installation: {
+            ...baseline.installation,
+            ...((parsed as Partial<PreloadForm>).installation ?? {})
           }
         };
-        selectedInstallationModel = form.installation.model;
+        const restoredInstallationModel = (parsed as Partial<PreloadForm>).installation?.model;
+        selectedInstallationModel =
+          restoredInstallationModel === 'exact_torque' ||
+          restoredInstallationModel === 'nut_factor' ||
+          restoredInstallationModel === 'direct_preload'
+            ? restoredInstallationModel
+            : baseline.installation.model;
       } catch {
         form = defaultForm();
       }
@@ -1616,9 +1628,10 @@
       ...current,
       outerDiameter: autoGeom.outer,
       innerDiameter: autoGeom.inner,
-      underHeadOuterDiameter: autoGeom.topFaceOuter,
+      // Washer rows should use washer OD/ID, not hardware face diameters.
+      underHeadOuterDiameter: autoGeom.outer,
       underHeadInnerDiameter: autoGeom.inner,
-      underNutOuterDiameter: autoGeom.bottomFaceOuter,
+      underNutOuterDiameter: autoGeom.outer,
       underNutInnerDiameter: autoGeom.inner
     };
     const currSig = JSON.stringify({
@@ -1886,6 +1899,20 @@
     }
     return [...left, ...right].join(' ');
   };
+  const buildConeBoundaryPoints = (
+    slices: Array<{ sliceStart: number; sliceEnd: number; topRadius: number; bottomRadius: number }>,
+    side: 'left' | 'right'
+  ) => {
+    if (!slices.length) return '';
+    const sign = side === 'left' ? -1 : 1;
+    const points: string[] = [];
+    const first = slices[0];
+    points.push(`${jointViewport.centerX + sign * jointRadiusPx(first.topRadius * 2)},${jointY(first.sliceStart)}`);
+    for (const slice of slices) {
+      points.push(`${jointViewport.centerX + sign * jointRadiusPx(slice.bottomRadius * 2)},${jointY(slice.sliceEnd)}`);
+    }
+    return points.join(' ');
+  };
   const buildThreadHelixPath = (side: 'left' | 'right', yValues: number[], width: number) => {
     if (!yValues.length) return '';
     const sign = side === 'right' ? 1 : -1;
@@ -2017,6 +2044,10 @@
     : []);
   let topConeEnvelopePoints = $derived(buildConeEnvelopePoints(coneVisualTop));
   let bottomConeEnvelopePoints = $derived(buildConeEnvelopePoints(coneVisualBottom));
+  let topConeLeftBoundaryPoints = $derived(buildConeBoundaryPoints(coneVisualTop, 'left'));
+  let topConeRightBoundaryPoints = $derived(buildConeBoundaryPoints(coneVisualTop, 'right'));
+  let bottomConeLeftBoundaryPoints = $derived(buildConeBoundaryPoints(coneVisualBottom, 'left'));
+  let bottomConeRightBoundaryPoints = $derived(buildConeBoundaryPoints(coneVisualBottom, 'right'));
   let stackRenderRows = $derived(stackVisualRows.map((row, index) => ({
     ...row,
     ...rowTint(row, index),
@@ -3099,6 +3130,21 @@
   </div>
 
   <div class="flex flex-col gap-4 overflow-y-auto pb-24 pr-2 scrollbar-hide">
+    {#if $safeModeStore && !loadFullWorkspace}
+      <Card class="glass-card">
+        <CardHeader class="pb-2 pt-4">
+          <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-amber-300">Safe Mode Deferred Panels</CardTitle>
+        </CardHeader>
+        <CardContent class="space-y-3">
+          <div class="rounded-xl border border-amber-300/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+            Heavy review visualizations are deferred in Safe mode to keep startup reliable on slower systems.
+          </div>
+          <Button size="sm" variant="secondary" on:click={() => (loadFullWorkspace = true)}>
+            Load Full Review Panels
+          </Button>
+        </CardContent>
+      </Card>
+    {:else}
     {#if workflowStep !== 'review'}
       <Card class="glass-card">
         <CardHeader class="pb-2 pt-4">
@@ -3265,17 +3311,19 @@
                 <polygon
                   points={topConeEnvelopePoints}
                   fill="url(#joint-frustum-fill)"
-                  stroke="rgba(34,211,238,0.52)"
-                  stroke-width="2"
+                  stroke="none"
                 />
+                <polyline points={topConeLeftBoundaryPoints} fill="none" stroke="rgba(34,211,238,0.52)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
+                <polyline points={topConeRightBoundaryPoints} fill="none" stroke="rgba(34,211,238,0.52)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
               {/if}
               {#if bottomConeEnvelopePoints}
                 <polygon
                   points={bottomConeEnvelopePoints}
                   fill="url(#joint-frustum-fill)"
-                  stroke="rgba(34,211,238,0.52)"
-                  stroke-width="2"
+                  stroke="none"
                 />
+                <polyline points={bottomConeLeftBoundaryPoints} fill="none" stroke="rgba(34,211,238,0.52)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
+                <polyline points={bottomConeRightBoundaryPoints} fill="none" stroke="rgba(34,211,238,0.52)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
               {/if}
             {/if}
             {#each stackRenderRows as row}
@@ -3627,6 +3675,7 @@
         {/if}
       </CardContent>
     </Card>
+    {/if}
     {/if}
   </div>
 </div>

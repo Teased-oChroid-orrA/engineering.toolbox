@@ -24,6 +24,15 @@ export default defineConfig(({ command }) => ({
         if (warning.message && warning.message.includes('Error when using sourcemap')) {
           return; // Suppress this warning
         }
+        // Suppress noisy unused-external-import warnings from third-party node_modules bundles.
+        if (
+          (warning.code === 'UNUSED_EXTERNAL_IMPORT' ||
+            (warning.message?.includes('is imported from external module') &&
+              warning.message?.includes('but never used in'))) &&
+          (warning.id?.includes('node_modules') || warning.message?.includes('node_modules'))
+        ) {
+          return;
+        }
         // Use default for everything else
         warn(warning);
       }

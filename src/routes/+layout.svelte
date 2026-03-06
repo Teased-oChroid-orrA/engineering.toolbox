@@ -6,6 +6,7 @@
   import { themeStore } from '$lib/stores/themeStore';
   import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
   import { toolboxProgress } from '$lib/stores/toolboxProgress';
+  import { safeModeStore } from '$lib/stores/safeModeStore';
   import { AppBar } from '@skeletonlabs/skeleton-svelte';
   import { cn } from '$lib/utils';
   import {
@@ -63,6 +64,24 @@
   let lastProgressRoute = $state('');
   let routeProgressToken = $state(0);
   let startupNotice = $state<{ open: boolean; text: string }>({ open: false, text: '' });
+  let startupHealth = $state<{
+    elapsedMs: number;
+    shellMounted: boolean;
+    appReady: boolean;
+    splashFinished: boolean;
+    shellMountedElapsedMs: number | null;
+    appReadyElapsedMs: number | null;
+    splashFinishedElapsedMs: number | null;
+    lastProgress: number;
+    lastMessage: string;
+    watchdogForcedShow: boolean;
+    watchdogForceCount: number;
+    mainWindowVisible: boolean | null;
+    pid: number;
+    executablePath: string | null;
+  } | null>(null);
+  let showStartupHealth = $state(false);
+  let safeModeRedirected = $state(false);
 
   type RouteBootProfile = {
     steps: [string, string, string];
@@ -231,6 +250,33 @@
   };
 
   onMount(() => {
+    let tauriInvoke: ((cmd: string, args?: Record<string, unknown>) => Promise<unknown>) | null = null;
+    let healthTimer: ReturnType<typeof setInterval> | null = null;
+    let healthTickInFlight = false;
+    const sendStartupHealthEvent = async (event: string, progress?: number, message?: string) => {
+      if (!tauriInvoke) return;
+      try {
+        await tauriInvoke('startup_health_event', {
+          event,
+          progress: typeof progress === 'number' ? Math.max(0, Math.min(100, Math.round(progress))) : undefined,
+          message
+        });
+      } catch {
+        // best-effort telemetry
+      }
+    };
+    const fetchStartupHealth = async () => {
+      if (!tauriInvoke || healthTickInFlight) return;
+      healthTickInFlight = true;
+      try {
+        const snap = (await tauriInvoke('startup_health_get')) as typeof startupHealth;
+        startupHealth = snap;
+      } catch {
+        // ignore when not running in tauri context
+      } finally {
+        healthTickInFlight = false;
+      }
+    };
     const unsubscribeProgress = toolboxProgress.subscribe((state) => {
       if (typeof window === 'undefined') return;
       if (!state.visible) return;
@@ -251,6 +297,7 @@
           }
         })
       );
+      void sendStartupHealthEvent('app-progress', state.progress, state.message);
     });
 
     if (typeof window !== 'undefined') {
@@ -267,9 +314,29 @@
           })
         );
       }, 120);
+      const onWatchdogEvent = (ev: Event) => {
+        const detail = (ev as CustomEvent<{ event?: string; visible?: boolean }>).detail;
+        if (!detail) return;
+        startupNotice = {
+          open: true,
+          text: `Startup watchdog: ${detail.event ?? 'signal'}${detail.visible == null ? '' : ` · window visible=${detail.visible}`}`
+        };
+      };
+      window.addEventListener('startup-watchdog', onWatchdogEvent as EventListener);
+      setTimeout(() => window.removeEventListener('startup-watchdog', onWatchdogEvent as EventListener), 30000);
     }
 
     themeStore.init();
+    safeModeStore.init();
+    void import('@tauri-apps/api/core')
+      .then((mod) => {
+        tauriInvoke = mod.invoke;
+        void fetchStartupHealth();
+        healthTimer = setInterval(fetchStartupHealth, 1200);
+      })
+      .catch(() => {
+        tauriInvoke = null;
+      });
     // Use setTimeout to ensure child components have mounted and registered
     setTimeout(() => {
       menuByScope = getRegisteredContextMenus();
@@ -314,23 +381,54 @@
       setTimeout(() => {
         startupNotice = { open: false, text: '' };
       }, 5200);
+      void sendStartupHealthEvent('boot-overlay-finished', 100, detail.diagnostics ?? 'Boot overlay finished');
+    };
+    const onShellMounted = () => {
+      void sendStartupHealthEvent('app-shell-mounted', 72, 'UI shell mounted');
+    };
+    const onAppReady = () => {
+      void sendStartupHealthEvent('app-ready', 100, 'Route ready');
     };
     window.addEventListener('pointerdown', onPointer, true);
     window.addEventListener(CONTEXT_MENU_REGISTER_EVENT, onMenuRegister as EventListener);
     window.addEventListener(CONTEXT_MENU_CLEAR_EVENT, onMenuClear as EventListener);
     window.addEventListener('boot-overlay-finished', onBootOverlayFinished as EventListener);
+    window.addEventListener('app-shell-mounted', onShellMounted as EventListener);
+    window.addEventListener('app-ready', onAppReady as EventListener);
     window.addEventListener('resize', update);
     window.addEventListener('scroll', update, true);
     return () => {
       unsubscribeProgress();
+      if (healthTimer) clearInterval(healthTimer);
       ro.disconnect();
       window.removeEventListener('pointerdown', onPointer, true);
       window.removeEventListener(CONTEXT_MENU_REGISTER_EVENT, onMenuRegister as EventListener);
       window.removeEventListener(CONTEXT_MENU_CLEAR_EVENT, onMenuClear as EventListener);
       window.removeEventListener('boot-overlay-finished', onBootOverlayFinished as EventListener);
+      window.removeEventListener('app-shell-mounted', onShellMounted as EventListener);
+      window.removeEventListener('app-ready', onAppReady as EventListener);
       window.removeEventListener('resize', update);
       window.removeEventListener('scroll', update, true);
     };
+  });
+
+  $effect(() => {
+    if (typeof window === 'undefined') return;
+    const safeMode = $safeModeStore;
+    document.body.setAttribute('data-safe-mode', safeMode ? 'true' : 'false');
+    if (!safeMode || safeModeRedirected) return;
+    const normalizedRoute = normalizeRoute(routePath);
+    if (normalizedRoute !== '/') {
+      safeModeRedirected = true;
+      window.location.hash = '#/';
+      startupNotice = {
+        open: true,
+        text: 'Safe mode launch is active. Redirected to Home; heavy toolboxes load on demand.'
+      };
+      setTimeout(() => {
+        startupNotice = { open: false, text: '' };
+      }, 4500);
+    }
   });
 
   $effect(() => {
@@ -479,6 +577,12 @@
       <AppBar.Trail>
         <div class="flex items-center gap-2" data-main-nav-root="true">
           <ThemeToggle compact={true} />
+          <button
+            class={`btn btn-xs rounded-full px-3 py-1.5 text-xs font-medium ${$safeModeStore ? 'variant-soft border border-amber-300/40 text-amber-100' : 'variant-ghost text-white/70'}`}
+            onclick={() => safeModeStore.toggle()}
+          >
+            Safe mode {$safeModeStore ? 'On' : 'Off'}
+          </button>
           {#if activeToolMenu}
             <div class="relative">
               <button
@@ -583,6 +687,37 @@
       <div class="rounded-xl border border-cyan-300/30 bg-surface-900/92 px-3 py-2 text-[11px] text-cyan-100 shadow-xl">
         <div class="mb-1 text-[10px] uppercase tracking-widest text-cyan-200/80">Startup Telemetry</div>
         <div>{startupNotice.text}</div>
+      </div>
+    </div>
+  {/if}
+  {#if startupHealth}
+    <div class="mx-auto mt-2 max-w-7xl px-4">
+      <div class="rounded-xl border border-indigo-300/20 bg-surface-900/88 px-3 py-2 text-[11px] text-indigo-100">
+        <div class="mb-1 flex items-center justify-between">
+          <div class="text-[10px] uppercase tracking-widest text-indigo-200/80">Startup Health</div>
+          <button class="btn btn-xs variant-soft px-2 py-0.5 text-[10px]" onclick={() => (showStartupHealth = !showStartupHealth)}>
+            {showStartupHealth ? 'Hide' : 'Show'}
+          </button>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 text-[10px]">
+          <span>elapsed {((startupHealth.elapsedMs ?? 0) / 1000).toFixed(1)}s</span>
+          <span>shell {startupHealth.shellMounted ? 'yes' : 'no'}</span>
+          <span>ready {startupHealth.appReady ? 'yes' : 'no'}</span>
+          <span>splash {startupHealth.splashFinished ? 'done' : 'pending'}</span>
+          <span>watchdog {startupHealth.watchdogForcedShow ? `force-show x${startupHealth.watchdogForceCount}` : 'idle'}</span>
+          <span>window {startupHealth.mainWindowVisible == null ? 'unknown' : startupHealth.mainWindowVisible ? 'visible' : 'hidden'}</span>
+        </div>
+        {#if showStartupHealth}
+          <div class="mt-2 grid gap-1 text-[10px] text-white/75">
+            <div>last progress: {startupHealth.lastProgress}%</div>
+            <div>last message: {startupHealth.lastMessage}</div>
+            <div>shell mounted at: {startupHealth.shellMountedElapsedMs == null ? '—' : `${(startupHealth.shellMountedElapsedMs / 1000).toFixed(2)}s`}</div>
+            <div>app ready at: {startupHealth.appReadyElapsedMs == null ? '—' : `${(startupHealth.appReadyElapsedMs / 1000).toFixed(2)}s`}</div>
+            <div>splash finished at: {startupHealth.splashFinishedElapsedMs == null ? '—' : `${(startupHealth.splashFinishedElapsedMs / 1000).toFixed(2)}s`}</div>
+            <div>pid: {startupHealth.pid}</div>
+            <div class="truncate">exe: {startupHealth.executablePath ?? '—'}</div>
+          </div>
+        {/if}
       </div>
     </div>
   {/if}
