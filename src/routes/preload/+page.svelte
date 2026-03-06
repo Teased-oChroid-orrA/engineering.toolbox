@@ -1778,6 +1778,12 @@
     0.0001,
     stackRows.reduce((sum, row) => sum + row.length, 0)
   ));
+  let topWasherStackLength = $derived(
+    form.washerStack.enabled ? washerTopCount * Number(form.washerStack.thicknessPerWasher) : 0
+  );
+  let bottomWasherStackLength = $derived(
+    form.washerStack.enabled ? washerBottomCount * Number(form.washerStack.thicknessPerWasher) : 0
+  );
   let adjacentFastenerCount = $derived(Math.max(
     1,
     Math.round(form.adjacentFastenerScreen.rowCount) * Math.round(form.adjacentFastenerScreen.columnCount)
@@ -1993,6 +1999,10 @@
       };
     });
   })());
+  let memberApexPosition = $derived((() => {
+    const topMember = stackVisualRows.find((row) => row.id === 'plate-a' && row.kind === 'member');
+    return topMember ? topMember.end : stackTotalLength / 2;
+  })());
   let stackTableRows = $derived(stackVisualRows.map((row) => ({
     id: row.id,
     kind: row.kind,
@@ -2002,16 +2012,22 @@
   })));
   let coneVisualTop = $derived(stackVisualRows.length
     ? (() => {
-        const apex = stackTotalLength / 2;
-        const start = 0;
-        const end = Math.min(apex, coneReachLength);
+        const apex = memberApexPosition;
+        const start = Math.max(0, topWasherStackLength);
+        const end = Math.min(apex, start + coneReachLength);
         return stackVisualRows
-          .filter((row) => row.end > start && row.start < end)
+          .filter((row) => row.kind === 'member' && row.end > start && row.start < end)
           .map((row) => {
             const sliceStart = Math.max(row.start, start);
             const sliceEnd = Math.min(row.end, end);
-            const topRadius = Math.min(topBearingFaceOuterDiameter / 2 + compressionConeSlope * sliceStart, row.displayOuterDiameter / 2);
-            const bottomRadius = Math.min(topBearingFaceOuterDiameter / 2 + compressionConeSlope * sliceEnd, row.displayOuterDiameter / 2);
+            const topRadius = Math.min(
+              topBearingFaceOuterDiameter / 2 + compressionConeSlope * (sliceStart - start),
+              row.displayOuterDiameter / 2
+            );
+            const bottomRadius = Math.min(
+              topBearingFaceOuterDiameter / 2 + compressionConeSlope * (sliceEnd - start),
+              row.displayOuterDiameter / 2
+            );
             return {
               sliceStart,
               sliceEnd,
@@ -2023,16 +2039,22 @@
     : []);
   let coneVisualBottom = $derived(stackVisualRows.length
     ? (() => {
-        const apex = stackTotalLength / 2;
-        const start = Math.max(apex, stackTotalLength - coneReachLength);
-        const end = stackTotalLength;
+        const apex = memberApexPosition;
+        const end = Math.min(stackTotalLength, Math.max(apex, stackTotalLength - bottomWasherStackLength));
+        const start = Math.max(apex, end - coneReachLength);
         return stackVisualRows
-          .filter((row) => row.end > start && row.start < end)
+          .filter((row) => row.kind === 'member' && row.end > start && row.start < end)
           .map((row) => {
             const sliceStart = Math.max(row.start, start);
             const sliceEnd = Math.min(row.end, end);
-            const topRadius = Math.min(bottomBearingFaceOuterDiameter / 2 + compressionConeSlope * (end - sliceStart), row.displayOuterDiameter / 2);
-            const bottomRadius = Math.min(bottomBearingFaceOuterDiameter / 2 + compressionConeSlope * (end - sliceEnd), row.displayOuterDiameter / 2);
+            const topRadius = Math.min(
+              bottomBearingFaceOuterDiameter / 2 + compressionConeSlope * (end - sliceStart),
+              row.displayOuterDiameter / 2
+            );
+            const bottomRadius = Math.min(
+              bottomBearingFaceOuterDiameter / 2 + compressionConeSlope * (end - sliceEnd),
+              row.displayOuterDiameter / 2
+            );
             return {
               sliceStart,
               sliceEnd,
@@ -3193,7 +3215,7 @@
           </div>
           <div class="rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white/65">
             {#if visualizationMode === 'classical_cone'}
-              Classical view: pressure cones originate at the active bearing faces under the head and nut (or washers).
+              Classical view: pressure cones originate where compression enters the clamped members (washer-member interfaces when washers are present).
             {:else}
               Equivalent annulus view: rows scale to the explicit equivalent annulus used by the stiffness model.
             {/if}
