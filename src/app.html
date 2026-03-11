@@ -220,6 +220,7 @@
 
         let progress = 4;
         let done = false;
+        let bootFailed = false;
         let shellMounted = false;
         let trickle = null;
         let lastStepCount = 0;
@@ -288,6 +289,41 @@
           pct.textContent = `${progress}%`;
           if (message) msg.textContent = message;
         };
+
+        const toErrorText = (value) => {
+          if (!value) return 'Unknown startup error';
+          if (typeof value === 'string') return value;
+          if (value instanceof Error) return value.stack || `${value.name}: ${value.message}`;
+          try {
+            return JSON.stringify(value);
+          } catch {
+            return String(value);
+          }
+        };
+
+        const failBoot = (headline, errorValue) => {
+          bootFailed = true;
+          if (trickle) clearInterval(trickle);
+          apply(99, headline);
+          stepEl.textContent = 'Step 3/3 · Frontend bootstrap failed';
+          diagEl.textContent = toErrorText(errorValue);
+        };
+
+        window.addEventListener('error', (event) => {
+          if (done || bootFailed) return;
+          const target = event?.target;
+          if (target && target !== window) {
+            const tag = target.tagName ? String(target.tagName).toLowerCase() : 'resource';
+            failBoot(`Failed to load ${tag} asset.`, event?.message || event);
+            return;
+          }
+          failBoot('Frontend runtime error during startup.', event?.error || event?.message || event);
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+          if (done || bootFailed) return;
+          failBoot('Unhandled startup promise rejection.', event?.reason || event);
+        });
 
         window.addEventListener('app-shell-mounted', () => {
           shellMounted = true;
@@ -399,7 +435,7 @@
         }, 16000);
 
         setTimeout(() => {
-          if (done) return;
+          if (done || bootFailed) return;
           const marker = document.querySelector('[data-route-ready]:not(#static-route-ready-marker)');
           if (marker) {
             finish('Workspace ready.');
@@ -407,7 +443,7 @@
         }, 9000);
 
         setTimeout(() => {
-          if (done) return;
+          if (done || bootFailed) return;
           const marker = document.querySelector('[data-route-ready]:not(#static-route-ready-marker)');
           if (shellMounted || marker) {
             finish('Workspace ready.');
