@@ -12,6 +12,8 @@ export default defineConfig(({ command }) => ({
   // kit.output.bundleStrategy = 'inline' (portable file:// build).
   // See SvelteKit configuration docs.
   build: {
+    // Keep transpilation compatible with older WebView2 runtimes used on some Windows machines.
+    target: 'es2020',
     assetsInlineLimit: Infinity,
     rollupOptions: {
       onwarn(warning, warn) {

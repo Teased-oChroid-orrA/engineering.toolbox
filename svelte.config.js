@@ -6,7 +6,8 @@ const config = {
   kit: {
     // Goal: a build that works when opening build/index.html directly (file://)
     // - Hash router avoids server-side routing requirements.
-    // - Split bundle strategy improves first paint by loading only active route code.
+    // - Single bundle strategy avoids startup dynamic-import failures on
+    //   slower/older WebView runtimes (notably some Windows systems).
     // - Relative paths ensure Windows file:// compatibility.
     // See SvelteKit config docs: kit.router.type = 'hash' and kit.output.bundleStrategy = 'inline'.
     adapter: adapter({ fallback: 'index.html' }),
@@ -17,7 +18,7 @@ const config = {
       type: 'hash'
     },
     output: {
-      bundleStrategy: 'split'
+      bundleStrategy: 'single'
     }
   }
 };
