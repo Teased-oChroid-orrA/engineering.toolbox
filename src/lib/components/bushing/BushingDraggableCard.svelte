@@ -49,12 +49,13 @@
 <div class="rounded-md" data-dnd-card={cardId} data-dnd-lane={column} role="listitem" data-drag-enabled={dragEnabled ? '1' : '0'}>
   <div class="mb-1 flex items-center justify-between rounded-md border border-white/10 bg-black/20 px-2 py-1 text-[10px] text-white/70">
     <div class="flex items-center gap-2">
-      <span class="rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-white/70 select-none">Drag</span>
       <span>{title}</span>
     </div>
     <div class="flex items-center gap-1">
-      <button type="button" class="rounded border border-white/15 px-1 py-0.5 text-[10px] text-white/80 disabled:opacity-35" onclick={() => onMoveUp?.()} disabled={!canMoveUp} aria-label={`Move ${title} up`}>Up</button>
-      <button type="button" class="rounded border border-white/15 px-1 py-0.5 text-[10px] text-white/80 disabled:opacity-35" onclick={() => onMoveDown?.()} disabled={!canMoveDown} aria-label={`Move ${title} down`}>Down</button>
+      {#if dragEnabled}
+        <button type="button" class="rounded border border-white/15 px-1 py-0.5 text-[10px] text-white/80 disabled:opacity-35" onclick={() => onMoveUp?.()} disabled={!canMoveUp} aria-label={`Move ${title} up`}>Up</button>
+        <button type="button" class="rounded border border-white/15 px-1 py-0.5 text-[10px] text-white/80 disabled:opacity-35" onclick={() => onMoveDown?.()} disabled={!canMoveDown} aria-label={`Move ${title} down`}>Down</button>
+      {/if}
       <button class="rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-white/80" onclick={toggleCollapsed}>
         {collapsed ? 'Expand' : 'Collapse'}
       </button>

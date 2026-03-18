@@ -27,6 +27,7 @@
   let showViews = $state(true);
   let selectedDimension = $state<DimensionKey>('od');
   let previousGeometrySig = $state('');
+  let isLegacyView = $derived(renderMode === 'legacy');
 
   let featureState = $derived.by(() => {
     const bore = Math.max(0.01, Number(viewModel?.boreDia ?? sectionScene.width * 0.25));
@@ -192,7 +193,7 @@
       {
         severity: 'info',
         code: 'D3_RENDER_SUMMARY',
-        message: `D3 loops: ${scene.loops.length} • upright 2D section + ${showViews ? 'top view inset' : 'section only'}`
+        message: `D3 loops: ${scene.loops.length} • ${isLegacyView ? 'legacy outline drafting' : `upright 2D section + ${showViews ? 'top view inset' : 'section only'}`}`
       },
       {
         severity: 'info',
@@ -209,6 +210,10 @@
       const reason = error instanceof Error ? error.message : 'Unknown D3 render error.';
       onInitFailure(reason);
     }
+  });
+
+  $effect(() => {
+    showViews = !isLegacyView;
   });
 </script>
 
@@ -235,7 +240,7 @@
 
     <rect width={SECTION_SIZE} height={SECTION_SIZE} rx="18" fill="rgba(2, 16, 28, 0.96)" />
 
-    {#if sectionBuild && sectionView}
+    {#if sectionBuild && sectionView && !isLegacyView}
       <g transform={`translate(${sectionView.tx} ${sectionView.ty}) scale(${sectionView.scale} ${sectionView.scale})`} opacity="0.96">
         <line
           x1="0"
@@ -279,12 +284,50 @@
       </g>
     {/if}
 
-    <text x="22" y="26" fill="#cbd5e1" font-size="12" font-family="ui-monospace, SFMono-Regular">2D Section</text>
-    <text x="30" y="242" fill="#cbd5e1" font-size="10" font-family="ui-monospace, SFMono-Regular">Housing section</text>
-    <text x="30" y="258" fill="#5eead4" font-size="10" font-family="ui-monospace, SFMono-Regular">Bushing wall + through-bore</text>
-    <text x="30" y={SECTION_SIZE - 42} fill="rgba(203,213,225,0.72)" font-size="10" font-family="ui-monospace, SFMono-Regular">Section shows profile. Top inset carries face diameters.</text>
+    {#if sectionBuild && sectionView && isLegacyView}
+      <g transform={`translate(${sectionView.tx} ${sectionView.ty}) scale(${sectionView.scale} ${sectionView.scale})`} opacity="0.98">
+        <line
+          x1="0"
+          y1={sectionBuild.dims.zTop - featureState.length * 0.18}
+          x2="0"
+          y2={sectionBuild.dims.zBottom + featureState.length * 0.18}
+          stroke="rgba(125,211,252,0.36)"
+          stroke-width={0.95 / sectionView.scale}
+          stroke-dasharray={`${8 / sectionView.scale} ${8 / sectionView.scale}`} />
+        <path
+          d={sectionBuild.paths.leftHousingPath}
+          fill="rgba(148,163,184,0.08)"
+          stroke="rgba(203,213,225,0.88)"
+          stroke-width={1.05 / sectionView.scale} />
+        <path
+          d={sectionBuild.paths.rightHousingPath}
+          fill="rgba(148,163,184,0.08)"
+          stroke="rgba(203,213,225,0.88)"
+          stroke-width={1.05 / sectionView.scale} />
+        <path
+          d={sectionBuild.paths.leftBushingPath}
+          fill="rgba(45,212,191,0.08)"
+          stroke="rgba(94,234,212,0.92)"
+          stroke-width={1.15 / sectionView.scale} />
+        <path
+          d={sectionBuild.paths.rightBushingPath}
+          fill="rgba(45,212,191,0.08)"
+          stroke="rgba(94,234,212,0.92)"
+          stroke-width={1.15 / sectionView.scale} />
+        <path
+          d={sectionBuild.paths.boreVoidPath}
+          fill="rgba(2, 16, 28, 0.98)"
+          stroke="rgba(148,163,184,0.24)"
+          stroke-width={0.8 / sectionView.scale} />
+      </g>
+    {/if}
 
-    {#if showViews && topPlanView}
+    <text x="22" y="26" fill="#cbd5e1" font-size="12" font-family="ui-monospace, SFMono-Regular">2D Section</text>
+    <text x="30" y="242" fill="#cbd5e1" font-size="10" font-family="ui-monospace, SFMono-Regular">{isLegacyView ? 'Legacy outline housing' : 'Housing section'}</text>
+    <text x="30" y="258" fill="#5eead4" font-size="10" font-family="ui-monospace, SFMono-Regular">{isLegacyView ? 'Legacy outline bushing + through-bore' : 'Bushing wall + through-bore'}</text>
+    <text x="30" y={SECTION_SIZE - 42} fill="rgba(203,213,225,0.72)" font-size="10" font-family="ui-monospace, SFMono-Regular">{isLegacyView ? 'Legacy view reduces to clean outlines only.' : 'Section shows profile. Top inset carries face diameters.'}</text>
+
+    {#if showViews && topPlanView && !isLegacyView}
       <g>
         <rect x={topPlanView.panel.x} y={topPlanView.panel.y} width={topPlanView.panel.w} height={topPlanView.panel.h} rx="12" fill="rgba(8, 22, 36, 0.52)" stroke="rgba(148,163,184,0.16)" />
         <text x={topPlanView.panel.x + 12} y={topPlanView.panel.y + 16} fill="#cbd5e1" font-size="10" font-family="ui-monospace, SFMono-Regular">Top View</text>
@@ -336,7 +379,7 @@
       D3 renderer active
     </div>
     <div class="rounded-md border border-cyan-300/20 bg-slate-950/88 px-2 py-1 text-[10px] font-mono text-cyan-100/80 shadow-sm">
-      2D section • top view inset
+      {isLegacyView ? 'Legacy outline view' : '2D section • top view inset'}
     </div>
   </div>
   <div class="absolute right-3 top-3 flex gap-1">
@@ -358,13 +401,16 @@
       onclick={() => (zoom = 1)}>
       Reset
     </button>
-    <button
-      aria-label="Toggle Top View"
-      class="rounded-md border border-cyan-300/35 bg-cyan-500/15 px-2 py-1 text-[10px] font-mono text-cyan-100 hover:bg-cyan-500/25"
-      onclick={() => (showViews = !showViews)}>
-      {showViews ? 'Top: On' : 'Top: Off'}
-    </button>
+    {#if !isLegacyView}
+      <button
+        aria-label="Toggle Top View"
+        class="rounded-md border border-cyan-300/35 bg-cyan-500/15 px-2 py-1 text-[10px] font-mono text-cyan-100 hover:bg-cyan-500/25"
+        onclick={() => (showViews = !showViews)}>
+        {showViews ? 'Top: On' : 'Top: Off'}
+      </button>
+    {/if}
   </div>
+  {#if !isLegacyView}
   <div class="absolute right-3 top-14 flex w-[104px] flex-col gap-1 rounded-md border border-cyan-300/20 bg-cyan-500/8 p-2">
     <div class="text-[9px] font-mono uppercase tracking-[0.18em] text-cyan-100/70">Focus</div>
     <button class="rounded-md border px-2 py-1 text-left text-[10px] font-mono" style={`border-color:${highlightColor('od')};color:${highlightColor('od')};background:${selectedDimension === 'od' ? 'rgba(148,163,184,0.16)' : 'rgba(148,163,184,0.08)'}`} onclick={() => setDimensionFocus('od')}>OD</button>
@@ -380,4 +426,5 @@
       <button class="rounded-md border px-2 py-1 text-left text-[10px] font-mono" style={`border-color:${highlightColor('intCs')};color:${highlightColor('intCs')};background:${selectedDimension === 'intCs' ? 'rgba(94,234,212,0.16)' : 'rgba(94,234,212,0.08)'}`} onclick={() => setDimensionFocus('intCs')}>Int CS</button>
     {/if}
   </div>
+  {/if}
 </div>

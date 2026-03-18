@@ -2,9 +2,8 @@
   import { onMount } from 'svelte';
   import { Card, CardContent } from '$lib/components/ui';
   import type { BushingOutput } from '$lib/core/bushing';
-  import { canMoveInList, moveCardInList, normalizeOrder, reorderList } from './BushingCardLayoutController';
+  import { normalizeOrder, reorderList } from './BushingCardLayoutController';
   import { loadNestedDiagnosticsLayout, persistNestedDiagnosticsLayout } from './BushingLayoutPersistence';
-  import NativeDragLane from './NativeDragLane.svelte';
 
   // Svelte 5: Convert props to $props()
   let {
@@ -59,18 +58,6 @@
       diagOrder = normalizeOrder(reorderList(diagOrder, sourceId, targetId), activeDiagIds);
     };
   });
-
-  function commitDiagLane(items: Array<{ id: string }>): void {
-    diagOrder = normalizeOrder(items.map((item) => item.id), activeDiagIds);
-  }
-
-  function canMove(id: string, direction: -1 | 1): boolean {
-    return canMoveInList(diagOrder, id, direction);
-  }
-
-  function move(id: string, direction: -1 | 1): void {
-    diagOrder = normalizeOrder(moveCardInList(diagOrder, id, direction), activeDiagIds);
-  }
 
   function focusSection(id: string) {
     if (!id || id.trim() === '') return; // Guard against empty strings
@@ -139,18 +126,10 @@
         ?
       </button>
     </summary>
-    <NativeDragLane
-      listClass="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2"
-      enabled={dndEnabled}
-      items={diagLaneItems}
-      on:finalize={(ev) => commitDiagLane(ev.detail.items)}>
-      {#snippet children(item)}
-        {#if item.id === 'edge'}
+    <div class="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+      {#each diagOrder as item}
+        {#if item === 'edge'}
         <div class="rounded-md" data-diag-card="edge">
-          <div class="mb-1 flex justify-end gap-1 text-[10px]">
-            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" onclick={() => move('edge', -1)} disabled={!canMove('edge', -1)}>Up</button>
-            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" onclick={() => move('edge', 1)} disabled={!canMove('edge', 1)}>Down</button>
-          </div>
           <div
             class="cursor-pointer"
             role="button"
@@ -175,12 +154,8 @@
             </Card>
           </div>
         </div>
-      {:else if item.id === 'wall'}
+      {:else if item === 'wall'}
         <div class="rounded-md" data-diag-card="wall">
-          <div class="mb-1 flex justify-end gap-1 text-[10px]">
-            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" onclick={() => move('wall', -1)} disabled={!canMove('wall', -1)}>Up</button>
-            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" onclick={() => move('wall', 1)} disabled={!canMove('wall', 1)}>Down</button>
-          </div>
           <div
             class="cursor-pointer"
             role="button"
@@ -204,12 +179,8 @@
             </Card>
           </div>
         </div>
-      {:else if item.id === 'warnings' && results.warnings?.length}
+      {:else if item === 'warnings' && results.warnings?.length}
         <div class="rounded-md md:col-span-2" data-diag-card="warnings">
-          <div class="mb-1 flex justify-end gap-1 text-[10px]">
-            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" onclick={() => move('warnings', -1)} disabled={!canMove('warnings', -1)}>Up</button>
-            <button type="button" class="rounded border border-white/20 px-1 text-white/80 disabled:opacity-35" onclick={() => move('warnings', 1)} disabled={!canMove('warnings', 1)}>Down</button>
-          </div>
           <Card id="bushing-warnings-card" class="border border-amber-300/55 bg-amber-500/15 bushing-pop-card bushing-depth-1">
             <CardContent class="pt-4 text-sm space-y-2">
               <div class="flex flex-wrap items-center justify-between gap-2">
@@ -234,8 +205,8 @@
           </Card>
         </div>
       {/if}
-      {/snippet}
-    </NativeDragLane>
+      {/each}
+    </div>
   </details>
 </div>
 

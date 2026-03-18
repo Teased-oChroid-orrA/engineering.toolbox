@@ -141,12 +141,36 @@ export function csDiaToleranceFromBase(
   solvedDia: number,
   solvedDepth: number,
   solvedAngleDeg: number,
-  base: ToleranceRange
+  base: ToleranceRange,
+  depthTolerance?: ToleranceRange
 ): ToleranceRange {
   if (mode !== 'depth_angle') return makeRange('nominal_tol', solvedDia, solvedDia, solvedDia);
   const angleRad = (solvedAngleDeg / 2) * (Math.PI / 180);
-  const offset = 2 * Math.max(0, solvedDepth) * Math.tan(angleRad);
-  return makeRange(base.mode, base.lower + offset, base.upper + offset, base.nominal + offset);
+  const depth = depthTolerance ?? makeRange('nominal_tol', solvedDepth, solvedDepth, solvedDepth);
+  const lower = base.lower + 2 * Math.max(0, depth.lower) * Math.tan(angleRad);
+  const upper = base.upper + 2 * Math.max(0, depth.upper) * Math.tan(angleRad);
+  return makeRange(base.mode, lower, upper, solvedDia);
+}
+
+export function csDepthToleranceFromBase(
+  mode: CSMode,
+  solvedDepth: number,
+  solvedDia: number,
+  solvedAngleDeg: number,
+  base: ToleranceRange,
+  explicitDepthTolerance?: ToleranceRange
+): ToleranceRange {
+  if (mode === 'depth_angle' || mode === 'dia_depth') {
+    return explicitDepthTolerance ?? makeRange('nominal_tol', solvedDepth, solvedDepth, solvedDepth);
+  }
+  const angleRad = (solvedAngleDeg / 2) * (Math.PI / 180);
+  const tanHalfAngle = Math.tan(angleRad);
+  if (!Number.isFinite(tanHalfAngle) || Math.abs(tanHalfAngle) < 1e-12) {
+    return makeRange('nominal_tol', solvedDepth, solvedDepth, solvedDepth);
+  }
+  const lower = Math.max((solvedDia - base.upper) / (2 * tanHalfAngle), 0);
+  const upper = Math.max((solvedDia - base.lower) / (2 * tanHalfAngle), 0);
+  return makeRange(base.mode, lower, upper, solvedDepth);
 }
 
 export function solveCountersink(mode: CSMode, dia: number, depth: number, angle: number, baseDia: number) {

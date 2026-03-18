@@ -1,10 +1,26 @@
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { createLogger, defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
+
+const viteLogger = createLogger();
+const originalWarn = viteLogger.warn;
+const suppressedWarningPatterns = [
+  /isEqual" is imported from external module "@zag-js\/utils" but never used/i,
+  /"clickOutside", "delegateClick" and "hotkeys" are imported from external module "@svar-ui\/lib-dom" but never used/i
+];
+
+viteLogger.warn = (msg, options) => {
+  const text = typeof msg === 'string' ? msg : String(msg);
+  if (suppressedWarningPatterns.some((pattern) => pattern.test(text))) {
+    return;
+  }
+  originalWarn(msg, options);
+};
 
 export default defineConfig(({ command }) => ({
   // file:// portability: ensure built asset URLs are relative
   base: './',
+  customLogger: viteLogger,
   plugins: [tailwindcss(), sveltekit()],
   // Bug 1 fix: Force re-bundle dependencies on dev startup to prevent 504 Outdated Optimize Dep
   optimizeDeps: command === 'serve' ? { force: true } : undefined,
@@ -15,6 +31,9 @@ export default defineConfig(({ command }) => ({
     // Keep transpilation compatible with older WebView2 runtimes used on some Windows machines.
     target: 'es2020',
     assetsInlineLimit: Infinity,
+    // Inline bundle strategy is intentional for Windows/Tauri startup reliability.
+    // Keep the warning threshold above the current monolithic client bundle size.
+    chunkSizeWarningLimit: 2000,
     rollupOptions: {
       onwarn(warning, warn) {
         // Suppress Rollup warnings about @__PURE__ annotations in .svelte.ts files

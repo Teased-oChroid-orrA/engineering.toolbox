@@ -3,6 +3,7 @@
   import { cn } from '$lib/utils';
   import { MATERIALS } from '$lib/core/bushing/materials';
   import type { BushingInputs } from '$lib/core/bushing';
+  import { formatToleranceRange } from '$lib/core/bushing/tolerancePresentation';
   import type { BushingPipelineState } from './BushingComputeController';
   import BushingHelperGuidance from './BushingHelperGuidance.svelte';
   import BushingProfileCard from './BushingProfileCard.svelte';
@@ -207,9 +208,9 @@
         <div class="rounded-lg border border-cyan-300/15 bg-cyan-500/8 p-3 text-[11px] text-cyan-100/85">
           <div class="font-semibold uppercase tracking-wide text-[10px] text-cyan-100">Fit Intent Summary</div>
           <div class="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
-            <div>Target band: {results.tolerance.interferenceTarget.lower.toFixed(4)} .. {results.tolerance.interferenceTarget.upper.toFixed(4)}</div>
-            <div>Solved OD: {results.tolerance.odBushing.lower.toFixed(4)} .. {results.tolerance.odBushing.upper.toFixed(4)}</div>
-            <div>Achieved interference: {results.tolerance.achievedInterference.lower.toFixed(4)} .. {results.tolerance.achievedInterference.upper.toFixed(4)}</div>
+            <div>Target band: {formatToleranceRange(results.tolerance.interferenceTarget)}</div>
+            <div>Solved OD: {formatToleranceRange(results.tolerance.odBushing)}</div>
+            <div>Achieved interference: {formatToleranceRange(results.tolerance.achievedInterference)}</div>
             <div class={results.tolerance.status === 'infeasible' ? 'text-amber-200' : 'text-emerald-200'}>
               Status: {results.tolerance.status}
             </div>
@@ -257,7 +258,7 @@
             {/if}
           </div>
           <div class="text-[10px] font-mono text-cyan-200/70">
-            Solved OD range: {results.tolerance.odBushing.lower.toFixed(4)} .. {results.tolerance.odBushing.upper.toFixed(4)} (nom {results.tolerance.odBushing.nominal.toFixed(4)})
+            Solved OD: {formatToleranceRange(results.tolerance.odBushing)}
           </div>
           {#if normalizationFeedback.length}
             <div class="rounded-md border border-white/10 bg-black/25 p-2 text-[10px] text-white/75">

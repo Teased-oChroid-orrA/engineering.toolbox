@@ -129,7 +129,9 @@ export type BushingOutput = {
     odBushing: ToleranceRange;
     achievedInterference: ToleranceRange;
     csInternalDia?: ToleranceRange;
+    csInternalDepth?: ToleranceRange;
     csExternalDia?: ToleranceRange;
+    csExternalDepth?: ToleranceRange;
   };
   candidates: BushingCandidate[];
   warningCodes: BushingWarning[];

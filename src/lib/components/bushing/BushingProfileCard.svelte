@@ -26,10 +26,12 @@
   let internalCsDiaDisabled = $derived(internalCsBlocked || form.csMode === 'depth_angle');
   let internalCsDepthDisabled = $derived(internalCsBlocked || form.csMode === 'dia_angle');
   let internalCsAngleDisabled = $derived(internalCsBlocked || form.csMode === 'dia_depth');
+  let internalDepthToleranceVisible = $derived(!internalCsBlocked && !internalCsDepthDisabled);
   let externalCsBlocked = $derived(form.bushingType !== 'countersink');
   let externalCsDiaDisabled = $derived(externalCsBlocked || form.extCsMode === 'depth_angle');
   let externalCsDepthDisabled = $derived(externalCsBlocked || form.extCsMode === 'dia_angle');
   let externalCsAngleDisabled = $derived(externalCsBlocked || form.extCsMode === 'dia_depth');
+  let externalDepthToleranceVisible = $derived(!externalCsBlocked && !externalCsDepthDisabled);
   let internalComputedLabel = $derived(computedFieldLabel(form.csMode, false));
   let externalComputedLabel = $derived(computedFieldLabel(form.extCsMode, true));
 
@@ -77,7 +79,7 @@
     const current = Number(form[key]);
     if (!isDifferent(current, value)) return;
     (form as unknown as Record<string, number>)[String(key)] = value;
-    form = form;
+    form = { ...form };
   }
 
   function setCountersinkMode(key: 'csMode' | 'extCsMode', next: string | number | undefined) {
@@ -85,7 +87,7 @@
     if (mode !== 'depth_angle' && mode !== 'dia_angle' && mode !== 'dia_depth') return;
     if (form[key] === mode) return;
     (form as unknown as Record<string, string>)[key] = mode;
-    form = form;
+    form = { ...form };
   }
 
   function computedFieldLabel(mode: BushingInputs['csMode'], external: boolean): string {
@@ -123,12 +125,24 @@
             <Select bind:value={externalCsMode} items={CS_MODES} />
             <div class="mt-1 text-[10px] text-white/45">Computed: {externalComputedLabel} • Editable: the other two fields</div>
           </div>
-          <div class="grid grid-cols-3 gap-2 text-xs">
-            <BushingCsInput label="External CS Dia" labelClass="text-white/50" step={0.001} bind:value={form.extCsDia} disabled={externalCsDiaDisabled} blocked={externalCsBlocked} />
-            <BushingCsInput label="External CS Depth" labelClass="text-white/50" step={0.001} bind:value={form.extCsDepth} disabled={externalCsDepthDisabled} blocked={externalCsBlocked} />
-            <BushingCsInput label="External CS Angle" labelClass="text-white/50" step={1} bind:value={form.extCsAngle} disabled={externalCsAngleDisabled} blocked={externalCsBlocked} />
+            <div class="grid grid-cols-3 gap-2 text-xs">
+              <BushingCsInput label="External CS Dia" labelClass="text-white/50" step={0.001} bind:value={form.extCsDia} disabled={externalCsDiaDisabled} blocked={externalCsBlocked} />
+              <BushingCsInput label="External CS Depth" labelClass="text-white/50" step={0.001} bind:value={form.extCsDepth} disabled={externalCsDepthDisabled} blocked={externalCsBlocked} />
+              <BushingCsInput label="External CS Angle" labelClass="text-white/50" step={1} bind:value={form.extCsAngle} disabled={externalCsAngleDisabled} blocked={externalCsBlocked} />
+            </div>
+            {#if externalDepthToleranceVisible}
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="space-y-1">
+                  <Label class="text-white/45">External CS Depth +Tol</Label>
+                  <Input type="number" min="0" step="0.0001" bind:value={form.extCsDepthTolPlus} />
+                </div>
+                <div class="space-y-1">
+                  <Label class="text-white/45">External CS Depth -Tol</Label>
+                  <Input type="number" min="0" step="0.0001" bind:value={form.extCsDepthTolMinus} />
+                </div>
+              </div>
+            {/if}
           </div>
-        </div>
       {/if}
     </div>
 
@@ -154,6 +168,18 @@
               <BushingCsInput label="CS Depth" labelClass="text-white/50" step={0.001} bind:value={form.csDepth} disabled={internalCsDepthDisabled} blocked={internalCsBlocked} />
               <BushingCsInput label="Internal CS Angle" labelClass="text-white/50" step={1} bind:value={form.csAngle} disabled={internalCsAngleDisabled} blocked={internalCsBlocked} />
             </div>
+            {#if internalDepthToleranceVisible}
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="space-y-1">
+                  <Label class="text-white/45">CS Depth +Tol</Label>
+                  <Input type="number" min="0" step="0.0001" bind:value={form.csDepthTolPlus} />
+                </div>
+                <div class="space-y-1">
+                  <Label class="text-white/45">CS Depth -Tol</Label>
+                  <Input type="number" min="0" step="0.0001" bind:value={form.csDepthTolMinus} />
+                </div>
+              </div>
+            {/if}
           </div>
         {/if}
       </div>

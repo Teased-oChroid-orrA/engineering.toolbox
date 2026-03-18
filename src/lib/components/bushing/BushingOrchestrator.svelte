@@ -4,9 +4,7 @@
   import { BUSHING_SCENE_MODULE_SENTINEL } from '$lib/drafting/bushing/bushingSceneModel';
   import { evaluateBushingPipeline, getBushingPipelineCacheStats } from './BushingComputeController';
   import BushingLeftLaneCards from './BushingLeftLaneCards.svelte';
-  import BushingFreePositionSlots from './BushingFreePositionSlots.svelte';
   import BushingDraggableCard from './BushingDraggableCard.svelte';
-  import NativeDragLane from './NativeDragLane.svelte';
   import BushingDraftingPanel from './BushingDraftingPanel.svelte';
   import BushingResultSummary from './BushingResultSummary.svelte';
   import BushingDiagnosticsPanel from './BushingDiagnosticsPanel.svelte';
@@ -14,103 +12,33 @@
   import { exportBushingPdf, exportBushingSvg } from './BushingExportController';
   import { buildBushingTraceRecord, emitBushingTrace } from './BushingTraceLogger';
   import { runBushingVisualDiagnostics } from './BushingVisualDiagnostics';
-  import { canMoveInList, LEFT_DEFAULT_ORDER, RIGHT_DEFAULT_ORDER, moveCardInList, normalizeOrder, reorderList, type LeftCardId, type RightCardId } from './BushingCardLayoutController';
-  import { loadTopLevelLayout, persistTopLevelLayout, readBushingDndEnabled, loadBushingUiState, persistBushingUiState, loadBushingRuntimeState, persistBushingRuntimeState, persistBushingDndEnabled, type BushingUxMode } from './BushingLayoutPersistence';
+  import { LEFT_DEFAULT_ORDER, RIGHT_DEFAULT_ORDER, normalizeOrder, type LeftCardId, type RightCardId } from './BushingCardLayoutController';
+  import { loadTopLevelLayout, persistTopLevelLayout, loadBushingUiState, persistBushingUiState, loadBushingRuntimeState, persistBushingRuntimeState, type BushingUxMode } from './BushingLayoutPersistence';
   import { safeGetItem, safeSetItem, safeParseJSON } from './BushingStorageHelper';
-  import { DragDropHistory } from './dragHistory';
   import { MATERIALS } from '$lib/core/bushing/materials';
   import { bushingLogger, bushingExportLogger } from '$lib/utils/loggers';
 
   const KEY = 'scd.bushing.inputs.v15';
-  const FREE_POSITIONING_KEY = 'scd.bushing.freePositioning.enabled';
   const LEGACY_RENDERER_KEY = 'scd.bushing.legacyRenderer';
   const TRACE_MODE_KEY = 'scd.bushing.traceEnabled';
   
   // Svelte 5: Convert local state to $state runes
   let leftCardOrder = $state<LeftCardId[]>([...LEFT_DEFAULT_ORDER]);
   let rightCardOrder = $state<RightCardId[]>([...RIGHT_DEFAULT_ORDER]);
-  let dndEnabled = $state(true);
-  let useFreePositioning = $state(false);
   let uxMode = $state<BushingUxMode>('guided');
-  
-  type LayoutState = { left: LeftCardId[]; right: RightCardId[] };
-  const layoutHistory = new DragDropHistory<LayoutState>(50);
-  let canUndo = $state(false);
-  let canRedo = $state(false);
-  
-  // Svelte 5: Convert reactive statement to $effect
-  $effect(() => {
-    if (typeof window !== 'undefined' && layoutHistory.size() === 0) {
-      layoutHistory.push({ left: [...leftCardOrder], right: [...rightCardOrder] });
-      canUndo = layoutHistory.canUndo();
-      canRedo = layoutHistory.canRedo();
-    }
-  });
-  
-  function pushHistory() { layoutHistory.push({ left: [...leftCardOrder], right: [...rightCardOrder] }); canUndo = layoutHistory.canUndo(); canRedo = layoutHistory.canRedo(); }
-  function handleUndo() { const prev = layoutHistory.undo(); if (prev) { leftCardOrder = [...prev.left]; rightCardOrder = [...prev.right]; canUndo = layoutHistory.canUndo(); canRedo = layoutHistory.canRedo(); } }
-  function handleRedo() { const next = layoutHistory.redo(); if (next) { leftCardOrder = [...next.left]; rightCardOrder = [...next.right]; canUndo = layoutHistory.canUndo(); canRedo = layoutHistory.canRedo(); } }
-  
-  // Svelte 5: Convert reactive statements to $derived
-  let leftLaneItems = $derived(leftCardOrder.map((id) => ({ id })));
-  let rightLaneItems = $derived(rightCardOrder.map((id) => ({ id })));
-  
-  const commitLane = (items: Array<{ id: string }>, isLeft: boolean) => {
-    if (isLeft) {
-      const newOrder = normalizeOrder(items.map((i) => i.id), LEFT_DEFAULT_ORDER);
-      if (JSON.stringify(newOrder) !== JSON.stringify(leftCardOrder)) {
-        leftCardOrder = newOrder;
-        persistTopLevelLayout(leftCardOrder, rightCardOrder);
-        pushHistory();
-      }
-    } else {
-      const newOrder = normalizeOrder(items.map((i) => i.id), RIGHT_DEFAULT_ORDER);
-      if (JSON.stringify(newOrder) !== JSON.stringify(rightCardOrder)) {
-        rightCardOrder = newOrder;
-        persistTopLevelLayout(leftCardOrder, rightCardOrder);
-        pushHistory();
-      }
-    }
-  };
-  
-  const commitLeftLane = (items: Array<{ id: string }>) => commitLane(items, true);
-  const commitRightLane = (items: Array<{ id: string }>) => commitLane(items, false);
-  
-  const moveCard = (cardId: any, direction: -1 | 1, isLeft: boolean) => {
-    if (isLeft) {
-      const newOrder = normalizeOrder(moveCardInList(leftCardOrder, cardId, direction), LEFT_DEFAULT_ORDER);
-      if (JSON.stringify(newOrder) !== JSON.stringify(leftCardOrder)) {
-        leftCardOrder = newOrder;
-        persistTopLevelLayout(leftCardOrder, rightCardOrder);
-        pushHistory();
-      }
-    } else {
-      const newOrder = normalizeOrder(moveCardInList(rightCardOrder, cardId, direction), RIGHT_DEFAULT_ORDER);
-      if (JSON.stringify(newOrder) !== JSON.stringify(rightCardOrder)) {
-        rightCardOrder = newOrder;
-        persistTopLevelLayout(leftCardOrder, rightCardOrder);
-        pushHistory();
-      }
-    }
-  };
-  
-  const moveLeftCard = (cardId: LeftCardId, direction: -1 | 1) => moveCard(cardId, direction, true);
-  const moveRightCard = (cardId: RightCardId, direction: -1 | 1) => moveCard(cardId, direction, false);
-
-  // Svelte 5: Convert reactive statements to $derived for move props
-  let leftMoveProps = $derived.by(() => (cardId: LeftCardId) => ({ 
-    dragEnabled: dndEnabled, 
-    canMoveUp: canMoveInList(leftCardOrder, cardId, -1), 
-    canMoveDown: canMoveInList(leftCardOrder, cardId, 1), 
-    onMoveUp: () => moveLeftCard(cardId, -1), 
-    onMoveDown: () => moveLeftCard(cardId, 1) 
+  let leftMoveProps = $derived.by(() => (_cardId: LeftCardId) => ({
+    dragEnabled: false,
+    canMoveUp: false,
+    canMoveDown: false,
+    onMoveUp: () => {},
+    onMoveDown: () => {}
   }));
-  let rightMoveProps = $derived.by(() => (cardId: RightCardId) => ({ 
-    dragEnabled: dndEnabled, 
-    canMoveUp: canMoveInList(rightCardOrder, cardId, -1), 
-    canMoveDown: canMoveInList(rightCardOrder, cardId, 1), 
-    onMoveUp: () => moveRightCard(cardId, -1), 
-    onMoveDown: () => moveRightCard(cardId, 1) 
+  let rightMoveProps = $derived.by(() => (_cardId: RightCardId) => ({
+    dragEnabled: false,
+    canMoveUp: false,
+    canMoveDown: false,
+    onMoveUp: () => {},
+    onMoveDown: () => {}
   }));
   
   // Svelte 5: Convert form to $state
@@ -123,8 +51,8 @@
     boreCapability: { mode: 'unspecified' }, enforceInterferenceTolerance: false, lockBoreForInterference: true,
     housingLen: 0.5, housingWidth: 1.5, edgeDist: 0.75, bushingType: 'straight',
     flangeOd: 0.75, flangeThk: 0.063, idType: 'straight', idBushing: 0.375,
-    csMode: 'depth_angle', csDia: 0.5, csDepth: 0.125, csAngle: 100,
-    extCsMode: 'depth_angle', extCsDia: 0.625, extCsDepth: 0.125, extCsAngle: 100,
+    csMode: 'depth_angle', csDia: 0.5, csDepth: 0.125, csDepthTolPlus: 0, csDepthTolMinus: 0, csAngle: 100,
+    extCsMode: 'depth_angle', extCsDia: 0.625, extCsDepth: 0.125, extCsDepthTolPlus: 0, extCsDepthTolMinus: 0, extCsAngle: 100,
     matHousing: MATERIALS[0].id, matBushing: 'bronze', friction: 0.15, dT: 0,
     minWallStraight: 0.05, minWallNeck: 0.04, endConstraint: 'free'
   });
@@ -145,14 +73,12 @@
       try {
         form = { ...form, ...safeParseJSON(safeGetItem(KEY), {}) };
         ({ leftCardOrder, rightCardOrder } = loadTopLevelLayout());
-        dndEnabled = readBushingDndEnabled();
         const runtimeState = loadBushingRuntimeState();
         useLegacyRenderer = runtimeState.useLegacyRenderer;
         renderMode = useLegacyRenderer ? 'legacy' : 'section';
         traceEnabled = runtimeState.traceEnabled;
         const uiState = loadBushingUiState();
         uxMode = uiState.uxMode;
-        useFreePositioning = uiState.useFreePositioning;
         initialized = true;
       } catch (e) {
         bushingLogger.error('Init error', e);
@@ -195,8 +121,7 @@
 
   $effect(() => {
     if (!initialized || typeof window === 'undefined') return;
-    persistBushingUiState({ uxMode, useFreePositioning });
-    safeSetItem(FREE_POSITIONING_KEY, useFreePositioning ? '1' : '0');
+    persistBushingUiState({ uxMode, useFreePositioning: false });
   });
 
   $effect(() => {
@@ -204,11 +129,6 @@
     persistBushingRuntimeState({ useLegacyRenderer, traceEnabled });
   });
 
-  $effect(() => {
-    if (!initialized || typeof window === 'undefined') return;
-    persistBushingDndEnabled(dndEnabled);
-  });
-  
   // Svelte 5: Convert reactive statements to $derived for computed values
   let pipeline = $derived(evaluateBushingPipeline(form));
   let results = $derived(pipeline.results);
@@ -254,20 +174,6 @@
     bushingLogger.debug('Mounted', { initError, units: form.units, cards: leftCardOrder.length + rightCardOrder.length });
     mountBushingContextMenu({ onExportSvg: () => { void onExportSvg(); }, onExportPdf: () => { void onExportPdf(); }, toggleRendererMode, toggleTraceMode });
     if (typeof window !== 'undefined') {
-      (window as any).__SCD_BUSHING_TEST_REORDER__ = (lane: 'left' | 'right', sourceId: string, targetId: string) => {
-        if (lane === 'left') leftCardOrder = normalizeOrder(reorderList(leftCardOrder, sourceId as LeftCardId, targetId as LeftCardId), LEFT_DEFAULT_ORDER);
-        else rightCardOrder = normalizeOrder(reorderList(rightCardOrder, sourceId as RightCardId, targetId as RightCardId), RIGHT_DEFAULT_ORDER);
-      };
-      (window as any).__ENABLE_FREE_POSITIONING__ = () => {
-        persistBushingUiState({ uxMode: 'advanced', useFreePositioning: true });
-        localStorage.setItem(FREE_POSITIONING_KEY, '1');
-        window.location.reload();
-      };
-      (window as any).__DISABLE_FREE_POSITIONING__ = () => {
-        persistBushingUiState({ uxMode, useFreePositioning: false });
-        localStorage.setItem(FREE_POSITIONING_KEY, '0');
-        window.location.reload();
-      };
     }
   });
 
@@ -289,67 +195,34 @@
   {#await import('./BushingInformationPage.svelte') then mod}
     <mod.default {form} {results} onBack={() => (showInformationView = false)} />
   {/await}
-{:else if useFreePositioning}
-  {#await import('./BushingFreePositionContainer.svelte') then mod}
-  <mod.default
-    {form} {results} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled}
-    {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics}
-    {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode}
-    {handleRenderInitFailure} {dndEnabled} {showInformationView} {isFailed}>
-    <svelte:fragment slot="header"><BushingFreePositionSlots slot="header" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
-    <svelte:fragment slot="guidance"><BushingFreePositionSlots slot="guidance" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
-    <svelte:fragment slot="setup"><BushingFreePositionSlots slot="setup" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
-    <svelte:fragment slot="geometry"><BushingFreePositionSlots slot="geometry" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
-    <svelte:fragment slot="profile"><BushingFreePositionSlots slot="profile" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
-    <svelte:fragment slot="process"><BushingFreePositionSlots slot="process" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
-    <svelte:fragment slot="drafting"><BushingFreePositionSlots slot="drafting" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
-    <svelte:fragment slot="summary"><BushingFreePositionSlots slot="summary" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
-    <svelte:fragment slot="diagnostics"><BushingFreePositionSlots slot="diagnostics" bind:form {results} normalized={pipeline.normalized} {isFailed} onShowInformation={() => (showInformationView = true)} {draftingView} {useLegacyRenderer} {renderMode} {traceEnabled} {cacheStats} {renderInitNotice} {visualDiagnostics} {renderDiagnostics} {onExportSvg} {onExportPdf} {toggleRendererMode} {toggleTraceMode} {handleRenderInitFailure} {dndEnabled} {uxMode} onSetUxMode={(mode) => (uxMode = mode)} /></svelte:fragment>
-  </mod.default>
-  {/await}
 {:else}
   <!-- Lane-based layout (legacy) -->
 <div class="grid grid-cols-1 gap-4 p-1 pt-4 lg:grid-cols-[450px_1fr]" data-route-ready="bushing">
   <div class="flex flex-col gap-4 pb-8 pr-2">
-    <NativeDragLane
-      listClass="flex flex-col gap-4"
-      enabled={dndEnabled}
-      items={leftLaneItems}
-      columnId="left"
-      allowCrossColumn={true}
-      on:finalize={(ev) => commitLeftLane(ev.detail.items)}>
-      {#snippet children(item)}
+      {#each leftCardOrder as item}
         <BushingLeftLaneCards 
-          itemId={item.id}
+          itemId={item}
           bind:form
           {results}
           normalized={pipeline.normalized}
           {isFailed}
-          {dndEnabled}
-          {canUndo}
-          {canRedo}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
+          dndEnabled={false}
+          canUndo={false}
+          canRedo={false}
+          onUndo={() => {}}
+          onRedo={() => {}}
           onShowInformation={() => (showInformationView = true)}
           {uxMode}
           onSetUxMode={(mode) => (uxMode = mode)}
-          moveProps={leftMoveProps(item.id as LeftCardId)}
+          moveProps={leftMoveProps(item as LeftCardId)}
         />
-      {/snippet}
-    </NativeDragLane>
+      {/each}
   </div>
 
   <div class="flex flex-col gap-4 pb-8 pr-1">
-    <NativeDragLane
-      listClass="flex flex-col gap-4"
-      enabled={dndEnabled}
-      items={rightLaneItems}
-      columnId="right"
-      allowCrossColumn={true}
-      on:finalize={(ev) => commitRightLane(ev.detail.items)}>
-      {#snippet children(item)}
-        {#if item.id === 'drafting'}
-          <BushingDraggableCard column="right" cardId="drafting" title="Drafting View" {...rightMoveProps('drafting')}>
+      {#each rightCardOrder as item}
+        {#if item === 'drafting'}
+          <BushingDraggableCard column="right" cardId="drafting" title="Drafting View" {...rightMoveProps('drafting' as RightCardId)}>
             {#snippet children()}
               <BushingDraftingPanel
                 {draftingView}
@@ -372,21 +245,20 @@
               />
             {/snippet}
           </BushingDraggableCard>
-        {:else if item.id === 'summary'}
-          <BushingDraggableCard column="right" cardId="summary" title="Results Panel" {...rightMoveProps('summary')}>
+        {:else if item === 'summary'}
+          <BushingDraggableCard column="right" cardId="summary" title="Results Panel" {...rightMoveProps('summary' as RightCardId)}>
             {#snippet children()}
               <BushingResultSummary {form} {results} guidedMode={uxMode === 'guided'} />
             {/snippet}
           </BushingDraggableCard>
-        {:else if item.id === 'diagnostics'}
-          <BushingDraggableCard column="right" cardId="diagnostics" title="Diagnostics" {...rightMoveProps('diagnostics')}>
+        {:else if item === 'diagnostics'}
+          <BushingDraggableCard column="right" cardId="diagnostics" title="Diagnostics" {...rightMoveProps('diagnostics' as RightCardId)}>
             {#snippet children()}
-              <BushingDiagnosticsPanel {results} {dndEnabled} {uxMode} />
+              <BushingDiagnosticsPanel {results} dndEnabled={false} {uxMode} />
             {/snippet}
           </BushingDraggableCard>
         {/if}
-      {/snippet}
-    </NativeDragLane>
+      {/each}
   </div>
 </div>
 {/if}

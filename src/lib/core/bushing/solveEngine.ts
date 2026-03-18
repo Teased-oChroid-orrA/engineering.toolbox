@@ -1,7 +1,7 @@
 import { MATERIALS } from './materials';
 import { calculateUniversalBearing } from '../shared/bearing';
 import type { BushingOutput, BushingWarning, InterferenceEnforcementReasonCode, ToleranceRange } from './types';
-import { clamp, toPsiFromKsi, resolveTolerance, buildOdTolerance, enforceBoreBandForTarget, containmentViolations, csDiaToleranceFromBase, makeRange, solveCountersink, EPS } from './solveMath';
+import { clamp, toPsiFromKsi, resolveTolerance, buildOdTolerance, enforceBoreBandForTarget, containmentViolations, csDiaToleranceFromBase, csDepthToleranceFromBase, makeRange, solveCountersink, EPS } from './solveMath';
 import { normalizeBushingInputs } from './normalize';
 
 const getMat = (id: string | undefined) => MATERIALS.find((m) => m.id === id) || MATERIALS[0];
@@ -34,6 +34,8 @@ type CalcState = {
   csSolvedOd: { dia: number; depth: number; angleDeg: number };
   csInternalDiaTol: ToleranceRange;
   csExternalDiaTol: ToleranceRange;
+  csInternalDepthTol: ToleranceRange;
+  csExternalDepthTol: ToleranceRange;
   internalCsInvalid: boolean;
   externalCsInvalid: boolean;
   wallStraight: number;
@@ -239,19 +241,50 @@ export function computeState(input: ReturnType<typeof normalizeBushingInputs>): 
     ? solveCountersink(input.extCsMode, input.extCsDia, input.extCsDepth, input.extCsAngle, odInstalled)
     : { dia: input.extCsDia, depth: input.extCsDepth, angleDeg: input.extCsAngle };
 
+  const csInternalDepthInputTol = makeRange(
+    'nominal_tol',
+    Math.max(0, input.csDepth - Math.max(0, input.csDepthTolMinus ?? 0)),
+    input.csDepth + Math.max(0, input.csDepthTolPlus ?? 0),
+    input.csDepth
+  );
+  const csExternalDepthInputTol = makeRange(
+    'nominal_tol',
+    Math.max(0, input.extCsDepth - Math.max(0, input.extCsDepthTolMinus ?? 0)),
+    input.extCsDepth + Math.max(0, input.extCsDepthTolPlus ?? 0),
+    input.extCsDepth
+  );
+
   const csInternalDiaTol = csDiaToleranceFromBase(
     input.csMode,
     csSolvedId.dia,
     csSolvedId.depth,
     csSolvedId.angleDeg,
-    makeRange('nominal_tol', input.idBushing, input.idBushing, input.idBushing)
+    makeRange('nominal_tol', input.idBushing, input.idBushing, input.idBushing),
+    csInternalDepthInputTol
   );
   const csExternalDiaTol = csDiaToleranceFromBase(
     input.extCsMode,
     csSolvedOd.dia,
     csSolvedOd.depth,
     csSolvedOd.angleDeg,
-    odFit.od
+    odFit.od,
+    csExternalDepthInputTol
+  );
+  const csInternalDepthTol = csDepthToleranceFromBase(
+    input.csMode,
+    csSolvedId.depth,
+    csSolvedId.dia,
+    csSolvedId.angleDeg,
+    makeRange('nominal_tol', input.idBushing, input.idBushing, input.idBushing),
+    csInternalDepthInputTol
+  );
+  const csExternalDepthTol = csDepthToleranceFromBase(
+    input.extCsMode,
+    csSolvedOd.depth,
+    csSolvedOd.dia,
+    csSolvedOd.angleDeg,
+    odFit.od,
+    csExternalDepthInputTol
   );
 
   const internalCsInvalid =
@@ -391,6 +424,8 @@ export function computeState(input: ReturnType<typeof normalizeBushingInputs>): 
     csSolvedOd,
     csInternalDiaTol,
     csExternalDiaTol,
+    csInternalDepthTol,
+    csExternalDepthTol,
     internalCsInvalid,
     externalCsInvalid,
     wallStraight,
@@ -567,7 +602,9 @@ export function toOutput(s: CalcState, warningCodes: BushingWarning[], warnings:
       odBushing: s.odTol,
       achievedInterference: s.achievedInterferenceTol,
       ...(s.input.idType === 'countersink' ? { csInternalDia: s.csInternalDiaTol } : {}),
-      ...(s.input.bushingType === 'countersink' ? { csExternalDia: s.csExternalDiaTol } : {})
+      ...(s.input.idType === 'countersink' ? { csInternalDepth: s.csInternalDepthTol } : {}),
+      ...(s.input.bushingType === 'countersink' ? { csExternalDia: s.csExternalDiaTol } : {}),
+      ...(s.input.bushingType === 'countersink' ? { csExternalDepth: s.csExternalDepthTol } : {})
     },
     governing: s.governing,
     candidates: s.candidates,

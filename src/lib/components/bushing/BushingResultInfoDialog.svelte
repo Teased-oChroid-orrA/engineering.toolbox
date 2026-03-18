@@ -53,7 +53,7 @@
           {:else}
             <div class="text-sm font-semibold text-cyan-100">Fit Physics</div>
             <div class="text-white/80">This panel quantifies assembly fit mechanics. Interference produces radial contact pressure through member elastic compliance; install force is estimated from friction, pressure, and engagement length.</div>
-            <div class="text-white/80">Tolerance rows are interval checks: `OD (tol)` is the solver-selected band, `Target tol` is requested interference, and `Achieved tol` is resulting stack-up.</div>
+            <div class="text-white/80">Tolerance rows are displayed as `nominal (-minus, +plus)`. `Bushing OD` is the solver-selected band, `Target interference` is the requested fit window, and `Achieved interference` is the resulting stack-up.</div>
             <div class="rounded-md border border-cyan-300/25 bg-cyan-500/5 p-2 text-[12px] text-cyan-100/95">
               Current effective interference: <span class="font-mono">{fmt(results.physics.deltaEffective, 4)}</span>
             </div>
