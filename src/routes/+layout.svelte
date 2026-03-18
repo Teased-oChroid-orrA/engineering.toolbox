@@ -82,6 +82,9 @@
   } | null>(null);
   let showStartupHealth = $state(false);
   let safeModeRedirected = $state(false);
+  let shellHidden = $state(false);
+  let shellPinned = $state(false);
+  let lastScrollY = $state(0);
 
   type RouteBootProfile = {
     steps: [string, string, string];
@@ -265,6 +268,24 @@
         // best-effort telemetry
       }
     };
+    const updateShellVisibility = () => {
+      const y = window.scrollY || 0;
+      if (shellPinned) {
+        lastScrollY = y;
+        return;
+      }
+      if (y < 80) {
+        shellHidden = false;
+        lastScrollY = y;
+        return;
+      }
+      const delta = y - lastScrollY;
+      if (delta > 10) shellHidden = true;
+      else if (delta < -10) shellHidden = false;
+      lastScrollY = y;
+    };
+    lastScrollY = typeof window !== 'undefined' ? window.scrollY || 0 : 0;
+    window.addEventListener('scroll', updateShellVisibility, { passive: true });
     const fetchStartupHealth = async () => {
       if (!tauriInvoke || healthTickInFlight) return;
       healthTickInFlight = true;
@@ -513,7 +534,30 @@
 </svelte:head>
 
 <div class="min-h-screen text-white">
-  <AppBar class="sticky top-4 z-50 mx-4 mt-4 rounded-2xl glass-panel shadow-2xl">
+  <AppBar
+    class={cn(
+      'sticky top-2 z-50 mx-4 mt-2 rounded-2xl glass-panel shadow-2xl transition-transform duration-300 ease-out',
+      shellHidden
+        ? '-translate-y-[calc(100%-18px)] opacity-80 hover:translate-y-0 hover:opacity-100 focus-within:translate-y-0 focus-within:opacity-100'
+        : 'translate-y-0 opacity-100'
+    )}
+    onmouseenter={() => {
+      shellPinned = true;
+      shellHidden = false;
+    }}
+    onmouseleave={() => {
+      shellPinned = false;
+      shellHidden = (window.scrollY || 0) > 80;
+    }}
+    onfocusin={() => {
+      shellPinned = true;
+      shellHidden = false;
+    }}
+    onfocusout={() => {
+      shellPinned = false;
+      shellHidden = (window.scrollY || 0) > 80;
+    }}
+  >
     <AppBar.Toolbar class="px-6 py-3 grid-cols-[auto_1fr_auto]">
       <AppBar.Lead>
         <div class="flex items-center gap-3">

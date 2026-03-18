@@ -165,7 +165,7 @@
     </Badge>
   </div>
 
-  <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+  <div class="grid grid-cols-1 gap-4 2xl:grid-cols-2">
     <div
       class="cursor-pointer"
       role="button"
@@ -447,7 +447,7 @@
 {/if}
 
 <style>
-  .results-ruled {
+  :global(.results-ruled) {
     --rs-label-col: 22ch;
     --rs-nominal-col: 10ch;
     --rs-tolerance-col: 15ch;
@@ -456,8 +456,8 @@
     position: relative;
   }
 
-  .results-ruled::before,
-  .results-ruled::after {
+  :global(.results-ruled::before),
+  :global(.results-ruled::after) {
     content: '';
     position: absolute;
     top: 2.1rem;
@@ -467,15 +467,15 @@
     background: linear-gradient(to bottom, rgba(148, 163, 184, 0), rgba(148, 163, 184, 0.14), rgba(148, 163, 184, 0));
   }
 
-  .results-ruled::before {
+  :global(.results-ruled::before) {
     right: calc(var(--rs-unit-col) + var(--rs-gap) + var(--rs-tolerance-col) + var(--rs-gap));
   }
 
-  .results-ruled::after {
+  :global(.results-ruled::after) {
     right: calc(var(--rs-unit-col) + var(--rs-gap));
   }
 
-  .results-row {
+  :global(.results-row) {
     display: grid;
     grid-template-columns: minmax(0, var(--rs-label-col)) var(--rs-nominal-col) var(--rs-tolerance-col) var(--rs-unit-col);
     align-items: baseline;
@@ -485,7 +485,7 @@
     position: relative;
   }
 
-  .results-row::after {
+  :global(.results-row::after) {
     content: '';
     position: absolute;
     left: 0;
@@ -495,41 +495,41 @@
     background: linear-gradient(to right, rgba(148, 163, 184, 0.07), rgba(148, 163, 184, 0.03), rgba(148, 163, 184, 0));
   }
 
-  .results-row--range {
+  :global(.results-row--range) {
     grid-template-columns: minmax(0, var(--rs-label-col)) var(--rs-nominal-col) var(--rs-tolerance-col) var(--rs-unit-col);
   }
 
-  .results-row--dense {
+  :global(.results-row--dense) {
     padding: 0.1rem 0;
   }
 
-  .results-row--dense::after {
+  :global(.results-row--dense::after) {
     bottom: -0.12rem;
   }
 
-  .results-label {
+  :global(.results-label) {
     min-width: 0;
     line-height: 1.2;
     max-width: var(--rs-label-col);
     padding-right: 0.5rem;
   }
 
-  .results-nominal,
-  .results-tolerance,
-  .results-unit,
-  .results-range {
+  :global(.results-nominal),
+  :global(.results-tolerance),
+  :global(.results-unit),
+  :global(.results-range) {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     text-align: right;
   }
 
-  .results-range {
+  :global(.results-range) {
     grid-column: 2 / 4;
   }
 
   @media (min-width: 1536px) {
-    .results-ruled {
+    :global(.results-ruled) {
       --rs-label-col: 22ch;
       --rs-nominal-col: 10ch;
       --rs-tolerance-col: 15ch;
