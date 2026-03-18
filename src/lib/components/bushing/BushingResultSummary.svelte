@@ -14,6 +14,7 @@
   const fmt = (n: number | null | undefined, d = 2) => (!Number.isFinite(Number(n)) ? '---' : Number(n).toFixed(d));
   const stressUnit = () => (form.units === 'metric' ? 'MPa' : 'ksi');
   const forceUnit = () => (form.units === 'metric' ? 'N' : 'lbf');
+  const lengthUnit = () => (form.units === 'metric' ? 'mm' : 'in');
   const fmtBand = (v: number, d = 4) => (!Number.isFinite(v) ? '---' : Number(v).toFixed(d));
   const valOk = 'text-emerald-300';
   const valFail = 'text-rose-300';
@@ -246,67 +247,65 @@
     tabindex="0"
     onclick={() => (infoDialog = 'fit')}
     onkeydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (infoDialog = 'fit')}>
-    <Card
-      id="bushing-fit-card"
-      class={`bushing-results-card bushing-pop-card bushing-depth-2 ${fitFailed ? 'border border-amber-300/55' : ''}`}>
+      <Card
+        id="bushing-fit-card"
+        class={`bushing-results-card bushing-pop-card bushing-depth-2 ${fitFailed ? 'border border-amber-300/55' : ''}`}>
       <CardContent class="pt-5 text-sm space-y-1.5">
         <div class="text-[10px] mb-2 uppercase tracking-wide text-indigo-200/95 font-bold">Fit Physics</div>
-        <div class="grid grid-cols-1 gap-x-10 gap-y-2 2xl:grid-cols-2">
-          <div class="results-ruled min-w-0 space-y-2">
-            <div class="results-row results-row--no-unit">
-              <span class="results-label text-slate-100/95 font-medium">Effective Interference</span>
-              <span class={`results-nominal text-[0.92rem] font-semibold ${positiveInterference ? valOk : valFail}`}>{splitTolText(effectiveInterferenceRange).nominal}</span>
-              <span class="results-tolerance text-slate-300/88">{splitTolText(effectiveInterferenceRange).tolerance}</span>
-              <span class="results-unit"></span>
-            </div>
-            <div class="results-row results-row--range">
-              <span class="results-label text-slate-100/95 font-medium">Interference Target</span>
-              <span class={`results-range text-[0.92rem] font-semibold ${valInfo}`}>{fmtMinMax(results.tolerance.interferenceTarget)}</span>
-            </div>
-            {#if results.tolerance.csExternalDia}
-              <div class="results-row results-row--no-unit">
-                <span class="results-label text-slate-100/95 font-medium">External CS Dia</span>
-                <span class="results-nominal text-cyan-200 font-semibold">{splitTolText(results.tolerance.csExternalDia).nominal}</span>
-                <span class="results-tolerance text-slate-300/88">{splitTolText(results.tolerance.csExternalDia).tolerance}</span>
-                <span class="results-unit"></span>
-              </div>
-            {/if}
-            {#if results.tolerance.csInternalDia}
-              <div class="results-row results-row--no-unit">
-                <span class="results-label text-slate-100/95 font-medium">Internal CS Dia</span>
-                <span class="results-nominal text-cyan-200 font-semibold">{splitTolText(results.tolerance.csInternalDia).nominal}</span>
-                <span class="results-tolerance text-slate-300/88">{splitTolText(results.tolerance.csInternalDia).tolerance}</span>
-                <span class="results-unit"></span>
-              </div>
-            {/if}
+        <div class="results-ruled min-w-0 space-y-2">
+          <div class="results-row">
+            <span class="results-label text-slate-100/95 font-medium">Effective Interference</span>
+            <span class={`results-nominal text-[0.92rem] font-semibold ${positiveInterference ? valOk : valFail}`}>{splitTolText(effectiveInterferenceRange).nominal}</span>
+            <span class="results-tolerance text-slate-300/88">{splitTolText(effectiveInterferenceRange).tolerance}</span>
+            <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
           </div>
-          <div class="results-ruled min-w-0 space-y-2">
-            <div class="results-row results-row--no-unit">
-              <span class="results-label text-slate-100/95 font-medium">Bushing OD</span>
-              <span class={`results-nominal text-[0.92rem] font-semibold ${odContained ? valOk : valFail}`}>{splitTolText(results.tolerance.odBushing).nominal}</span>
-              <span class="results-tolerance text-slate-300/88">{splitTolText(results.tolerance.odBushing).tolerance}</span>
-              <span class="results-unit"></span>
+          {#if results.tolerance.csExternalDia}
+            <div class="results-row">
+              <span class="results-label text-slate-100/95 font-medium">External CS Dia</span>
+              <span class="results-nominal text-cyan-200 font-semibold">{splitTolText(results.tolerance.csExternalDia).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitTolText(results.tolerance.csExternalDia).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
             </div>
-            <div class="results-row results-row--range">
-              <span class="results-label text-slate-100/95 font-medium">Interference Achieved</span>
-              <span class={`results-range text-[0.92rem] font-semibold ${achievedWithinTarget ? valOk : valFail}`}>{fmtMinMax(results.tolerance.achievedInterference)}</span>
+          {/if}
+          {#if results.tolerance.csInternalDia}
+            <div class="results-row">
+              <span class="results-label text-slate-100/95 font-medium">Internal CS Dia</span>
+              <span class="results-nominal text-cyan-200 font-semibold">{splitTolText(results.tolerance.csInternalDia).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitTolText(results.tolerance.csInternalDia).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
             </div>
-            {#if results.tolerance.csExternalDepth}
-              <div class="results-row results-row--no-unit">
-                <span class="results-label text-slate-100/95 font-medium">External CS Depth</span>
-                <span class="results-nominal text-cyan-200 font-semibold">{splitTolText(results.tolerance.csExternalDepth).nominal}</span>
-                <span class="results-tolerance text-slate-300/88">{splitTolText(results.tolerance.csExternalDepth).tolerance}</span>
-                <span class="results-unit"></span>
-              </div>
-            {/if}
-            {#if results.tolerance.csInternalDepth}
-              <div class="results-row results-row--no-unit">
-                <span class="results-label text-slate-100/95 font-medium">Internal CS Depth</span>
-                <span class="results-nominal text-cyan-200 font-semibold">{splitTolText(results.tolerance.csInternalDepth).nominal}</span>
-                <span class="results-tolerance text-slate-300/88">{splitTolText(results.tolerance.csInternalDepth).tolerance}</span>
-                <span class="results-unit"></span>
-              </div>
-            {/if}
+          {/if}
+          <div class="results-row">
+            <span class="results-label text-slate-100/95 font-medium">Bushing OD</span>
+            <span class={`results-nominal text-[0.92rem] font-semibold ${odContained ? valOk : valFail}`}>{splitTolText(results.tolerance.odBushing).nominal}</span>
+            <span class="results-tolerance text-slate-300/88">{splitTolText(results.tolerance.odBushing).tolerance}</span>
+            <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
+          </div>
+          {#if results.tolerance.csExternalDepth}
+            <div class="results-row">
+              <span class="results-label text-slate-100/95 font-medium">External CS Depth</span>
+              <span class="results-nominal text-cyan-200 font-semibold">{splitTolText(results.tolerance.csExternalDepth).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitTolText(results.tolerance.csExternalDepth).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
+            </div>
+          {/if}
+          {#if results.tolerance.csInternalDepth}
+            <div class="results-row">
+              <span class="results-label text-slate-100/95 font-medium">Internal CS Depth</span>
+              <span class="results-nominal text-cyan-200 font-semibold">{splitTolText(results.tolerance.csInternalDepth).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitTolText(results.tolerance.csInternalDepth).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
+            </div>
+          {/if}
+          <div class="results-row results-row--range">
+            <span class="results-label text-slate-100/95 font-medium">Interference Target</span>
+            <span class={`results-range text-[0.92rem] font-semibold ${valInfo}`}>{fmtMinMax(results.tolerance.interferenceTarget)}</span>
+            <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
+          </div>
+          <div class="results-row results-row--range">
+            <span class="results-label text-slate-100/95 font-medium">Interference Achieved</span>
+            <span class={`results-range text-[0.92rem] font-semibold ${achievedWithinTarget ? valOk : valFail}`}>{fmtMinMax(results.tolerance.achievedInterference)}</span>
+            <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
           </div>
         </div>
         {#if results.tolerance.status === 'infeasible'}
@@ -385,10 +384,10 @@
 
 <style>
   .results-ruled {
-    --rs-nominal-col: 7.75ch;
-    --rs-tolerance-col: 12ch;
+    --rs-nominal-col: 10ch;
+    --rs-tolerance-col: 15ch;
     --rs-unit-col: 3.5ch;
-    --rs-gap: 0.875rem;
+    --rs-gap: 1rem;
     position: relative;
   }
 
@@ -419,10 +418,6 @@
     min-width: 0;
   }
 
-  .results-row--no-unit .results-unit {
-    visibility: hidden;
-  }
-
   .results-row--range {
     grid-template-columns: minmax(0, 1fr) var(--rs-nominal-col) var(--rs-tolerance-col) var(--rs-unit-col);
   }
@@ -444,13 +439,13 @@
   }
 
   .results-range {
-    grid-column: 2 / 5;
+    grid-column: 2 / 4;
   }
 
   @media (min-width: 1536px) {
     .results-ruled {
-      --rs-nominal-col: 8.5ch;
-      --rs-tolerance-col: 14ch;
+      --rs-nominal-col: 10ch;
+      --rs-tolerance-col: 15ch;
       --rs-unit-col: 4ch;
       --rs-gap: 1rem;
     }

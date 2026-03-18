@@ -10,7 +10,7 @@ const config = {
     //   This avoids tauri.localhost module fetch misses on some Windows installs.
     // - Relative paths ensure Windows file:// compatibility.
     // See SvelteKit config docs: kit.router.type = 'hash' and kit.output.bundleStrategy = 'inline'.
-    adapter: adapter({ fallback: 'index.html' }),
+    adapter: adapter({ fallback: '200.html' }),
     paths: {
       relative: true // Enable relative paths for file:// compatibility on all platforms
     },
