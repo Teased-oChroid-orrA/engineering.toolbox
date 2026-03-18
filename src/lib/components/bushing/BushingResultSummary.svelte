@@ -384,6 +384,7 @@
 
 <style>
   .results-ruled {
+    --rs-label-col: 22ch;
     --rs-nominal-col: 10ch;
     --rs-tolerance-col: 15ch;
     --rs-unit-col: 3.5ch;
@@ -412,20 +413,33 @@
 
   .results-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) var(--rs-nominal-col) var(--rs-tolerance-col) var(--rs-unit-col);
+    grid-template-columns: minmax(0, var(--rs-label-col)) var(--rs-nominal-col) var(--rs-tolerance-col) var(--rs-unit-col);
     align-items: baseline;
     column-gap: var(--rs-gap);
     min-width: 0;
+    padding: 0.14rem 0;
+    position: relative;
+  }
+
+  .results-row::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -0.2rem;
+    height: 1px;
+    background: linear-gradient(to right, rgba(148, 163, 184, 0.07), rgba(148, 163, 184, 0.03), rgba(148, 163, 184, 0));
   }
 
   .results-row--range {
-    grid-template-columns: minmax(0, 1fr) var(--rs-nominal-col) var(--rs-tolerance-col) var(--rs-unit-col);
+    grid-template-columns: minmax(0, var(--rs-label-col)) var(--rs-nominal-col) var(--rs-tolerance-col) var(--rs-unit-col);
   }
 
   .results-label {
     min-width: 0;
     line-height: 1.2;
-    padding-right: 0.25rem;
+    max-width: var(--rs-label-col);
+    padding-right: 0.5rem;
   }
 
   .results-nominal,
@@ -444,6 +458,7 @@
 
   @media (min-width: 1536px) {
     .results-ruled {
+      --rs-label-col: 22ch;
       --rs-nominal-col: 10ch;
       --rs-tolerance-col: 15ch;
       --rs-unit-col: 4ch;
