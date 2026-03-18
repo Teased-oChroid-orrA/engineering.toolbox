@@ -338,21 +338,85 @@
       <div class="grid grid-cols-1 gap-2 text-[12px] text-white/85 md:grid-cols-2">
         <div class="rounded-md border border-white/10 bg-black/20 p-2">
           <div class="font-semibold text-emerald-200">Bushing Boundaries</div>
-          <div class="font-mono">σr(inner) = {fmtStressTol(results.lame.field.bushing.boundary.sigmaRInner)} {stressUnit()}</div>
-          <div class="font-mono">σr(outer) = {fmtStressTol(results.lame.field.bushing.boundary.sigmaROuter)} {stressUnit()}</div>
-          <div class="font-mono">σθ(inner) = {fmtStressTol(results.lame.field.bushing.boundary.sigmaThetaInner)} {stressUnit()}</div>
-          <div class="font-mono">σθ(outer) = {fmtStressTol(results.lame.field.bushing.boundary.sigmaThetaOuter)} {stressUnit()}</div>
-          <div class="font-mono">σz(inner) = {fmtStressTol(results.lame.field.bushing.boundary.sigmaAxialInner)} {stressUnit()}</div>
-          <div class="font-mono">σz(outer) = {fmtStressTol(results.lame.field.bushing.boundary.sigmaAxialOuter)} {stressUnit()}</div>
+          <div class="results-ruled results-ruled--dense mt-2 space-y-1">
+            <div class="results-row results-row--dense">
+              <span class="results-label text-slate-100/92 font-medium">σr(inner)</span>
+              <span class="results-nominal text-slate-100 font-semibold">{splitStressTol(results.lame.field.bushing.boundary.sigmaRInner).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitStressTol(results.lame.field.bushing.boundary.sigmaRInner).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{stressUnit()}</span>
+            </div>
+            <div class="results-row results-row--dense">
+              <span class="results-label text-slate-100/92 font-medium">σr(outer)</span>
+              <span class="results-nominal text-slate-100 font-semibold">{splitStressTol(results.lame.field.bushing.boundary.sigmaROuter).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitStressTol(results.lame.field.bushing.boundary.sigmaROuter).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{stressUnit()}</span>
+            </div>
+            <div class="results-row results-row--dense">
+              <span class="results-label text-slate-100/92 font-medium">σθ(inner)</span>
+              <span class="results-nominal text-slate-100 font-semibold">{splitStressTol(results.lame.field.bushing.boundary.sigmaThetaInner).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitStressTol(results.lame.field.bushing.boundary.sigmaThetaInner).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{stressUnit()}</span>
+            </div>
+            <div class="results-row results-row--dense">
+              <span class="results-label text-slate-100/92 font-medium">σθ(outer)</span>
+              <span class="results-nominal text-slate-100 font-semibold">{splitStressTol(results.lame.field.bushing.boundary.sigmaThetaOuter).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitStressTol(results.lame.field.bushing.boundary.sigmaThetaOuter).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{stressUnit()}</span>
+            </div>
+            <div class="results-row results-row--dense">
+              <span class="results-label text-slate-100/92 font-medium">σz(inner)</span>
+              <span class="results-nominal text-slate-100 font-semibold">{splitStressTol(results.lame.field.bushing.boundary.sigmaAxialInner).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitStressTol(results.lame.field.bushing.boundary.sigmaAxialInner).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{stressUnit()}</span>
+            </div>
+            <div class="results-row results-row--dense">
+              <span class="results-label text-slate-100/92 font-medium">σz(outer)</span>
+              <span class="results-nominal text-slate-100 font-semibold">{splitStressTol(results.lame.field.bushing.boundary.sigmaAxialOuter).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitStressTol(results.lame.field.bushing.boundary.sigmaAxialOuter).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{stressUnit()}</span>
+            </div>
+          </div>
         </div>
         <div class="rounded-md border border-white/10 bg-black/20 p-2">
           <div class="font-semibold text-blue-200">Housing Boundaries</div>
-          <div class="font-mono">σr(inner) = {fmtStressTol(results.lame.field.housing.boundary.sigmaRInner)} {stressUnit()}</div>
-          <div class="font-mono">σr(outer) = {fmtStressTol(results.lame.field.housing.boundary.sigmaROuter)} {stressUnit()}</div>
-          <div class="font-mono">σθ(inner) = {fmtStressTol(results.lame.field.housing.boundary.sigmaThetaInner)} {stressUnit()}</div>
-          <div class="font-mono">σθ(outer) = {fmtStressTol(results.lame.field.housing.boundary.sigmaThetaOuter)} {stressUnit()}</div>
-          <div class="font-mono">σz(inner) = {fmtStressTol(results.lame.field.housing.boundary.sigmaAxialInner)} {stressUnit()}</div>
-          <div class="font-mono">σz(outer) = {fmtStressTol(results.lame.field.housing.boundary.sigmaAxialOuter)} {stressUnit()}</div>
+          <div class="results-ruled results-ruled--dense mt-2 space-y-1">
+            <div class="results-row results-row--dense">
+              <span class="results-label text-slate-100/92 font-medium">σr(inner)</span>
+              <span class="results-nominal text-slate-100 font-semibold">{splitStressTol(results.lame.field.housing.boundary.sigmaRInner).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitStressTol(results.lame.field.housing.boundary.sigmaRInner).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{stressUnit()}</span>
+            </div>
+            <div class="results-row results-row--dense">
+              <span class="results-label text-slate-100/92 font-medium">σr(outer)</span>
+              <span class="results-nominal text-slate-100 font-semibold">{splitStressTol(results.lame.field.housing.boundary.sigmaROuter).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitStressTol(results.lame.field.housing.boundary.sigmaROuter).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{stressUnit()}</span>
+            </div>
+            <div class="results-row results-row--dense">
+              <span class="results-label text-slate-100/92 font-medium">σθ(inner)</span>
+              <span class="results-nominal text-slate-100 font-semibold">{splitStressTol(results.lame.field.housing.boundary.sigmaThetaInner).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitStressTol(results.lame.field.housing.boundary.sigmaThetaInner).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{stressUnit()}</span>
+            </div>
+            <div class="results-row results-row--dense">
+              <span class="results-label text-slate-100/92 font-medium">σθ(outer)</span>
+              <span class="results-nominal text-slate-100 font-semibold">{splitStressTol(results.lame.field.housing.boundary.sigmaThetaOuter).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitStressTol(results.lame.field.housing.boundary.sigmaThetaOuter).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{stressUnit()}</span>
+            </div>
+            <div class="results-row results-row--dense">
+              <span class="results-label text-slate-100/92 font-medium">σz(inner)</span>
+              <span class="results-nominal text-slate-100 font-semibold">{splitStressTol(results.lame.field.housing.boundary.sigmaAxialInner).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitStressTol(results.lame.field.housing.boundary.sigmaAxialInner).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{stressUnit()}</span>
+            </div>
+            <div class="results-row results-row--dense">
+              <span class="results-label text-slate-100/92 font-medium">σz(outer)</span>
+              <span class="results-nominal text-slate-100 font-semibold">{splitStressTol(results.lame.field.housing.boundary.sigmaAxialOuter).nominal}</span>
+              <span class="results-tolerance text-slate-300/88">{splitStressTol(results.lame.field.housing.boundary.sigmaAxialOuter).tolerance}</span>
+              <span class="results-unit text-slate-100 font-semibold">{stressUnit()}</span>
+            </div>
+          </div>
         </div>
       </div>
       <div class="text-[11px] text-cyan-100/80">
@@ -433,6 +497,14 @@
 
   .results-row--range {
     grid-template-columns: minmax(0, var(--rs-label-col)) var(--rs-nominal-col) var(--rs-tolerance-col) var(--rs-unit-col);
+  }
+
+  .results-row--dense {
+    padding: 0.1rem 0;
+  }
+
+  .results-row--dense::after {
+    bottom: -0.12rem;
   }
 
   .results-label {
