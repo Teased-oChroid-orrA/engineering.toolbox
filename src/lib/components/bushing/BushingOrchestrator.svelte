@@ -254,7 +254,7 @@
         {:else if item === 'diagnostics'}
           <BushingDraggableCard column="right" cardId="diagnostics" title="Diagnostics" {...rightMoveProps('diagnostics' as RightCardId)}>
             {#snippet children()}
-              <BushingDiagnosticsPanel {results} dndEnabled={false} {uxMode} />
+              <BushingDiagnosticsPanel bind:form {results} dndEnabled={false} {uxMode} />
             {/snippet}
           </BushingDraggableCard>
         {/if}

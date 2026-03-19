@@ -23,11 +23,49 @@
     allowBoreNominalShift: false
   };
   const DEFAULT_BORE_CAPABILITY: NonNullable<BushingInputs['boreCapability']> = { mode: 'unspecified' };
+  type PolicyPreset = 'hold_requested_range' | 'tighten_bore_only' | 'tighten_and_shift';
 
   const capabilitySummary = (mode: NonNullable<BushingInputs['boreCapability']>['mode']) => {
     if (mode === 'reamer_fixed') return 'Bore is tooling-fixed. The solver keeps the bore locked.';
     if (mode === 'adjustable') return 'Bore width may be tightened if process capability allows it.';
     return 'No manufacturing constraint has been declared.';
+  };
+
+  const presetLabel = (preset: PolicyPreset) => {
+    if (preset === 'hold_requested_range') return 'Hold requested range';
+    if (preset === 'tighten_bore_only') return 'Tighten bore only';
+    return 'Tighten + shift nominal';
+  };
+
+  const presetDescription = (preset: PolicyPreset) => {
+    if (preset === 'hold_requested_range') return 'Do not reshape the bore band. Report any conflict directly.';
+    if (preset === 'tighten_bore_only') return 'Allow bore tolerance width reduction, but keep bore nominal fixed.';
+    return 'Allow bore tolerance reduction and nominal shift within the permitted shift limit.';
+  };
+
+  const resolvePreset = (policy: NonNullable<BushingInputs['interferencePolicy']>): PolicyPreset => {
+    if (policy.lockBore) return 'hold_requested_range';
+    if (policy.allowBoreNominalShift) return 'tighten_and_shift';
+    return 'tighten_bore_only';
+  };
+
+  const applyPreset = (preset: PolicyPreset) => {
+    if (!form.interferencePolicy) form = { ...form, interferencePolicy: { ...DEFAULT_INTERFERENCE_POLICY } };
+    const next = { ...(form.interferencePolicy ?? DEFAULT_INTERFERENCE_POLICY) };
+    if (preset === 'hold_requested_range') {
+      next.lockBore = true;
+      next.preserveBoreNominal = true;
+      next.allowBoreNominalShift = false;
+    } else if (preset === 'tighten_bore_only') {
+      next.lockBore = false;
+      next.preserveBoreNominal = true;
+      next.allowBoreNominalShift = false;
+    } else {
+      next.lockBore = false;
+      next.preserveBoreNominal = false;
+      next.allowBoreNominalShift = true;
+    }
+    form = { ...form, interferencePolicy: next };
   };
 
   $effect(() => {
@@ -45,17 +83,15 @@
   let reamerFixed = $derived(capability.mode === 'reamer_fixed');
   let adjustableCapability = $derived(capability.mode === 'adjustable');
   let showBoreLock = $derived(enforcementEnabled && !reamerFixed);
-  let showNominalPreserve = $derived(enforcementEnabled && !Boolean(policy.lockBore));
-  let showNominalShiftToggle = $derived(showNominalPreserve && !Boolean(policy.preserveBoreNominal));
-  let showMaxShift = $derived(showNominalShiftToggle && Boolean(policy.allowBoreNominalShift));
+  let showMaxShift = $derived(enforcementEnabled && !reamerFixed && Boolean(policy.allowBoreNominalShift));
   let showCapabilityWidths = $derived(enforcementEnabled && adjustableCapability);
+  let activePreset = $derived(resolvePreset(policy));
   let controlSummary = $derived.by(() => {
     if (!enforcementEnabled) return 'Strict containment is off. The solver reports the fit window but does not try to reshape the bore band.';
     if (reamerFixed) return 'Strict containment is on. Bore stays locked because the bore process is reamer-fixed.';
-    if (policy.lockBore) return 'Strict containment is on. Bore stays locked to the entered nominal and width.';
-    if (policy.preserveBoreNominal) return 'Strict containment is on. The solver may tighten bore width but will keep bore nominal fixed.';
-    if (policy.allowBoreNominalShift) return 'Strict containment is on. The solver may tighten bore width and shift bore nominal within the allowed limit.';
-    return 'Strict containment is on. The solver may tighten bore width only.';
+    if (activePreset === 'hold_requested_range') return 'Strict containment is on. The solver will hold the requested bore limits and report a conflict if they cannot satisfy the target interference window.';
+    if (activePreset === 'tighten_bore_only') return 'Strict containment is on. The solver may narrow the bore range, but the bore nominal stays fixed.';
+    return 'Strict containment is on. The solver may narrow the bore range and shift the bore nominal within the allowed limit.';
   });
 </script>
 
@@ -77,35 +113,38 @@
     <Select bind:value={form.boreCapability!.mode} items={CAPABILITY_MODE_ITEMS} />
     <div class="text-[10px] text-cyan-200/70">{capabilitySummary(capability.mode)}</div>
   </div>
-  {#if showBoreLock}
-    <label class="flex items-center justify-between rounded-md border border-white/10 bg-black/25 px-2 py-1.5 text-xs text-white/85">
-      <span>Keep Bore Locked</span>
-      <input
-        type="checkbox"
-        class="h-4 w-4"
-        bind:checked={form.interferencePolicy!.lockBore}
-      />
-    </label>
-  {/if}
-  {#if showNominalPreserve}
-    <label class="flex items-center justify-between rounded-md border border-white/10 bg-black/25 px-2 py-1.5 text-xs text-white/85">
-      <span>Preserve Bore Nominal</span>
-      <input
-        type="checkbox"
-        class="h-4 w-4"
-        bind:checked={form.interferencePolicy!.preserveBoreNominal}
-      />
-    </label>
-  {/if}
-  {#if showNominalShiftToggle}
-    <label class="flex items-center justify-between rounded-md border border-white/10 bg-black/25 px-2 py-1.5 text-xs text-white/85">
-      <span>Allow Bore Nominal Shift</span>
-      <input
-        type="checkbox"
-        class="h-4 w-4"
-        bind:checked={form.interferencePolicy!.allowBoreNominalShift}
-      />
-    </label>
+  {#if enforcementEnabled}
+    <div class="space-y-1">
+      <Label class="text-white/70">Solver behavior when limits conflict</Label>
+      <div class="grid grid-cols-1 gap-2">
+        {#each (['hold_requested_range', 'tighten_bore_only', 'tighten_and_shift'] satisfies PolicyPreset[]) as preset}
+          {@const disabled = reamerFixed && preset !== 'hold_requested_range'}
+          <button
+            type="button"
+            class={`rounded-md border px-3 py-2 text-left transition-colors ${
+              activePreset === preset
+                ? 'border-cyan-300/45 bg-cyan-500/12 text-cyan-100'
+                : 'border-white/10 bg-black/20 text-white/80 hover:border-white/20 hover:bg-white/[0.04]'
+            } ${disabled ? 'cursor-not-allowed opacity-45' : ''}`}
+            disabled={disabled}
+            onclick={() => applyPreset(preset)}
+          >
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-medium">{presetLabel(preset)}</span>
+              {#if activePreset === preset}
+                <span class="rounded-full border border-cyan-300/40 px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] text-cyan-100">Active</span>
+              {/if}
+            </div>
+            <div class="mt-1 text-[10px] text-white/60">{presetDescription(preset)}</div>
+          </button>
+        {/each}
+      </div>
+      {#if reamerFixed}
+        <div class="rounded-md border border-amber-300/20 bg-amber-500/10 px-2 py-1.5 text-[10px] text-amber-100/90">
+          Reamer-fixed capability locks the bore. Bore tightening and nominal shift presets are unavailable.
+        </div>
+      {/if}
+    </div>
   {/if}
   {#if showMaxShift}
     <div class="space-y-1">
@@ -132,7 +171,7 @@
     </div>
   {/if}
   <div class="text-[10px] text-cyan-200/70">
-    Hidden controls are not applicable under the currently selected capability and lock rules.
+    Only controls that affect the active solver behavior are shown.
   </div>
   {#if results.tolerance.enforcement.enabled}
     <div class="rounded-md border border-white/10 bg-black/35 px-2 py-1 text-[10px] text-cyan-100/85">

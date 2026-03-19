@@ -469,8 +469,8 @@ export function buildWarnings(validationWarnings: BushingWarning[], s: CalcState
   if (s.delta <= 0) push('NET_CLEARANCE_FIT', 'Net interference is negative (clearance fit after thermal).', 'warning');
   if (s.edActual / s.edMinSequence - 1 < 0) push('EDGE_DISTANCE_SEQUENCE_FAIL', 'Edge distance sequencing margin is below zero.', 'error');
   if (s.edActual / s.edMinStrength - 1 < 0) push('EDGE_DISTANCE_STRENGTH_FAIL', 'Edge distance strength margin is below zero.', 'error');
-  if (s.internalCsInvalid) push('INPUT_INVALID', 'Internal countersink geometry is invalid for the selected mode.', 'warning');
-  if (s.externalCsInvalid) push('INPUT_INVALID', 'External countersink geometry is invalid for the selected mode.', 'warning');
+  if (s.internalCsInvalid) push('INTERNAL_CS_GEOMETRY_INVALID', 'Internal countersink geometry is invalid for the selected mode.', 'warning');
+  if (s.externalCsInvalid) push('EXTERNAL_CS_GEOMETRY_INVALID', 'External countersink geometry is invalid for the selected mode.', 'warning');
   if (s.toleranceStatus === 'infeasible') {
     push('TOLERANCE_INFEASIBLE', 'Bore/interference tolerance bands are incompatible for full-range containment.', 'warning');
   }

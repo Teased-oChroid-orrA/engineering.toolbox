@@ -1,16 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Card, CardContent } from '$lib/components/ui';
-  import type { BushingOutput } from '$lib/core/bushing';
+  import type { BushingInputs, BushingOutput } from '$lib/core/bushing';
+  import { buildBushingWarningEntries } from './bushingWarningGuidance';
   import { normalizeOrder, reorderList } from './BushingCardLayoutController';
   import { loadNestedDiagnosticsLayout, persistNestedDiagnosticsLayout } from './BushingLayoutPersistence';
 
   // Svelte 5: Convert props to $props()
   let {
+    form = $bindable(),
     results,
     dndEnabled = true,
     uxMode = 'guided'
   }: {
+    form: BushingInputs;
     results: BushingOutput;
     dndEnabled?: boolean;
     uxMode?: 'guided' | 'advanced';
@@ -18,6 +21,7 @@
   
   // Svelte 5: Convert local state to $state
   let infoDialog = $state<'diagnostics' | 'edge' | 'wall' | null>(null);
+  let activeWarningIndex = $state(0);
 
   const DEFAULT_DIAG_ORDER = ['edge', 'wall', 'warnings'] as const;
 
@@ -88,6 +92,25 @@
     e.stopPropagation();
     infoDialog = type;
   }
+
+  const updateForm = (patch: Partial<BushingInputs>) => {
+    form = { ...form, ...patch };
+  };
+  const updateInterferencePolicy = (patch: Partial<NonNullable<BushingInputs['interferencePolicy']>>) => {
+    form = { ...form, interferencePolicy: { ...(form.interferencePolicy ?? {}), ...patch } };
+  };
+  const updateBoreCapability = (patch: Partial<NonNullable<BushingInputs['boreCapability']>>) => {
+    form = { ...form, boreCapability: { ...(form.boreCapability ?? {}), ...patch } };
+  };
+
+  let warningEntries = $derived(
+    buildBushingWarningEntries(form, results, {
+      updateForm,
+      updateInterferencePolicy,
+      updateBoreCapability
+    })
+  );
+  let selectedWarningEntry = $derived(warningEntries[Math.min(activeWarningIndex, Math.max(warningEntries.length - 1, 0))] ?? null);
 
   let warningActions = $derived.by(() => {
     const actions = new Map<string, { label: string; target: string }>();
@@ -201,6 +224,57 @@
                   <span class="text-amber-200">⚠</span><span class="font-medium">{w}</span>
                 </div>
               {/each}
+              {#if warningEntries.length}
+                <div class="mt-3 rounded-md border border-cyan-300/20 bg-cyan-500/10 p-3 text-[11px] text-cyan-100/88">
+                  <div class="font-semibold uppercase tracking-wide text-[10px] text-cyan-100">Direct Remediation</div>
+                  <div class="mt-2 flex flex-col gap-2">
+                    {#each warningEntries as entry, index}
+                      <button
+                        type="button"
+                        class={`w-full rounded-md border px-2 py-1.5 text-left transition-colors ${
+                          activeWarningIndex === index
+                            ? 'border-cyan-300/35 bg-cyan-500/12 text-white'
+                            : 'border-white/10 bg-black/20 text-white/80 hover:border-white/20 hover:bg-white/[0.04]'
+                        }`}
+                        onclick={() => (activeWarningIndex = index)}>
+                        <div class="flex items-start justify-between gap-3">
+                          <div>
+                            <div class="font-medium">{entry.friendly.title}</div>
+                            <div class="mt-1 text-[11px] text-white/70">{entry.friendly.description}</div>
+                          </div>
+                          <div class="shrink-0 text-[10px] uppercase tracking-[0.16em] text-white/45">
+                            {entry.warning.severity}
+                          </div>
+                        </div>
+                      </button>
+                    {/each}
+                  </div>
+                  {#if selectedWarningEntry}
+                    <div class="mt-3 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-[11px] text-white/80">
+                      <div class="font-semibold uppercase tracking-wide text-[10px] text-white/60">Possible Solutions</div>
+                      <div class="mt-1">{selectedWarningEntry.friendly.suggestion}</div>
+                      <div class="mt-2 flex flex-wrap gap-2">
+                        {#each selectedWarningEntry.actions as action}
+                          <button
+                            type="button"
+                            class="rounded border border-cyan-300/30 bg-cyan-500/10 px-2 py-1 text-[10px] text-cyan-100 hover:bg-cyan-500/20"
+                            onclick={() => {
+                              action.run();
+                              if (action.target) focusSection(action.target);
+                            }}>
+                            {action.label}
+                          </button>
+                        {/each}
+                        {#if selectedWarningEntry.actions.length === 0 && selectedWarningEntry.quickFix}
+                          <div class="rounded border border-white/10 bg-black/25 px-2 py-1 text-[10px] text-white/70">
+                            Suggested direction: {selectedWarningEntry.quickFix}
+                          </div>
+                        {/if}
+                      </div>
+                    </div>
+                  {/if}
+                </div>
+              {/if}
             </CardContent>
           </Card>
         </div>

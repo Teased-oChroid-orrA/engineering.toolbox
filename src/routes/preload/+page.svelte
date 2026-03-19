@@ -339,6 +339,14 @@
     autoBearingArea: boolean;
   };
   type StepTelemetry = { totalMs: number; enteredAt: number | null };
+  type PreloadIssueAction = { label: string; target?: string; run: () => void };
+  type PreloadIssue = {
+    key: string;
+    title: string;
+    description: string;
+    severity: 'warning' | 'error';
+    actions: PreloadIssueAction[];
+  };
   let stepSnapshots: Partial<Record<WorkflowStep, StepSnapshot[]>> = $state({});
   let stepHintsSeen: Partial<Record<WorkflowStep, boolean>> = $state({});
   let stepCompletedAt: Partial<Record<WorkflowStep, number>> = $state({});
@@ -367,6 +375,7 @@
   let summarySvg = $state<SVGSVGElement | null>(null);
   let jointSectionSvg = $state<SVGSVGElement | null>(null);
   let loadFullWorkspace = $state(false);
+  let activePreloadIssueIndex = $state(0);
 
   if (typeof window !== 'undefined') {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -569,6 +578,11 @@
       ? element
       : (element.querySelector('input,select,button,[tabindex]') as HTMLElement | null);
     focusTarget?.focus();
+  }
+
+  function focusIssueTarget(id?: string) {
+    if (!id) return;
+    focusByFieldId(id);
   }
 
   function focusFirstInvalidField(step: WorkflowStep) {
@@ -1220,6 +1234,281 @@
     }
     return issues;
   }
+
+  function replaceBoltSegment(index: number, next: BoltSegmentInput) {
+    form.boltSegments = form.boltSegments.map((segment, i) => (i === index ? next : segment));
+  }
+
+  function replaceMemberSegment(index: number, next: MemberSegmentInput) {
+    form.memberSegments = form.memberSegments.map((segment, i) => (i === index ? next : segment));
+  }
+
+  function safeStepSize() {
+    return Math.max(0.001, Number(form.nominalDiameter || 0.5) * 0.05);
+  }
+
+  function autoFixBoltSegment(index: number) {
+    const segment = form.boltSegments[index];
+    if (!segment) return;
+    replaceBoltSegment(index, {
+      id: segment.id?.trim() || `bolt-${index + 1}`,
+      length: Math.max(0.05, Number(segment.length || 0.05)),
+      area: Math.max(0.0001, Number(segment.area || form.tensileStressArea || 0.0001)),
+      modulus: Math.max(1, Number(segment.modulus || form.boltModulus || 1))
+    });
+  }
+
+  function autoFixMemberSegment(index: number) {
+    const segment = form.memberSegments[index];
+    if (!segment) return;
+    const base = {
+      ...segment,
+      id: segment.id?.trim() || `member-${index + 1}`,
+      length: Math.max(0.02, Number(segment.length || 0.02)),
+      plateWidth: Math.max(0.1, Number(segment.plateWidth || form.defaultPlateWidth || 0.1)),
+      plateLength: Math.max(0.1, Number(segment.plateLength || form.defaultPlateLength || 0.1)),
+      modulus: Math.max(1, Number(segment.modulus || getPreloadMaterial(form.useSamePlateMaterial ? form.selectedPlateMaterialId : form.selectedTopPlateMaterialId).modulusPsi || 1))
+    };
+    const step = safeStepSize();
+    if (segment.compressionModel === 'cylindrical_annulus') {
+      const outerDiameter = Math.max(Number(segment.outerDiameter || form.nominalDiameter * 2.6), Number(form.nominalDiameter) + step);
+      replaceMemberSegment(index, {
+        ...base,
+        compressionModel: 'cylindrical_annulus',
+        outerDiameter,
+        innerDiameter: Math.max(0, Math.min(Number(segment.innerDiameter || form.nominalDiameter), outerDiameter - step))
+      });
+      return;
+    }
+    if (segment.compressionModel === 'conical_frustum_annulus') {
+      const outerDiameterStart = Math.max(Number(segment.outerDiameterStart || form.nominalDiameter * 2.2), Number(form.nominalDiameter) + step);
+      const outerDiameterEnd = Math.max(Number(segment.outerDiameterEnd || form.nominalDiameter * 2.6), outerDiameterStart + step);
+      replaceMemberSegment(index, {
+        ...base,
+        compressionModel: 'conical_frustum_annulus',
+        outerDiameterStart,
+        outerDiameterEnd,
+        innerDiameter: Math.max(0, Math.min(Number(segment.innerDiameter || form.nominalDiameter), Math.min(outerDiameterStart, outerDiameterEnd) - step))
+      });
+      return;
+    }
+    replaceMemberSegment(index, {
+      ...base,
+      compressionModel: 'explicit_area',
+      effectiveArea: Math.max(0.0001, Number(segment.effectiveArea || base.plateWidth * base.plateLength * 0.22)),
+      note: segment.note || 'Auto-corrected explicit area'
+    });
+  }
+
+  function buildSolverIssue(message: string): PreloadIssue | null {
+    const trimmed = message.trim();
+    if (!trimmed) return null;
+    if (trimmed.includes('Applied torque must exceed prevailing torque')) {
+      return {
+        key: 'solver-prevailing-torque',
+        title: 'Prevailing torque exceeds applied torque',
+        description: 'The exact-torque model cannot solve because the available tightening torque is zero or negative.',
+        severity: 'error',
+        actions: [
+          {
+            label: 'Reduce prevailing torque to 5% of applied torque',
+            target: fieldId('installation-model'),
+            run: () => {
+              if (form.installation.model !== 'exact_torque') return;
+              form.installation = {
+                ...form.installation,
+                prevailingTorque: Number(form.installation.appliedTorque) * 0.05
+              };
+            }
+          },
+          {
+            label: 'Focus installation inputs',
+            target: fieldId('installation-model'),
+            run: () => {}
+          }
+        ]
+      };
+    }
+    if (trimmed.includes('Thread torque denominator is non-physical')) {
+      return {
+        key: 'solver-nonphysical-thread',
+        title: 'Thread friction inputs are non-physical',
+        description: 'The exact-torque decomposition could not compute a valid preload from the current pitch and friction terms.',
+        severity: 'error',
+        actions: [
+          {
+            label: 'Reset exact-torque friction defaults',
+            target: fieldId('installation-model'),
+            run: () => {
+              if (form.installation.model !== 'exact_torque') return;
+              form.installation = {
+                ...form.installation,
+                threadFrictionCoeff: 0.12,
+                bearingFrictionCoeff: 0.14,
+                threadHalfAngleDeg: 30
+              };
+            }
+          }
+        ]
+      };
+    }
+    if (trimmed.includes('At least one member segment is required')) {
+      return {
+        key: 'solver-missing-member',
+        title: 'No clamped plate layers are defined',
+        description: 'The preload model needs at least one plate layer to compute member stiffness.',
+        severity: 'error',
+        actions: [
+          {
+            label: 'Add a default plate layer',
+            target: fieldId('plate-layers'),
+            run: () => addMemberSegment(form.defaultPlateCompressionModel)
+          }
+        ]
+      };
+    }
+    if (trimmed.includes('At least one bolt segment is required')) {
+      return {
+        key: 'solver-missing-bolt',
+        title: 'No bolt segments are defined',
+        description: 'The preload model needs at least one bolt segment to compute bolt stiffness.',
+        severity: 'error',
+        actions: [
+          {
+            label: 'Add a default bolt segment',
+            target: fieldId('nominal-dia'),
+            run: () => addBoltSegment()
+          }
+        ]
+      };
+    }
+    if (trimmed.includes('Unsupported area model')) {
+      return {
+        key: 'solver-unsupported-area-model',
+        title: 'Compression model selection is inconsistent',
+        description: 'One or more plate layers use an unsupported compression model state.',
+        severity: 'error',
+        actions: [
+          {
+            label: 'Reset layers to the selected default model',
+            target: fieldId('plate-layers'),
+            run: () => {
+              form.memberSegments = form.memberSegments.map((segment) => {
+                if (form.defaultPlateCompressionModel === 'explicit_area') {
+                  return {
+                    ...segment,
+                    compressionModel: 'explicit_area',
+                    effectiveArea:
+                      'effectiveArea' in segment ? Math.max(0.0001, Number(segment.effectiveArea || 0.0001)) : Math.max(0.0001, Number(segment.plateWidth) * Number(segment.plateLength) * 0.22)
+                  } as MemberSegmentInput;
+                }
+                if (form.defaultPlateCompressionModel === 'conical_frustum_annulus') {
+                  const outerDiameterStart =
+                    'outerDiameterStart' in segment ? Number(segment.outerDiameterStart) : Math.max(Number(form.nominalDiameter) * 2.2, Number(form.nominalDiameter) + safeStepSize());
+                  const outerDiameterEnd =
+                    'outerDiameterEnd' in segment ? Number(segment.outerDiameterEnd) : Math.max(Number(form.nominalDiameter) * 2.6, outerDiameterStart + safeStepSize());
+                  return {
+                    ...segment,
+                    compressionModel: 'conical_frustum_annulus',
+                    outerDiameterStart,
+                    outerDiameterEnd,
+                    innerDiameter: Math.max(0, Math.min(Number('innerDiameter' in segment ? segment.innerDiameter : form.nominalDiameter), Math.min(outerDiameterStart, outerDiameterEnd) - safeStepSize()))
+                  } as MemberSegmentInput;
+                }
+                const outerDiameter =
+                  'outerDiameter' in segment ? Number(segment.outerDiameter) : Math.max(Number(form.nominalDiameter) * 2.6, Number(form.nominalDiameter) + safeStepSize());
+                return {
+                  ...segment,
+                  compressionModel: 'cylindrical_annulus',
+                  outerDiameter,
+                  innerDiameter: Math.max(0, Math.min(Number('innerDiameter' in segment ? segment.innerDiameter : form.nominalDiameter), outerDiameter - safeStepSize()))
+                } as MemberSegmentInput;
+              });
+            }
+          }
+        ]
+      };
+    }
+    return {
+      key: `solver-generic-${trimmed}`,
+      title: 'Solver input combination is invalid',
+      description: trimmed,
+      severity: 'error',
+      actions: [
+        {
+          label: 'Focus current step',
+          target: fieldId(`${workflowStep}-main`),
+          run: () => {}
+        }
+      ]
+    };
+  }
+
+  let preloadIssues = $derived.by(() => {
+    const issues: PreloadIssue[] = [];
+
+    if (form.useCustomBoltSegments) {
+      form.boltSegments.forEach((segment, index) => {
+        const validation = boltValidation(segment);
+        if (!validation.length) return;
+        issues.push({
+          key: `bolt-${segment.id}-${index}`,
+          title: `Bolt segment ${segment.id || index + 1} needs correction`,
+          description: validation.join(' '),
+          severity: 'warning',
+          actions: [
+            {
+              label: 'Auto-fix bolt segment values',
+              target: fieldId('nominal-dia'),
+              run: () => autoFixBoltSegment(index)
+            },
+            {
+              label: 'Focus fastener geometry',
+              target: fieldId('nominal-dia'),
+              run: () => {}
+            }
+          ]
+        });
+      });
+    }
+
+    if (form.useCustomPlateLayers) {
+      form.memberSegments.forEach((segment, index) => {
+        const validation = memberValidation(segment);
+        if (!validation.length) return;
+        issues.push({
+          key: `member-${segment.id}-${index}`,
+          title: `Plate layer ${segment.id || index + 1} needs correction`,
+          description: validation.join(' '),
+          severity: 'warning',
+          actions: [
+            {
+              label: 'Auto-fix plate layer geometry',
+              target: fieldId('plate-layers'),
+              run: () => autoFixMemberSegment(index)
+            },
+            {
+              label: 'Focus plate layers',
+              target: fieldId('plate-layers'),
+              run: () => {}
+            }
+          ]
+        });
+      });
+    }
+
+    if (solverError) {
+      const solverIssue = buildSolverIssue(solverError);
+      if (solverIssue) issues.unshift(solverIssue);
+    }
+
+    return issues;
+  });
+  let selectedPreloadIssue = $derived(preloadIssues[Math.min(activePreloadIssueIndex, Math.max(preloadIssues.length - 1, 0))] ?? null);
+
+  $effect(() => {
+    activePreloadIssueIndex = Math.min(activePreloadIssueIndex, Math.max(preloadIssues.length - 1, 0));
+  });
 
   async function exportPdfReport() {
     if (!output) return;
@@ -2928,6 +3217,60 @@
           </div>
           <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/60">
             Two plate rows are generated automatically from the main geometry inputs. Turn on custom plate layers only when the joint stack is more complex than a simple two-plate clampup.
+          </div>
+        {/if}
+      </CardContent>
+    </Card>
+    {/if}
+
+    {#if preloadIssues.length}
+    <Card class="glass-card !border-0 !bg-transparent !shadow-none wizard-subcard">
+      <CardHeader class="pb-2 pt-4">
+        <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-amber-300">Attention Required</CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-3">
+        <div class="rounded-lg border border-amber-300/30 bg-amber-500/10 p-3 text-xs text-amber-100">
+          Select an issue to see concrete fix options. These actions update the current input set directly instead of leaving you with raw solver text.
+        </div>
+        <div class="space-y-2">
+          {#each preloadIssues as issue, index}
+            <button
+              type="button"
+              class={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
+                activePreloadIssueIndex === index
+                  ? 'border-amber-300/45 bg-amber-500/12 text-white'
+                  : 'border-white/10 bg-black/20 text-white/80 hover:border-white/20 hover:bg-white/[0.04]'
+              }`}
+              onclick={() => (activePreloadIssueIndex = index)}>
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <div class="font-semibold">{issue.title}</div>
+                  <div class="mt-1 text-[11px] text-white/70">{issue.description}</div>
+                </div>
+                <div class={`shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] ${issue.severity === 'error' ? 'bg-amber-500/20 text-amber-100' : 'bg-cyan-500/20 text-cyan-100'}`}>
+                  {issue.severity}
+                </div>
+              </div>
+            </button>
+          {/each}
+        </div>
+        {#if selectedPreloadIssue}
+          <div class="rounded-lg border border-cyan-300/20 bg-cyan-500/10 p-3 text-xs text-cyan-100">
+            <div class="font-semibold uppercase tracking-wide text-[10px]">Possible Solutions</div>
+            <div class="mt-1 text-white/78">{selectedPreloadIssue.description}</div>
+            <div class="mt-3 flex flex-wrap gap-2">
+              {#each selectedPreloadIssue.actions as action}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onclick={() => {
+                    action.run();
+                    focusIssueTarget(action.target);
+                  }}>
+                  {action.label}
+                </Button>
+              {/each}
+            </div>
           </div>
         {/if}
       </CardContent>

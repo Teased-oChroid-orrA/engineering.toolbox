@@ -152,5 +152,5 @@
 {:else if slot === 'summary'}
   <BushingResultSummary {form} {results} guidedMode={uxMode === 'guided'} />
 {:else if slot === 'diagnostics'}
-  <BushingDiagnosticsPanel {results} {dndEnabled} {uxMode} />
+  <BushingDiagnosticsPanel bind:form {results} {dndEnabled} {uxMode} />
 {/if}

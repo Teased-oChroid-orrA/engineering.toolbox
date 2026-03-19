@@ -87,14 +87,14 @@ export function validateBushingInputs(input: BushingInputs): BushingWarning[] {
   const parsed = bushingInputsSchema.safeParse(input);
   if (!parsed.success) {
     warnings.push({
-      code: 'INPUT_INVALID',
+      code: 'INPUT_SCHEMA_INVALID',
       message: 'Some inputs are invalid. Results are best-effort.',
       severity: 'warning'
     });
   }
   if (Number.isFinite(input.idBushing) && Number.isFinite(input.boreDia) && input.idBushing >= input.boreDia) {
     warnings.push({
-      code: 'INPUT_INVALID',
+      code: 'BUSHING_ID_GE_BORE',
       message: 'Bushing ID should be smaller than bore diameter.',
       severity: 'warning'
     });
@@ -103,7 +103,7 @@ export function validateBushingInputs(input: BushingInputs): BushingWarning[] {
   const boreUpper = Number(input.boreUpper);
   if (Number.isFinite(boreLower) && Number.isFinite(boreUpper) && boreLower > boreUpper) {
     warnings.push({
-      code: 'INPUT_INVALID',
+      code: 'BORE_LIMITS_REVERSED',
       message: 'Bore lower limit should be <= upper limit.',
       severity: 'warning'
     });
@@ -112,7 +112,7 @@ export function validateBushingInputs(input: BushingInputs): BushingWarning[] {
   const interferenceUpper = Number(input.interferenceUpper);
   if (Number.isFinite(interferenceLower) && Number.isFinite(interferenceUpper) && interferenceLower > interferenceUpper) {
     warnings.push({
-      code: 'INPUT_INVALID',
+      code: 'INTERFERENCE_LIMITS_REVERSED',
       message: 'Interference lower limit should be <= upper limit.',
       severity: 'warning'
     });
@@ -121,21 +121,21 @@ export function validateBushingInputs(input: BushingInputs): BushingWarning[] {
   const maxRecommendedTolWidth = Number(input.boreCapability?.maxRecommendedTolWidth);
   if (Number.isFinite(minAchievableTolWidth) && Number.isFinite(maxRecommendedTolWidth) && minAchievableTolWidth > maxRecommendedTolWidth) {
     warnings.push({
-      code: 'INPUT_INVALID',
+      code: 'BORE_CAPABILITY_RANGE_INVALID',
       message: 'Bore capability min achievable tolerance width should be <= max recommended tolerance width.',
       severity: 'warning'
     });
   }
   if (input.interferencePolicy?.preserveBoreNominal && input.interferencePolicy?.allowBoreNominalShift) {
     warnings.push({
-      code: 'INPUT_INVALID',
+      code: 'POLICY_PRESERVE_SHIFT_CONFLICT',
       message: 'Interference policy has both preserve-bore-nominal and allow-bore-nominal-shift enabled; preserve nominal takes precedence.',
       severity: 'info'
     });
   }
   if (input.boreCapability?.mode === 'reamer_fixed' && input.interferencePolicy?.lockBore === false) {
     warnings.push({
-      code: 'INPUT_INVALID',
+      code: 'REAMER_LOCK_CONFLICT',
       message: 'Reamer-fixed bore capability requires lock bore to remain enabled.',
       severity: 'info'
     });
@@ -143,14 +143,14 @@ export function validateBushingInputs(input: BushingInputs): BushingWarning[] {
   if (input.idType === 'countersink') {
     if (Number.isFinite(input.csDia) && Number.isFinite(input.idBushing) && input.csDia < input.idBushing) {
       warnings.push({
-        code: 'INPUT_INVALID',
+        code: 'INTERNAL_CS_DIA_LT_ID',
         message: 'Internal countersink diameter should be >= bushing ID.',
         severity: 'warning'
       });
     }
     if (!Number.isFinite(input.csAngle) || input.csAngle <= 0 || input.csAngle >= 180) {
       warnings.push({
-        code: 'INPUT_INVALID',
+        code: 'INTERNAL_CS_ANGLE_INVALID',
         message: 'Internal countersink angle must be between 0 and 180 degrees.',
         severity: 'warning'
       });
@@ -159,14 +159,14 @@ export function validateBushingInputs(input: BushingInputs): BushingWarning[] {
   if (input.bushingType === 'countersink') {
     if (Number.isFinite(input.extCsDia) && Number.isFinite(input.boreDia) && input.extCsDia < input.boreDia) {
       warnings.push({
-        code: 'INPUT_INVALID',
+        code: 'EXTERNAL_CS_DIA_LT_OD',
         message: 'External countersink diameter should be >= installed OD baseline.',
         severity: 'warning'
       });
     }
     if (!Number.isFinite(input.extCsAngle) || input.extCsAngle <= 0 || input.extCsAngle >= 180) {
       warnings.push({
-        code: 'INPUT_INVALID',
+        code: 'EXTERNAL_CS_ANGLE_INVALID',
         message: 'External countersink angle must be between 0 and 180 degrees.',
         severity: 'warning'
       });

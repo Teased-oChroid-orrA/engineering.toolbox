@@ -84,6 +84,7 @@
   let safeModeRedirected = $state(false);
   let shellHidden = $state(false);
   let shellPinned = $state(false);
+  let shellHoverReady = $state(false);
   let lastScrollY = $state(0);
 
   type RouteBootProfile = {
@@ -276,16 +277,27 @@
       }
       if (y < 80) {
         shellHidden = false;
+        shellHoverReady = false;
         lastScrollY = y;
         return;
       }
       const delta = y - lastScrollY;
-      if (delta > 10) shellHidden = true;
-      else if (delta < -10) shellHidden = false;
+      if (delta > 10) {
+        if (!shellHidden) shellHoverReady = false;
+        shellHidden = true;
+      } else if (delta < -10) {
+        shellHidden = false;
+        shellHoverReady = false;
+      }
       lastScrollY = y;
+    };
+    const armShellHover = (ev: PointerEvent) => {
+      if (!shellHidden) return;
+      if (ev.clientY > 32) shellHoverReady = true;
     };
     lastScrollY = typeof window !== 'undefined' ? window.scrollY || 0 : 0;
     window.addEventListener('scroll', updateShellVisibility, { passive: true });
+    window.addEventListener('pointermove', armShellHover, { passive: true });
     const fetchStartupHealth = async () => {
       if (!tauriInvoke || healthTickInFlight) return;
       healthTickInFlight = true;
@@ -430,6 +442,7 @@
       window.removeEventListener('app-ready', onAppReady as EventListener);
       window.removeEventListener('resize', update);
       window.removeEventListener('scroll', update, true);
+      window.removeEventListener('pointermove', armShellHover);
     };
   });
 
@@ -534,16 +547,29 @@
 </svelte:head>
 
 <div class="min-h-screen text-white">
+  {#if shellHidden}
+    <div
+      class="fixed inset-x-0 top-0 z-[55] h-3"
+      aria-hidden="true"
+      onmouseenter={() => {
+        if (!shellHoverReady) return;
+        shellPinned = true;
+        shellHidden = false;
+        shellHoverReady = false;
+      }}
+    ></div>
+  {/if}
   <AppBar
     class={cn(
-      'sticky top-2 z-50 mx-4 mt-2 rounded-2xl glass-panel shadow-2xl transition-transform duration-300 ease-out',
+      'fixed inset-x-0 top-0 z-50 mx-4 mt-2 rounded-2xl glass-panel shadow-2xl transition-[transform,opacity] duration-300 ease-out',
       shellHidden
-        ? '-translate-y-[calc(100%-18px)] opacity-80 hover:translate-y-0 hover:opacity-100 focus-within:translate-y-0 focus-within:opacity-100'
-        : 'translate-y-0 opacity-100'
+        ? '-translate-y-[calc(100%+1.25rem)] opacity-0 pointer-events-none'
+        : 'translate-y-0 opacity-100 pointer-events-auto'
     )}
     onmouseenter={() => {
       shellPinned = true;
       shellHidden = false;
+      shellHoverReady = false;
     }}
     onmouseleave={() => {
       shellPinned = false;
@@ -552,6 +578,7 @@
     onfocusin={() => {
       shellPinned = true;
       shellHidden = false;
+      shellHoverReady = false;
     }}
     onfocusout={() => {
       shellPinned = false;
@@ -676,8 +703,9 @@
     </AppBar.Toolbar>
   </AppBar>
 
-  {#if $toolboxProgress.visible}
-    <div class="mx-auto mt-2 max-w-7xl px-4">
+  <div class="mx-auto max-w-7xl px-4 pt-24">
+  {#if $toolboxProgress.visible && $toolboxProgress.progress < 100}
+    <div class="mt-2">
       <div class="rounded-xl border border-cyan-400/20 bg-surface-900/70 px-3 py-2 backdrop-blur">
         <div class="mb-1 flex items-center justify-between text-[10px] uppercase tracking-widest">
           <span class="text-cyan-200">Loading · {$toolboxProgress.scope}</span>
@@ -727,7 +755,7 @@
     </div>
   {/if}
   {#if startupNotice.open}
-    <div class="mx-auto mt-2 max-w-7xl px-4">
+    <div class="mt-2">
       <div class="rounded-xl border border-cyan-300/30 bg-surface-900/92 px-3 py-2 text-[11px] text-cyan-100 shadow-xl">
         <div class="mb-1 text-[10px] uppercase tracking-widest text-cyan-200/80">Startup Telemetry</div>
         <div>{startupNotice.text}</div>
@@ -735,7 +763,7 @@
     </div>
   {/if}
   {#if startupHealth}
-    <div class="mx-auto mt-2 max-w-7xl px-4">
+    <div class="mt-2">
       <div class="rounded-xl border border-indigo-300/20 bg-surface-900/88 px-3 py-2 text-[11px] text-indigo-100">
         <div class="mb-1 flex items-center justify-between">
           <div class="text-[10px] uppercase tracking-widest text-indigo-200/80">Startup Health</div>
@@ -769,8 +797,9 @@
   <div
     id="app-content-root"
     data-route-ready={routeReadyKey(routePath)}
-    class="mx-auto max-w-7xl px-4 py-6 pb-20"
+    class="py-6 pb-20"
   >
     {@render children()}
+  </div>
   </div>
 </div>
