@@ -36,6 +36,8 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
   const installationRows: Array<[string, string]> = [
     ['Installation model', esc(installation.model)],
     ['Installed preload', fmt(installation.preload, 4)],
+    ['Installed preload (min)', fmt(installation.preloadMin, 4)],
+    ['Installed preload (max)', fmt(installation.preloadMax, 4)],
     ['Nominal diameter', fmt(input.nominalDiameter, 4)],
     ['Tensile stress area', fmt(input.tensileStressArea, 6)]
   ];
@@ -61,13 +63,22 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
   const serviceRows: Array<[string, string]> = service
     ? [
         ['Preload effective', fmt(service.preloadEffective, 4)],
+        ['Preload effective (min)', fmt(service.preloadEffectiveMin, 4)],
+        ['Preload effective (max)', fmt(service.preloadEffectiveMax, 4)],
         ['Embedment loss', fmt(service.embedmentLoss, 6)],
+        ['Coating crush loss', fmt(service.preloadLossBreakdown.coatingCrushLoss, 6)],
+        ['Washer seating loss', fmt(service.preloadLossBreakdown.washerSeatingLoss, 6)],
+        ['Relaxation loss', fmt(service.preloadLossBreakdown.relaxationLoss, 6)],
+        ['Creep loss', fmt(service.preloadLossBreakdown.creepLoss, 6)],
         ['Thermal preload shift', fmt(service.thermalPreloadShift, 6)],
+        ['Mechanical loss total', fmt(service.preloadLossBreakdown.mechanicalLossTotal, 6)],
+        ['Net preload shift', fmt(service.preloadLossBreakdown.netPreloadShift, 6)],
         ['External axial load', fmt(service.externalAxialLoad, 4)],
         ['External transverse load', fmt(service.externalTransverseLoad, 4)],
         ['Bolt load in service', fmt(service.boltLoadService, 4)],
         ['Clamp force in service', fmt(service.clampForceService, 4)],
         ['Separation load', fmt(service.separationLoad, 4)],
+        ['Separation state', esc(service.separationState)],
         ['Slip resistance', fmt(service.slipResistance, 4)]
       ]
     : [['Service state', 'No service case provided']];
@@ -123,15 +134,32 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
     .map((segment, index) => {
       const label =
         segment.compressionModel === 'cylindrical_annulus'
-          ? `Uniform compression proxy: Do=${fmt(segment.outerDiameter, 4)}, Di=${fmt(segment.innerDiameter, 4)}`
+          ? `Constant effective compression diameter: Do=${fmt(segment.outerDiameter, 4)}, Di=${fmt(segment.innerDiameter, 4)}`
           : segment.compressionModel === 'conical_frustum_annulus'
-            ? `Tapered compression proxy: Do0=${fmt(segment.outerDiameterStart, 4)}, Do1=${fmt(segment.outerDiameterEnd, 4)}, Di=${fmt(segment.innerDiameter, 4)}`
-            : `Direct equivalent area proxy: Aeff=${fmt(segment.effectiveArea, 6)}`;
+            ? `Tapered effective compression diameter: Do0=${fmt(segment.outerDiameterStart, 4)}, Do1=${fmt(segment.outerDiameterEnd, 4)}, Di=${fmt(segment.innerDiameter, 4)}`
+            : segment.compressionModel === 'calibrated_vdi_equivalent'
+              ? `Calibrated cone / VDI-style equivalent row: Di=${fmt(segment.innerDiameter, 4)}`
+              : `Equivalent compressed area: Aeff=${fmt(segment.effectiveArea, 6)}`;
       return `<tr><td>${esc(segment.id || `member-${index + 1}`)}</td><td>${esc(segment.compressionModel)}</td><td>${fmt(segment.length, 4)}</td><td>${fmt(segment.modulus, 0)}</td><td>Plate ${fmt(segment.plateWidth, 4)} × ${fmt(segment.plateLength, 4)} • ${label}</td></tr>`;
     })
     .join('');
 
   const assumptions = output.assumptions.map((entry) => `<li>${esc(entry)}</li>`).join('');
+  const modelBasisRows: Array<[string, string]> = [
+    ['Compression basis', esc(output.modelBasis.compressionModelSummary)],
+    ['Uncertainty basis', esc(output.modelBasis.uncertaintySummary)],
+    ['Preload-loss basis', esc(output.modelBasis.preloadLossSummary)],
+    ['Active compression models', esc(output.modelBasis.activeCompressionModels.join(', '))]
+  ];
+  const uncertaintyRows: Array<[string, string]> = [
+    ['Legacy scatter %', fmt(installation.uncertainty.legacyScatterPercent, 3)],
+    ['Tool accuracy %', fmt(installation.uncertainty.toolAccuracyPercent, 3)],
+    ['Thread friction %', fmt(installation.uncertainty.threadFrictionPercent, 3)],
+    ['Bearing friction %', fmt(installation.uncertainty.bearingFrictionPercent, 3)],
+    ['Prevailing torque %', fmt(installation.uncertainty.prevailingTorquePercent, 3)],
+    ['Thread geometry %', fmt(installation.uncertainty.threadGeometryPercent, 3)],
+    ['Combined RSS %', fmt(installation.uncertainty.combinedPercent, 3)]
+  ];
 
   return `<!doctype html>
 <html>
@@ -190,6 +218,18 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
       <h2>Checks Summary</h2>
       <table>${renderRows(checkRows)}</table>
       <p>${esc(checks.serviceLimits.selfLooseningRisk.note)}</p>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:16px">
+    <div class="box">
+      <h2>Model Basis</h2>
+      <table>${renderRows(modelBasisRows)}</table>
+    </div>
+    <div class="box">
+      <h2>Installation Uncertainty</h2>
+      <table>${renderRows(uncertaintyRows)}</table>
+      <p>${esc(installation.uncertainty.note)}</p>
     </div>
   </div>
 

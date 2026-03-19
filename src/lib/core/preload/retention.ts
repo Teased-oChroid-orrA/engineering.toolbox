@@ -32,6 +32,10 @@ export function evaluateServicePreloadRetention(
   const axial = Math.max(0, Number(service.externalAxialLoad ?? 0));
   const transverse = Math.max(0, Number(service.externalTransverseLoad ?? 0));
   const embedmentSettlement = Math.max(0, Number(service.embedmentSettlement ?? 0));
+  const coatingCrushLoss = Math.max(0, Number(service.coatingCrushLoss ?? 0));
+  const washerSeatingLoss = Math.max(0, Number(service.washerSeatingLoss ?? 0));
+  const relaxationLossPercent = Math.max(0, Number(service.relaxationLossPercent ?? 0)) / 100;
+  const creepLossPercent = Math.max(0, Number(service.creepLossPercent ?? 0)) / 100;
   const deltaTemperature = Number(service.temperatureChange ?? 0);
 
   const combinedCompliance = stiffness.bolt.compliance + stiffness.members.compliance;
@@ -42,8 +46,13 @@ export function evaluateServicePreloadRetention(
   const memberThermalSum = sumMemberThermalExpansion(input.memberSegments) + washerThermalExpansion(input);
   const freeThermalMismatch = deltaTemperature * (memberThermalSum - boltThermal * boltLength);
   const thermalPreloadShift = freeThermalMismatch / combinedCompliance;
+  const relaxationLoss = preloadInstalled * relaxationLossPercent;
+  const creepLoss = preloadInstalled * creepLossPercent;
+  const mechanicalLossTotal =
+    embedmentLoss + coatingCrushLoss + washerSeatingLoss + relaxationLoss + creepLoss;
+  const netPreloadShift = thermalPreloadShift - mechanicalLossTotal;
 
-  const preloadEffective = preloadInstalled - embedmentLoss + thermalPreloadShift;
+  const preloadEffective = preloadInstalled + netPreloadShift;
 
   const boltLoadIncrease = stiffness.jointConstant * axial;
   const clampForceLoss = stiffness.memberLoadFraction * axial;
@@ -52,6 +61,12 @@ export function evaluateServicePreloadRetention(
   const separationLoad = preloadEffective / Math.max(stiffness.memberLoadFraction, 1e-12);
   const separationMargin = separationLoad - axial;
   const hasSeparated = clampForceService <= 0;
+  const separationState =
+    clampForceService <= 0
+      ? 'post_separation'
+      : clampForceService <= Math.max(preloadEffective * 0.05, 1e-6)
+        ? 'incipient'
+        : 'clamped';
 
   const boltLoadPostSeparation = hasSeparated
     ? preloadEffective + stiffness.jointConstant * separationLoad + (axial - separationLoad)
@@ -69,8 +84,20 @@ export function evaluateServicePreloadRetention(
   return {
     preloadInstalled,
     preloadEffective,
+    preloadEffectiveMin: preloadEffective,
+    preloadEffectiveMax: preloadEffective,
     embedmentLoss,
     thermalPreloadShift,
+    preloadLossBreakdown: {
+      embedmentLoss,
+      coatingCrushLoss,
+      washerSeatingLoss,
+      relaxationLoss,
+      creepLoss,
+      thermalPreloadShift,
+      mechanicalLossTotal,
+      netPreloadShift
+    },
     externalAxialLoad: axial,
     externalTransverseLoad: transverse,
     boltLoadIncrease,
@@ -80,6 +107,9 @@ export function evaluateServicePreloadRetention(
     separationLoad,
     separationMargin,
     hasSeparated,
+    separationState,
+    preSeparationBoltLoadSlope: stiffness.jointConstant,
+    postSeparationBoltLoadSlope: 1,
     boltLoadPostSeparation,
     slipResistance,
     slipMargin,

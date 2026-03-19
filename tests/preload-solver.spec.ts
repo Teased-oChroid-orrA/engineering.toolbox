@@ -62,6 +62,14 @@ const baseInput: FastenedJointPreloadInput = {
       innerDiameter: 0.53
     }
   ],
+  installationUncertainty: {
+    legacyScatterPercent: 15,
+    toolAccuracyPercent: 3,
+    threadFrictionPercent: 6,
+    bearingFrictionPercent: 4,
+    prevailingTorquePercent: 2,
+    threadGeometryPercent: 1
+  },
   installation: {
     model: 'exact_torque',
     appliedTorque: 120,
@@ -82,7 +90,11 @@ const baseInput: FastenedJointPreloadInput = {
     meanAxialLoad: 180,
     alternatingAxialLoad: 90,
     embedmentSettlement: 0.00008,
-    temperatureChange: 40
+    temperatureChange: 40,
+    coatingCrushLoss: 5,
+    washerSeatingLoss: 8,
+    relaxationLossPercent: 2,
+    creepLossPercent: 1
   }
 };
 
@@ -146,6 +158,8 @@ test.describe('preload solver G1 core', () => {
     expect(out.checks.proof.status).not.toBe('unavailable');
     expect(out.checks.bearing.governing).not.toBeNull();
     expect(out.assumptions.some((entry) => entry.includes('No hidden pressure-cone shortcut'))).toBeTruthy();
+    expect(out.modelBasis.v2FoundationEnabled).toBeTruthy();
+    expect(out.modelBasis.uncertaintySummary).toContain('root-sum-square');
   });
 
   test('exact torque helper exposes explicit geometry terms', () => {
@@ -167,10 +181,38 @@ test.describe('preload solver G1 core', () => {
     expect(out.service).not.toBeNull();
     if (!out.service) return;
     expect(out.service.preloadEffective).toBeLessThan(out.service.preloadInstalled + 1e9);
+    expect(out.service.preloadLossBreakdown.embedmentLoss).toBeGreaterThan(0);
+    expect(out.service.preloadLossBreakdown.coatingCrushLoss).toBe(5);
+    expect(out.service.preloadLossBreakdown.washerSeatingLoss).toBe(8);
+    expect(out.service.preloadLossBreakdown.relaxationLoss).toBeGreaterThan(0);
+    expect(out.service.preloadLossBreakdown.creepLoss).toBeGreaterThan(0);
     expect(out.service.separationLoad).toBeGreaterThan(0);
     expect(out.service.slipResistance).not.toBeNull();
     expect(out.service.slipRatio).not.toBeNull();
     expect(out.service.boltLoadPostSeparation).toBeGreaterThan(0);
+    expect(out.service.separationState).toBeTruthy();
+  });
+
+  test('calibrated cone / VDI-style equivalent stiffness produces a valid member segment result', () => {
+    const segment = solveMemberSegmentStiffness({
+      id: 'vdi-row',
+      plateWidth: 2.5,
+      plateLength: 3.5,
+      compressionModel: 'calibrated_vdi_equivalent',
+      length: 0.25,
+      modulus: 10_600_000,
+      innerDiameter: 0.53
+    });
+    expect(segment.stiffness).toBeGreaterThan(0);
+    expect(segment.averageAreaEquivalent).toBeGreaterThan(0);
+    expect(segment.modelNote).toContain('Auto-derived tapered annulus');
+  });
+
+  test('installation uncertainty uses explicit RSS combination, not only legacy scatter', () => {
+    const out = solveInstallationPreload(baseInput.installation, baseInput.installationScatterPercent, baseInput.installationUncertainty);
+    expect(out.uncertainty.combinedPercent).toBeGreaterThan(baseInput.installationScatterPercent ?? 0);
+    expect(out.preloadMin).toBeLessThan(out.preload);
+    expect(out.preloadMax).toBeGreaterThan(out.preload);
   });
 
   test('structural checks expose explicit proof, bearing, strip, and fatigue capacities', () => {
@@ -225,6 +267,9 @@ test.describe('preload solver G1 core', () => {
     expect(html).toContain('Joint constant C');
     expect(html).toContain('Self-loosening risk');
     expect(html).toContain('Audit-ready equation sheet');
+    expect(html).toContain('Installation Uncertainty');
+    expect(html).toContain('Preload effective (min)');
+    expect(html).toContain('Separation state');
   });
 
   test('2D fastener pattern solver returns a full influence matrix and critical fastener ranking', () => {

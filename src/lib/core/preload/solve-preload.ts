@@ -6,6 +6,8 @@ import type {
   ExactTorqueTerms,
   FastenedJointPreloadInput,
   FastenedJointPreloadOutput,
+  InstallationUncertaintyInput,
+  InstallationUncertaintyResult,
   InstallationInput,
   InstallationResult
 } from './types';
@@ -56,8 +58,41 @@ function buildExactTorqueTerms(input: Extract<InstallationInput, { model: 'exact
   };
 }
 
-function scatterBounds(preload: number, scatterPercent: number | undefined) {
-  const scatter = Math.max(0, Number(scatterPercent ?? 0));
+function buildInstallationUncertainty(
+  scatterPercent: number | undefined,
+  uncertainty: InstallationUncertaintyInput | undefined
+): InstallationUncertaintyResult {
+  const legacyScatterPercent = Math.max(0, Number(uncertainty?.legacyScatterPercent ?? scatterPercent ?? 0));
+  const toolAccuracyPercent = Math.max(0, Number(uncertainty?.toolAccuracyPercent ?? 0));
+  const threadFrictionPercent = Math.max(0, Number(uncertainty?.threadFrictionPercent ?? 0));
+  const bearingFrictionPercent = Math.max(0, Number(uncertainty?.bearingFrictionPercent ?? 0));
+  const prevailingTorquePercent = Math.max(0, Number(uncertainty?.prevailingTorquePercent ?? 0));
+  const threadGeometryPercent = Math.max(0, Number(uncertainty?.threadGeometryPercent ?? 0));
+  const rss = Math.sqrt(
+    legacyScatterPercent ** 2 +
+      toolAccuracyPercent ** 2 +
+      threadFrictionPercent ** 2 +
+      bearingFrictionPercent ** 2 +
+      prevailingTorquePercent ** 2 +
+      threadGeometryPercent ** 2
+  );
+  return {
+    legacyScatterPercent,
+    toolAccuracyPercent,
+    threadFrictionPercent,
+    bearingFrictionPercent,
+    prevailingTorquePercent,
+    threadGeometryPercent,
+    combinedPercent: rss,
+    note:
+      rss > 0
+        ? 'Combined installation uncertainty uses root-sum-square aggregation of explicit tightening and friction contributors.'
+        : 'No explicit uncertainty terms were provided; preload range remains deterministic.'
+  };
+}
+
+function scatterBounds(preload: number, uncertainty: InstallationUncertaintyResult) {
+  const scatter = Math.max(0, Number(uncertainty.combinedPercent ?? 0));
   const fraction = scatter / 100;
   return {
     preloadMin: preload * (1 - fraction),
@@ -81,8 +116,10 @@ function buildEnvelope(
 
 export function solveInstallationPreload(
   installation: InstallationInput,
-  scatterPercent?: number
+  scatterPercent?: number,
+  installationUncertaintyInput?: InstallationUncertaintyInput
 ): InstallationResult {
+  const uncertainty = buildInstallationUncertainty(scatterPercent, installationUncertaintyInput);
   switch (installation.model) {
     case 'exact_torque': {
       const exactTerms = buildExactTorqueTerms(installation);
@@ -92,7 +129,7 @@ export function solveInstallationPreload(
         throw new Error('Applied torque must exceed prevailing torque.');
       }
       const preload = availableTorque * exactTerms.preloadPerAppliedTorque;
-      const bounds = scatterBounds(preload, scatterPercent);
+      const bounds = scatterBounds(preload, uncertainty);
       return {
         model: 'exact_torque',
         preload,
@@ -102,7 +139,8 @@ export function solveInstallationPreload(
         availableTorque,
         threadTorque: preload * exactTerms.threadTorquePerUnitPreload,
         bearingTorque: preload * exactTerms.bearingTorquePerUnitPreload,
-        exactTerms
+        exactTerms,
+        uncertainty
       };
     }
     case 'nut_factor': {
@@ -110,7 +148,7 @@ export function solveInstallationPreload(
       assertPositive('nominalDiameter', installation.nominalDiameter);
       const torqueCoefficient = installation.nutFactor * installation.nominalDiameter;
       const preload = installation.appliedTorque / torqueCoefficient;
-      const bounds = scatterBounds(preload, scatterPercent);
+      const bounds = scatterBounds(preload, uncertainty);
       return {
         model: 'nut_factor',
         preload,
@@ -118,17 +156,19 @@ export function solveInstallationPreload(
         appliedTorque: installation.appliedTorque,
         nutFactor: installation.nutFactor,
         nominalDiameter: installation.nominalDiameter,
-        torqueCoefficient
+        torqueCoefficient,
+        uncertainty
       };
     }
     case 'direct_preload':
       assertPositive('targetPreload', installation.targetPreload);
-      const bounds = scatterBounds(installation.targetPreload, scatterPercent);
+      const bounds = scatterBounds(installation.targetPreload, uncertainty);
       return {
         model: 'direct_preload',
         preload: installation.targetPreload,
         ...bounds,
-        targetPreload: installation.targetPreload
+        targetPreload: installation.targetPreload,
+        uncertainty
       };
     default: {
       const _never: never = installation;
@@ -142,7 +182,11 @@ export function computeFastenedJointPreload(input: FastenedJointPreloadInput): F
   assertPositive('tensileStressArea', input.tensileStressArea);
   assertPositive('boltModulus', input.boltModulus);
 
-  const installation = solveInstallationPreload(input.installation, input.installationScatterPercent);
+  const installation = solveInstallationPreload(
+    input.installation,
+    input.installationScatterPercent,
+    input.installationUncertainty
+  );
   const stiffness = solveJointStiffness(input);
   const service = evaluateServicePreloadRetention(input, installation.preload, stiffness);
   const checks = evaluateStructuralChecks(input, installation.preload, service);
@@ -203,6 +247,40 @@ export function computeFastenedJointPreload(input: FastenedJointPreloadInput): F
       'Fatigue envelope from installation preload scatter superposed with explicit mean and alternating loads.'
     )
   };
+  if (service && serviceMin && serviceMax) {
+    service.preloadEffectiveMin = Math.min(serviceMin.preloadEffective, serviceMax.preloadEffective);
+    service.preloadEffectiveMax = Math.max(serviceMin.preloadEffective, serviceMax.preloadEffective);
+  }
+
+  const activeCompressionModels = Array.from(new Set(input.memberSegments.map((segment) => segment.compressionModel)));
+  const compressionModelNotes = input.memberSegments.map((segment) => {
+    switch (segment.compressionModel) {
+      case 'cylindrical_annulus':
+        return `${segment.id}: constant effective compression diameter through thickness.`;
+      case 'conical_frustum_annulus':
+        return `${segment.id}: exact annular-frustum compliance integration from explicit start/end diameters.`;
+      case 'explicit_area':
+        return `${segment.id}: direct equivalent compressed area from user-defined area input.`;
+      case 'calibrated_vdi_equivalent':
+        return `${segment.id}: auto-derived tapered annulus from plate footprint and cone half-angle.`;
+      default:
+        return 'Explicit compression model.';
+    }
+  });
+  const modelBasis = {
+    v2FoundationEnabled: Boolean(input.featureFlags?.v2Foundation ?? true),
+    activeCompressionModels,
+    compressionModelSummary:
+      activeCompressionModels.length === 1
+        ? `Active compression model: ${activeCompressionModels[0]}.`
+        : `Mixed compression models: ${activeCompressionModels.join(', ')}.`,
+    compressionModelNotes,
+    uncertaintySummary: installation.uncertainty.note,
+    preloadLossSummary:
+      service === null
+        ? 'No service case: preload-loss breakdown not evaluated.'
+        : `Effective preload uses explicit embedment, seating/crush, relaxation, creep, and thermal terms.`
+  };
 
   const assumptions = [
     'Segmented axial-spring model with explicit serial compliance only.',
@@ -211,7 +289,9 @@ export function computeFastenedJointPreload(input: FastenedJointPreloadInput): F
     'Exact thread + bearing torque decomposition is used when installation.model = exact_torque.',
     'Service-load redistribution uses the classical joint constant C = kb / (kb + km).',
     'Post-separation bolt load uses the conservative continuous transition rule from the implementation plan.',
-    'Proof, bearing, thread-strip, and fatigue checks use only explicitly supplied capacities; unavailable inputs are surfaced, not guessed.'
+    'Proof, bearing, thread-strip, and fatigue checks use only explicitly supplied capacities; unavailable inputs are surfaced, not guessed.',
+    modelBasis.uncertaintySummary,
+    modelBasis.preloadLossSummary
   ];
 
   return {
@@ -220,7 +300,8 @@ export function computeFastenedJointPreload(input: FastenedJointPreloadInput): F
     stiffness,
     service,
     checks,
-    assumptions
+    assumptions,
+    modelBasis
   };
 }
 

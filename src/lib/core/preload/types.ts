@@ -3,7 +3,21 @@ export type InstallationModel = 'exact_torque' | 'nut_factor' | 'direct_preload'
 export type CompressionModel =
   | 'cylindrical_annulus'
   | 'conical_frustum_annulus'
-  | 'explicit_area';
+  | 'explicit_area'
+  | 'calibrated_vdi_equivalent';
+
+export type PreloadFeatureFlags = {
+  v2Foundation?: boolean;
+};
+
+export type InstallationUncertaintyInput = {
+  legacyScatterPercent?: number;
+  toolAccuracyPercent?: number;
+  threadFrictionPercent?: number;
+  bearingFrictionPercent?: number;
+  prevailingTorquePercent?: number;
+  threadGeometryPercent?: number;
+};
 
 export type BoltSegmentInput = {
   id: string;
@@ -46,6 +60,17 @@ export type MemberSegmentInput =
       effectiveArea: number;
       thermalExpansionCoeff?: number;
       note?: string;
+    }
+  | {
+      id: string;
+      plateWidth: number;
+      plateLength: number;
+      compressionModel: 'calibrated_vdi_equivalent';
+      length: number;
+      modulus: number;
+      innerDiameter: number;
+      thermalExpansionCoeff?: number;
+      note?: string;
     };
 
 export type InstallationInput =
@@ -72,11 +97,13 @@ export type InstallationInput =
     };
 
 export type FastenedJointPreloadInput = {
+  featureFlags?: PreloadFeatureFlags;
   nominalDiameter: number;
   tensileStressArea: number;
   boltModulus: number;
   compressionConeHalfAngleDeg?: number;
   installationScatterPercent?: number;
+  installationUncertainty?: InstallationUncertaintyInput;
   boltThermalExpansionCoeff?: number;
   boltProofStrength?: number;
   boltUltimateStrength?: number;
@@ -115,7 +142,22 @@ export type FastenedJointPreloadInput = {
     alternatingAxialLoad?: number;
     temperatureChange?: number;
     embedmentSettlement?: number;
+    coatingCrushLoss?: number;
+    washerSeatingLoss?: number;
+    relaxationLossPercent?: number;
+    creepLossPercent?: number;
   };
+};
+
+export type InstallationUncertaintyResult = {
+  legacyScatterPercent: number;
+  toolAccuracyPercent: number;
+  threadFrictionPercent: number;
+  bearingFrictionPercent: number;
+  prevailingTorquePercent: number;
+  threadGeometryPercent: number;
+  combinedPercent: number;
+  note: string;
 };
 
 export type ExactTorqueTerms = {
@@ -139,6 +181,7 @@ export type InstallationResult =
       threadTorque: number;
       bearingTorque: number;
       exactTerms: ExactTorqueTerms;
+      uncertainty: InstallationUncertaintyResult;
     }
   | {
       model: 'nut_factor';
@@ -149,6 +192,7 @@ export type InstallationResult =
       nutFactor: number;
       nominalDiameter: number;
       torqueCoefficient: number;
+      uncertainty: InstallationUncertaintyResult;
     }
   | {
       model: 'direct_preload';
@@ -156,6 +200,7 @@ export type InstallationResult =
       preloadMin: number;
       preloadMax: number;
       targetPreload: number;
+      uncertainty: InstallationUncertaintyResult;
     };
 
 export type SegmentStiffnessResult = {
@@ -168,6 +213,7 @@ export type MemberSegmentStiffnessResult = SegmentStiffnessResult & {
   compressionModel: CompressionModel;
   exactAreaIntegral: number;
   averageAreaEquivalent: number;
+  modelNote?: string;
 };
 
 export type StiffnessResult = {
@@ -199,13 +245,39 @@ export type FastenedJointPreloadOutput = {
   service: ServiceEvaluationResult | null;
   checks: StructuralChecksResult;
   assumptions: string[];
+  modelBasis: ModelBasisResult;
+};
+
+export type PreloadLossBreakdown = {
+  embedmentLoss: number;
+  coatingCrushLoss: number;
+  washerSeatingLoss: number;
+  relaxationLoss: number;
+  creepLoss: number;
+  thermalPreloadShift: number;
+  mechanicalLossTotal: number;
+  netPreloadShift: number;
+};
+
+export type SeparationState = 'clamped' | 'incipient' | 'post_separation';
+
+export type ModelBasisResult = {
+  v2FoundationEnabled: boolean;
+  activeCompressionModels: CompressionModel[];
+  compressionModelSummary: string;
+  compressionModelNotes: string[];
+  uncertaintySummary: string;
+  preloadLossSummary: string;
 };
 
 export type ServiceEvaluationResult = {
   preloadInstalled: number;
   preloadEffective: number;
+  preloadEffectiveMin: number;
+  preloadEffectiveMax: number;
   embedmentLoss: number;
   thermalPreloadShift: number;
+  preloadLossBreakdown: PreloadLossBreakdown;
   externalAxialLoad: number;
   externalTransverseLoad: number;
   boltLoadIncrease: number;
@@ -215,6 +287,9 @@ export type ServiceEvaluationResult = {
   separationLoad: number;
   separationMargin: number;
   hasSeparated: boolean;
+  separationState: SeparationState;
+  preSeparationBoltLoadSlope: number;
+  postSeparationBoltLoadSlope: number;
   boltLoadPostSeparation: number;
   slipResistance: number | null;
   slipMargin: number | null;

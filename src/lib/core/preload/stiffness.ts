@@ -114,7 +114,50 @@ function solveExplicitArea(segment: Extract<MemberSegmentInput, { compressionMod
     stiffness: 1 / compliance,
     compliance,
     exactAreaIntegral: integral,
-    averageAreaEquivalent: segment.effectiveArea
+    averageAreaEquivalent: segment.effectiveArea,
+    modelNote: segment.note
+  };
+}
+
+function solveCalibratedVdiEquivalent(
+  segment: Extract<MemberSegmentInput, { compressionModel: 'calibrated_vdi_equivalent' }>,
+  compressionConeHalfAngleDeg = 30
+): MemberSegmentStiffnessResult {
+  assertPositive(`${segment.id}.length`, segment.length);
+  assertPositive(`${segment.id}.modulus`, segment.modulus);
+  if (!Number.isFinite(segment.innerDiameter) || segment.innerDiameter < 0) {
+    throw new Error(`${segment.id}.innerDiameter must be a finite non-negative number.`);
+  }
+
+  const footprintCap = Math.max(
+    segment.innerDiameter + 1e-3,
+    Math.min(Number(segment.plateWidth), Number(segment.plateLength))
+  );
+  const halfAngleRad = (Math.max(10, Math.min(45, compressionConeHalfAngleDeg)) * Math.PI) / 180;
+  const spread = 2 * segment.length * Math.tan(halfAngleRad);
+  const outerDiameterStart = Math.min(footprintCap, Math.max(segment.innerDiameter + 1e-3, segment.innerDiameter + spread * 0.35));
+  const outerDiameterEnd = Math.min(footprintCap, Math.max(outerDiameterStart + 1e-3, segment.innerDiameter + spread));
+
+  const exactAreaIntegral =
+    outerDiameterEnd === outerDiameterStart
+      ? segment.length / areaFromDiameter(outerDiameterStart, segment.innerDiameter, segment.id)
+      : solveConicalFrustumAnnulus({
+          ...segment,
+          compressionModel: 'conical_frustum_annulus',
+          outerDiameterStart,
+          outerDiameterEnd
+        }).exactAreaIntegral;
+  const compliance = exactAreaIntegral / segment.modulus;
+  const averageAreaEquivalent = segment.length / exactAreaIntegral;
+
+  return {
+    id: segment.id,
+    compressionModel: segment.compressionModel,
+    stiffness: 1 / compliance,
+    compliance,
+    exactAreaIntegral,
+    averageAreaEquivalent,
+    modelNote: `Auto-derived tapered annulus from row footprint cap and ${compressionConeHalfAngleDeg.toFixed(1)}° half-angle.`
   };
 }
 
@@ -178,7 +221,10 @@ function buildWasherSegments(
   }));
 }
 
-export function solveMemberSegmentStiffness(segment: MemberSegmentInput): MemberSegmentStiffnessResult {
+export function solveMemberSegmentStiffness(
+  segment: MemberSegmentInput,
+  compressionConeHalfAngleDeg = 30
+): MemberSegmentStiffnessResult {
   switch (segment.compressionModel) {
     case 'cylindrical_annulus':
       return solveCylindricalAnnulus(segment);
@@ -186,6 +232,8 @@ export function solveMemberSegmentStiffness(segment: MemberSegmentInput): Member
       return solveConicalFrustumAnnulus(segment);
     case 'explicit_area':
       return solveExplicitArea(segment);
+    case 'calibrated_vdi_equivalent':
+      return solveCalibratedVdiEquivalent(segment, compressionConeHalfAngleDeg);
     default: {
       const _never: never = segment;
       throw new Error(`Unsupported area model: ${String(_never)}`);
@@ -210,7 +258,7 @@ export function solveSegmentedMemberStiffness(segments: MemberSegmentInput[]): S
   if (!segments.length) {
     throw new Error('At least one member segment is required.');
   }
-  const solved = segments.map(solveMemberSegmentStiffness);
+  const solved = segments.map((segment) => solveMemberSegmentStiffness(segment));
   const compliance = solved.reduce((sum, segment) => sum + segment.compliance, 0);
   return {
     stiffness: 1 / compliance,
@@ -220,15 +268,22 @@ export function solveSegmentedMemberStiffness(segments: MemberSegmentInput[]): S
 }
 
 export function solveJointStiffness(
-  input: Pick<FastenedJointPreloadInput, 'boltSegments' | 'memberSegments' | 'washerStack'>
+  input: Pick<FastenedJointPreloadInput, 'boltSegments' | 'memberSegments' | 'washerStack' | 'compressionConeHalfAngleDeg'>
 ): StiffnessResult {
   const bolt = solveSegmentedBoltStiffness(input.boltSegments);
   const washerInputs = buildWasherSegments(input as Pick<FastenedJointPreloadInput, 'washerStack'>);
-  const washerSegments = washerInputs.map(solveMemberSegmentStiffness);
+  const compressionConeHalfAngleDeg = Number(input.compressionConeHalfAngleDeg ?? 30);
+  const washerSegments = washerInputs.map((segment) => solveMemberSegmentStiffness(segment, compressionConeHalfAngleDeg));
   const washerCompliance = washerSegments.reduce((sum, segment) => sum + segment.compliance, 0);
   const washerStiffness = washerCompliance > 0 ? 1 / washerCompliance : null;
   const combinedMemberInputs = [...washerInputs, ...input.memberSegments];
-  const members = solveSegmentedMemberStiffness(combinedMemberInputs);
+  const solved = combinedMemberInputs.map((segment) => solveMemberSegmentStiffness(segment, compressionConeHalfAngleDeg));
+  const compliance = solved.reduce((sum, segment) => sum + segment.compliance, 0);
+  const members = {
+    stiffness: 1 / compliance,
+    compliance,
+    segments: solved
+  };
   const jointConstant = bolt.stiffness / (bolt.stiffness + members.stiffness);
   return {
     bolt,

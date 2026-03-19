@@ -14,6 +14,7 @@ async function goToPreloadReview(page: import('@playwright/test').Page) {
 async function preparePreloadScreenshot(page: import('@playwright/test').Page) {
   await page.goto('/');
   await page.evaluate(() => {
+    localStorage.removeItem('scd.preload.inputs.v2');
     localStorage.removeItem('scd.preload.inputs.v1');
     localStorage.removeItem('scd.preload.step-snapshots.v1');
     localStorage.removeItem('scd.preload.step-hints.v1');

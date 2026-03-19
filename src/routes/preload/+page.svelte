@@ -14,6 +14,7 @@
   } from '$lib/components/ui';
   import { exportPdfFromHtml, exportSvg } from '$lib/drafting/core/export';
   import { safeModeStore } from '$lib/stores/safeModeStore';
+  import { cn } from '$lib/utils';
   import {
     buildPreloadEquationSheetHtml,
     computeFastenedJointPreload,
@@ -31,13 +32,16 @@
     type MemberSegmentInput
   } from '$lib/core/preload';
 
-  const STORAGE_KEY = 'scd.preload.inputs.v1';
+  const STORAGE_KEY = 'scd.preload.inputs.v2';
+  const LEGACY_STORAGE_KEYS = ['scd.preload.inputs.v1'];
   const STEP_SNAPSHOT_KEY = 'scd.preload.step-snapshots.v1';
   const STEP_HINTS_KEY = 'scd.preload.step-hints.v1';
   const STEP_TELEMETRY_KEY = 'scd.preload.step-telemetry.v1';
   const STEP_PREFS_KEY = 'scd.preload.step-prefs.v1';
   type WorkflowStep = 'fastener' | 'materials' | 'geometry' | 'review';
   type PreloadForm = Omit<FastenedJointPreloadInput, 'serviceCase' | 'washerStack'> & {
+    featureFlags: NonNullable<FastenedJointPreloadInput['featureFlags']>;
+    installationUncertainty: NonNullable<FastenedJointPreloadInput['installationUncertainty']>;
     washerStack: NonNullable<FastenedJointPreloadInput['washerStack']>;
     serviceCase: NonNullable<FastenedJointPreloadInput['serviceCase']>;
     useCustomBoltSegments: boolean;
@@ -108,6 +112,40 @@
   ];
 
   const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+  const localButtonBase =
+    'inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-semibold tracking-tight transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/40 disabled:pointer-events-none disabled:opacity-50 hover:brightness-110 hover:scale-[1.01] active:scale-[0.99]';
+  const localButtonVariants = {
+    primary: 'bg-teal-400 text-black hover:bg-teal-300',
+    secondary: 'bg-white/10 text-white hover:bg-white/15',
+    outline: 'border border-white/12 bg-white/0 text-white hover:bg-white/6',
+    ghost: 'bg-transparent text-white/80 hover:bg-white/6 hover:text-white'
+  } as const;
+  const localButtonSizes = {
+    sm: 'h-8 px-3',
+    md: 'h-9 px-4'
+  } as const;
+  function localButtonClass(
+    variant: keyof typeof localButtonVariants = 'secondary',
+    size: keyof typeof localButtonSizes = 'sm',
+    className = ''
+  ) {
+    return cn(localButtonBase, localButtonVariants[variant], localButtonSizes[size], className);
+  }
+
+  function readStoredInputs() {
+    if (typeof window === 'undefined') return null;
+    const keys = [STORAGE_KEY, ...LEGACY_STORAGE_KEYS];
+    for (const key of keys) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      try {
+        return JSON.parse(raw) as Partial<PreloadForm>;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
 
   function estimateThreadedArea(nominalDiameter: number) {
     const d = Math.max(0.05, Number(nominalDiameter));
@@ -145,23 +183,32 @@
     bottomThickness: number,
     modulus: number,
     nominalDiameter: number,
-    compressionModel: MemberSegmentInput['compressionModel']
+    compressionModel: MemberSegmentInput['compressionModel'],
+    compressionConeHalfAngleDeg = 30
   ): MemberSegmentInput[] {
     const safePlateWidth = Math.max(0.1, Number(plateWidth));
     const safePlateLength = Math.max(0.1, Number(plateLength));
     const proxyOuterDiameter = Math.min(Math.max(safePlateWidth, safePlateLength), Math.max(nominalDiameter * 2.6, nominalDiameter + 0.5));
+    const safeGap = Math.max(0.001, Number(nominalDiameter || 0.5) * 0.05);
     const makeLayer = (id: string, thickness: number): MemberSegmentInput => {
       if (compressionModel === 'conical_frustum_annulus') {
+        const layerThickness = Math.max(0.02, Number(thickness));
+        const inner = Math.max(0, Number(nominalDiameter));
+        const footprintCap = Math.min(safePlateWidth, safePlateLength);
+        const cap = Math.max(inner + safeGap, footprintCap || inner + safeGap);
+        const start = Math.max(inner + safeGap, Math.min(cap, Math.max(inner + safeGap, nominalDiameter * 1.6)));
+        const spread = 2 * layerThickness * Math.tan((Math.max(5, Math.min(45, Number(compressionConeHalfAngleDeg || 30))) * Math.PI) / 180);
+        const end = Math.max(inner + safeGap, Math.min(cap, Math.max(start + safeGap, start + spread)));
         return {
           id,
           plateWidth: safePlateWidth,
           plateLength: safePlateLength,
           compressionModel,
-          length: Math.max(0.02, Number(thickness)),
+          length: layerThickness,
           modulus,
-          outerDiameterStart: Math.max(nominalDiameter + 0.2, proxyOuterDiameter * 0.82),
-          outerDiameterEnd: proxyOuterDiameter,
-          innerDiameter: nominalDiameter
+          outerDiameterStart: start,
+          outerDiameterEnd: end,
+          innerDiameter: inner
         };
       }
       if (compressionModel === 'explicit_area') {
@@ -174,6 +221,18 @@
           modulus,
           effectiveArea: Math.max(0.0001, safePlateWidth * safePlateLength * 0.22),
           note: 'Auto-derived from rectangular plate footprint'
+        };
+      }
+      if (compressionModel === 'calibrated_vdi_equivalent') {
+        return {
+          id,
+          plateWidth: safePlateWidth,
+          plateLength: safePlateLength,
+          compressionModel,
+          length: Math.max(0.02, Number(thickness)),
+          modulus,
+          innerDiameter: nominalDiameter,
+          note: 'Auto-derived calibrated cone / VDI-style equivalent row'
         };
       }
       return {
@@ -210,11 +269,20 @@
   }
 
   const defaultForm = (): PreloadForm => ({
+    featureFlags: { v2Foundation: true },
     nominalDiameter: 0.5,
     tensileStressArea: 0.1419,
     boltModulus: 30_000_000,
     compressionConeHalfAngleDeg: 30,
     installationScatterPercent: 15,
+    installationUncertainty: {
+      legacyScatterPercent: 15,
+      toolAccuracyPercent: 3,
+      threadFrictionPercent: 6,
+      bearingFrictionPercent: 4,
+      prevailingTorquePercent: 2,
+      threadGeometryPercent: 1
+    },
     boltThermalExpansionCoeff: 6.5e-6,
     boltProofStrength: 85_000,
     boltUltimateStrength: 120_000,
@@ -307,7 +375,11 @@
       meanAxialLoad: 180,
       alternatingAxialLoad: 90,
       temperatureChange: 40,
-      embedmentSettlement: 0.00008
+      embedmentSettlement: 0.00008,
+      coatingCrushLoss: 0,
+      washerSeatingLoss: 0,
+      relaxationLossPercent: 0,
+      creepLossPercent: 0
     }
     ,
     useCustomBoltSegments: false,
@@ -360,26 +432,26 @@
     review: { totalMs: 0, enteredAt: null }
   });
   let stepEnteredAt = $state<number>(Date.now());
-  let previousTrackedStep = $state<WorkflowStep>('fastener');
-  let snapshotTimer = $state<ReturnType<typeof setTimeout> | null>(null);
+  let previousTrackedStep: WorkflowStep = 'fastener';
+  let snapshotTimer: ReturnType<typeof setTimeout> | null = null;
   let stepToastTimer: ReturnType<typeof setTimeout> | null = null;
   let stepToast: { open: boolean; text: string; tone: 'info' | 'ok' | 'warn' } = $state({
     open: false,
     text: '',
     tone: 'info'
   });
-  let formSignature = $state<string>('');
-  let stepPrefsSignature = $state<string>('');
+  let formSignature = '';
+  let stepPrefsSignature = '';
   let summarySvg = $state<SVGSVGElement | null>(null);
   let jointSectionSvg = $state<SVGSVGElement | null>(null);
   let loadFullWorkspace = $state(false);
   let activePreloadIssueIndex = $state(0);
+  let lastConicalAutoSignature = '';
 
   if (typeof window !== 'undefined') {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
+    const parsed = readStoredInputs();
+    if (parsed) {
       try {
-        const parsed = JSON.parse(raw) as Partial<FastenedJointPreloadInput>;
         const baseline = defaultForm();
         form = {
           ...baseline,
@@ -390,9 +462,9 @@
             : baseline.memberSegments,
           adjacentFastenerScreen: {
             ...baseline.adjacentFastenerScreen,
-            ...((parsed as Partial<PreloadForm>).adjacentFastenerScreen ?? {}),
-            loadCases: Array.isArray((parsed as Partial<PreloadForm>).adjacentFastenerScreen?.loadCases)
-              ? (parsed as Partial<PreloadForm>).adjacentFastenerScreen?.loadCases ?? baseline.adjacentFastenerScreen.loadCases
+            ...(parsed.adjacentFastenerScreen ?? {}),
+            loadCases: Array.isArray(parsed.adjacentFastenerScreen?.loadCases)
+              ? parsed.adjacentFastenerScreen?.loadCases ?? baseline.adjacentFastenerScreen.loadCases
               : baseline.adjacentFastenerScreen.loadCases
           },
           washerStack: {
@@ -403,12 +475,16 @@
             ...baseline.serviceCase,
             ...(parsed.serviceCase ?? {})
           },
+          installationUncertainty: {
+            ...baseline.installationUncertainty,
+            ...(parsed.installationUncertainty ?? {})
+          },
           installation: {
             ...baseline.installation,
-            ...((parsed as Partial<PreloadForm>).installation ?? {})
+            ...(parsed.installation ?? {})
           }
         };
-        const restoredInstallationModel = (parsed as Partial<PreloadForm>).installation?.model;
+        const restoredInstallationModel = parsed.installation?.model;
         selectedInstallationModel =
           restoredInstallationModel === 'exact_torque' ||
           restoredInstallationModel === 'nut_factor' ||
@@ -590,8 +666,8 @@
   }
 
   function handleNextClick() {
-    if (canGoNext) {
-      setWorkflowStep(nextStepTarget);
+    if (workflowStep !== 'review' && currentStepValid) {
+      setWorkflowStep(nextWorkflowStep(workflowStep));
       return;
     }
     showStepToast('Complete required fields to continue.', 'warn');
@@ -712,10 +788,10 @@
     };
   }
 
-  let lastPlateMaterialSignature = $state('');
-  let lastWasherMaterialSignature = $state('');
-  let lastFastenerId = $state('');
-  let lastFastenerMaterialId = $state('');
+  let lastPlateMaterialSignature = '';
+  let lastWasherMaterialSignature = '';
+  let lastFastenerId = '';
+  let lastFastenerMaterialId = '';
 
   function applyPlateMaterialDefaults() {
     const topMaterial = getPreloadMaterial(form.useSamePlateMaterial ? form.selectedPlateMaterialId : form.selectedTopPlateMaterialId);
@@ -807,10 +883,10 @@
     };
   }
 
-  (() => {
+  $effect(() => {
     if (selectedInstallationModel !== form.installation.model) setInstallationModel(selectedInstallationModel);
   });
-  (() => {
+  $effect(() => {
     const signature = form.useSamePlateMaterial
       ? `same:${form.selectedPlateMaterialId}`
       : `split:${form.selectedTopPlateMaterialId}:${form.selectedBottomPlateMaterialId}`;
@@ -819,7 +895,7 @@
       applyPlateMaterialDefaults();
     }
   });
-  (() => {
+  $effect(() => {
     const signature = form.useSameWasherMaterial
       ? `same:${form.selectedWasherMaterialId}`
       : `split:${form.selectedHeadWasherMaterialId}:${form.selectedNutWasherMaterialId}`;
@@ -828,7 +904,7 @@
       applyWasherMaterialDefaults();
     }
   });
-  (() => {
+  $effect(() => {
     if (form.selectedFastenerId !== lastFastenerId) {
       lastFastenerId = form.selectedFastenerId;
       const fastener = getPreloadFastener(form.selectedFastenerId);
@@ -843,25 +919,25 @@
       }
     }
   });
-  (() => {
+  $effect(() => {
     if (form.selectedFastenerMaterialId !== lastFastenerMaterialId) {
       lastFastenerMaterialId = form.selectedFastenerMaterialId;
       applyFastenerMaterialDefaults(form.selectedFastenerMaterialId);
     }
   });
-  (() => {
+  $effect(() => {
     if (form.useSamePlateMaterial) {
       form.selectedTopPlateMaterialId = form.selectedPlateMaterialId;
       form.selectedBottomPlateMaterialId = form.selectedPlateMaterialId;
     }
   });
-  (() => {
+  $effect(() => {
     if (form.useSameWasherMaterial) {
       form.selectedHeadWasherMaterialId = form.selectedWasherMaterialId;
       form.selectedNutWasherMaterialId = form.selectedWasherMaterialId;
     }
   });
-  (() => {
+  $effect(() => {
     if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
   });
 
@@ -972,7 +1048,7 @@
       state
     };
   }));
-  (() => {
+  $effect(() => {
     if (workflowStep !== previousTrackedStep) {
       const now = Date.now();
       const elapsed = Math.max(0, now - stepEnteredAt);
@@ -987,39 +1063,42 @@
       persistStepState();
     }
   });
-  (() => {
+  $effect(() => {
     if (isStepValid(workflowStep) && !(stepHintsSeen[workflowStep] ?? false)) {
       stepHintsSeen = { ...stepHintsSeen, [workflowStep]: true };
       persistStepState();
     }
   });
-  (() => {
+  $effect(() => {
     for (const step of workflowOrder) {
       if (isStepValid(step) && !stepCompletedAt[step]) {
         stepCompletedAt = { ...stepCompletedAt, [step]: Date.now() };
       }
     }
   });
-  (() => {
+  $effect(() => {
     formSignature = JSON.stringify(form);
   });
-  (() => {
+  $effect(() => {
     if (formSignature) {
       if (snapshotTimer) clearTimeout(snapshotTimer);
       snapshotTimer = setTimeout(() => {
         saveStepSnapshot(workflowStep);
       }, 450);
+      return () => {
+        if (snapshotTimer) clearTimeout(snapshotTimer);
+      };
     }
   });
-  (() => {
+  $effect(() => {
     stepPrefsSignature = JSON.stringify(stepPrefs);
   });
-  (() => {
+  $effect(() => {
     if (typeof window !== 'undefined' && stepPrefsSignature) {
       localStorage.setItem(STEP_PREFS_KEY, stepPrefsSignature);
     }
   });
-  (() => {
+  $effect(() => {
     if (
       stepPrefs.autoAdvance &&
       workflowStep !== 'review' &&
@@ -1028,13 +1107,14 @@
     ) {
       const current = workflowStep;
       const next = nextStepTarget;
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         if (workflowStep === current && currentStepValid) setWorkflowStep(next);
       }, 220);
+      return () => clearTimeout(timer);
     }
   });
 
-  (() => {
+  $effect(() => {
     solverError = '';
     try {
       output = computeFastenedJointPreload(form);
@@ -1103,6 +1183,17 @@
         outerDiameterStart: 1.2,
         outerDiameterEnd: 1.5,
         innerDiameter: 0.53
+      };
+    } else if (compressionModel === 'calibrated_vdi_equivalent') {
+      segment = {
+        id,
+        plateWidth: 2.5,
+        plateLength: 3.5,
+        compressionModel,
+        length: 0.25,
+        modulus: 10_600_000,
+        innerDiameter: 0.53,
+        note: 'Calibrated row'
       };
     } else {
       segment = {
@@ -1179,6 +1270,18 @@
           'outerDiameterEnd' in current ? current.outerDiameterEnd : 'outerDiameter' in current ? current.outerDiameter + 0.2 : 1.5,
         innerDiameter: 'innerDiameter' in current ? current.innerDiameter : 0.53
       };
+    } else if (compressionModel === 'calibrated_vdi_equivalent') {
+      next = {
+        id,
+        plateWidth,
+        plateLength,
+        compressionModel,
+        length,
+        modulus,
+        thermalExpansionCoeff,
+        innerDiameter: 'innerDiameter' in current ? current.innerDiameter : 0.53,
+        note: 'Calibrated row'
+      };
     } else {
       next = {
         id,
@@ -1226,6 +1329,13 @@
         segment.innerDiameter >= segment.outerDiameterEnd
       ) {
         issues.push('Inner diameter must be smaller than both conical outer diameters.');
+      }
+    } else if (segment.compressionModel === 'calibrated_vdi_equivalent') {
+      if (!(segment.innerDiameter >= 0)) {
+        issues.push('Bolt hole diameter must be non-negative.');
+      }
+      if (!(segment.plateWidth > segment.innerDiameter) || !(segment.plateLength > segment.innerDiameter)) {
+        issues.push('Plate footprint must remain larger than the bolt hole diameter.');
       }
     } else if (!(segment.effectiveArea > 0)) {
       issues.push('Effective area must be positive.');
@@ -1287,6 +1397,15 @@
         outerDiameterStart,
         outerDiameterEnd,
         innerDiameter: Math.max(0, Math.min(Number(segment.innerDiameter || form.nominalDiameter), Math.min(outerDiameterStart, outerDiameterEnd) - step))
+      });
+      return;
+    }
+    if (segment.compressionModel === 'calibrated_vdi_equivalent') {
+      replaceMemberSegment(index, {
+        ...base,
+        compressionModel: 'calibrated_vdi_equivalent',
+        innerDiameter: Math.max(0, Math.min(Number('innerDiameter' in segment ? segment.innerDiameter : form.nominalDiameter), Math.min(base.plateWidth, base.plateLength) - step)),
+        note: segment.note || 'Auto-corrected calibrated row'
       });
       return;
     }
@@ -1398,6 +1517,20 @@
                     compressionModel: 'explicit_area',
                     effectiveArea:
                       'effectiveArea' in segment ? Math.max(0.0001, Number(segment.effectiveArea || 0.0001)) : Math.max(0.0001, Number(segment.plateWidth) * Number(segment.plateLength) * 0.22)
+                  } as MemberSegmentInput;
+                }
+                if (form.defaultPlateCompressionModel === 'calibrated_vdi_equivalent') {
+                  return {
+                    ...segment,
+                    compressionModel: 'calibrated_vdi_equivalent',
+                    innerDiameter: Math.max(
+                      0,
+                      Math.min(
+                        Number('innerDiameter' in segment ? segment.innerDiameter : form.nominalDiameter),
+                        Math.min(Number(segment.plateWidth), Number(segment.plateLength)) - safeStepSize()
+                      )
+                    ),
+                    note: 'Reset to calibrated cone / VDI-style equivalent row'
                   } as MemberSegmentInput;
                 }
                 if (form.defaultPlateCompressionModel === 'conical_frustum_annulus') {
@@ -1594,8 +1727,19 @@
         ['stiffness.members', String(output.stiffness.members.stiffness)],
         ['stiffness.jointConstant', String(output.stiffness.jointConstant)],
         ['service.preloadEffective', String(output.service?.preloadEffective ?? '')],
+        ['service.preloadEffectiveMin', String(output.service?.preloadEffectiveMin ?? '')],
+        ['service.preloadEffectiveMax', String(output.service?.preloadEffectiveMax ?? '')],
+        ['service.loss.embedment', String(output.service?.preloadLossBreakdown.embedmentLoss ?? '')],
+        ['service.loss.coatingCrush', String(output.service?.preloadLossBreakdown.coatingCrushLoss ?? '')],
+        ['service.loss.washerSeating', String(output.service?.preloadLossBreakdown.washerSeatingLoss ?? '')],
+        ['service.loss.relaxation', String(output.service?.preloadLossBreakdown.relaxationLoss ?? '')],
+        ['service.loss.creep', String(output.service?.preloadLossBreakdown.creepLoss ?? '')],
+        ['service.loss.thermalShift', String(output.service?.preloadLossBreakdown.thermalPreloadShift ?? '')],
         ['service.separationLoad', String(output.service?.separationLoad ?? '')],
+        ['service.separationState', String(output.service?.separationState ?? '')],
         ['service.slipResistance', String(output.service?.slipResistance ?? '')],
+        ['installation.uncertainty.combinedPercent', String(output.installation.uncertainty.combinedPercent ?? '')],
+        ['modelBasis.compressionSummary', output.modelBasis.compressionModelSummary],
         ['checks.separation.status', output.checks.serviceLimits.separation.status],
         ['checks.separation.utilization.min', String(output.checks.envelopes.separationUtilization.min ?? '')],
         ['checks.separation.utilization.nominal', String(output.checks.envelopes.separationUtilization.nominal ?? '')],
@@ -1747,22 +1891,26 @@
   function deriveConicalProxyDiameters(segment: Extract<MemberSegmentInput, { compressionModel: 'conical_frustum_annulus' }>) {
     const inner = Math.max(0, Number(segment.innerDiameter) || 0);
     const thickness = Math.max(0.001, Number(segment.length) || 0.001);
-    const cap = Math.max(inner + 0.001, Math.min(Number(segment.plateWidth) || 0, Number(segment.plateLength) || 0));
-    const startSeed = Math.max(inner + 0.05, form.nominalDiameter * 1.6);
-    const start = Math.min(cap, startSeed);
+    const gap = safeStepSize();
+    const footprintCap = Math.min(Number(segment.plateWidth) || 0, Number(segment.plateLength) || 0);
+    const cap = Math.max(inner + gap, footprintCap || inner + gap);
+    const startSeed = Math.max(inner + gap, form.nominalDiameter * 1.6);
+    const start = Math.max(inner + gap, Math.min(cap, startSeed));
     const spread = 2 * thickness * Math.tan((Math.max(5, Math.min(45, Number(form.compressionConeHalfAngleDeg ?? 30))) * Math.PI) / 180);
-    const end = Math.min(cap, Math.max(start + 0.001, start + spread));
+    const end = Math.max(inner + gap, Math.min(cap, Math.max(start + gap, start + spread)));
     return { start, end };
   }
 
   function compressionModelLabel(compressionModel: MemberSegmentInput['compressionModel']) {
     switch (compressionModel) {
       case 'cylindrical_annulus':
-        return 'Uniform zone (constant effective diameter)';
+        return 'Constant effective compression diameter';
       case 'conical_frustum_annulus':
-        return 'Tapered zone (cone-like spread)';
+        return 'Tapered effective compression diameter';
       case 'explicit_area':
-        return 'Direct area (equivalent compressed area)';
+        return 'Equivalent compressed area';
+      case 'calibrated_vdi_equivalent':
+        return 'Calibrated cone / VDI-style equivalent stiffness';
       default:
         return compressionModel;
     }
@@ -1814,37 +1962,44 @@
     selectedFastener.gripTable[0] ??
     null);
   let selectedFastenerMaterial = $derived(getPreloadMaterial(form.selectedFastenerMaterialId));
-  (() => {
+  $effect(() => {
     if (selectedFastenerDashVariant && !form.useCustomBoltSegments) {
       form.nominalDiameter = selectedFastenerDashVariant.nominalDiameterIn;
       form.tensileStressArea = estimateThreadedArea(selectedFastenerDashVariant.nominalDiameterIn);
     }
   });
-  (() => {
+  $effect(() => {
     if (!form.useCustomBoltSegments) {
       const gripLength = selectedFastenerGripVariant?.nominalGripIn ?? 0.5;
-      form.boltSegments = buildAutoBoltSegments(
+      const nextSegments = buildAutoBoltSegments(
         form.nominalDiameter,
         form.boltModulus,
         gripLength,
         Number(form.engagedThreadLength ?? 0.45)
       );
+      if (JSON.stringify(form.boltSegments) !== JSON.stringify(nextSegments)) {
+        form.boltSegments = nextSegments;
+      }
     }
   });
-  (() => {
+  $effect(() => {
     if (!form.useCustomPlateLayers) {
-      form.memberSegments = buildAutoPlateLayers(
+      const nextSegments = buildAutoPlateLayers(
         form.defaultPlateWidth,
         form.defaultPlateLength,
         form.defaultTopPlateThickness,
         form.defaultBottomPlateThickness,
         selectedPlateMaterial.modulusPsi,
         form.nominalDiameter,
-        form.defaultPlateCompressionModel
+        form.defaultPlateCompressionModel,
+        form.compressionConeHalfAngleDeg
       );
+      if (JSON.stringify(form.memberSegments) !== JSON.stringify(nextSegments)) {
+        form.memberSegments = nextSegments;
+      }
     }
   });
-  (() => {
+  $effect(() => {
     let changed = false;
     const nextSegments = form.memberSegments.map((segment) => {
       const sanitized = sanitizeMemberSegment(segment);
@@ -1853,8 +2008,23 @@
     });
     if (changed) form.memberSegments = nextSegments;
   });
-  (() => {
-    if (form.conicalGeometryManualOverride) return;
+  $effect(() => {
+    if (form.conicalGeometryManualOverride || !form.useCustomPlateLayers) return;
+    const signature = JSON.stringify({
+      nominalDiameter: Number(form.nominalDiameter),
+      compressionConeHalfAngleDeg: Number(form.compressionConeHalfAngleDeg ?? 30),
+      segments: form.memberSegments
+        .filter((segment) => segment.compressionModel === 'conical_frustum_annulus')
+        .map((segment) => ({
+          id: segment.id,
+          plateWidth: Number(segment.plateWidth),
+          plateLength: Number(segment.plateLength),
+          length: Number(segment.length),
+          innerDiameter: Number(segment.innerDiameter)
+        }))
+    });
+    if (signature === lastConicalAutoSignature) return;
+    lastConicalAutoSignature = signature;
     let changed = false;
     const nextSegments = form.memberSegments.map((segment) => {
       if (segment.compressionModel !== 'conical_frustum_annulus') return segment;
@@ -1874,7 +2044,7 @@
     });
     if (changed) form.memberSegments = nextSegments;
   });
-  (() => {
+  $effect(() => {
     const current = form.washerStack;
     const autoGeom = deriveAutoWasherGeometry();
     const globalInnerSource = Number.isFinite(Number(current.innerDiameter)) ? Number(current.innerDiameter) : autoGeom.inner;
@@ -1907,7 +2077,7 @@
       underNutInnerDiameter: nut.inner
     };
   });
-  (() => {
+  $effect(() => {
     if (form.washerGeometryManualOverride) return;
     const current = form.washerStack;
     const autoGeom = deriveAutoWasherGeometry();
@@ -1947,7 +2117,13 @@
   let slipUtil = $derived(Math.max(0, Math.min(1.4, output?.checks.serviceLimits.slip.utilization ?? 0)));
   let scatterMin = $derived(output?.installation.preloadMin ?? 0);
   let scatterMax = $derived(output?.installation.preloadMax ?? 0);
-  let representativeCone = $derived(form.memberSegments.find((segment) => segment.compressionModel === 'conical_frustum_annulus') ?? null);
+  let representativeCone = $derived(
+    form.memberSegments.find(
+      (segment) =>
+        segment.compressionModel === 'conical_frustum_annulus' ||
+        segment.compressionModel === 'calibrated_vdi_equivalent'
+    ) ?? null
+  );
   let washerTopCount = $derived(Math.max(0, Math.round(form.washerStack.underHeadCount ?? 0)));
   let washerBottomCount = $derived(Math.max(0, Math.round(form.washerStack.underNutCount ?? 0)));
   let effectiveWasherCount = $derived(form.washerStack.enabled ? washerTopCount + washerBottomCount : 0);
@@ -2000,12 +2176,12 @@
     $derived(topBearingFaceArea > 0 && bottomBearingFaceArea > 0
       ? Math.min(topBearingFaceArea, bottomBearingFaceArea)
       : Math.max(topBearingFaceArea, bottomBearingFaceArea, 0));
-  (() => {
+  $effect(() => {
     if (stepPrefs.autoBearingArea && Math.abs(Number(form.underHeadBearingArea ?? 0) - autoComputedBearingArea) > 1e-9) {
       form.underHeadBearingArea = autoComputedBearingArea;
     }
   });
-  (() => {
+  $effect(() => {
     if (
       stepPrefs.autoBearingArea &&
       form.installation.model === 'exact_torque' &&
@@ -2016,7 +2192,7 @@
   });
   let compressionConeHalfAngleDeg = $derived(Math.max(10, Math.min(45, Number(form.compressionConeHalfAngleDeg ?? 30))));
   let compressionConeSlope = $derived(Math.tan((compressionConeHalfAngleDeg * Math.PI) / 180));
-  (() => {
+  $effect(() => {
     if (form.washerStack.enabled && form.washerStack.count !== effectiveWasherCount) {
       form.washerStack.count = effectiveWasherCount;
     }
@@ -2032,24 +2208,29 @@
           innerDiameter: Number(form.washerStack.underHeadInnerDiameter ?? form.washerStack.innerDiameter)
         }))
       : []),
-    ...form.memberSegments.map((segment) => ({
-      id: segment.id,
-      kind: 'member' as const,
-      length: Number(segment.length),
-      modulus: Number(segment.modulus),
-      compressionModel: segment.compressionModel,
-      preview: memberPreview(segment),
-      outerDiameter:
+    ...form.memberSegments.map((segment) => {
+      const preview = memberPreview(segment);
+      const innerDiameter =
+        segment.compressionModel === 'explicit_area' ? Number(form.nominalDiameter) : Number(segment.innerDiameter);
+      const outerDiameter =
         segment.compressionModel === 'cylindrical_annulus'
           ? Number(segment.outerDiameter)
           : segment.compressionModel === 'conical_frustum_annulus'
             ? Math.max(Number(segment.outerDiameterStart), Number(segment.outerDiameterEnd))
-            : topBearingFaceOuterDiameter,
-      innerDiameter:
-        segment.compressionModel === 'explicit_area'
-          ? Number(form.nominalDiameter)
-          : Number(segment.innerDiameter)
-    })),
+            : segment.compressionModel === 'calibrated_vdi_equivalent'
+              ? (equivalentOuterDiameter(preview?.averageAreaEquivalent, innerDiameter) ?? topBearingFaceOuterDiameter)
+              : topBearingFaceOuterDiameter;
+      return {
+        id: segment.id,
+        kind: 'member' as const,
+        length: Number(segment.length),
+        modulus: Number(segment.modulus),
+        compressionModel: segment.compressionModel,
+        preview,
+        outerDiameter,
+        innerDiameter
+      };
+    }),
     ...(form.washerStack.enabled
       ? Array.from({ length: washerBottomCount }, (_, index) => ({
           id: `washer-nut-${index + 1}`,
@@ -2488,17 +2669,17 @@
       </div>
       <div class="flex items-center gap-2">
         <Badge variant="outline" class="border-white/20 text-white/60">explicit solver</Badge>
-        <Button
-          size="sm"
-          variant="secondary"
-          on:click={() => {
+        <button
+          type="button"
+          class={localButtonClass('secondary', 'sm')}
+          onclick={() => {
             const next = !showAdvancedInputs;
             showAdvancedInputs = next;
             if (next) setWorkflowStep('review');
           }}
         >
           {showAdvancedInputs ? 'Hide Advanced' : 'Show Advanced'}
-        </Button>
+        </button>
       </div>
     </div>
 
@@ -2520,10 +2701,10 @@
           </div>
         </div>
         <div class="grid grid-cols-2 gap-2 xl:grid-cols-4">
-          <Button aria-label="Pick Fastener" size="sm" variant={workflowStep === 'fastener' ? 'primary' : 'secondary'} on:click={() => setWorkflowStep('fastener')}>1. Pick Fastener</Button>
-          <Button aria-label="Pick Materials" size="sm" variant={workflowStep === 'materials' ? 'primary' : 'secondary'} on:click={() => setWorkflowStep('materials')} disabled={!canNavigateToStep('materials')}>2. Pick Materials</Button>
-          <Button aria-label="Define Geometry" size="sm" variant={workflowStep === 'geometry' ? 'primary' : 'secondary'} on:click={() => setWorkflowStep('geometry')} disabled={!canNavigateToStep('geometry')}>3. Define Geometry</Button>
-          <Button aria-label="Review" size="sm" variant={workflowStep === 'review' ? 'primary' : 'secondary'} on:click={() => setWorkflowStep('review')} disabled={!canNavigateToStep('review')}>4. Review</Button>
+          <button type="button" aria-label="Pick Fastener" class={localButtonClass(workflowStep === 'fastener' ? 'primary' : 'secondary', 'sm')} onclick={() => setWorkflowStep('fastener')}>1. Pick Fastener</button>
+          <button type="button" aria-label="Pick Materials" class={localButtonClass(workflowStep === 'materials' ? 'primary' : 'secondary', 'sm')} onclick={() => setWorkflowStep('materials')} disabled={!canNavigateToStep('materials')}>2. Pick Materials</button>
+          <button type="button" aria-label="Define Geometry" class={localButtonClass(workflowStep === 'geometry' ? 'primary' : 'secondary', 'sm')} onclick={() => setWorkflowStep('geometry')} disabled={!canNavigateToStep('geometry')}>3. Define Geometry</button>
+          <button type="button" aria-label="Review" class={localButtonClass(workflowStep === 'review' ? 'primary' : 'secondary', 'sm')} onclick={() => setWorkflowStep('review')} disabled={!canNavigateToStep('review')}>4. Review</button>
         </div>
         <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/65">
           {#if workflowStep === 'fastener'}
@@ -2544,8 +2725,8 @@
         <div class="flex items-center justify-between">
           <div class="text-xs text-white/50">Advanced is optional. Shortcuts: <span class="text-cyan-200">Alt + ← / Alt + →</span>.</div>
           <div class="flex gap-2">
-            <Button size="sm" variant="ghost" on:click={() => setWorkflowStep(previousWorkflowStep(workflowStep))} disabled={!canGoBack}>Back</Button>
-            <Button size="sm" variant="secondary" on:click={handleNextClick}>Next</Button>
+            <button type="button" class={localButtonClass('ghost', 'sm')} onclick={() => setWorkflowStep(previousWorkflowStep(workflowStep))} disabled={!canGoBack}>Back</button>
+            <button type="button" class={localButtonClass('secondary', 'sm')} onclick={handleNextClick}>Next</button>
           </div>
         </div>
         {#if workflowStep !== 'review' && blockedPrereqs.length}
@@ -2615,14 +2796,14 @@
           <Button
             size="sm"
             variant="ghost"
-            on:click={() => showStepHintToast(workflowStep)}
+            onclick={() => showStepHintToast(workflowStep)}
           >
             Show tip
           </Button>
-          <Button size="sm" variant="secondary" on:click={() => revertStepSnapshot(workflowStep)} disabled={!currentSnapshot}>
+          <Button size="sm" variant="secondary" onclick={() => revertStepSnapshot(workflowStep)} disabled={!currentSnapshot}>
             Revert Step
           </Button>
-          <Button size="sm" variant="ghost" on:click={() => revertPreviousStepSnapshot(workflowStep)} disabled={currentSnapshotHistory.length < 2}>
+          <Button size="sm" variant="ghost" onclick={() => revertPreviousStepSnapshot(workflowStep)} disabled={currentSnapshotHistory.length < 2}>
             Restore Previous
           </Button>
         </div>
@@ -2910,7 +3091,7 @@
             <div class="space-y-1"><Label class="text-white/70">Top Plate Thickness</Label><Input id={fieldId('top-thk')} type="number" step="0.0001" bind:value={form.defaultTopPlateThickness} /></div>
             <div class="space-y-1"><Label class="text-white/70">Bottom Plate Thickness</Label><Input id={fieldId('bot-thk')} type="number" step="0.0001" bind:value={form.defaultBottomPlateThickness} /></div>
           {/if}
-          <div class="space-y-1"><Label class="text-white/70">Scatter %</Label><Input type="number" step="0.1" bind:value={form.installationScatterPercent} /></div>
+          <div class="space-y-1"><Label class="text-white/70">Legacy Scatter %</Label><Input type="number" step="0.1" bind:value={form.installationScatterPercent} /></div>
           <div class="space-y-1"><Label class="text-white/70">Cone Half-Angle (visual)</Label><Input type="number" step="0.1" bind:value={form.compressionConeHalfAngleDeg} /></div>
           <div class="space-y-1"><Label class="text-white/70">Slip Coeff</Label><Input type="number" step="0.01" bind:value={form.fayingSurfaceSlipCoeff} /></div>
           <div class="space-y-1"><Label class="text-white/70">Interface Count</Label><Input type="number" step="1" bind:value={form.frictionInterfaceCount} /></div>
@@ -2928,6 +3109,20 @@
             </div>
           </div>
           <div class="space-y-1"><Label class="text-white/70">Engaged Thread Length</Label><Input type="number" step="0.0001" bind:value={form.engagedThreadLength} /></div>
+        </div>
+        <div class="rounded-lg border border-cyan-400/15 bg-cyan-500/5 p-3 text-xs text-cyan-100">
+          Installation uncertainty now combines the legacy scatter band with explicit contributor percentages using root-sum-square aggregation.
+        </div>
+        <div class="grid grid-cols-2 gap-3 xl:grid-cols-3">
+          <div class="space-y-1"><Label class="text-white/70">Tool Accuracy %</Label><Input type="number" step="0.1" bind:value={form.installationUncertainty.toolAccuracyPercent} /></div>
+          <div class="space-y-1"><Label class="text-white/70">Thread Friction %</Label><Input type="number" step="0.1" bind:value={form.installationUncertainty.threadFrictionPercent} /></div>
+          <div class="space-y-1"><Label class="text-white/70">Bearing Friction %</Label><Input type="number" step="0.1" bind:value={form.installationUncertainty.bearingFrictionPercent} /></div>
+          <div class="space-y-1"><Label class="text-white/70">Prevailing Torque %</Label><Input type="number" step="0.1" bind:value={form.installationUncertainty.prevailingTorquePercent} /></div>
+          <div class="space-y-1"><Label class="text-white/70">Thread Geometry %</Label><Input type="number" step="0.1" bind:value={form.installationUncertainty.threadGeometryPercent} /></div>
+          <div class="space-y-1">
+            <Label class="text-white/70">Combined RSS %</Label>
+            <Input type="number" step="0.001" value={output?.installation.uncertainty.combinedPercent ?? 0} disabled />
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -2992,10 +3187,10 @@
               <div class="mb-3 flex items-center justify-between gap-2">
                 <div class="text-xs font-semibold text-white/75">{segment.id}</div>
                 <div class="flex items-center gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
-                  <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move bolt segment up" on:click={() => moveBoltSegment(index, -1)} disabled={index === 0}>Up</Button>
-                  <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move bolt segment down" on:click={() => moveBoltSegment(index, 1)} disabled={index === form.boltSegments.length - 1}>Down</Button>
-                  <Button size="sm" variant="ghost" class="min-w-16 px-2 text-[10px]" aria-label="Duplicate bolt segment" on:click={() => duplicateBoltSegment(index)}>Duplicate</Button>
-                  <Button size="sm" variant="ghost" class="min-w-14 px-2 text-[10px]" aria-label="Remove bolt segment" on:click={() => removeBoltSegment(index)} disabled={form.boltSegments.length <= 1}>Remove</Button>
+                  <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move bolt segment up" onclick={() => moveBoltSegment(index, -1)} disabled={index === 0}>Up</Button>
+                  <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move bolt segment down" onclick={() => moveBoltSegment(index, 1)} disabled={index === form.boltSegments.length - 1}>Down</Button>
+                  <Button size="sm" variant="ghost" class="min-w-16 px-2 text-[10px]" aria-label="Duplicate bolt segment" onclick={() => duplicateBoltSegment(index)}>Duplicate</Button>
+                  <Button size="sm" variant="ghost" class="min-w-14 px-2 text-[10px]" aria-label="Remove bolt segment" onclick={() => removeBoltSegment(index)} disabled={form.boltSegments.length <= 1}>Remove</Button>
                 </div>
               </div>
               <div class="grid grid-cols-2 gap-3">
@@ -3020,7 +3215,7 @@
               {/if}
             </div>
           {/each}
-          <Button size="sm" variant="secondary" on:click={addBoltSegment}>Add Bolt Segment</Button>
+          <Button size="sm" variant="secondary" onclick={addBoltSegment}>Add Bolt Segment</Button>
         {:else}
           <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/60">
             The selected catalog fastener automatically defines a smooth grip segment and an engaged threaded segment. Switch on custom segmentation only when you need to override the catalog-derived split.
@@ -3059,9 +3254,10 @@
         </div>
         <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/70">
           <div class="font-semibold text-white/85">Compression proxy quick guide</div>
-          <div class="mt-1"><span class="text-cyan-200">Uniform zone</span>: one constant effective compressed diameter through thickness.</div>
-          <div><span class="text-cyan-200">Tapered zone</span>: effective compressed diameter expands through thickness (classical cone-like proxy).</div>
-          <div><span class="text-cyan-200">Direct area</span>: you directly enter the equivalent compressed area and skip diameter proxies.</div>
+          <div class="mt-1"><span class="text-cyan-200">Constant effective compression diameter</span>: one constant compressed zone through thickness.</div>
+          <div><span class="text-cyan-200">Tapered effective compression diameter</span>: explicit start/end compressed zone diameters through thickness.</div>
+          <div><span class="text-cyan-200">Equivalent compressed area</span>: you enter the equivalent compressed area directly and skip diameter proxies.</div>
+          <div><span class="text-cyan-200">Calibrated cone / VDI-style equivalent stiffness</span>: the solver auto-derives a tapered annulus from plate footprint and cone half-angle.</div>
         </div>
         <label class="flex items-center gap-2 text-sm text-white/75" id={fieldId('plate-layers')}>
           <input type="checkbox" class="checkbox checkbox-sm border-white/20 bg-black/30" bind:checked={form.useCustomPlateLayers} />
@@ -3086,9 +3282,10 @@
                   class="min-w-[220px]"
                   value={segment.compressionModel}
                   items={[
-                    { value: 'cylindrical_annulus', label: 'Uniform zone (constant effective diameter)' },
-                    { value: 'conical_frustum_annulus', label: 'Tapered zone (cone-like spread)' },
-                    { value: 'explicit_area', label: 'Direct area (enter equivalent compressed area)' }
+                    { value: 'cylindrical_annulus', label: 'Constant effective compression diameter' },
+                    { value: 'conical_frustum_annulus', label: 'Tapered effective compression diameter' },
+                    { value: 'explicit_area', label: 'Equivalent compressed area' },
+                    { value: 'calibrated_vdi_equivalent', label: 'Calibrated cone / VDI-style equivalent stiffness' }
                   ]}
                   on:change={(event) =>
                     changeCompressionModel(
@@ -3097,10 +3294,10 @@
                     )}
                 />
                 {#if form.useCustomPlateLayers}
-                  <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move member segment up" on:click={() => moveMemberSegment(index, -1)} disabled={index === 0}>Up</Button>
-                  <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move member segment down" on:click={() => moveMemberSegment(index, 1)} disabled={index === form.memberSegments.length - 1}>Down</Button>
-                  <Button size="sm" variant="ghost" class="min-w-16 px-2 text-[10px]" aria-label="Duplicate member segment" on:click={() => duplicateMemberSegment(index)}>Duplicate</Button>
-                  <Button size="sm" variant="ghost" class="min-w-14 px-2 text-[10px]" aria-label="Remove member segment" on:click={() => removeMemberSegment(index)} disabled={form.memberSegments.length <= 1}>Remove</Button>
+                  <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move member segment up" onclick={() => moveMemberSegment(index, -1)} disabled={index === 0}>Up</Button>
+                  <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move member segment down" onclick={() => moveMemberSegment(index, 1)} disabled={index === form.memberSegments.length - 1}>Down</Button>
+                  <Button size="sm" variant="ghost" class="min-w-16 px-2 text-[10px]" aria-label="Duplicate member segment" onclick={() => duplicateMemberSegment(index)}>Duplicate</Button>
+                  <Button size="sm" variant="ghost" class="min-w-14 px-2 text-[10px]" aria-label="Remove member segment" onclick={() => removeMemberSegment(index)} disabled={form.memberSegments.length <= 1}>Remove</Button>
                 {/if}
               </div>
             </div>
@@ -3120,6 +3317,9 @@
                 <div class="space-y-1"><Label class="text-white/60">Effective zone OD (end face)</Label><Input type="number" step="0.0001" bind:value={segment.outerDiameterEnd} disabled={!form.useCustomPlateLayers || !form.conicalGeometryManualOverride} /></div>
                 <div class="space-y-1"><Label class="text-white/60">Bolt hole dia</Label><Input type="number" step="0.0001" bind:value={segment.innerDiameter} disabled={!form.useCustomPlateLayers} /></div>
                 <div class="rounded-lg border border-cyan-400/20 bg-cyan-500/5 p-2 text-xs text-cyan-100">Exact annular-frustum compliance integration is used for the compressed-zone representation only. The physical part is still a plate layer.</div>
+              {:else if segment.compressionModel === 'calibrated_vdi_equivalent'}
+                <div class="space-y-1"><Label class="text-white/60">Bolt hole dia</Label><Input type="number" step="0.0001" bind:value={segment.innerDiameter} disabled={!form.useCustomPlateLayers} /></div>
+                <div class="rounded-lg border border-cyan-400/20 bg-cyan-500/5 p-2 text-xs text-cyan-100">The solver auto-derives the tapered compression annulus from the row footprint and the active cone half-angle.</div>
               {:else}
                 <div class="space-y-1"><Label class="text-white/60">Explicit Equivalent Area</Label><Input type="number" step="0.0001" bind:value={segment.effectiveArea} disabled={!form.useCustomPlateLayers} /></div>
                 <div class="space-y-1"><Label class="text-white/60">Note</Label><Input bind:value={segment.note} disabled={!form.useCustomPlateLayers} /></div>
@@ -3155,11 +3355,13 @@
             </div>
             <div class="mt-2 rounded-lg border border-white/8 bg-white/[0.02] p-2 text-[11px] text-white/62">
               {#if segment.compressionModel === 'cylindrical_annulus'}
-                Uniform zone: keeps one effective compressed diameter through the plate thickness.
+                Constant effective compression diameter: keeps one compressed-zone diameter through the plate thickness.
               {:else if segment.compressionModel === 'conical_frustum_annulus'}
-                Tapered zone: lets the effective compressed diameter widen through the plate thickness.
+                Tapered effective compression diameter: lets the compressed zone widen through the plate thickness.
+              {:else if segment.compressionModel === 'calibrated_vdi_equivalent'}
+                Calibrated cone / VDI-style equivalent stiffness: auto-derived tapered annulus from the plate footprint and active cone angle.
               {:else}
-                Direct area: you enter the equivalent compressed area directly instead of using a diameter-based proxy.
+                Equivalent compressed area: you enter the effective area directly instead of using a diameter-based proxy.
               {/if}
             </div>
             {#if memberValidation(segment).length}
@@ -3172,9 +3374,10 @@
           </div>
         {/each}
         <div class="flex flex-wrap gap-2">
-          <Button size="sm" variant="secondary" on:click={() => addMemberSegment('cylindrical_annulus')}>Add Plate Layer (Uniform Proxy)</Button>
-          <Button size="sm" variant="secondary" on:click={() => addMemberSegment('conical_frustum_annulus')}>Add Plate Layer (Tapered Proxy)</Button>
-          <Button size="sm" variant="secondary" on:click={() => addMemberSegment('explicit_area')}>Add Plate Layer (Area Proxy)</Button>
+          <Button size="sm" variant="secondary" onclick={() => addMemberSegment('cylindrical_annulus')}>Add Plate Layer (Constant Diameter)</Button>
+          <Button size="sm" variant="secondary" onclick={() => addMemberSegment('conical_frustum_annulus')}>Add Plate Layer (Tapered Diameter)</Button>
+          <Button size="sm" variant="secondary" onclick={() => addMemberSegment('calibrated_vdi_equivalent')}>Add Plate Layer (Calibrated Cone)</Button>
+          <Button size="sm" variant="secondary" onclick={() => addMemberSegment('explicit_area')}>Add Plate Layer (Equivalent Area)</Button>
         </div>
         {:else}
           <div class="space-y-2">
@@ -3192,11 +3395,13 @@
                 </div>
                 <div class="mt-2 rounded-lg border border-cyan-400/15 bg-cyan-500/5 p-2 text-cyan-100">
                   {#if segment.compressionModel === 'cylindrical_annulus'}
-                    Uniform zone: constant effective compressed diameter through the plate thickness.
+                    Constant effective compression diameter: constant compressed-zone diameter through the plate thickness.
                   {:else if segment.compressionModel === 'conical_frustum_annulus'}
-                    Tapered zone: cone-like effective diameter spread through the plate thickness.
+                    Tapered effective compression diameter: explicit widening through thickness.
+                  {:else if segment.compressionModel === 'calibrated_vdi_equivalent'}
+                    Calibrated cone / VDI-style equivalent stiffness: auto-derived tapered annulus using row footprint and cone angle.
                   {:else}
-                    Direct area: explicit equivalent compressed area replaces the diameter proxy.
+                    Equivalent compressed area: explicit area replaces the diameter proxy.
                   {/if}
                 </div>
               </div>
@@ -3207,9 +3412,10 @@
             <Select
               bind:value={form.defaultPlateCompressionModel}
               items={[
-                { value: 'cylindrical_annulus', label: 'Uniform zone (constant effective diameter)' },
-                { value: 'conical_frustum_annulus', label: 'Tapered zone (cone-like spread)' },
-                { value: 'explicit_area', label: 'Direct area (enter equivalent compressed area)' }
+                { value: 'cylindrical_annulus', label: 'Constant effective compression diameter' },
+                { value: 'conical_frustum_annulus', label: 'Tapered effective compression diameter' },
+                { value: 'calibrated_vdi_equivalent', label: 'Calibrated cone / VDI-style equivalent stiffness' },
+                { value: 'explicit_area', label: 'Equivalent compressed area' }
               ]}
             />
           </div>
@@ -3287,6 +3493,10 @@
         <div class="space-y-1"><Label class="text-white/70">Alternating Axial</Label><Input type="number" step="1" bind:value={form.serviceCase.alternatingAxialLoad} /></div>
         <div class="space-y-1"><Label class="text-white/70">ΔT</Label><Input type="number" step="1" bind:value={form.serviceCase.temperatureChange} /></div>
         <div class="space-y-1"><Label class="text-white/70">Embedment Settlement</Label><Input type="number" step="0.00001" bind:value={form.serviceCase.embedmentSettlement} /></div>
+        <div class="space-y-1"><Label class="text-white/70">Coating Crush Loss</Label><Input type="number" step="0.00001" bind:value={form.serviceCase.coatingCrushLoss} /></div>
+        <div class="space-y-1"><Label class="text-white/70">Washer Seating Loss</Label><Input type="number" step="0.00001" bind:value={form.serviceCase.washerSeatingLoss} /></div>
+        <div class="space-y-1"><Label class="text-white/70">Relaxation Loss %</Label><Input type="number" step="0.1" bind:value={form.serviceCase.relaxationLossPercent} /></div>
+        <div class="space-y-1"><Label class="text-white/70">Creep Loss %</Label><Input type="number" step="0.1" bind:value={form.serviceCase.creepLossPercent} /></div>
       </CardContent>
     </Card>
     {/if}
@@ -3352,7 +3562,7 @@
           <div class="rounded-lg border border-white/10 bg-black/20 p-3">
             <div class="mb-2 flex items-center justify-between">
               <div class="text-[10px] uppercase tracking-widest text-white/45">Load cases</div>
-              <Button size="sm" variant="secondary" on:click={addLoadCase}>Add Load Case</Button>
+              <Button size="sm" variant="secondary" onclick={addLoadCase}>Add Load Case</Button>
             </div>
             <div class="space-y-2">
               {#each form.adjacentFastenerScreen.loadCases as loadCase, index}
@@ -3360,10 +3570,10 @@
                   <div class="mb-2 flex items-center justify-between gap-2">
                     <Input bind:value={loadCase.label} class="max-w-[220px]" />
                     <div class="flex items-center gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
-                      <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move load case up" on:click={() => moveLoadCase(index, -1)} disabled={index === 0}>Up</Button>
-                      <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move load case down" on:click={() => moveLoadCase(index, 1)} disabled={index === form.adjacentFastenerScreen.loadCases.length - 1}>Down</Button>
-                      <Button size="sm" variant="ghost" class="min-w-16 px-2 text-[10px]" aria-label="Duplicate load case" on:click={() => duplicateLoadCase(index)}>Duplicate</Button>
-                      <Button size="sm" variant="ghost" class="min-w-14 px-2 text-[10px]" aria-label="Remove load case" on:click={() => removeLoadCase(index)} disabled={form.adjacentFastenerScreen.loadCases.length <= 1}>Remove</Button>
+                      <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move load case up" onclick={() => moveLoadCase(index, -1)} disabled={index === 0}>Up</Button>
+                      <Button size="sm" variant="ghost" class="min-w-12 px-2 text-[10px]" aria-label="Move load case down" onclick={() => moveLoadCase(index, 1)} disabled={index === form.adjacentFastenerScreen.loadCases.length - 1}>Down</Button>
+                      <Button size="sm" variant="ghost" class="min-w-16 px-2 text-[10px]" aria-label="Duplicate load case" onclick={() => duplicateLoadCase(index)}>Duplicate</Button>
+                      <Button size="sm" variant="ghost" class="min-w-14 px-2 text-[10px]" aria-label="Remove load case" onclick={() => removeLoadCase(index)} disabled={form.adjacentFastenerScreen.loadCases.length <= 1}>Remove</Button>
                     </div>
                   </div>
                   <div class="grid grid-cols-2 gap-2">
@@ -3392,7 +3602,7 @@
           {#if fastenerCaseEnvelopeRows.length}
             <div class="rounded-lg border border-white/10 bg-black/20 p-3">
               <div class="mb-2 text-[10px] uppercase tracking-widest text-white/45">Per-case critical envelopes</div>
-              <svg viewBox={`0 0 320 ${envelopeChartHeight}`} class="h-auto w-full rounded-lg border border-white/8 bg-black/20 p-2" aria-label="Preload fastener-group case envelopes">
+              <svg role="img" viewBox={`0 0 320 ${envelopeChartHeight}`} class="h-auto w-full rounded-lg border border-white/8 bg-black/20 p-2" aria-label="Preload fastener-group case envelopes">
                 <rect x="16" y="16" width="288" height={envelopeChartHeight - 32} rx="12" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.08)" />
                 {#each fastenerCaseEnvelopeRows as row}
                   {@const y = 42 + row.index * 28}
@@ -3433,7 +3643,7 @@
             </div>
             <div class="rounded-lg border border-white/10 bg-black/20 p-3">
               <div class="mb-2 text-[10px] uppercase tracking-widest text-white/45">Bolt map / load heatmap</div>
-              <svg viewBox="0 0 320 220" class="h-auto w-full rounded-lg border border-white/8 bg-black/20 p-2" aria-label="Preload bolt pattern map">
+              <svg role="img" viewBox="0 0 320 220" class="h-auto w-full rounded-lg border border-white/8 bg-black/20 p-2" aria-label="Preload bolt pattern map">
                 <defs>
                   <linearGradient id="bolt-map-grad" x1="0" x2="1">
                     <stop offset="0%" stop-color="#22d3ee" />
@@ -3455,7 +3665,7 @@
             </div>
             <div class="rounded-lg border border-white/10 bg-black/20 p-3">
               <div class="mb-2 text-[10px] uppercase tracking-widest text-white/45">Influence matrix heatmap</div>
-              <svg viewBox="0 0 320 320" class="h-auto w-full rounded-lg border border-white/8 bg-black/20 p-2" aria-label="Preload geometry influence matrix heatmap" data-preload-heatmap-svg="true">
+              <svg role="img" viewBox="0 0 320 320" class="h-auto w-full rounded-lg border border-white/8 bg-black/20 p-2" aria-label="Preload geometry influence matrix heatmap" data-preload-heatmap-svg="true">
                 <rect x="40" y="24" width="248" height="248" rx="10" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.08)" />
                 {#each fastenerGroupResult.geometryInfluenceMatrix as row, rowIndex}
                   {#each row as cell, columnIndex}
@@ -3502,7 +3712,7 @@
           <div class="rounded-xl border border-amber-300/30 bg-amber-500/10 p-3 text-sm text-amber-100">
             Heavy review visualizations are deferred in Safe mode to keep startup reliable on slower systems.
           </div>
-          <Button size="sm" variant="secondary" on:click={() => (loadFullWorkspace = true)}>
+          <Button size="sm" variant="secondary" onclick={() => (loadFullWorkspace = true)}>
             Load Full Review Panels
           </Button>
         </CardContent>
@@ -3529,8 +3739,12 @@
               </div>
               <div class="rounded-xl border border-white/10 bg-black/20 p-4">
                 <div class="text-[10px] uppercase tracking-widest text-white/45">Current status</div>
-                <div class="mt-2 text-sm font-semibold {output.service?.hasSeparated ? 'text-rose-300' : 'text-emerald-300'}">
-                  {output.service?.hasSeparated ? 'Separated' : 'Still clamped'}
+                <div class="mt-2 text-sm font-semibold {output.service?.separationState === 'post_separation' ? 'text-rose-300' : output.service?.separationState === 'incipient' ? 'text-amber-300' : 'text-emerald-300'}">
+                  {output.service?.separationState === 'post_separation'
+                    ? 'Post-separation'
+                    : output.service?.separationState === 'incipient'
+                      ? 'Incipient separation'
+                      : 'Still clamped'}
                 </div>
               </div>
             </div>
@@ -3563,7 +3777,7 @@
           </div>
         </div>
         {#if output}
-          <svg bind:this={jointSectionSvg} viewBox="0 0 560 560" class="h-auto w-full rounded-xl border border-white/10 bg-black/20 p-2" aria-label="Preload joint section panel">
+          <svg role="img" bind:this={jointSectionSvg} viewBox="0 0 560 560" class="h-auto w-full rounded-xl border border-white/10 bg-black/20 p-2" aria-label="Preload joint section panel">
             <defs>
               <linearGradient id="joint-frustum-fill" x1="0" x2="1">
                 <stop offset="0%" stop-color="rgba(14,165,233,0.18)" />
@@ -3824,7 +4038,7 @@
             Default cone half-angle is 30.0° for visualization, matching the common Shigley pressure-cone assumption. Literature commonly treats 25°–35° as reasonable, while FEA studies report lower values around 20°–28° for smaller bolts and shorter grips. The angle remains user-editable here and does not override the explicit segment stiffness model.
           </div>
           <div class="flex flex-wrap gap-2">
-            <Button variant="secondary" on:click={exportJointSectionSvg} disabled={!output}>Export Joint Section SVG</Button>
+            <button type="button" class={localButtonClass('secondary', 'md')} onclick={exportJointSectionSvg} disabled={!output}>Export Joint Section SVG</button>
           </div>
         {/if}
       </CardContent>
@@ -3836,7 +4050,7 @@
       </CardHeader>
       <CardContent class="space-y-4">
         {#if output}
-          <svg bind:this={summarySvg} viewBox="0 0 560 340" class="h-auto w-full rounded-xl border border-white/10 bg-black/20 p-2" data-preload-summary-svg="true" aria-label="Preload summary panel">
+          <svg role="img" bind:this={summarySvg} viewBox="0 0 560 340" class="h-auto w-full rounded-xl border border-white/10 bg-black/20 p-2" data-preload-summary-svg="true" aria-label="Preload summary panel">
             <defs>
               <linearGradient id="preload-bar-cyan" x1="0" x2="1">
                 <stop offset="0%" stop-color="#22d3ee" />
@@ -3862,11 +4076,11 @@
             <line x1="147" y1={170 - (74 * scatterMax) / clampMax} x2="163" y2={170 - (74 * scatterMax) / clampMax} stroke="#fde68a" stroke-width="2" />
             <text x="155" y="186" text-anchor="middle" fill="rgba(255,255,255,0.72)" font-size="12">Installed</text>
             <text x="295" y="186" text-anchor="middle" fill="rgba(255,255,255,0.72)" font-size="12">Service</text>
-            <text x="366" y="102" fill="#fde68a" font-size="11">Scatter band ±{fmt(form.installationScatterPercent, 1)}%</text>
+            <text x="366" y="102" fill="#fde68a" font-size="11">Combined uncertainty ±{fmt(output.installation.uncertainty.combinedPercent, 1)}%</text>
             <text x="366" y="122" fill="rgba(255,255,255,0.64)" font-size="11">Bolt rise = {fmt(output.service?.boltLoadIncrease, 2)}</text>
             <text x="366" y="139" fill="rgba(255,255,255,0.64)" font-size="11">Clamp loss = {fmt(output.service?.clampForceLoss, 2)}</text>
-            <text x="366" y="156" fill="rgba(255,255,255,0.64)" font-size="11">Separation load = {fmt(output.service?.separationLoad, 2)}</text>
-            <text x="366" y="173" fill="rgba(255,255,255,0.64)" font-size="11">Post-separation bolt load = {fmt(output.service?.boltLoadPostSeparation, 2)}</text>
+            <text x="366" y="156" fill="rgba(255,255,255,0.64)" font-size="11">Mech. loss = {fmt(output.service?.preloadLossBreakdown.mechanicalLossTotal, 2)}</text>
+            <text x="366" y="173" fill="rgba(255,255,255,0.64)" font-size="11">Thermal shift = {fmt(output.service?.preloadLossBreakdown.thermalPreloadShift, 2)}</text>
 
             <text x="22" y="228" fill="rgba(255,255,255,0.82)" font-size="16" font-weight="700">Reserve Envelopes (min / nominal / max)</text>
             <rect x="22" y="240" width="516" height="76" rx="14" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.08)" />
@@ -3886,10 +4100,10 @@
         {/if}
 
         <div class="flex flex-wrap gap-2">
-          <Button on:click={exportSummarySvg} disabled={!output}>Export Summary SVG</Button>
-          <Button variant="secondary" on:click={exportPdfReport} disabled={!output}>Export PDF Equation Sheet</Button>
-          <Button variant="secondary" on:click={exportAuditCsv} disabled={!output}>Export Audit CSV</Button>
-          <Button variant="secondary" on:click={exportAuditJson} disabled={!output}>Export Audit JSON</Button>
+          <button type="button" class={localButtonClass('primary', 'md')} onclick={exportSummarySvg} disabled={!output}>Export Summary SVG</button>
+          <button type="button" class={localButtonClass('secondary', 'md')} onclick={exportPdfReport} disabled={!output}>Export PDF Equation Sheet</button>
+          <button type="button" class={localButtonClass('secondary', 'md')} onclick={exportAuditCsv} disabled={!output}>Export Audit CSV</button>
+          <button type="button" class={localButtonClass('secondary', 'md')} onclick={exportAuditJson} disabled={!output}>Export Audit JSON</button>
         </div>
         {#if exportError}
           <div class="rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-xs text-red-200">{exportError}</div>
@@ -3906,7 +4120,7 @@
       </CardHeader>
       <CardContent class="space-y-3">
         {#if output}
-          <svg viewBox="0 0 560 250" class="h-auto w-full rounded-xl border border-white/10 bg-black/20 p-2" aria-label="Preload spring analogy panel">
+          <svg role="img" viewBox="0 0 560 250" class="h-auto w-full rounded-xl border border-white/10 bg-black/20 p-2" aria-label="Preload spring analogy panel">
             <text x="18" y="24" fill="rgba(255,255,255,0.82)" font-size="15" font-weight="700">Equivalent Springs</text>
             <text x="18" y="42" fill="rgba(255,255,255,0.55)" font-size="11">The bolt acts like one tensile spring. The clamped parts act like two mirrored compression spring branches reacting at the bearing faces.</text>
             <rect x="110" y="52" width="340" height="14" rx="7" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" />
@@ -3977,8 +4191,9 @@
           <div class="text-[10px] uppercase tracking-widest text-white/45">Installation</div>
           {#if output}
             <div class="mt-3 text-sm text-white/85">Preload: <span class="font-mono text-cyan-300">{fmt(output.installation.preload)}</span></div>
-            <div class="mt-1 text-sm text-white/70">Scatter Range: {fmt(output.installation.preloadMin)} → {fmt(output.installation.preloadMax)}</div>
+            <div class="mt-1 text-sm text-white/70">Uncertainty Range: {fmt(output.installation.preloadMin)} → {fmt(output.installation.preloadMax)}</div>
             <div class="mt-1 text-sm text-white/70">Model: {output.installation.model}</div>
+            <div class="mt-1 text-sm text-white/70">Combined RSS %: {fmt(output.installation.uncertainty.combinedPercent, 2)}</div>
             {#if output.installation.model === 'exact_torque'}
               <div class="mt-1 text-sm text-white/70">Thread Torque: {fmt(output.installation.threadTorque)}</div>
               <div class="mt-1 text-sm text-white/70">Bearing Torque: {fmt(output.installation.bearingTorque)}</div>
@@ -3993,6 +4208,28 @@
             <div class="mt-1 text-sm text-white/85">k<sub>m</sub>: <span class="font-mono text-cyan-300">{fmt(output.stiffness.members.stiffness)}</span></div>
             <div class="mt-1 text-sm text-white/70">Joint Constant C: {fmt(output.stiffness.jointConstant, 6)}</div>
             <div class="mt-1 text-sm text-white/70">Washers: {output.stiffness.washers.enabled ? `${output.stiffness.washers.count} active` : 'off'}</div>
+            <div class="mt-1 text-sm text-white/70">{output.modelBasis.compressionModelSummary}</div>
+          {/if}
+        </div>
+
+        <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+          <div class="text-[10px] uppercase tracking-widest text-white/45">Preload Loss Breakdown</div>
+          {#if output?.service}
+            <div class="mt-3 text-sm text-white/85">Embedment: <span class="font-mono text-cyan-300">{fmt(output.service.preloadLossBreakdown.embedmentLoss)}</span></div>
+            <div class="mt-1 text-sm text-white/85">Coating crush: <span class="font-mono text-cyan-300">{fmt(output.service.preloadLossBreakdown.coatingCrushLoss)}</span></div>
+            <div class="mt-1 text-sm text-white/85">Washer seating: <span class="font-mono text-cyan-300">{fmt(output.service.preloadLossBreakdown.washerSeatingLoss)}</span></div>
+            <div class="mt-1 text-sm text-white/70">Relaxation: {fmt(output.service.preloadLossBreakdown.relaxationLoss)}</div>
+            <div class="mt-1 text-sm text-white/70">Creep: {fmt(output.service.preloadLossBreakdown.creepLoss)}</div>
+            <div class="mt-1 text-sm text-white/70">Thermal shift: {fmt(output.service.preloadLossBreakdown.thermalPreloadShift)}</div>
+          {/if}
+        </div>
+
+        <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+          <div class="text-[10px] uppercase tracking-widest text-white/45">Model Basis</div>
+          {#if output}
+            <div class="mt-3 text-sm text-white/85">{output.modelBasis.compressionModelSummary}</div>
+            <div class="mt-1 text-sm text-white/70">{output.modelBasis.uncertaintySummary}</div>
+            <div class="mt-1 text-sm text-white/70">{output.modelBasis.preloadLossSummary}</div>
           {/if}
         </div>
 

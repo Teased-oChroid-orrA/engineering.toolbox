@@ -9,6 +9,7 @@
     class?: string | undefined | null;
     type?: 'button' | 'submit' | 'reset';
     disabled?: boolean;
+    onclick?: ((event: MouseEvent) => void) | null;
     children?: import('svelte').Snippet;
     [key: string]: any
   }
@@ -19,12 +20,14 @@
     class: className = undefined,
     type = 'button',
     disabled = false,
+    onclick = null,
     children,
     ...rest
   }: Props = $props();
   const dispatch = createEventDispatcher<{ click: MouseEvent }>();
 
   function handleClick(event: MouseEvent) {
+    onclick?.(event);
     dispatch('click', event);
   }
 
@@ -47,6 +50,6 @@
   };
 </script>
 
-<button {type} class={cn(base, variants[variant], sizes[size], className)} {disabled} onclick={handleClick} {...rest}>
+<button {type} class={cn(base, variants[variant], sizes[size], className)} {disabled} {...rest} onclick={handleClick}>
   {@render children?.()}
 </button>
