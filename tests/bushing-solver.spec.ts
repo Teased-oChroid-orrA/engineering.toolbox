@@ -42,6 +42,7 @@ test.describe('bushing solver regression', () => {
 
     expect(internalOnly.neckWall).toBeLessThan(internalOnly.sleeveWall);
     expect(doubleCountersink.neckWall).toBeLessThan(doubleCountersink.sleeveWall);
+    expect(internalOnly.neckWall!).toBeLessThan(0);
   });
 
   test('neck wall keeps decreasing as internal countersink grows deeper under a fixed angle', async () => {

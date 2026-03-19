@@ -149,9 +149,14 @@ export function computeMinimumBushingWall(p: SharedBushingSectionParams): number
     .sort((a, b) => a - b);
   const points = rawPoints.filter((value, index) => index === 0 || Math.abs(value - rawPoints[index - 1]) > 1e-9);
   const samples = new Set<number>();
+  const epsilon = Math.max(p.L, 1) * 1e-6;
   for (const point of points) samples.add(point);
   for (let index = 0; index < points.length - 1; index += 1) {
     samples.add((points[index] + points[index + 1]) / 2);
+  }
+  for (const point of points) {
+    if (point > materialTop + epsilon) samples.add(point - epsilon);
+    if (point < p.zBottom - epsilon) samples.add(point + epsilon);
   }
   let minimum = Infinity;
   for (const z of samples) {
