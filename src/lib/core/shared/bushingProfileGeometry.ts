@@ -14,6 +14,8 @@ export type SharedBushingProfileInput = {
   };
 };
 
+export type SharedBushingGeometryMode = 'solver' | 'render';
+
 export type SharedBushingSectionParams = {
   D: number;
   L: number;
@@ -46,7 +48,11 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-export function resolveBushingSectionParams(input: SharedBushingProfileInput): SharedBushingSectionParams {
+export function resolveBushingSectionParams(
+  input: SharedBushingProfileInput,
+  options: { mode?: SharedBushingGeometryMode } = {}
+): SharedBushingSectionParams {
+  const mode = options.mode ?? 'solver';
   const D = Math.max(1e-6, Number(input.boreDia ?? 0.5));
   const L = Math.max(1e-6, Number(input.housingLen ?? 0.5));
   const housingW = Math.max(D * 1.8, Number(input.housingWidth ?? 1.5));
@@ -64,14 +70,27 @@ export function resolveBushingSectionParams(input: SharedBushingProfileInput): S
   const zFlangeTop = zTop - flangeT;
   const innerTopZ = bushingType === 'flanged' ? zFlangeTop : zTop;
   const flangeRaw = Math.max(rOuter, Number(input.flangeOd ?? od) / 2);
-  const flangeR = bushingType === 'flanged' ? clamp(flangeRaw, rOuter, rHousing * 0.96) : rOuter;
+  const flangeR = bushingType === 'flanged'
+    ? mode === 'render'
+      ? clamp(flangeRaw, rOuter, rHousing * 0.96)
+      : flangeRaw
+    : rOuter;
   const extRaw = bushingType === 'countersink' ? Math.max(rOuter, (input.geometry?.csExternal?.dia ?? rOuter * 2) / 2) : rOuter;
-  const extTop = bushingType === 'countersink' ? clamp(extRaw, rOuter, rOuter + wall * 0.35) : rOuter;
+  const extTop = bushingType === 'countersink'
+    ? mode === 'render'
+      ? clamp(extRaw, rOuter, rHousing * 0.96)
+      : extRaw
+    : rOuter;
   const extDepthRaw = bushingType === 'countersink' ? Math.max(0, input.geometry?.csExternal?.depth ?? 0) : 0;
-  const extDepth = clamp(extDepthRaw, 0, L * 0.45);
+  const extDepth = clamp(extDepthRaw, 0, L);
   const zExt = Math.min(zBottom, zTop + extDepth);
   const intRaw = idType === 'countersink' ? Math.max(rInner, (input.geometry?.csInternal?.dia ?? rInner * 2) / 2) : rInner;
-  const intTop = idType === 'countersink' ? clamp(intRaw, rInner + wall * 0.06, rOuter * 0.98) : rInner;
+  const topOuterRadius = bushingType === 'flanged' ? flangeR : extTop;
+  const intTop = idType === 'countersink'
+    ? mode === 'render'
+      ? clamp(intRaw, rInner, Math.max(rInner, topOuterRadius - 1e-6))
+      : intRaw
+    : rInner;
   const intDepthRaw = idType === 'countersink' ? Math.max(0, input.geometry?.csInternal?.depth ?? 0) : 0;
   const maxIntDepth = Math.max(0, zBottom - innerTopZ);
   const intDepth = idType === 'countersink'
@@ -139,5 +158,5 @@ export function computeMinimumBushingWall(p: SharedBushingSectionParams): number
     const wall = evaluateBushingOuterRadius(p, z) - evaluateBushingInnerRadius(p, z);
     if (wall < minimum) minimum = wall;
   }
-  return Number.isFinite(minimum) ? Math.max(minimum, 0) : 0;
+  return Number.isFinite(minimum) ? minimum : 0;
 }

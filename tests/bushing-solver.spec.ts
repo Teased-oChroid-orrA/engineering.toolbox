@@ -44,6 +44,39 @@ test.describe('bushing solver regression', () => {
     expect(doubleCountersink.neckWall).toBeLessThan(doubleCountersink.sleeveWall);
   });
 
+  test('neck wall keeps decreasing as internal countersink grows deeper under a fixed angle', async () => {
+    const shallow = computeBushing({
+      ...baseBushingInput,
+      bushingType: 'straight',
+      idType: 'countersink',
+      csMode: 'depth_angle',
+      csDepth: 0.04,
+      csAngle: 100
+    });
+    const medium = computeBushing({
+      ...baseBushingInput,
+      bushingType: 'straight',
+      idType: 'countersink',
+      csMode: 'depth_angle',
+      csDepth: 0.08,
+      csAngle: 100
+    });
+    const deep = computeBushing({
+      ...baseBushingInput,
+      bushingType: 'straight',
+      idType: 'countersink',
+      csMode: 'depth_angle',
+      csDepth: 0.12,
+      csAngle: 100
+    });
+
+    expect(shallow.neckWall).not.toBeNull();
+    expect(medium.neckWall).not.toBeNull();
+    expect(deep.neckWall).not.toBeNull();
+    expect(medium.neckWall!).toBeLessThan(shallow.neckWall!);
+    expect(deep.neckWall!).toBeLessThan(medium.neckWall!);
+  });
+
   test('metric/imperial conversion stays physically consistent', async () => {
     const imperial = computeBushing({ ...baseBushingInput, units: 'imperial' });
     const metric = computeBushing({

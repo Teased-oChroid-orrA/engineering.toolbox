@@ -136,7 +136,7 @@ function buildLabels(width: number, p: SectionParams) {
 }
 
 export function buildBushingSectionProfile(input: BushingSceneInputs, tolerance = 1e-4): BushingSectionBuild {
-  const p = resolveBushingSectionParams(input);
+  const p = resolveBushingSectionParams(input, { mode: 'render' });
 
   const { leftHousing, rightHousing } = buildHousingLoops(p);
   const { leftBushing, rightBushing } = buildBushingLoops(input, p);
