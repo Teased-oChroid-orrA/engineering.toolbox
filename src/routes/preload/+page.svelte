@@ -71,6 +71,7 @@
     plateBehaviorMode: 'isotropic_metallic' | 'orthotropic_laminate_proxy' | 'bearing_critical_thin_sheet';
     adjacentFastenerScreen: {
       enabled: boolean;
+      mode: 'screening' | 'joint_interaction';
       rowCount: number;
       columnCount: number;
       rowPitch: number;
@@ -83,6 +84,9 @@
       plateStiffnessRatioY: number;
       bypassLoadFactor: number;
       transferEfficiency: number;
+      preloadVariationPercent: number;
+      localMemberStiffnessVariationPercent: number;
+      progressionStepLimit: number;
       loadCases: FastenerGroupPatternLoadCaseInput[];
     };
   };
@@ -349,6 +353,7 @@
     plateBehaviorMode: 'isotropic_metallic',
     adjacentFastenerScreen: {
       enabled: true,
+      mode: 'screening',
       rowCount: 2,
       columnCount: 2,
       rowPitch: 1.5,
@@ -361,6 +366,9 @@
       plateStiffnessRatioY: 1,
       bypassLoadFactor: 0.18,
       transferEfficiency: 0.65,
+      preloadVariationPercent: 8,
+      localMemberStiffnessVariationPercent: 12,
+      progressionStepLimit: 3,
       loadCases: [
         {
           id: 'lc1',
@@ -1746,6 +1754,7 @@
             ...output,
             adjacentFastenerScreen: {
               enabled: form.adjacentFastenerScreen.enabled,
+              mode: fastenerGroupModeLabel,
               governingLoadCase: governingLoadCaseLabel,
               neighborCount: adjacentNeighborCount,
               attenuation: adjacentTransferAttenuation,
@@ -1811,6 +1820,7 @@
         ['checks.fatigue.utilization.nominal', String(output.checks.envelopes.fatigueUtilization.nominal ?? '')],
         ['checks.fatigue.utilization.max', String(output.checks.envelopes.fatigueUtilization.max ?? '')],
         ['adjacent.enabled', String(form.adjacentFastenerScreen.enabled)],
+        ['adjacent.mode', fastenerGroupModeLabel],
         ['adjacent.governingLoadCase', governingLoadCaseLabel],
         ['adjacent.neighborCount', String(adjacentNeighborCount)],
         ['adjacent.attenuation', String(adjacentTransferAttenuation)],
@@ -2709,6 +2719,7 @@
   let fastenerGroupCaseResult =
     $derived(form.adjacentFastenerScreen.enabled && output
       ? solveFastenerGroupPatternCases({
+          mode: form.adjacentFastenerScreen.mode,
           rowCount: form.adjacentFastenerScreen.rowCount,
           columnCount: form.adjacentFastenerScreen.columnCount,
           rowPitch: form.adjacentFastenerScreen.rowPitch,
@@ -2721,6 +2732,9 @@
           plateStiffnessRatioY: form.adjacentFastenerScreen.plateStiffnessRatioY,
           bypassLoadFactor: form.adjacentFastenerScreen.bypassLoadFactor,
           transferEfficiency: form.adjacentFastenerScreen.transferEfficiency,
+          preloadVariationPercent: form.adjacentFastenerScreen.preloadVariationPercent,
+          localMemberStiffnessVariationPercent: form.adjacentFastenerScreen.localMemberStiffnessVariationPercent,
+          progressionStepLimit: form.adjacentFastenerScreen.progressionStepLimit,
           boltStiffness: output.stiffness.bolt.stiffness,
           memberStiffness: output.stiffness.members.stiffness,
           preloadPerFastener: output.service?.preloadEffective ?? output.installation.preload
@@ -2747,6 +2761,9 @@
     ? `F${fastenerGroupResult.criticalFastenerIndex + 1}`
     : 'Current fastener');
   let governingLoadCaseLabel = $derived(fastenerGroupCaseResult?.governingCaseLabel ?? '—');
+  let fastenerGroupModeLabel = $derived(
+    fastenerGroupCaseResult?.mode === 'joint_interaction' ? 'Joint interaction' : 'Screening'
+  );
   let caseEnvelopeScale = $derived(Math.max(
     1,
     ...(fastenerGroupCaseResult?.cases.map((entry) => entry.result.criticalEquivalentDemand) ?? [1])
@@ -2760,6 +2777,13 @@
       ratio: entry.result.criticalEquivalentDemand / caseEnvelopeScale,
       isGoverning: entry.caseId === fastenerGroupCaseResult.governingCaseId
     })) ?? []);
+  let fastenerProgressionRows = $derived(
+    fastenerGroupResult?.progression.map((entry) => ({
+      ...entry,
+      removedLabel: entry.removedFastenerIndices.map((index) => `F${index + 1}`).join(', '),
+      criticalLabel: `F${entry.criticalFastenerIndex + 1}`
+    })) ?? []
+  );
   let coneReachLength = $derived(Math.min(stackTotalLength / 2, (Math.max(topBearingFaceOuterDiameter, bottomBearingFaceOuterDiameter) - form.nominalDiameter) / Math.max(compressionConeSlope, 1e-6)));
   let heatmapValues = $derived(fastenerGroupResult ? fastenerGroupResult.geometryInfluenceMatrix.flat() : []);
   let heatmapMin = $derived(heatmapValues.length ? Math.min(...heatmapValues) : 0);
@@ -4490,6 +4514,16 @@
         {/if}
         {#if showAdvancedInputs}
           <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <Label class="text-white/70">Solver mode</Label>
+              <Select
+                bind:value={form.adjacentFastenerScreen.mode}
+                items={[
+                  { value: 'screening', label: 'Screening' },
+                  { value: 'joint_interaction', label: 'Joint interaction' }
+                ]}
+              />
+            </div>
             <div class="space-y-1"><Label class="text-white/70">Rows</Label><Input type="number" step="1" bind:value={form.adjacentFastenerScreen.rowCount} /></div>
             <div class="space-y-1"><Label class="text-white/70">Columns</Label><Input type="number" step="1" bind:value={form.adjacentFastenerScreen.columnCount} /></div>
             <div class="space-y-1"><Label class="text-white/70">Row pitch</Label><Input type="number" step="0.0001" bind:value={form.adjacentFastenerScreen.rowPitch} /></div>
@@ -4502,10 +4536,19 @@
             <div class="space-y-1"><Label class="text-white/70">Plate stiffness Y/X</Label><Input type="number" step="0.05" bind:value={form.adjacentFastenerScreen.plateStiffnessRatioY} /></div>
             <div class="space-y-1"><Label class="text-white/70">Bypass edge factor</Label><Input type="number" step="0.01" min="0" max="1" bind:value={form.adjacentFastenerScreen.bypassLoadFactor} /></div>
             <div class="space-y-1"><Label class="text-white/70">Transfer efficiency</Label><Input type="number" step="0.01" min="0" max="1" bind:value={form.adjacentFastenerScreen.transferEfficiency} /></div>
+            {#if form.adjacentFastenerScreen.mode === 'joint_interaction'}
+              <div class="space-y-1"><Label class="text-white/70">Preload variation %</Label><Input type="number" step="0.1" min="0" bind:value={form.adjacentFastenerScreen.preloadVariationPercent} /></div>
+              <div class="space-y-1"><Label class="text-white/70">Local member stiffness variation %</Label><Input type="number" step="0.1" min="0" bind:value={form.adjacentFastenerScreen.localMemberStiffnessVariationPercent} /></div>
+              <div class="space-y-1"><Label class="text-white/70">Progression steps</Label><Input type="number" step="1" min="1" bind:value={form.adjacentFastenerScreen.progressionStepLimit} /></div>
+            {/if}
           </div>
           <div class="rounded-lg border border-cyan-400/15 bg-cyan-500/5 p-3 text-xs text-cyan-100">
-            2D bolt-pattern solver: an explicit coordinate matrix distributes axial relief, shear, and in-plane torsional moment using row/column geometry, directional plate-stiffness ratios, and a bypass-style loaded-edge bias.
-            This is a mechanics-based bolt-pattern model, not a hidden continuum plate solver.
+            {#if form.adjacentFastenerScreen.mode === 'joint_interaction'}
+              Joint-interaction mode adds fastener-to-fastener preload variation, local member-stiffness variation, and redistribution progression on top of the geometry-based pattern solution.
+            {:else}
+              2D bolt-pattern screening uses an explicit coordinate matrix to distribute axial relief, shear, and in-plane torsional moment using row/column geometry, directional plate-stiffness ratios, and a bypass-style loaded-edge bias.
+            {/if}
+            This is a mechanics-based joint model, not a hidden continuum plate solver.
           </div>
           <div class="rounded-lg border border-white/10 bg-black/20 p-3">
             <div class="mb-2 flex items-center justify-between">
@@ -4538,6 +4581,7 @@
         {#if form.adjacentFastenerScreen.enabled}
           <div class="rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/75">
             <div>Fasteners in pattern: <span class="font-mono text-cyan-300">{adjacentFastenerCount}</span></div>
+            <div>Solver mode: <span class="font-mono text-cyan-300">{fastenerGroupModeLabel}</span></div>
             <div>Neighbor count: <span class="font-mono text-cyan-300">{adjacentNeighborCount}</span></div>
             <div>Governing load case: <span class="font-mono text-amber-200">{governingLoadCaseLabel}</span></div>
             <div>Attenuation: <span class="font-mono text-cyan-300">{fmt(adjacentTransferAttenuation, 4)}</span></div>
@@ -4589,6 +4633,27 @@
               </div>
               <div class="mt-3 text-xs text-white/55">{fastenerGroupResult.note}</div>
             </div>
+            {#if fastenerProgressionRows.length}
+              <div class="rounded-lg border border-white/10 bg-black/20 p-3">
+                <div class="mb-2 text-[10px] uppercase tracking-widest text-white/45">Failure progression</div>
+                <div class="space-y-2">
+                  {#each fastenerProgressionRows as row}
+                    <div class="rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2 text-xs text-white/72">
+                      <div class="flex items-center justify-between gap-3">
+                        <div class="font-semibold text-white/84">Step {row.step}</div>
+                        <div class="font-mono text-amber-200">Next critical {row.criticalLabel}</div>
+                      </div>
+                      <div class="mt-1 grid grid-cols-1 gap-1 text-[11px] text-white/58 sm:grid-cols-3">
+                        <div>Removed: <span class="font-mono text-cyan-200">{row.removedLabel}</span></div>
+                        <div>Active fasteners: <span class="font-mono text-cyan-200">{row.activeFastenerCount}</span></div>
+                        <div>Eqv demand: <span class="font-mono text-cyan-200">{fmt(row.criticalEquivalentDemand, 2)}</span></div>
+                      </div>
+                      <div class="mt-1 text-[11px] text-white/48">{row.note}</div>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
             <div class="rounded-lg border border-white/10 bg-black/20 p-3">
               <div class="mb-2 text-[10px] uppercase tracking-widest text-white/45">Bolt map / load heatmap</div>
               <svg role="img" viewBox="0 0 320 220" class="h-auto w-full rounded-lg border border-white/8 bg-black/20 p-2" aria-label="Preload bolt pattern map">

@@ -336,11 +336,46 @@ test.describe('preload solver G1 core', () => {
     expect(out.criticalFastenerIndex).toBeGreaterThanOrEqual(0);
     expect(out.criticalFastenerIndex).toBeLessThan(6);
     expect(out.criticalEquivalentDemand).toBeGreaterThan(0);
+    expect(out.mode).toBe('screening');
+    expect(out.progression.length).toBeGreaterThan(0);
+  });
+
+  test('joint interaction pattern mode carries preload/member variation and progression output', () => {
+    const out = solveFastenerGroupPattern({
+      mode: 'joint_interaction',
+      rowCount: 2,
+      columnCount: 3,
+      rowPitch: 1.5,
+      columnPitch: 1.75,
+      edgeDistanceX: 1.0,
+      edgeDistanceY: 0.9,
+      eccentricityX: 0.2,
+      eccentricityY: 0.1,
+      plateStiffnessRatioX: 1.2,
+      plateStiffnessRatioY: 0.9,
+      bypassLoadFactor: 0.2,
+      transferEfficiency: 0.65,
+      boltStiffness: 100_000,
+      memberStiffness: 240_000,
+      preloadPerFastener: 4200,
+      preloadVariationPercent: 10,
+      localMemberStiffnessVariationPercent: 15,
+      progressionStepLimit: 2,
+      externalAxialLoad: 300,
+      externalShearX: 180,
+      externalShearY: 60,
+      externalMomentZ: 140
+    });
+    expect(out.mode).toBe('joint_interaction');
+    expect(out.progression).toHaveLength(2);
+    expect(out.fasteners.some((fastener) => fastener.preloadFactor !== 1)).toBe(true);
+    expect(out.fasteners.some((fastener) => fastener.memberStiffnessFactor !== 1)).toBe(true);
   });
 
   test('multiple load cases return a governing case and fastener', () => {
     const out = solveFastenerGroupPatternCases(
       {
+        mode: 'joint_interaction',
         rowCount: 2,
         columnCount: 2,
         rowPitch: 1.5,
@@ -353,6 +388,9 @@ test.describe('preload solver G1 core', () => {
         plateStiffnessRatioY: 1.1,
         bypassLoadFactor: 0.18,
         transferEfficiency: 0.65,
+        preloadVariationPercent: 8,
+        localMemberStiffnessVariationPercent: 12,
+        progressionStepLimit: 2,
         boltStiffness: 100_000,
         memberStiffness: 240_000,
         preloadPerFastener: 4200
@@ -381,5 +419,7 @@ test.describe('preload solver G1 core', () => {
     expect(out.governingCaseLabel).not.toBeNull();
     expect(out.governingFastenerIndex).not.toBeNull();
     expect(out.governingEquivalentDemand).toBeGreaterThan(0);
+    expect(out.mode).toBe('joint_interaction');
+    expect(out.cases.every((entry) => entry.result.progression.length === 2)).toBe(true);
   });
 });
