@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  buildJointAssemblyInput,
   buildPreloadEquationSheetHtml,
   buildExactTorqueTerms,
   computeFastenedJointPreload,
@@ -159,7 +160,26 @@ test.describe('preload solver G1 core', () => {
     expect(out.checks.bearing.governing).not.toBeNull();
     expect(out.assumptions.some((entry) => entry.includes('No hidden pressure-cone shortcut'))).toBeTruthy();
     expect(out.modelBasis.v2FoundationEnabled).toBeTruthy();
+    expect(out.modelBasis.assemblySummary).toContain('assembly');
     expect(out.modelBasis.uncertaintySummary).toContain('root-sum-square');
+  });
+
+  test('joint assembly fallback builds ordered rows from plates and washers', () => {
+    const assembly = buildJointAssemblyInput({
+      ...baseInput,
+      jointTypePreset: 'hi_lok_collar',
+      plateBehaviorMode: 'isotropic_metallic',
+      bearingGeometry: {
+        source: 'catalog',
+        headBearingDiameter: 0.95,
+        nutOrCollarBearingDiameter: 0.95,
+        washerCompatibilityNote: 'Catalog-backed collar mapping.'
+      }
+    });
+    expect(assembly.preset).toBe('hi_lok_collar');
+    expect(assembly.rows.some((row) => row.kind === 'head')).toBeTruthy();
+    expect(assembly.rows.some((row) => row.kind === 'collar')).toBeTruthy();
+    expect(assembly.rows.filter((row) => row.participatesInClamp).length).toBeGreaterThan(0);
   });
 
   test('exact torque helper exposes explicit geometry terms', () => {
@@ -231,6 +251,9 @@ test.describe('preload solver G1 core', () => {
     expect(out.checks.threadStrip.internal.shearArea).not.toBeNull();
     expect(out.checks.threadStrip.external.shearArea).not.toBeNull();
     expect(out.checks.threadStrip.governing).not.toBeNull();
+    expect(out.checks.threadMechanics.engagedLengthEffectiveness).not.toBeNull();
+    expect(out.checks.threadMechanics.loadDistributionFactor).not.toBeNull();
+    expect(out.checks.threadMechanics.effectiveEngagedLength).not.toBeNull();
     expect(out.checks.fatigue.goodmanEquivalent).not.toBeNull();
     expect(out.checks.fatigue.soderbergEquivalent).not.toBeNull();
     expect(out.checks.fatigue.gerberEquivalent).not.toBeNull();
@@ -270,6 +293,9 @@ test.describe('preload solver G1 core', () => {
     expect(html).toContain('Installation Uncertainty');
     expect(html).toContain('Preload effective (min)');
     expect(html).toContain('Separation state');
+    expect(html).toContain('Assembly Model');
+    expect(html).toContain('Thread / Bearing Mechanics');
+    expect(html).toContain('Bearing geometry source');
   });
 
   test('2D fastener pattern solver returns a full influence matrix and critical fastener ranking', () => {

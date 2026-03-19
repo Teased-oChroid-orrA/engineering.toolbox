@@ -16,6 +16,7 @@
   import { safeModeStore } from '$lib/stores/safeModeStore';
   import { cn } from '$lib/utils';
   import {
+    buildJointAssemblyInput,
     buildPreloadEquationSheetHtml,
     computeFastenedJointPreload,
     solveFastenerGroupPattern,
@@ -29,6 +30,7 @@
     type BoltSegmentInput,
     type FastenedJointPreloadInput,
     type FastenerGroupPatternLoadCaseInput,
+    type JointTypePreset,
     type MemberSegmentInput
   } from '$lib/core/preload';
 
@@ -65,6 +67,8 @@
     selectedFastenerDash: string;
     selectedFastenerGrip: string;
     selectedFastenerMaterialId: string;
+    jointTypePreset: JointTypePreset;
+    plateBehaviorMode: 'isotropic_metallic' | 'orthotropic_laminate_proxy' | 'bearing_critical_thin_sheet';
     adjacentFastenerScreen: {
       enabled: boolean;
       rowCount: number;
@@ -323,6 +327,8 @@
     selectedFastenerDash: '8',
     selectedFastenerGrip: '8',
     selectedFastenerMaterialId: 'ti6al4v',
+    jointTypePreset: 'hi_lok_collar',
+    plateBehaviorMode: 'isotropic_metallic',
     adjacentFastenerScreen: {
       enabled: true,
       rowCount: 2,
@@ -1117,7 +1123,11 @@
   $effect(() => {
     solverError = '';
     try {
-      output = computeFastenedJointPreload(form);
+      output = computeFastenedJointPreload({
+        ...form,
+        assembly: assemblyInput,
+        bearingGeometry: currentBearingGeometry
+      });
     } catch (error) {
       output = null;
       solverError = error instanceof Error ? error.message : 'Preload solver failed.';
@@ -2172,6 +2182,35 @@
     $derived(annularFrictionMeanDiameter(bottomBearingFaceOuterDiameter, bottomBearingFaceInnerDiameter) ??
     form.nominalDiameter);
   let effectiveBearingMeanDiameter = $derived(Math.min(topBearingMeanDiameter, bottomBearingMeanDiameter));
+  let bearingGeometrySource =
+    $derived(form.washerGeometryManualOverride
+      ? 'manual' as const
+      : dashGeometry
+        ? 'catalog' as const
+        : 'derived' as const);
+  let currentBearingGeometry = $derived({
+    source: bearingGeometrySource,
+    headBearingDiameter: topBearingFaceOuterDiameter,
+    nutOrCollarBearingDiameter: bottomBearingFaceOuterDiameter,
+    washerCompatibilityNote:
+      selectedFastenerDashVariant?.collarPart
+        ? `Selected dash maps to collar ${selectedFastenerDashVariant.collarPart}.`
+        : selectedFastener.collarCompatibility,
+    fastenerLabel: selectedFastener.label,
+    headStyle: selectedFastener.headStyle,
+    threadDetail: selectedFastenerDashVariant?.threadCallout ?? selectedFastener.threadDetail
+  });
+  let assemblyInput = $derived(
+    buildJointAssemblyInput({
+      ...form,
+      bearingGeometry: currentBearingGeometry,
+      jointTypePreset: form.jointTypePreset,
+      plateBehaviorMode: form.plateBehaviorMode,
+      fastenerLabel: selectedFastener.label,
+      headStyle: selectedFastener.headStyle,
+      collarCompatibility: selectedFastenerDashVariant?.collarPart ?? selectedFastener.collarCompatibility
+    })
+  );
   let autoComputedBearingArea =
     $derived(topBearingFaceArea > 0 && bottomBearingFaceArea > 0
       ? Math.min(topBearingFaceArea, bottomBearingFaceArea)
@@ -3074,6 +3113,67 @@
     {#if workflowStep === 'geometry'}
     <Card class="glass-card !border-0 !bg-transparent !shadow-none wizard-subcard">
       <CardHeader class="pb-2 pt-4">
+        <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Joint Assembly</CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1">
+            <Label class="text-white/70">Joint preset</Label>
+            <Select
+              bind:value={form.jointTypePreset}
+              items={[
+                { value: 'bolted_nut', label: 'Bolted joint with nut' },
+                { value: 'hi_lok_collar', label: 'Hi-Lok with collar' },
+                { value: 'blind_fastener', label: 'Blind fastener reference' },
+                { value: 'tapped_joint', label: 'Tapped joint' },
+                { value: 'countersunk_fastener', label: 'Countersunk fastener' }
+              ]}
+            />
+          </div>
+          <div class="space-y-1">
+            <Label class="text-white/70">Plate behavior basis</Label>
+            <Select
+              bind:value={form.plateBehaviorMode}
+              items={[
+                { value: 'isotropic_metallic', label: 'Isotropic metallic' },
+                { value: 'orthotropic_laminate_proxy', label: 'Orthotropic laminate proxy' },
+                { value: 'bearing_critical_thin_sheet', label: 'Bearing-critical thin sheet' }
+              ]}
+            />
+          </div>
+        </div>
+        <div class="rounded-lg border border-cyan-400/15 bg-cyan-500/5 p-3 text-xs text-cyan-100">
+          The route now carries an explicit assembly model. This ordered stack is exported and used to describe the active joint basis, while bolt segments and clamped plate rows remain the stiffness inputs.
+        </div>
+        <div class="grid gap-2">
+          {#each assemblyInput.rows as row}
+            <div class="grid grid-cols-[minmax(0,1.3fr)_minmax(0,0.85fr)_minmax(0,0.7fr)_minmax(0,0.85fr)] gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/74">
+              <div>
+                <div class="font-semibold text-white/86">{row.label}</div>
+                <div class="mt-0.5 text-[11px] text-white/45">{row.kind.replaceAll('_', ' ')}</div>
+              </div>
+              <div>
+                <div class="text-[10px] uppercase tracking-widest text-white/40">Axial</div>
+                <div class="font-mono text-cyan-200">{fmt(row.axialLength, 4)}</div>
+              </div>
+              <div>
+                <div class="text-[10px] uppercase tracking-widest text-white/40">OD / ID</div>
+                <div class="font-mono text-white/82">{fmt(row.outerDiameter, 4)} / {fmt(row.innerDiameter, 4)}</div>
+              </div>
+              <div>
+                <div class="text-[10px] uppercase tracking-widest text-white/40">Clamp row</div>
+                <div class={row.participatesInClamp ? 'text-emerald-200' : 'text-white/55'}>
+                  {row.participatesInClamp ? 'Yes' : 'No'}
+                </div>
+              </div>
+            </div>
+          {/each}
+        </div>
+      </CardContent>
+    </Card>
+
+    <Card class="glass-card !border-0 !bg-transparent !shadow-none wizard-subcard">
+      <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Joint Inputs</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
@@ -3112,6 +3212,13 @@
         </div>
         <div class="rounded-lg border border-cyan-400/15 bg-cyan-500/5 p-3 text-xs text-cyan-100">
           Installation uncertainty now combines the legacy scatter band with explicit contributor percentages using root-sum-square aggregation.
+        </div>
+        <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/72">
+          Active joint preset: <span class="text-cyan-200">{assemblyInput.preset.replaceAll('_', ' ')}</span>
+          <span class="text-white/45"> • </span>
+          plate behavior: <span class="text-cyan-200">{assemblyInput.plateBehavior.replaceAll('_', ' ')}</span>
+          <span class="text-white/45"> • </span>
+          bearing geometry source: <span class="text-cyan-200">{currentBearingGeometry.source}</span>
         </div>
         <div class="grid grid-cols-2 gap-3 xl:grid-cols-3">
           <div class="space-y-1"><Label class="text-white/70">Tool Accuracy %</Label><Input type="number" step="0.1" bind:value={form.installationUncertainty.toolAccuracyPercent} /></div>
@@ -4227,9 +4334,25 @@
         <div class="rounded-xl border border-white/10 bg-black/20 p-4">
           <div class="text-[10px] uppercase tracking-widest text-white/45">Model Basis</div>
           {#if output}
-            <div class="mt-3 text-sm text-white/85">{output.modelBasis.compressionModelSummary}</div>
+            <div class="mt-3 text-sm text-white/85">{output.modelBasis.assemblySummary}</div>
+            <div class="mt-1 text-sm text-white/70">Preset: {assemblyInput.preset.replaceAll('_', ' ')}</div>
+            <div class="mt-1 text-sm text-white/70">Plate behavior: {assemblyInput.plateBehavior.replaceAll('_', ' ')}</div>
+            <div class="mt-1 text-sm text-white/70">{output.modelBasis.compressionModelSummary}</div>
             <div class="mt-1 text-sm text-white/70">{output.modelBasis.uncertaintySummary}</div>
             <div class="mt-1 text-sm text-white/70">{output.modelBasis.preloadLossSummary}</div>
+          {/if}
+        </div>
+
+        <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+          <div class="text-[10px] uppercase tracking-widest text-white/45">Thread / Bearing Mechanics</div>
+          {#if output}
+            <div class="mt-3 text-sm text-white/85">Bearing geometry source: {output.checks.threadMechanics.bearingGeometrySource}</div>
+            <div class="mt-1 text-sm text-white/85">Engagement effectiveness: <span class="font-mono text-cyan-300">{fmt(output.checks.threadMechanics.engagedLengthEffectiveness, 4)}</span></div>
+            <div class="mt-1 text-sm text-white/85">Load distribution factor: <span class="font-mono text-cyan-300">{fmt(output.checks.threadMechanics.loadDistributionFactor, 4)}</span></div>
+            <div class="mt-1 text-sm text-white/70">Effective engaged length: {fmt(output.checks.threadMechanics.effectiveEngagedLength, 4)}</div>
+            <div class="mt-1 text-sm text-white/70">Strip governing location: {output.checks.threadMechanics.governingStripLocation ?? 'unavailable'}</div>
+            <div class="mt-1 text-sm text-white/70">Head face Ø {fmt(output.checks.threadMechanics.headBearingDiameter, 4)} • nut/collar face Ø {fmt(output.checks.threadMechanics.nutOrCollarBearingDiameter, 4)}</div>
+            <div class="mt-1 text-sm text-white/70">{output.checks.threadMechanics.washerCompatibilityNote}</div>
           {/if}
         </div>
 

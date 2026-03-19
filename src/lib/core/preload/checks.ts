@@ -7,6 +7,30 @@ import type {
   UtilizationCheck
 } from './types';
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function threadMechanicsFactors(input: FastenedJointPreloadInput) {
+  const nominalDiameter = Number(input.nominalDiameter);
+  const engagedLength = Number(input.engagedThreadLength);
+  if (!Number.isFinite(nominalDiameter) || nominalDiameter <= 0 || !Number.isFinite(engagedLength) || engagedLength <= 0) {
+    return {
+      engagementEffectiveness: null,
+      loadDistributionFactor: null,
+      effectiveEngagedLength: null
+    };
+  }
+  const engagementRatio = engagedLength / nominalDiameter;
+  const engagementEffectiveness = clamp(engagementRatio, 0, 1);
+  const loadDistributionFactor = clamp(0.6 + 0.4 * Math.min(engagementRatio, 1), 0.6, 1);
+  return {
+    engagementEffectiveness,
+    loadDistributionFactor,
+    effectiveEngagedLength: engagedLength * engagementEffectiveness * loadDistributionFactor
+  };
+}
+
 function buildUnavailable(note: string): UtilizationCheck {
   return {
     status: 'unavailable',
@@ -38,7 +62,9 @@ function buildThreadStripCheck(
   allowable: number | undefined,
   shearDiameter: number | undefined,
   engagedLength: number | undefined,
-  label: string
+  label: string,
+  engagementEffectiveness: number | null,
+  loadDistributionFactor: number | null
 ): ThreadStripCheck {
   if (
     !Number.isFinite(Number(allowable)) ||
@@ -50,16 +76,30 @@ function buildThreadStripCheck(
   ) {
     return {
       ...buildUnavailable(`${label} thread-strip inputs are incomplete.`),
-      shearArea: null
+      shearArea: null,
+      effectiveEngagedLength: null,
+      engagementEffectiveness,
+      loadDistributionFactor
     };
   }
 
-  const shearArea = Math.PI * Number(shearDiameter) * Number(engagedLength);
+  const effectiveEngagedLength =
+    Number(engagedLength) *
+    Number(engagementEffectiveness ?? 1) *
+    Number(loadDistributionFactor ?? 1);
+  const shearArea = Math.PI * Number(shearDiameter) * effectiveEngagedLength;
   const capacity = Number(allowable) * shearArea;
-  const base = buildCheck(preloadDemand, capacity, `${label} thread strip from explicit cylindrical shear area.`);
+  const base = buildCheck(
+    preloadDemand,
+    capacity,
+    `${label} thread strip uses explicit cylindrical shear area scaled by engagement effectiveness and load distribution.`
+  );
   return {
     ...base,
-    shearArea
+    shearArea,
+    effectiveEngagedLength,
+    engagementEffectiveness,
+    loadDistributionFactor
   };
 }
 
@@ -68,6 +108,7 @@ export function evaluateStructuralChecks(
   installationPreload: number,
   service: ServiceEvaluationResult | null
 ): StructuralChecksResult {
+  const factors = threadMechanicsFactors(input);
   const governingBoltLoad = Math.max(
     installationPreload,
     service?.boltLoadService ?? 0,
@@ -134,7 +175,7 @@ export function evaluateStructuralChecks(
       ? buildCheck(
           governingBoltLoad,
           Number(input.memberBearingAllowable) * Number(input.underHeadBearingArea),
-          'Under-head bearing check uses explicit under-head/nut bearing area.'
+          `Under-head bearing check uses explicit under-head/nut bearing area (${input.bearingGeometry?.source ?? 'derived'} source).`
         )
       : buildUnavailable('memberBearingAllowable and underHeadBearingArea are required for bearing check.');
 
@@ -193,7 +234,9 @@ export function evaluateStructuralChecks(
     input.internalThreadStripShearAllowable,
     input.internalThreadShearDiameter,
     input.engagedThreadLength,
-    'Internal'
+    'Internal',
+    factors.engagementEffectiveness,
+    factors.loadDistributionFactor
   );
 
   const threadStripExternal = buildThreadStripCheck(
@@ -201,7 +244,9 @@ export function evaluateStructuralChecks(
     input.externalThreadStripShearAllowable,
     input.externalThreadShearDiameter,
     input.engagedThreadLength,
-    'External'
+    'External',
+    factors.engagementEffectiveness,
+    factors.loadDistributionFactor
   );
 
   const internalUtil = threadStripInternal.utilization ?? -Infinity;
@@ -334,6 +379,19 @@ export function evaluateStructuralChecks(
       internal: threadStripInternal,
       external: threadStripExternal,
       governing
+    },
+    threadMechanics: {
+      engagedLengthEffectiveness: factors.engagementEffectiveness,
+      loadDistributionFactor: factors.loadDistributionFactor,
+      effectiveEngagedLength: factors.effectiveEngagedLength,
+      governingStripLocation: governing,
+      bearingGeometrySource: input.bearingGeometry?.source ?? 'derived',
+      headBearingDiameter: input.bearingGeometry?.headBearingDiameter ?? null,
+      nutOrCollarBearingDiameter: input.bearingGeometry?.nutOrCollarBearingDiameter ?? null,
+      washerCompatibilityNote:
+        input.bearingGeometry?.washerCompatibilityNote ?? 'Washer compatibility not explicitly declared.',
+      stripCapacityNote:
+        'Thread-strip capacity uses explicit cylindrical shear area scaled by engaged-length effectiveness and a first-thread load-distribution factor.'
     },
     fatigue
   };

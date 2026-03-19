@@ -1,3 +1,4 @@
+import { buildJointAssemblyInput } from './assembly';
 import type { FastenedJointPreloadOutput } from './types';
 
 function esc(value: unknown): string {
@@ -32,6 +33,7 @@ function renderRows(rows: Array<[string, string]>): string {
 
 export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput): string {
   const { input, installation, stiffness, service, checks } = output;
+  const assembly = buildJointAssemblyInput(input);
   const date = new Date().toISOString().slice(0, 10);
   const installationRows: Array<[string, string]> = [
     ['Installation model', esc(installation.model)],
@@ -146,6 +148,7 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
 
   const assumptions = output.assumptions.map((entry) => `<li>${esc(entry)}</li>`).join('');
   const modelBasisRows: Array<[string, string]> = [
+    ['Assembly basis', esc(output.modelBasis.assemblySummary)],
     ['Compression basis', esc(output.modelBasis.compressionModelSummary)],
     ['Uncertainty basis', esc(output.modelBasis.uncertaintySummary)],
     ['Preload-loss basis', esc(output.modelBasis.preloadLossSummary)],
@@ -159,6 +162,21 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
     ['Prevailing torque %', fmt(installation.uncertainty.prevailingTorquePercent, 3)],
     ['Thread geometry %', fmt(installation.uncertainty.threadGeometryPercent, 3)],
     ['Combined RSS %', fmt(installation.uncertainty.combinedPercent, 3)]
+  ];
+  const assemblyRows = assembly.rows
+    .map(
+      (row) =>
+        `<tr><td>${esc(row.label)}</td><td>${esc(row.kind)}</td><td>${fmt(row.axialLength, 4)}</td><td>${fmt(row.outerDiameter, 4)}</td><td>${fmt(row.innerDiameter, 4)}</td><td>${row.participatesInClamp ? 'yes' : 'no'}</td><td>${esc(row.note ?? '—')}</td></tr>`
+    )
+    .join('');
+  const threadMechanicsRows: Array<[string, string]> = [
+    ['Bearing geometry source', esc(checks.threadMechanics.bearingGeometrySource)],
+    ['Head bearing diameter', fmt(checks.threadMechanics.headBearingDiameter, 4)],
+    ['Nut/collar bearing diameter', fmt(checks.threadMechanics.nutOrCollarBearingDiameter, 4)],
+    ['Engagement effectiveness', fmt(checks.threadMechanics.engagedLengthEffectiveness, 4)],
+    ['Load distribution factor', fmt(checks.threadMechanics.loadDistributionFactor, 4)],
+    ['Effective engaged length', fmt(checks.threadMechanics.effectiveEngagedLength, 4)],
+    ['Governing strip location', esc(checks.threadMechanics.governingStripLocation ?? 'unavailable')]
   ];
 
   return `<!doctype html>
@@ -244,6 +262,17 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
     <tr><th>ID</th><th>Effective compression model</th><th>Thickness</th><th>Modulus</th><th>Geometry</th></tr>
     ${memberSegments}
   </table>
+
+  <h2>Assembly Model</h2>
+  <table>
+    <tr><th>Row</th><th>Kind</th><th>Axial length</th><th>Outer dia</th><th>Inner dia</th><th>Clamp row</th><th>Note</th></tr>
+    ${assemblyRows}
+  </table>
+
+  <h2>Thread / Bearing Mechanics</h2>
+  <table>${renderRows(threadMechanicsRows)}</table>
+  <p>${esc(checks.threadMechanics.stripCapacityNote)}</p>
+  <p>${esc(checks.threadMechanics.washerCompatibilityNote)}</p>
 
   <h2>Assumptions (Explicit)</h2>
   <ul>${assumptions}</ul>

@@ -1,6 +1,7 @@
 import { evaluateStructuralChecks } from './checks';
 import { evaluateServicePreloadRetention } from './retention';
 import { solveJointStiffness } from './stiffness';
+import { buildJointAssemblyInput } from './assembly';
 import type {
   CheckEnvelope,
   ExactTorqueTerms,
@@ -253,6 +254,7 @@ export function computeFastenedJointPreload(input: FastenedJointPreloadInput): F
   }
 
   const activeCompressionModels = Array.from(new Set(input.memberSegments.map((segment) => segment.compressionModel)));
+  const assembly = buildJointAssemblyInput(input);
   const compressionModelNotes = input.memberSegments.map((segment) => {
     switch (segment.compressionModel) {
       case 'cylindrical_annulus':
@@ -275,6 +277,7 @@ export function computeFastenedJointPreload(input: FastenedJointPreloadInput): F
         ? `Active compression model: ${activeCompressionModels[0]}.`
         : `Mixed compression models: ${activeCompressionModels.join(', ')}.`,
     compressionModelNotes,
+    assemblySummary: `${assembly.preset.replaceAll('_', ' ')} assembly with ${assembly.rows.filter((row) => row.participatesInClamp).length} clamp-participating rows and ${assembly.rows.length} total rows.`,
     uncertaintySummary: installation.uncertainty.note,
     preloadLossSummary:
       service === null
@@ -284,6 +287,7 @@ export function computeFastenedJointPreload(input: FastenedJointPreloadInput): F
 
   const assumptions = [
     'Segmented axial-spring model with explicit serial compliance only.',
+    modelBasis.assemblySummary,
     'No hidden pressure-cone shortcut: member stiffness comes only from the selected area model.',
     `Compression-cone visualization uses the explicit half-angle input (default ${Number(input.compressionConeHalfAngleDeg ?? 30).toFixed(1)}°); it does not override the explicit member-segment stiffness model.`,
     'Exact thread + bearing torque decomposition is used when installation.model = exact_torque.',

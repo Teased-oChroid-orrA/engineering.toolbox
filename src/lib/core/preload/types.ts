@@ -6,6 +6,63 @@ export type CompressionModel =
   | 'explicit_area'
   | 'calibrated_vdi_equivalent';
 
+export type JointTypePreset =
+  | 'bolted_nut'
+  | 'hi_lok_collar'
+  | 'blind_fastener'
+  | 'tapped_joint'
+  | 'countersunk_fastener';
+
+export type PlateBehaviorMode =
+  | 'isotropic_metallic'
+  | 'orthotropic_laminate_proxy'
+  | 'bearing_critical_thin_sheet';
+
+export type AssemblyRowKind =
+  | 'head'
+  | 'head_washer'
+  | 'plate'
+  | 'shim'
+  | 'interlayer'
+  | 'nut_washer'
+  | 'nut'
+  | 'collar'
+  | 'tapped_thread';
+
+export type AssemblyRowInput = {
+  id: string;
+  label: string;
+  kind: AssemblyRowKind;
+  axialLength: number;
+  outerDiameter: number | null;
+  innerDiameter: number | null;
+  modulus: number | null;
+  thermalExpansionCoeff?: number;
+  plateWidth?: number;
+  plateLength?: number;
+  compressionModel?: CompressionModel;
+  note?: string;
+  participatesInClamp: boolean;
+  source: 'preset' | 'derived' | 'custom';
+};
+
+export type JointAssemblyInput = {
+  preset: JointTypePreset;
+  plateBehavior: PlateBehaviorMode;
+  rows: AssemblyRowInput[];
+  notes: string[];
+};
+
+export type BearingGeometryMetadata = {
+  source: 'catalog' | 'manual' | 'derived';
+  headBearingDiameter?: number | null;
+  nutOrCollarBearingDiameter?: number | null;
+  washerCompatibilityNote?: string;
+  fastenerLabel?: string;
+  headStyle?: string;
+  threadDetail?: string;
+};
+
 export type PreloadFeatureFlags = {
   v2Foundation?: boolean;
 };
@@ -98,6 +155,8 @@ export type InstallationInput =
 
 export type FastenedJointPreloadInput = {
   featureFlags?: PreloadFeatureFlags;
+  assembly?: JointAssemblyInput;
+  bearingGeometry?: BearingGeometryMetadata;
   nominalDiameter: number;
   tensileStressArea: number;
   boltModulus: number;
@@ -266,6 +325,7 @@ export type ModelBasisResult = {
   activeCompressionModels: CompressionModel[];
   compressionModelSummary: string;
   compressionModelNotes: string[];
+  assemblySummary: string;
   uncertaintySummary: string;
   preloadLossSummary: string;
 };
@@ -307,6 +367,21 @@ export type UtilizationCheck = {
 
 export type ThreadStripCheck = UtilizationCheck & {
   shearArea: number | null;
+  effectiveEngagedLength: number | null;
+  engagementEffectiveness: number | null;
+  loadDistributionFactor: number | null;
+};
+
+export type ThreadMechanicsResult = {
+  engagedLengthEffectiveness: number | null;
+  loadDistributionFactor: number | null;
+  effectiveEngagedLength: number | null;
+  governingStripLocation: 'internal' | 'external' | null;
+  bearingGeometrySource: 'catalog' | 'manual' | 'derived';
+  headBearingDiameter: number | null;
+  nutOrCollarBearingDiameter: number | null;
+  washerCompatibilityNote: string;
+  stripCapacityNote: string;
 };
 
 export type FatigueCheck = UtilizationCheck & {
@@ -353,5 +428,6 @@ export type StructuralChecksResult = {
     external: ThreadStripCheck;
     governing: 'internal' | 'external' | null;
   };
+  threadMechanics: ThreadMechanicsResult;
   fatigue: FatigueCheck;
 };

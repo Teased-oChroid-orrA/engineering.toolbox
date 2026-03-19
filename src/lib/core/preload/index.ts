@@ -6,3 +6,4 @@ export * from './report';
 export * from './solve-preload';
 export * from './libraries';
 export * from './group';
+export * from './assembly';
