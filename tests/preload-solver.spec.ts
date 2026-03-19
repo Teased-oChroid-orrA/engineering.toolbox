@@ -302,6 +302,10 @@ test.describe('preload solver G1 core', () => {
     expect(html).toContain('Bearing geometry source');
     expect(html).toContain('Design Verdict');
     expect(html).toContain('Why This Fails / Governs');
+    expect(html).toContain('Input Provenance');
+    expect(html).toContain('Worst-Case Envelopes');
+    expect(html).toContain('Equation Traceability');
+    expect(html).toContain('Standards / Method Basis');
   });
 
   test('2D fastener pattern solver returns a full influence matrix and critical fastener ranking', () => {

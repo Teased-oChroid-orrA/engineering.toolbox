@@ -115,6 +115,24 @@
     }
   ];
 
+  const guidedPreloadPresets = [
+    {
+      id: 'typical_aerospace_metal_joint',
+      label: 'Typical aerospace metal joint',
+      description: 'Hi-Lok collar in two metallic plates with auto-derived washers and calibrated cone defaults.'
+    },
+    {
+      id: 'hilok_aluminum_plates',
+      label: 'Hi-Lok in aluminum plates',
+      description: 'Hi-Lok collar, aluminum clamp stack, isotropic metallic plate basis, and washer stack enabled.'
+    },
+    {
+      id: 'steel_bolt_titanium_stack',
+      label: 'Steel bolt in titanium stack',
+      description: 'Bolted-nut configuration with steel fastener material and titanium plate stack for higher stiffness mismatch.'
+    }
+  ] as const;
+
   const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
   const localButtonBase =
     'inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-semibold tracking-tight transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/40 disabled:pointer-events-none disabled:opacity-50 hover:brightness-110 hover:scale-[1.01] active:scale-[0.99]';
@@ -436,6 +454,19 @@
     note: string;
     severity: 'ok' | 'warn' | 'fail';
   };
+  type CompareSnapshot = {
+    label: string;
+    capturedAt: number;
+    form: PreloadForm;
+    output: ReturnType<typeof computeFastenedJointPreload>;
+  };
+  type CompareMetricRow = {
+    label: string;
+    baseline: number | null;
+    current: number | null;
+    delta: number | null;
+    digits?: number;
+  };
   let stepSnapshots: Partial<Record<WorkflowStep, StepSnapshot[]>> = $state({});
   let stepHintsSeen: Partial<Record<WorkflowStep, boolean>> = $state({});
   let stepCompletedAt: Partial<Record<WorkflowStep, number>> = $state({});
@@ -466,6 +497,7 @@
   let loadFullWorkspace = $state(false);
   let activePreloadIssueIndex = $state(0);
   let lastConicalAutoSignature = '';
+  let compareBaseline = $state<CompareSnapshot | null>(null);
 
   if (typeof window !== 'undefined') {
     const parsed = readStoredInputs();
@@ -1935,6 +1967,40 @@
     }
   }
 
+  function jointPresetLabel(preset: JointTypePreset) {
+    switch (preset) {
+      case 'bolted_nut':
+        return 'Bolted joint with nut';
+      case 'hi_lok_collar':
+        return 'Hi-Lok with collar';
+      case 'blind_fastener':
+        return 'Blind fastener reference';
+      case 'tapped_joint':
+        return 'Tapped joint';
+      case 'countersunk_fastener':
+        return 'Countersunk fastener';
+      default:
+        return preset;
+    }
+  }
+
+  function plateBehaviorLabel(mode: PreloadForm['plateBehaviorMode']) {
+    switch (mode) {
+      case 'isotropic_metallic':
+        return 'Isotropic metallic';
+      case 'orthotropic_laminate_proxy':
+        return 'Orthotropic laminate proxy';
+      case 'bearing_critical_thin_sheet':
+        return 'Bearing-critical thin sheet';
+      default:
+        return mode;
+    }
+  }
+
+  function compressionModelSummaryLabel() {
+    return compressionModelLabel(form.defaultPlateCompressionModel);
+  }
+
   function linearlyInterpolate(start: number, end: number, ratio: number) {
     return start + (end - start) * ratio;
   }
@@ -2403,6 +2469,158 @@
       })
     };
   }
+
+  function applyGuidedPreset(presetId: (typeof guidedPreloadPresets)[number]['id']) {
+    const next = clone(defaultForm());
+    next.useCustomBoltSegments = false;
+    next.useCustomPlateLayers = false;
+    next.washerGeometryManualOverride = false;
+    next.conicalGeometryManualOverride = false;
+    next.installation.model = 'exact_torque';
+    next.defaultPlateCompressionModel = 'calibrated_vdi_equivalent';
+    next.adjacentFastenerScreen.enabled = true;
+
+    if (presetId === 'typical_aerospace_metal_joint') {
+      next.selectedFastenerId = 'HL48';
+      next.selectedFastenerDash = '8';
+      next.selectedFastenerGrip = '8';
+      next.selectedFastenerMaterialId = 'a286_cres';
+      next.jointTypePreset = 'hi_lok_collar';
+      next.plateBehaviorMode = 'isotropic_metallic';
+      next.selectedPlateMaterialId = 'al_7075_t6_clad';
+      next.selectedTopPlateMaterialId = 'al_7075_t6_clad';
+      next.selectedBottomPlateMaterialId = 'al_7075_t6_clad';
+      next.selectedWasherMaterialId = 'washer_steel';
+      next.selectedHeadWasherMaterialId = 'washer_steel';
+      next.selectedNutWasherMaterialId = 'washer_steel';
+      next.defaultPlateWidth = 2.5;
+      next.defaultPlateLength = 3.5;
+      next.defaultTopPlateThickness = 0.3;
+      next.defaultBottomPlateThickness = 0.3;
+    } else if (presetId === 'hilok_aluminum_plates') {
+      next.selectedFastenerId = 'HL48';
+      next.selectedFastenerDash = '8';
+      next.selectedFastenerGrip = '10';
+      next.selectedFastenerMaterialId = 'a286_cres';
+      next.jointTypePreset = 'hi_lok_collar';
+      next.plateBehaviorMode = 'isotropic_metallic';
+      next.selectedPlateMaterialId = 'al_2024_t3_bare';
+      next.selectedTopPlateMaterialId = 'al_2024_t3_bare';
+      next.selectedBottomPlateMaterialId = 'al_2024_t3_bare';
+      next.selectedWasherMaterialId = 'washer_steel';
+      next.selectedHeadWasherMaterialId = 'washer_steel';
+      next.selectedNutWasherMaterialId = 'washer_steel';
+      next.defaultTopPlateThickness = 0.28;
+      next.defaultBottomPlateThickness = 0.34;
+      next.serviceCase.externalTransverseLoad = 260;
+      next.serviceCase.externalAxialLoad = 240;
+    } else {
+      next.selectedFastenerId = 'HL48';
+      next.selectedFastenerDash = '10';
+      next.selectedFastenerGrip = '12';
+      next.selectedFastenerMaterialId = 'steel_4340';
+      next.jointTypePreset = 'bolted_nut';
+      next.plateBehaviorMode = 'isotropic_metallic';
+      next.selectedPlateMaterialId = 'ti_6al_4v_gr5';
+      next.selectedTopPlateMaterialId = 'ti_6al_4v_gr5';
+      next.selectedBottomPlateMaterialId = 'ti_6al_4v_gr5';
+      next.selectedWasherMaterialId = 'washer_steel';
+      next.selectedHeadWasherMaterialId = 'washer_steel';
+      next.selectedNutWasherMaterialId = 'washer_steel';
+      next.defaultPlateWidth = 2.75;
+      next.defaultPlateLength = 4;
+      next.defaultTopPlateThickness = 0.24;
+      next.defaultBottomPlateThickness = 0.42;
+      next.serviceCase.temperatureChange = 120;
+      next.serviceCase.externalAxialLoad = 420;
+    }
+
+    form = next;
+    selectedInstallationModel = next.installation.model;
+    compareBaseline = null;
+    setWorkflowStep('fastener');
+    showStepHintToast('fastener');
+    stepToast = {
+      open: true,
+      text: `Preset applied: ${guidedPreloadPresets.find((preset) => preset.id === presetId)?.label ?? presetId}`,
+      tone: 'ok'
+    };
+  }
+
+  function captureCompareBaseline() {
+    if (!output) return;
+    compareBaseline = {
+      label: `${selectedFastener.label} • ${jointPresetLabel(form.jointTypePreset)}`,
+      capturedAt: Date.now(),
+      form: clone(form),
+      output: clone(output)
+    };
+    stepToast = {
+      open: true,
+      text: 'Scenario compare baseline captured.',
+      tone: 'ok'
+    };
+  }
+
+  function clearCompareBaseline() {
+    compareBaseline = null;
+  }
+
+  function reviewAction(label: string, step: WorkflowStep, target?: string, run?: () => void) {
+    return {
+      label,
+      run: () => {
+        if (run) run();
+        setWorkflowStep(step);
+        if (target) {
+          setTimeout(() => focusByFieldId(target), 30);
+        }
+      }
+    };
+  }
+
+  function exportBundleManifest() {
+    if (!output) return;
+    downloadTextFile(
+      'preload_review_bundle_manifest.json',
+      JSON.stringify(
+        {
+          exportedAt: new Date().toISOString(),
+          fastener: selectedFastener.label,
+          jointPreset: jointPresetLabel(form.jointTypePreset),
+          plateBehavior: plateBehaviorLabel(form.plateBehaviorMode),
+          files: [
+            'preload_summary.svg',
+            'preload_joint_section.svg',
+            'preload_audit.csv',
+            'preload_audit.json',
+            'Fastened Joint Preload Analysis.pdf'
+          ],
+          overallVerdict: output.decisionSupport.overall,
+          governing: output.decisionSupport.governing.title,
+          assumptions: output.assumptions
+        },
+        null,
+        2
+      ),
+      'application/json;charset=utf-8'
+    );
+  }
+
+  async function exportReviewBundle() {
+    if (!output) return;
+    exportError = '';
+    try {
+      await exportSummarySvg();
+      await exportJointSectionSvg();
+      await exportPdfReport();
+      exportAuditCsv();
+      exportAuditJson();
+      exportBundleManifest();
+    } catch (error) {
+      exportError = error instanceof Error ? error.message : 'Preload review bundle export failed.';
+    }
+  }
   let autoComputedBearingArea =
     $derived(topBearingFaceArea > 0 && bottomBearingFaceArea > 0
       ? Math.min(topBearingFaceArea, bottomBearingFaceArea)
@@ -2800,6 +3018,163 @@
     return cards;
   });
 
+  let loadPathRows = $derived.by(() => {
+    if (!output || !output.service) return [] as Array<{ label: string; value: number | null; unit: string; tone: string; note: string }>;
+    return [
+      {
+        label: 'Installed preload',
+        value: output.installation.preload,
+        unit: 'lbf',
+        tone: 'text-cyan-300',
+        note: 'Preload at installation before explicit loss terms.'
+      },
+      {
+        label: 'Retained clamp',
+        value: output.service.clampForceService,
+        unit: 'lbf',
+        tone: output.service.hasSeparated ? 'text-rose-300' : 'text-emerald-300',
+        note: output.service.hasSeparated ? 'Joint has entered separation behavior.' : 'Clamp remains active under the current service case.'
+      },
+      {
+        label: 'Clamp lost',
+        value: output.service.clampForceLoss,
+        unit: 'lbf',
+        tone: 'text-amber-300',
+        note: 'Compression relieved from the clamped members by axial service load.'
+      },
+      {
+        label: 'Bolt load rise',
+        value: output.service.boltLoadIncrease,
+        unit: 'lbf',
+        tone: 'text-indigo-300',
+        note: 'Additional service load transferred into the bolt before or after separation.'
+      },
+      {
+        label: 'Slip reserve',
+        value: output.checks.envelopes.slipUtilization.nominal != null ? 1 - Number(output.checks.envelopes.slipUtilization.nominal) : null,
+        unit: 'reserve',
+        tone: 'text-emerald-300',
+        note: 'Positive means transverse slip margin remains.'
+      },
+      {
+        label: 'Separation reserve',
+        value: output.checks.envelopes.separationUtilization.nominal != null ? 1 - Number(output.checks.envelopes.separationUtilization.nominal) : null,
+        unit: 'reserve',
+        tone: output.service.hasSeparated ? 'text-rose-300' : 'text-emerald-300',
+        note: 'Positive means compression is still retained at the interface.'
+      }
+    ];
+  });
+
+  let verdictActions = $derived.by(() => {
+    if (!output) return [] as Array<{ title: string; note: string; action: ReturnType<typeof reviewAction> }>;
+    const rows: Array<{ title: string; note: string; action: ReturnType<typeof reviewAction> }> = [];
+    if (output.decisionSupport.installationRisk.severity !== 'pass') {
+      rows.push({
+        title: 'Installation uncertainty',
+        note: output.decisionSupport.installationRisk.note,
+        action: reviewAction('Reduce tightening uncertainty inputs', 'geometry', fieldId('bearing-area'))
+      });
+    }
+    if (output.decisionSupport.slipRisk.severity !== 'pass') {
+      rows.push({
+        title: 'Slip reserve',
+        note: output.decisionSupport.slipRisk.note,
+        action: reviewAction('Tune faying friction or preload inputs', 'geometry', fieldId('plate-width'))
+      });
+    }
+    if (output.decisionSupport.separationRisk.severity !== 'pass') {
+      rows.push({
+        title: 'Separation state',
+        note: output.decisionSupport.separationRisk.note,
+        action: reviewAction('Inspect service load inputs', 'review', fieldId('review-main'))
+      });
+    }
+    if (output.decisionSupport.stripRisk.severity !== 'pass') {
+      rows.push({
+        title: 'Thread strip',
+        note: output.decisionSupport.stripRisk.note,
+        action: reviewAction('Increase engaged thread or diameter', 'geometry', fieldId('nominal-dia'))
+      });
+    }
+    if (output.decisionSupport.fatigueRisk.severity !== 'pass') {
+      rows.push({
+        title: 'Fatigue demand',
+        note: output.decisionSupport.fatigueRisk.note,
+        action: reviewAction('Review service mean/alternating loads', 'review', fieldId('review-main'))
+      });
+    }
+    return rows;
+  });
+
+  let guideCheckActions = $derived.by(() =>
+    guideDerivedChecks
+      .filter((check) => check.status !== 'ok')
+      .map((check) => ({
+        id: check.id,
+        title: check.principle,
+        note: check.action ?? check.rationale,
+        action:
+          check.id === 'installation-method'
+            ? reviewAction('Go to fastener installation model', 'fastener', fieldId('fastener-family'))
+            : check.id === 'friction-scatter'
+              ? reviewAction('Tune geometry + uncertainty inputs', 'geometry', fieldId('plate-width'))
+              : check.id === 'service-load-path'
+                ? reviewAction('Review service case', 'review', fieldId('review-main'))
+                : check.id === 'stiffness-ratio'
+                  ? reviewAction('Inspect plate layers and washer stack', 'geometry', fieldId('plate-layers'))
+                  : reviewAction('Open adjacent fastener screening', 'review', fieldId('adjacent-screening'))
+      }))
+  );
+
+  let scenarioCompareRows = $derived.by(() => {
+    if (!output || !compareBaseline) return [] as CompareMetricRow[];
+    return [
+      {
+        label: 'Installed preload',
+        baseline: compareBaseline.output.installation.preload,
+        current: output.installation.preload,
+        delta: output.installation.preload - compareBaseline.output.installation.preload,
+        digits: 2
+      },
+      {
+        label: 'Joint constant',
+        baseline: compareBaseline.output.stiffness.jointConstant,
+        current: output.stiffness.jointConstant,
+        delta: output.stiffness.jointConstant - compareBaseline.output.stiffness.jointConstant,
+        digits: 4
+      },
+      {
+        label: 'Slip utilization',
+        baseline: compareBaseline.output.checks.serviceLimits.slip.utilization,
+        current: output.checks.serviceLimits.slip.utilization,
+        delta: Number(output.checks.serviceLimits.slip.utilization ?? 0) - Number(compareBaseline.output.checks.serviceLimits.slip.utilization ?? 0),
+        digits: 4
+      },
+      {
+        label: 'Separation utilization',
+        baseline: compareBaseline.output.checks.serviceLimits.separation.utilization,
+        current: output.checks.serviceLimits.separation.utilization,
+        delta: Number(output.checks.serviceLimits.separation.utilization ?? 0) - Number(compareBaseline.output.checks.serviceLimits.separation.utilization ?? 0),
+        digits: 4
+      },
+      {
+        label: 'Proof utilization',
+        baseline: compareBaseline.output.checks.proof.utilization,
+        current: output.checks.proof.utilization,
+        delta: Number(output.checks.proof.utilization ?? 0) - Number(compareBaseline.output.checks.proof.utilization ?? 0),
+        digits: 4
+      },
+      {
+        label: 'Critical fastener demand',
+        baseline: compareBaseline.output.service?.boltLoadService ?? null,
+        current: output.service?.boltLoadService ?? null,
+        delta: Number(output.service?.boltLoadService ?? 0) - Number(compareBaseline.output.service?.boltLoadService ?? 0),
+        digits: 2
+      }
+    ];
+  });
+
   function heatmapDisplayRatio(rowIndex: number, columnIndex: number, cell: number): number {
     if (!fastenerGroupResult) return 0;
     if (!heatmapIsFlat) {
@@ -3179,6 +3554,22 @@
               class="h-full rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-300 transition-[width] duration-300 ease-out"
               style={`width: ${validityProgressPct.toFixed(1)}%`}
             ></div>
+          </div>
+        </div>
+        <div class="rounded-lg border border-cyan-400/20 bg-cyan-500/8 p-3 text-xs text-cyan-100">
+          <div class="font-semibold uppercase tracking-widest text-[10px] text-cyan-200">Guided presets</div>
+          <div class="mt-1 text-white/70">Start from a known assembly, then edit any detail. Presets change fastener family, materials, joint preset, and plate defaults together.</div>
+          <div class="mt-3 grid gap-2 lg:grid-cols-3">
+            {#each guidedPreloadPresets as preset}
+              <button
+                type="button"
+                class="rounded-lg border border-white/12 bg-black/20 px-3 py-2 text-left transition-colors hover:border-cyan-300/35 hover:bg-cyan-500/10"
+                onclick={() => applyGuidedPreset(preset.id)}
+              >
+                <div class="text-sm font-semibold text-white/88">{preset.label}</div>
+                <div class="mt-1 text-[11px] text-white/60">{preset.description}</div>
+              </button>
+            {/each}
           </div>
         </div>
         <div class="grid grid-cols-2 gap-2 xl:grid-cols-4">
@@ -3656,9 +4047,9 @@
           Installation uncertainty now combines the legacy scatter band with explicit contributor percentages using root-sum-square aggregation.
         </div>
         <div class="rounded-lg border border-white/10 bg-black/15 p-3 text-xs text-white/72">
-          Active joint preset: <span class="text-cyan-200">{assemblyInput.preset.replaceAll('_', ' ')}</span>
+          Active joint preset: <span class="text-cyan-200">{jointPresetLabel(assemblyInput.preset)}</span>
           <span class="text-white/45"> • </span>
-          plate behavior: <span class="text-cyan-200">{assemblyInput.plateBehavior.replaceAll('_', ' ')}</span>
+          plate behavior: <span class="text-cyan-200">{plateBehaviorLabel(assemblyInput.plateBehavior)}</span>
           <span class="text-white/45"> • </span>
           bearing geometry source: <span class="text-cyan-200">{currentBearingGeometry.source}</span>
         </div>
@@ -4070,6 +4461,14 @@
             {#if check.action}
               <div class="mt-1 text-[10px] text-amber-100">Action: {check.action}</div>
             {/if}
+            {#if guideCheckActions.find((entry) => entry.id === check.id)}
+              {@const actionEntry = guideCheckActions.find((entry) => entry.id === check.id)}
+              <div class="mt-2">
+                <Button size="sm" variant="secondary" onclick={() => actionEntry?.action.run()}>
+                  {actionEntry?.action.label}
+                </Button>
+              </div>
+            {/if}
           </div>
         {/each}
       </CardContent>
@@ -4303,6 +4702,40 @@
     {:else}
     <Card class="glass-card">
       <CardHeader class="pb-2 pt-4">
+        <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-emerald-300">Load Path Dashboard</CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        {#if output && output.service}
+          <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {#each loadPathRows as row}
+              <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div class="text-[10px] uppercase tracking-widest text-white/45">{row.label}</div>
+                <div class={`mt-2 text-xl font-semibold ${row.tone}`}>{fmt(row.value, row.unit === 'reserve' ? 3 : 2)}</div>
+                <div class="mt-1 text-[11px] uppercase tracking-widest text-white/35">{row.unit}</div>
+                <div class="mt-2 text-xs text-white/62">{row.note}</div>
+              </div>
+            {/each}
+          </div>
+          <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+            <div class="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+              <div>
+                <div class="text-[10px] uppercase tracking-widest text-white/45">State transition</div>
+                <div class="mt-2 text-sm text-white/75">
+                  Before separation, additional axial load is split by <span class="font-mono text-cyan-200">C = {fmt(output.stiffness.jointConstant, 4)}</span>.
+                  At incipient separation the remaining clamp approaches zero. Post-separation, additional axial load transfers directly into the bolt slope.
+                </div>
+              </div>
+              <div class={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] ${output.service.separationState === 'post_separation' ? 'bg-rose-500/18 text-rose-200' : output.service.separationState === 'incipient' ? 'bg-amber-500/18 text-amber-200' : 'bg-emerald-500/18 text-emerald-200'}`}>
+                {output.service.separationState.replaceAll('_', ' ')}
+              </div>
+            </div>
+          </div>
+        {/if}
+      </CardContent>
+    </Card>
+
+    <Card class="glass-card">
+      <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-emerald-300">Joint Section Model</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
@@ -4324,6 +4757,12 @@
               Equivalent annulus view: rows scale to the explicit equivalent annulus used by the stiffness model.
             {/if}
           </div>
+        </div>
+        <div class="flex flex-wrap gap-2 text-[11px] text-white/70">
+          <div class="rounded-full border border-white/12 bg-black/20 px-3 py-1">Preset: <span class="text-cyan-200">{jointPresetLabel(form.jointTypePreset)}</span></div>
+          <div class="rounded-full border border-white/12 bg-black/20 px-3 py-1">Plate basis: <span class="text-cyan-200">{plateBehaviorLabel(form.plateBehaviorMode)}</span></div>
+          <div class="rounded-full border border-white/12 bg-black/20 px-3 py-1">Compression model: <span class="text-cyan-200">{compressionModelSummaryLabel()}</span></div>
+          <div class="rounded-full border border-white/12 bg-black/20 px-3 py-1">Separation state: <span class={output?.service?.separationState === 'post_separation' ? 'text-rose-300' : output?.service?.separationState === 'incipient' ? 'text-amber-300' : 'text-emerald-300'}>{output?.service?.separationState?.replaceAll('_', ' ') ?? 'n/a'}</span></div>
         </div>
         {#if output}
           <svg role="img" bind:this={jointSectionSvg} viewBox="0 0 560 560" class="h-auto w-full rounded-xl border border-white/10 bg-black/20 p-2" aria-label="Preload joint section panel">
@@ -4653,6 +5092,7 @@
           <button type="button" class={localButtonClass('secondary', 'md')} onclick={exportPdfReport} disabled={!output}>Export PDF Equation Sheet</button>
           <button type="button" class={localButtonClass('secondary', 'md')} onclick={exportAuditCsv} disabled={!output}>Export Audit CSV</button>
           <button type="button" class={localButtonClass('secondary', 'md')} onclick={exportAuditJson} disabled={!output}>Export Audit JSON</button>
+          <button type="button" class={localButtonClass('secondary', 'md')} onclick={exportReviewBundle} disabled={!output}>Export Review Bundle</button>
         </div>
         {#if exportError}
           <div class="rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-xs text-red-200">{exportError}</div>
@@ -4777,8 +5217,8 @@
           <div class="text-[10px] uppercase tracking-widest text-white/45">Model Basis</div>
           {#if output}
             <div class="mt-3 text-sm text-white/85">{output.modelBasis.assemblySummary}</div>
-            <div class="mt-1 text-sm text-white/70">Preset: {assemblyInput.preset.replaceAll('_', ' ')}</div>
-            <div class="mt-1 text-sm text-white/70">Plate behavior: {assemblyInput.plateBehavior.replaceAll('_', ' ')}</div>
+            <div class="mt-1 text-sm text-white/70">Preset: {jointPresetLabel(assemblyInput.preset)}</div>
+            <div class="mt-1 text-sm text-white/70">Plate behavior: {plateBehaviorLabel(assemblyInput.plateBehavior)}</div>
             <div class="mt-1 text-sm text-white/70">{output.modelBasis.compressionModelSummary}</div>
             <div class="mt-1 text-sm text-white/70">{output.modelBasis.uncertaintySummary}</div>
             <div class="mt-1 text-sm text-white/70">{output.modelBasis.preloadLossSummary}</div>
@@ -4824,7 +5264,8 @@
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-emerald-300">Design Verdict</CardTitle>
       </CardHeader>
-      <CardContent class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <CardContent class="space-y-4">
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div class="rounded-xl border border-white/10 bg-black/20 p-4">
           <div class="text-[10px] uppercase tracking-widest text-white/45">Verdict Stack</div>
           {#if output}
@@ -4849,6 +5290,25 @@
             </ul>
           {/if}
         </div>
+        </div>
+        {#if verdictActions.length}
+          <div class="rounded-xl border border-amber-300/20 bg-amber-500/8 p-4">
+            <div class="text-[10px] uppercase tracking-widest text-amber-100/80">Direct remediation</div>
+            <div class="mt-3 grid gap-3 lg:grid-cols-2">
+              {#each verdictActions as item}
+                <div class="rounded-lg border border-white/10 bg-black/20 p-3">
+                  <div class="text-sm font-semibold text-white/88">{item.title}</div>
+                  <div class="mt-1 text-xs text-white/65">{item.note}</div>
+                  <div class="mt-3">
+                    <Button size="sm" variant="secondary" onclick={() => item.action.run()}>
+                      {item.action.label}
+                    </Button>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/if}
       </CardContent>
     </Card>
 
@@ -4898,6 +5358,46 @@
 
     <Card class="glass-card">
       <CardHeader class="pb-2 pt-4">
+        <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Scenario Compare</CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" onclick={captureCompareBaseline} disabled={!output}>Capture Current as Baseline</Button>
+          <Button size="sm" variant="ghost" onclick={clearCompareBaseline} disabled={!compareBaseline}>Clear Baseline</Button>
+        </div>
+        {#if compareBaseline && output}
+          <div class="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/72">
+            Baseline <span class="text-cyan-200">{compareBaseline.label}</span> captured {new Date(compareBaseline.capturedAt).toLocaleTimeString()}.
+            Current case <span class="text-cyan-200">{selectedFastener.label} • {jointPresetLabel(form.jointTypePreset)}</span>.
+          </div>
+          <div class="overflow-x-auto rounded-xl border border-white/10 bg-black/20">
+            <div class="grid min-w-[640px] grid-cols-[minmax(0,1.4fr)_0.8fr_0.8fr_0.8fr] gap-x-3 px-4 py-3 text-[10px] uppercase tracking-widest text-white/40">
+              <div>Metric</div>
+              <div>Baseline</div>
+              <div>Current</div>
+              <div>Delta</div>
+            </div>
+            {#each scenarioCompareRows as row}
+              <div class="grid min-w-[640px] grid-cols-[minmax(0,1.4fr)_0.8fr_0.8fr_0.8fr] gap-x-3 border-t border-white/8 px-4 py-3 text-sm">
+                <div class="text-white/82">{row.label}</div>
+                <div class="font-mono text-white/76">{fmt(row.baseline, row.digits ?? 4)}</div>
+                <div class="font-mono text-cyan-200">{fmt(row.current, row.digits ?? 4)}</div>
+                <div class={`font-mono ${Number(row.delta ?? 0) > 0 ? 'text-amber-300' : Number(row.delta ?? 0) < 0 ? 'text-emerald-300' : 'text-white/60'}`}>
+                  {Number(row.delta ?? 0) > 0 ? '+' : ''}{fmt(row.delta, row.digits ?? 4)}
+                </div>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <div class="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/72">
+            Capture a baseline, then change fastener, washers, materials, or geometry. This compare table will stay focused on verdict-driving metrics instead of dumping the entire solver state.
+          </div>
+        {/if}
+      </CardContent>
+    </Card>
+
+    <Card class="glass-card">
+      <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Audit Report</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
@@ -4905,6 +5405,46 @@
           Export uses the same explicit intermediate values returned by the solver: torque terms, segmented stiffness, service redistribution, separation/slip state, and strength checks.
         </div>
         {#if output}
+          <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div class="text-[10px] uppercase tracking-widest text-white/45">Standards / method basis</div>
+              <ul class="mt-3 list-disc space-y-2 pl-5 text-sm text-white/70">
+                <li>Bolt Council installation guidance is used to structure tightening, scatter, and service-case checks.</li>
+                <li>Joint stiffness uses explicit serial bolt/member compliance, not hidden plate FEA.</li>
+                <li>Compression zone can be modeled as {compressionModelSummaryLabel().toLowerCase()}.</li>
+                <li>Pattern screening remains a mechanics-based fastener-group model, not a continuum plate solver.</li>
+              </ul>
+            </div>
+            <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div class="text-[10px] uppercase tracking-widest text-white/45">Input provenance</div>
+              <div class="mt-3 text-sm text-white/70">Fastener family: <span class="text-cyan-200">{selectedFastener.label}</span></div>
+              <div class="mt-1 text-sm text-white/70">Dash / grip: <span class="font-mono text-cyan-200">-{form.selectedFastenerDash} / -{form.selectedFastenerGrip}</span></div>
+              <div class="mt-1 text-sm text-white/70">Joint preset: <span class="text-cyan-200">{jointPresetLabel(form.jointTypePreset)}</span></div>
+              <div class="mt-1 text-sm text-white/70">Plate behavior: <span class="text-cyan-200">{plateBehaviorLabel(form.plateBehaviorMode)}</span></div>
+              <div class="mt-1 text-sm text-white/70">Bearing geometry source: <span class="text-cyan-200">{currentBearingGeometry.source}</span></div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div class="text-[10px] uppercase tracking-widest text-white/45">Governing equation trace</div>
+              <div class="mt-3 text-sm text-white/82">{output.decisionSupport.governing.title}</div>
+              <div class="mt-2 rounded-lg border border-white/10 bg-black/20 p-3 font-mono text-sm text-cyan-200">{output.decisionSupport.governing.equation}</div>
+              <div class="mt-3 text-sm text-white/70">Demand = <span class="font-mono text-white/85">{fmt(output.decisionSupport.governing.demand, 4)}</span></div>
+              <div class="mt-1 text-sm text-white/70">Capacity = <span class="font-mono text-white/85">{fmt(output.decisionSupport.governing.capacity, 4)}</span></div>
+              <div class="mt-1 text-sm text-white/70">Utilization = <span class="font-mono text-white/85">{fmt(output.decisionSupport.governing.utilization, 4)}</span></div>
+              <div class="mt-1 text-sm text-white/70">Margin = <span class="font-mono text-white/85">{fmt(output.decisionSupport.governing.margin, 4)}</span></div>
+            </div>
+            <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div class="text-[10px] uppercase tracking-widest text-white/45">Worst-case envelope</div>
+              <div class="mt-3 space-y-1 text-sm text-white/70">
+                <div>Separation min / nominal / max: <span class="font-mono text-white/85">{fmt(output.checks.envelopes.separationUtilization.min, 3)} / {fmt(output.checks.envelopes.separationUtilization.nominal, 3)} / {fmt(output.checks.envelopes.separationUtilization.max, 3)}</span></div>
+                <div>Slip min / nominal / max: <span class="font-mono text-white/85">{fmt(output.checks.envelopes.slipUtilization.min, 3)} / {fmt(output.checks.envelopes.slipUtilization.nominal, 3)} / {fmt(output.checks.envelopes.slipUtilization.max, 3)}</span></div>
+                <div>Proof min / nominal / max: <span class="font-mono text-white/85">{fmt(output.checks.envelopes.proofUtilization.min, 3)} / {fmt(output.checks.envelopes.proofUtilization.nominal, 3)} / {fmt(output.checks.envelopes.proofUtilization.max, 3)}</span></div>
+                <div>Bearing min / nominal / max: <span class="font-mono text-white/85">{fmt(output.checks.envelopes.bearingUtilization.min, 3)} / {fmt(output.checks.envelopes.bearingUtilization.nominal, 3)} / {fmt(output.checks.envelopes.bearingUtilization.max, 3)}</span></div>
+                <div>Fatigue min / nominal / max: <span class="font-mono text-white/85">{fmt(output.checks.envelopes.fatigueUtilization.min, 3)} / {fmt(output.checks.envelopes.fatigueUtilization.nominal, 3)} / {fmt(output.checks.envelopes.fatigueUtilization.max, 3)}</span></div>
+              </div>
+            </div>
+          </div>
           <div class="rounded-xl border border-white/10 bg-black/20 p-4">
             <div class="text-[10px] uppercase tracking-widest text-white/45">Explicit Assumptions</div>
             <ul class="mt-3 list-disc space-y-2 pl-5 text-sm text-white/70">

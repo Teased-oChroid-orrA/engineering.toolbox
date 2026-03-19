@@ -179,6 +179,36 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
     ['Utilization', fmt(output.decisionSupport.governing.utilization, 4)],
     ['Margin', fmt(output.decisionSupport.governing.margin, 4)]
   ];
+  const provenanceRows: Array<[string, string]> = [
+    ['Fastener label', esc(output.input.bearingGeometry?.fastenerLabel ?? '—')],
+    ['Head style', esc(output.input.bearingGeometry?.headStyle ?? '—')],
+    ['Thread detail', esc(output.input.bearingGeometry?.threadDetail ?? '—')],
+    ['Bearing geometry source', esc(output.input.bearingGeometry?.source ?? 'derived')],
+    ['Assembly preset', esc(assembly.preset)],
+    ['Plate behavior', esc(assembly.plateBehavior)]
+  ];
+  const envelopeRows: Array<[string, string]> = [
+    [
+      'Separation envelope',
+      `${fmt(checks.envelopes.separationUtilization.min, 3)} / ${fmt(checks.envelopes.separationUtilization.nominal, 3)} / ${fmt(checks.envelopes.separationUtilization.max, 3)}`
+    ],
+    [
+      'Slip envelope',
+      `${fmt(checks.envelopes.slipUtilization.min, 3)} / ${fmt(checks.envelopes.slipUtilization.nominal, 3)} / ${fmt(checks.envelopes.slipUtilization.max, 3)}`
+    ],
+    [
+      'Proof envelope',
+      `${fmt(checks.envelopes.proofUtilization.min, 3)} / ${fmt(checks.envelopes.proofUtilization.nominal, 3)} / ${fmt(checks.envelopes.proofUtilization.max, 3)}`
+    ],
+    [
+      'Bearing envelope',
+      `${fmt(checks.envelopes.bearingUtilization.min, 3)} / ${fmt(checks.envelopes.bearingUtilization.nominal, 3)} / ${fmt(checks.envelopes.bearingUtilization.max, 3)}`
+    ],
+    [
+      'Fatigue envelope',
+      `${fmt(checks.envelopes.fatigueUtilization.min, 3)} / ${fmt(checks.envelopes.fatigueUtilization.nominal, 3)} / ${fmt(checks.envelopes.fatigueUtilization.max, 3)}`
+    ]
+  ];
   const assemblyRows = assembly.rows
     .map(
       (row) =>
@@ -279,6 +309,32 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
     </div>
   </div>
 
+  <div class="grid" style="margin-top:16px">
+    <div class="box">
+      <h2>Input Provenance</h2>
+      <table>${renderRows(provenanceRows)}</table>
+      <p>Catalog-backed geometry is preserved explicitly. When catalog geometry is unavailable, the report states whether the value was manual or derived.</p>
+    </div>
+    <div class="box">
+      <h2>Worst-Case Envelopes</h2>
+      <table>${renderRows(envelopeRows)}</table>
+      <p>Each row is reported as min / nominal / max utilization to expose preload scatter and explicit loss contributors.</p>
+    </div>
+  </div>
+
+  <div class="box" style="margin-top:16px">
+    <h2>Equation Traceability</h2>
+    <table>${renderRows([
+      ['Governing title', esc(output.decisionSupport.governing.title)],
+      ['Substitution', `<code>${esc(output.decisionSupport.governing.equation)}</code>`],
+      ['Demand', fmt(output.decisionSupport.governing.demand, 4)],
+      ['Capacity', fmt(output.decisionSupport.governing.capacity, 4)],
+      ['Utilization', fmt(output.decisionSupport.governing.utilization, 4)],
+      ['Margin', fmt(output.decisionSupport.governing.margin, 4)]
+    ])}</table>
+    <p>The report exposes the governing equation label and the exact substituted values used by the active solver state.</p>
+  </div>
+
   <h2>Bolt Segments</h2>
   <table>
     <tr><th>ID</th><th>Length</th><th>Area</th><th>Modulus</th></tr>
@@ -304,6 +360,14 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
 
   <h2>Assumptions (Explicit)</h2>
   <ul>${assumptions}</ul>
+
+  <h2>Standards / Method Basis</h2>
+  <ul>
+    <li>Bolt Council installation guidance structures tightening, scatter, and service-load checks.</li>
+    <li>Joint stiffness uses explicit serial compliance; no hidden plate FEA is inserted.</li>
+    <li>Compression-zone interpretation remains explicit through the selected effective compressed-area model.</li>
+    <li>Fastener-pattern screening is a mechanics-based distribution model, not a continuum plate solver.</li>
+  </ul>
 </body>
 </html>`;
 }
