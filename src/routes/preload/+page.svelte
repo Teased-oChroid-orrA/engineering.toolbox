@@ -1,7 +1,5 @@
 <script lang="ts">
-  import { run } from 'svelte/legacy';
-
-  import { fly } from 'svelte/transition';
+    import { fly } from 'svelte/transition';
   import { onDestroy, onMount } from 'svelte';
   import {
     Badge,
@@ -809,10 +807,10 @@
     };
   }
 
-  run(() => {
+  (() => {
     if (selectedInstallationModel !== form.installation.model) setInstallationModel(selectedInstallationModel);
   });
-  run(() => {
+  (() => {
     const signature = form.useSamePlateMaterial
       ? `same:${form.selectedPlateMaterialId}`
       : `split:${form.selectedTopPlateMaterialId}:${form.selectedBottomPlateMaterialId}`;
@@ -821,7 +819,7 @@
       applyPlateMaterialDefaults();
     }
   });
-  run(() => {
+  (() => {
     const signature = form.useSameWasherMaterial
       ? `same:${form.selectedWasherMaterialId}`
       : `split:${form.selectedHeadWasherMaterialId}:${form.selectedNutWasherMaterialId}`;
@@ -830,7 +828,7 @@
       applyWasherMaterialDefaults();
     }
   });
-  run(() => {
+  (() => {
     if (form.selectedFastenerId !== lastFastenerId) {
       lastFastenerId = form.selectedFastenerId;
       const fastener = getPreloadFastener(form.selectedFastenerId);
@@ -845,25 +843,25 @@
       }
     }
   });
-  run(() => {
+  (() => {
     if (form.selectedFastenerMaterialId !== lastFastenerMaterialId) {
       lastFastenerMaterialId = form.selectedFastenerMaterialId;
       applyFastenerMaterialDefaults(form.selectedFastenerMaterialId);
     }
   });
-  run(() => {
+  (() => {
     if (form.useSamePlateMaterial) {
       form.selectedTopPlateMaterialId = form.selectedPlateMaterialId;
       form.selectedBottomPlateMaterialId = form.selectedPlateMaterialId;
     }
   });
-  run(() => {
+  (() => {
     if (form.useSameWasherMaterial) {
       form.selectedHeadWasherMaterialId = form.selectedWasherMaterialId;
       form.selectedNutWasherMaterialId = form.selectedWasherMaterialId;
     }
   });
-  run(() => {
+  (() => {
     if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
   });
 
@@ -974,7 +972,7 @@
       state
     };
   }));
-  run(() => {
+  (() => {
     if (workflowStep !== previousTrackedStep) {
       const now = Date.now();
       const elapsed = Math.max(0, now - stepEnteredAt);
@@ -989,23 +987,23 @@
       persistStepState();
     }
   });
-  run(() => {
+  (() => {
     if (isStepValid(workflowStep) && !(stepHintsSeen[workflowStep] ?? false)) {
       stepHintsSeen = { ...stepHintsSeen, [workflowStep]: true };
       persistStepState();
     }
   });
-  run(() => {
+  (() => {
     for (const step of workflowOrder) {
       if (isStepValid(step) && !stepCompletedAt[step]) {
         stepCompletedAt = { ...stepCompletedAt, [step]: Date.now() };
       }
     }
   });
-  run(() => {
+  (() => {
     formSignature = JSON.stringify(form);
   });
-  run(() => {
+  (() => {
     if (formSignature) {
       if (snapshotTimer) clearTimeout(snapshotTimer);
       snapshotTimer = setTimeout(() => {
@@ -1013,15 +1011,15 @@
       }, 450);
     }
   });
-  run(() => {
+  (() => {
     stepPrefsSignature = JSON.stringify(stepPrefs);
   });
-  run(() => {
+  (() => {
     if (typeof window !== 'undefined' && stepPrefsSignature) {
       localStorage.setItem(STEP_PREFS_KEY, stepPrefsSignature);
     }
   });
-  run(() => {
+  (() => {
     if (
       stepPrefs.autoAdvance &&
       workflowStep !== 'review' &&
@@ -1036,7 +1034,7 @@
     }
   });
 
-  run(() => {
+  (() => {
     solverError = '';
     try {
       output = computeFastenedJointPreload(form);
@@ -1816,13 +1814,13 @@
     selectedFastener.gripTable[0] ??
     null);
   let selectedFastenerMaterial = $derived(getPreloadMaterial(form.selectedFastenerMaterialId));
-  run(() => {
+  (() => {
     if (selectedFastenerDashVariant && !form.useCustomBoltSegments) {
       form.nominalDiameter = selectedFastenerDashVariant.nominalDiameterIn;
       form.tensileStressArea = estimateThreadedArea(selectedFastenerDashVariant.nominalDiameterIn);
     }
   });
-  run(() => {
+  (() => {
     if (!form.useCustomBoltSegments) {
       const gripLength = selectedFastenerGripVariant?.nominalGripIn ?? 0.5;
       form.boltSegments = buildAutoBoltSegments(
@@ -1833,7 +1831,7 @@
       );
     }
   });
-  run(() => {
+  (() => {
     if (!form.useCustomPlateLayers) {
       form.memberSegments = buildAutoPlateLayers(
         form.defaultPlateWidth,
@@ -1846,7 +1844,7 @@
       );
     }
   });
-  run(() => {
+  (() => {
     let changed = false;
     const nextSegments = form.memberSegments.map((segment) => {
       const sanitized = sanitizeMemberSegment(segment);
@@ -1855,7 +1853,7 @@
     });
     if (changed) form.memberSegments = nextSegments;
   });
-  run(() => {
+  (() => {
     if (form.conicalGeometryManualOverride) return;
     let changed = false;
     const nextSegments = form.memberSegments.map((segment) => {
@@ -1876,7 +1874,7 @@
     });
     if (changed) form.memberSegments = nextSegments;
   });
-  run(() => {
+  (() => {
     const current = form.washerStack;
     const autoGeom = deriveAutoWasherGeometry();
     const globalInnerSource = Number.isFinite(Number(current.innerDiameter)) ? Number(current.innerDiameter) : autoGeom.inner;
@@ -1909,7 +1907,7 @@
       underNutInnerDiameter: nut.inner
     };
   });
-  run(() => {
+  (() => {
     if (form.washerGeometryManualOverride) return;
     const current = form.washerStack;
     const autoGeom = deriveAutoWasherGeometry();
@@ -2002,12 +2000,12 @@
     $derived(topBearingFaceArea > 0 && bottomBearingFaceArea > 0
       ? Math.min(topBearingFaceArea, bottomBearingFaceArea)
       : Math.max(topBearingFaceArea, bottomBearingFaceArea, 0));
-  run(() => {
+  (() => {
     if (stepPrefs.autoBearingArea && Math.abs(Number(form.underHeadBearingArea ?? 0) - autoComputedBearingArea) > 1e-9) {
       form.underHeadBearingArea = autoComputedBearingArea;
     }
   });
-  run(() => {
+  (() => {
     if (
       stepPrefs.autoBearingArea &&
       form.installation.model === 'exact_torque' &&
@@ -2018,7 +2016,7 @@
   });
   let compressionConeHalfAngleDeg = $derived(Math.max(10, Math.min(45, Number(form.compressionConeHalfAngleDeg ?? 30))));
   let compressionConeSlope = $derived(Math.tan((compressionConeHalfAngleDeg * Math.PI) / 180));
-  run(() => {
+  (() => {
     if (form.washerStack.enabled && form.washerStack.count !== effectiveWasherCount) {
       form.washerStack.count = effectiveWasherCount;
     }
