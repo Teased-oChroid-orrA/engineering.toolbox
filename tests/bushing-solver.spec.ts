@@ -21,6 +21,29 @@ test.describe('bushing solver regression', () => {
     expect(countersink.csSolved.od?.dia).toBeGreaterThan(countersink.odInstalled);
   });
 
+  test('neck wall follows actual countersink geometry instead of collapsing to straight wall', async () => {
+    const internalOnly = computeBushing({
+      ...baseBushingInput,
+      bushingType: 'straight',
+      idType: 'countersink',
+      csMode: 'depth_angle',
+      csDepth: 0.1,
+      csAngle: 100
+    });
+    const doubleCountersink = computeBushing({
+      ...baseBushingInput,
+      bushingType: 'countersink',
+      idType: 'countersink',
+      extCsMode: 'dia_depth',
+      extCsDia: 0.72,
+      extCsDepth: 0.09,
+      csDepth: 0.1
+    });
+
+    expect(internalOnly.neckWall).toBeLessThan(internalOnly.sleeveWall);
+    expect(doubleCountersink.neckWall).toBeLessThan(doubleCountersink.sleeveWall);
+  });
+
   test('metric/imperial conversion stays physically consistent', async () => {
     const imperial = computeBushing({ ...baseBushingInput, units: 'imperial' });
     const metric = computeBushing({
@@ -52,7 +75,7 @@ test.describe('bushing solver regression', () => {
       boreDia: 0.3,
       idBushing: 0.35
     });
-    expect(out.warningCodes.some((w) => w.code === 'INPUT_INVALID')).toBeTruthy();
+    expect(out.warningCodes.some((w) => w.code === 'BUSHING_ID_GE_BORE')).toBeTruthy();
     expect(Number.isFinite(out.pressure)).toBeTruthy();
   });
 

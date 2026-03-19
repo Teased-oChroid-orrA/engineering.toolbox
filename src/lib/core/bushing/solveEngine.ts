@@ -1,5 +1,6 @@
 import { MATERIALS } from './materials';
 import { calculateUniversalBearing } from '../shared/bearing';
+import { computeMinimumBushingWall, resolveBushingSectionParams } from '../shared/bushingProfileGeometry';
 import type { BushingOutput, BushingWarning, InterferenceEnforcementReasonCode, ToleranceRange } from './types';
 import { clamp, toPsiFromKsi, resolveTolerance, buildOdTolerance, enforceBoreBandForTarget, containmentViolations, csDiaToleranceFromBase, csDepthToleranceFromBase, makeRange, solveCountersink, EPS } from './solveMath';
 import { normalizeBushingInputs } from './normalize';
@@ -307,24 +308,25 @@ export function computeState(input: ReturnType<typeof normalizeBushingInputs>): 
       csSolvedOd.angleDeg >= 180);
 
   const wallStraight = Math.max((odInstalled - input.idBushing) / 2, 0);
-  const A_rad = (csSolvedId.angleDeg / 2) * (Math.PI / 180);
-  const outerBoundary =
-    input.bushingType === 'flanged'
-      ? (input.flangeOd ?? 0)
-      : input.bushingType === 'countersink'
-        ? csSolvedOd.dia
-        : odInstalled;
-  const t_top = (outerBoundary - csSolvedId.dia) / (2 * Math.cos(A_rad));
-  const d_corner =
-    ((odInstalled - csSolvedId.dia) / 2) * Math.cos(A_rad) + (input.flangeThk ?? 0) * Math.sin(A_rad);
+  const sectionGeometry = resolveBushingSectionParams({
+    boreDia: input.boreDia,
+    housingLen: input.housingLen,
+    housingWidth: input.housingWidth,
+    idBushing: input.idBushing,
+    bushingType: input.bushingType,
+    idType: input.idType,
+    flangeOd: input.flangeOd,
+    flangeThk: input.flangeThk,
+    geometry: {
+      odBushing: odInstalled,
+      csExternal: { dia: csSolvedOd.dia, depth: csSolvedOd.depth },
+      csInternal: { dia: csSolvedId.dia, depth: csSolvedId.depth }
+    }
+  });
   const wallNeck =
     input.idType !== 'countersink'
       ? wallStraight
-      : input.bushingType === 'countersink'
-        ? Math.min((csSolvedOd.dia - csSolvedId.dia) / 2, wallStraight)
-        : input.bushingType === 'flanged'
-          ? Math.min(t_top, d_corner)
-          : t_top;
+      : computeMinimumBushingWall(sectionGeometry);
   const failStraight = wallStraight < input.minWallStraight;
   const failNeck = wallNeck < input.minWallNeck;
 
