@@ -163,6 +163,22 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
     ['Thread geometry %', fmt(installation.uncertainty.threadGeometryPercent, 3)],
     ['Combined RSS %', fmt(installation.uncertainty.combinedPercent, 3)]
   ];
+  const verdictRows: Array<[string, string]> = [
+    ['Overall', esc(output.decisionSupport.overall)],
+    ['Installation risk', `${esc(output.decisionSupport.installationRisk.severity)} • ${esc(output.decisionSupport.installationRisk.driver)}`],
+    ['Slip risk', `${esc(output.decisionSupport.slipRisk.severity)} • ${esc(output.decisionSupport.slipRisk.driver)}`],
+    ['Separation risk', `${esc(output.decisionSupport.separationRisk.severity)} • ${esc(output.decisionSupport.separationRisk.driver)}`],
+    ['Strip risk', `${esc(output.decisionSupport.stripRisk.severity)} • ${esc(output.decisionSupport.stripRisk.driver)}`],
+    ['Fatigue risk', `${esc(output.decisionSupport.fatigueRisk.severity)} • ${esc(output.decisionSupport.fatigueRisk.driver)}`]
+  ];
+  const governingRows: Array<[string, string]> = [
+    ['Governing title', esc(output.decisionSupport.governing.title)],
+    ['Equation', `<code>${esc(output.decisionSupport.governing.equation)}</code>`],
+    ['Demand', fmt(output.decisionSupport.governing.demand, 4)],
+    ['Capacity', fmt(output.decisionSupport.governing.capacity, 4)],
+    ['Utilization', fmt(output.decisionSupport.governing.utilization, 4)],
+    ['Margin', fmt(output.decisionSupport.governing.margin, 4)]
+  ];
   const assemblyRows = assembly.rows
     .map(
       (row) =>
@@ -236,6 +252,18 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
       <h2>Checks Summary</h2>
       <table>${renderRows(checkRows)}</table>
       <p>${esc(checks.serviceLimits.selfLooseningRisk.note)}</p>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:16px">
+    <div class="box">
+      <h2>Design Verdict</h2>
+      <table>${renderRows(verdictRows)}</table>
+    </div>
+    <div class="box">
+      <h2>Why This Fails / Governs</h2>
+      <table>${renderRows(governingRows)}</table>
+      <ul>${output.decisionSupport.governing.recommendations.map((entry) => `<li>${esc(entry)}</li>`).join('')}</ul>
     </div>
   </div>
 

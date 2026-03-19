@@ -4,6 +4,7 @@ import { solveJointStiffness } from './stiffness';
 import { buildJointAssemblyInput } from './assembly';
 import type {
   CheckEnvelope,
+  DecisionSupportResult,
   ExactTorqueTerms,
   FastenedJointPreloadInput,
   FastenedJointPreloadOutput,
@@ -112,6 +113,191 @@ function buildEnvelope(
     nominal: Number.isFinite(Number(nominal)) ? Number(nominal) : null,
     max: Number.isFinite(Number(max)) ? Number(max) : null,
     note
+  };
+}
+
+function verdictSeverity(utilization: number | null | undefined): 'pass' | 'attention' | 'fail' | 'unknown' {
+  if (!Number.isFinite(Number(utilization))) return 'unknown';
+  const value = Number(utilization);
+  if (value > 1) return 'fail';
+  if (value >= 0.8) return 'attention';
+  return 'pass';
+}
+
+function buildDecisionSupport(
+  input: FastenedJointPreloadInput,
+  installation: InstallationResult,
+  service: FastenedJointPreloadOutput['service'],
+  checks: FastenedJointPreloadOutput['checks']
+): DecisionSupportResult {
+  const separationSeverity =
+    service?.separationState === 'post_separation'
+      ? 'fail'
+      : service?.separationState === 'incipient'
+        ? 'attention'
+        : verdictSeverity(checks.serviceLimits.separation.utilization);
+  const slipSeverity = verdictSeverity(checks.serviceLimits.slip.utilization);
+  const stripUtilization = Math.max(
+    checks.threadStrip.internal.utilization ?? -Infinity,
+    checks.threadStrip.external.utilization ?? -Infinity
+  );
+  const stripSeverity = verdictSeverity(stripUtilization);
+  const fatigueSeverity = verdictSeverity(checks.fatigue.utilization);
+  const installationSeverity =
+    installation.uncertainty.combinedPercent > 20
+      ? 'fail'
+      : installation.uncertainty.combinedPercent > 12
+        ? 'attention'
+        : 'pass';
+
+  const bearingCheck =
+    checks.bearing.governing === 'under_head'
+      ? checks.bearing.underHead
+      : checks.bearing.governing === 'thread_bearing'
+        ? checks.bearing.threadBearing
+        : checks.bearing.localCrushing;
+
+  const candidates = [
+    {
+      id: 'separation' as const,
+      title: 'Separation governs',
+      equation: 'F_service / F_sep',
+      check: checks.serviceLimits.separation,
+      recommendations: [
+        'Increase installed preload or reduce preload losses.',
+        'Increase member stiffness relative to bolt stiffness.',
+        'Reduce external axial load or shorten the effective grip.'
+      ]
+    },
+    {
+      id: 'slip' as const,
+      title: 'Slip governs',
+      equation: 'V_service / (μ · n · F_clamp)',
+      check: checks.serviceLimits.slip,
+      recommendations: [
+        'Increase retained clamp preload.',
+        'Increase faying-surface slip coefficient.',
+        'Increase friction interface count or reduce transverse load.'
+      ]
+    },
+    {
+      id: 'proof' as const,
+      title: 'Proof governs',
+      equation: 'F_bolt / (S_proof · A_t)',
+      check: checks.proof,
+      recommendations: [
+        'Increase fastener diameter or proof strength.',
+        'Reduce installed preload or service bolt-load rise.',
+        'Increase member stiffness so a smaller fraction of service load enters the bolt.'
+      ]
+    },
+    {
+      id: 'bearing' as const,
+      title: 'Bearing / crushing governs',
+      equation: 'F / (σ_allow · A_bearing)',
+      check: bearingCheck,
+      recommendations: [
+        'Increase bearing diameter or washer OD.',
+        'Increase member bearing allowable or use a harder washer stack.',
+        'Reduce governing bolt load.'
+      ]
+    },
+    {
+      id: 'thread_strip' as const,
+      title: 'Thread strip governs',
+      equation: 'F / (τ_allow · π · d_shear · L_eff)',
+      check:
+        (checks.threadStrip.governing ? checks.threadStrip[checks.threadStrip.governing] : checks.threadStrip.internal),
+      recommendations: [
+        'Increase engaged thread length.',
+        'Increase internal or external strip allowable as applicable.',
+        'Increase nominal diameter or reduce installed preload.'
+      ]
+    },
+    {
+      id: 'fatigue' as const,
+      title: 'Fatigue governs',
+      equation: 'max(Goodman, Soderberg, Gerber)',
+      check: checks.fatigue,
+      recommendations: [
+        'Reduce alternating load at the fastener.',
+        'Increase fastener endurance capability or diameter.',
+        'Increase retained preload only if proof and strip margins remain acceptable.'
+      ]
+    }
+  ].sort((a, b) => (b.check.utilization ?? -Infinity) - (a.check.utilization ?? -Infinity));
+
+  const governing = candidates[0] ?? {
+    id: 'none' as const,
+    title: 'No governing check available',
+    equation: '—',
+    check: { demand: null, capacity: null, utilization: null, margin: null },
+    recommendations: ['Provide explicit capacities and service loads to activate decision support.']
+  };
+
+  const overallOrder = ['fail', 'attention', 'pass', 'unknown'] as const;
+  const criticalFastenerRisk = input.serviceCase
+    ? {
+        severity: 'attention' as const,
+        driver: 'pattern screening',
+        note: 'Critical-fastener ranking is currently provided by the route-level pattern solver rather than the core preload solver.'
+      }
+    : {
+        severity: 'unknown' as const,
+        driver: 'pattern screening',
+        note: 'No group-screening context is attached to the current preload solve.'
+      };
+  const severities = [
+    installationSeverity,
+    slipSeverity,
+    separationSeverity,
+    stripSeverity,
+    fatigueSeverity,
+    criticalFastenerRisk.severity
+  ];
+  const overall = overallOrder.find((severity) => severities.includes(severity)) ?? 'unknown';
+
+  return {
+    overall,
+    installationRisk: {
+      severity: installationSeverity,
+      driver: 'installation uncertainty',
+      note: `Combined installation uncertainty is ${installation.uncertainty.combinedPercent.toFixed(2)}%.`
+    },
+    slipRisk: {
+      severity: slipSeverity,
+      driver: 'slip reserve',
+      note: checks.serviceLimits.selfLooseningRisk.note
+    },
+    separationRisk: {
+      severity: separationSeverity,
+      driver: service?.separationState ?? 'separation utilization',
+      note:
+        service === null
+          ? 'Service case is required to evaluate separation.'
+          : `Current separation state is ${service.separationState.replaceAll('_', ' ')}.`
+    },
+    stripRisk: {
+      severity: stripSeverity,
+      driver: checks.threadMechanics.governingStripLocation ?? 'thread strip unavailable',
+      note: checks.threadMechanics.stripCapacityNote
+    },
+    fatigueRisk: {
+      severity: fatigueSeverity,
+      driver: 'fatigue envelope',
+      note: checks.fatigue.note ?? 'Fatigue envelope not available.'
+    },
+    criticalFastenerRisk,
+    governing: {
+      id: governing.id,
+      title: governing.title,
+      equation: governing.equation,
+      demand: governing.check.demand,
+      capacity: governing.check.capacity,
+      utilization: governing.check.utilization,
+      margin: governing.check.margin,
+      recommendations: governing.recommendations
+    }
   };
 }
 
@@ -304,6 +490,7 @@ export function computeFastenedJointPreload(input: FastenedJointPreloadInput): F
     stiffness,
     service,
     checks,
+    decisionSupport: buildDecisionSupport(input, installation, service, checks),
     assumptions,
     modelBasis
   };

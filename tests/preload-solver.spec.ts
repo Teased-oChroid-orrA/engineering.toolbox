@@ -162,6 +162,8 @@ test.describe('preload solver G1 core', () => {
     expect(out.modelBasis.v2FoundationEnabled).toBeTruthy();
     expect(out.modelBasis.assemblySummary).toContain('assembly');
     expect(out.modelBasis.uncertaintySummary).toContain('root-sum-square');
+    expect(out.decisionSupport.overall).toBeTruthy();
+    expect(out.decisionSupport.governing.title).toBeTruthy();
   });
 
   test('joint assembly fallback builds ordered rows from plates and washers', () => {
@@ -254,6 +256,8 @@ test.describe('preload solver G1 core', () => {
     expect(out.checks.threadMechanics.engagedLengthEffectiveness).not.toBeNull();
     expect(out.checks.threadMechanics.loadDistributionFactor).not.toBeNull();
     expect(out.checks.threadMechanics.effectiveEngagedLength).not.toBeNull();
+    expect(out.decisionSupport.stripRisk.severity).toBeTruthy();
+    expect(out.decisionSupport.governing.recommendations.length).toBeGreaterThan(0);
     expect(out.checks.fatigue.goodmanEquivalent).not.toBeNull();
     expect(out.checks.fatigue.soderbergEquivalent).not.toBeNull();
     expect(out.checks.fatigue.gerberEquivalent).not.toBeNull();
@@ -296,6 +300,8 @@ test.describe('preload solver G1 core', () => {
     expect(html).toContain('Assembly Model');
     expect(html).toContain('Thread / Bearing Mechanics');
     expect(html).toContain('Bearing geometry source');
+    expect(html).toContain('Design Verdict');
+    expect(html).toContain('Why This Fails / Governs');
   });
 
   test('2D fastener pattern solver returns a full influence matrix and critical fastener ranking', () => {

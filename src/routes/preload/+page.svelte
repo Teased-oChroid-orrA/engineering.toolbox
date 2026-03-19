@@ -423,6 +423,19 @@
     severity: 'warning' | 'error';
     actions: PreloadIssueAction[];
   };
+  type SensitivityDriver = {
+    label: string;
+    baseUtilization: number;
+    perturbedUtilization: number;
+    deltaPercent: number;
+    note: string;
+  };
+  type InverseSolveCard = {
+    title: string;
+    value: string;
+    note: string;
+    severity: 'ok' | 'warn' | 'fail';
+  };
   let stepSnapshots: Partial<Record<WorkflowStep, StepSnapshot[]>> = $state({});
   let stepHintsSeen: Partial<Record<WorkflowStep, boolean>> = $state({});
   let stepCompletedAt: Partial<Record<WorkflowStep, number>> = $state({});
@@ -1123,11 +1136,7 @@
   $effect(() => {
     solverError = '';
     try {
-      output = computeFastenedJointPreload({
-        ...form,
-        assembly: assemblyInput,
-        bearingGeometry: currentBearingGeometry
-      });
+      output = computeFastenedJointPreload(buildSolverInputFromForm(form));
     } catch (error) {
       output = null;
       solverError = error instanceof Error ? error.message : 'Preload solver failed.';
@@ -2211,6 +2220,189 @@
       collarCompatibility: selectedFastenerDashVariant?.collarPart ?? selectedFastener.collarCompatibility
     })
   );
+
+  function resolveFastenerSelection(candidate: PreloadForm) {
+    const fastener = getPreloadFastener(candidate.selectedFastenerId);
+    const dashVariant =
+      fastener.dashVariants.find((variant) => variant.dash === candidate.selectedFastenerDash) ??
+      fastener.dashVariants[0] ??
+      null;
+    const gripVariant =
+      fastener.gripTable.find((entry) => entry.gripCode === candidate.selectedFastenerGrip) ??
+      fastener.gripTable[0] ??
+      null;
+    return { fastener, dashVariant, gripVariant };
+  }
+
+  function deriveAutoWasherGeometryForCandidate(
+    candidate: PreloadForm,
+    selectedFastenerCandidate: ReturnType<typeof getPreloadFastener>,
+    dashVariant: ReturnType<typeof resolveFastenerSelection>['dashVariant']
+  ) {
+    const d = Number(dashVariant?.nominalDiameterIn ?? candidate.nominalDiameter);
+    const nominal = Number.isFinite(d) && d > 0 ? d : 0.25;
+    const style = String(selectedFastenerCandidate.headStyle ?? '').toLowerCase();
+    const isFlush = style.includes('flush');
+    const isTension = style.includes('tension');
+    const headStyleKey: 'protrudingShear' | 'reducedFlushShear' | 'protrudingTension' | 'flushTension' =
+      isTension ? (isFlush ? 'flushTension' : 'protrudingTension') : (isFlush ? 'reducedFlushShear' : 'protrudingShear');
+    const dashGeom = dashVariant?.geometry;
+    const clearance = Math.max(0.005, nominal * 0.06);
+    const inner =
+      Number.isFinite(Number(dashGeom?.washerInnerDiameterIn)) && Number(dashGeom?.washerInnerDiameterIn) > nominal
+        ? Number(dashGeom?.washerInnerDiameterIn)
+        : nominal + clearance;
+    const existingOuter = Number(dashGeom?.washerOuterDiameterIn ?? candidate.washerStack.outerDiameter);
+    const outerCandidate = Math.max(
+      Number.isFinite(existingOuter) && existingOuter > 0 ? existingOuter : 0,
+      nominal * 2.6,
+      inner + 0.08
+    );
+    const enforced = enforceAnnulusGap(outerCandidate, inner, 0.001);
+    const nutFace = Number(dashGeom?.nutFaceDiameterIn ?? 0);
+    const headFace = Number(dashGeom?.headFaceDiametersIn?.[headStyleKey] ?? 0);
+    const topFaceEnforced = enforceAnnulusGap(
+      Number.isFinite(headFace) && headFace > 0 ? headFace : enforced.outer,
+      enforced.inner,
+      0.001
+    );
+    const bottomFaceEnforced = enforceAnnulusGap(
+      Number.isFinite(nutFace) && nutFace > 0 ? nutFace : enforced.outer,
+      enforced.inner,
+      0.001
+    );
+    return {
+      outer: enforced.outer,
+      inner: enforced.inner,
+      topFaceOuter: topFaceEnforced.outer,
+      bottomFaceOuter: bottomFaceEnforced.outer
+    };
+  }
+
+  function buildSolverInputFromForm(candidate: PreloadForm): FastenedJointPreloadInput {
+    const { fastener, dashVariant, gripVariant } = resolveFastenerSelection(candidate);
+    const plateMaterial = getPreloadMaterial(candidate.selectedPlateMaterialId);
+    const style = String(fastener.headStyle ?? '').toLowerCase();
+    const isFlush = style.includes('flush');
+    const isTension = style.includes('tension');
+    const headStyleKey: 'protrudingShear' | 'reducedFlushShear' | 'protrudingTension' | 'flushTension' =
+      isTension ? (isFlush ? 'flushTension' : 'protrudingTension') : (isFlush ? 'reducedFlushShear' : 'protrudingShear');
+    const dashGeometry = dashVariant?.geometry ?? null;
+    const inferredOuter =
+      candidate.installation.model === 'exact_torque' && Number(candidate.installation.bearingMeanDiameter) > 0
+        ? Math.max(
+            candidate.nominalDiameter,
+            2 * Number(candidate.installation.bearingMeanDiameter) - candidate.nominalDiameter
+          )
+        : Math.max(candidate.nominalDiameter * 1.8, candidate.nominalDiameter + 0.08);
+
+    const autoWasherGeometry = deriveAutoWasherGeometryForCandidate(candidate, fastener, dashVariant);
+    const washerStack = candidate.washerGeometryManualOverride
+      ? { ...candidate.washerStack }
+      : {
+          ...candidate.washerStack,
+          outerDiameter: autoWasherGeometry.outer,
+          innerDiameter: autoWasherGeometry.inner,
+          underHeadOuterDiameter: autoWasherGeometry.outer,
+          underHeadInnerDiameter: autoWasherGeometry.inner,
+          underNutOuterDiameter: autoWasherGeometry.outer,
+          underNutInnerDiameter: autoWasherGeometry.inner
+        };
+
+    const washerTopCount = Math.max(0, Math.round(washerStack.underHeadCount ?? 0));
+    const washerBottomCount = Math.max(0, Math.round(washerStack.underNutCount ?? 0));
+    const fastenerHeadFaceOuterDiameter = Number(dashGeometry?.headFaceDiametersIn?.[headStyleKey] ?? inferredOuter);
+    const fastenerNutFaceOuterDiameter = Number(dashGeometry?.nutFaceDiameterIn ?? inferredOuter);
+    const topBearingFaceInnerDiameter =
+      washerStack.enabled && washerTopCount > 0
+        ? Number(washerStack.underHeadInnerDiameter ?? washerStack.innerDiameter)
+        : candidate.nominalDiameter;
+    const bottomBearingFaceInnerDiameter =
+      washerStack.enabled && washerBottomCount > 0
+        ? Number(washerStack.underNutInnerDiameter ?? washerStack.innerDiameter)
+        : candidate.nominalDiameter;
+    const topBearingFaceOuterDiameter =
+      washerStack.enabled && washerTopCount > 0 && Number(washerStack.underHeadOuterDiameter ?? washerStack.outerDiameter) > 0
+        ? Number(washerStack.underHeadOuterDiameter ?? washerStack.outerDiameter)
+        : fastenerHeadFaceOuterDiameter;
+    const bottomBearingFaceOuterDiameter =
+      washerStack.enabled && washerBottomCount > 0 && Number(washerStack.underNutOuterDiameter ?? washerStack.outerDiameter) > 0
+        ? Number(washerStack.underNutOuterDiameter ?? washerStack.outerDiameter)
+        : fastenerNutFaceOuterDiameter;
+    const topBearingFaceArea = annulusArea(topBearingFaceOuterDiameter, topBearingFaceInnerDiameter) ?? 0;
+    const bottomBearingFaceArea = annulusArea(bottomBearingFaceOuterDiameter, bottomBearingFaceInnerDiameter) ?? 0;
+    const autoBearingArea =
+      topBearingFaceArea > 0 && bottomBearingFaceArea > 0
+        ? Math.min(topBearingFaceArea, bottomBearingFaceArea)
+        : Math.max(topBearingFaceArea, bottomBearingFaceArea, 0);
+    const topBearingMeanDiameter =
+      annularFrictionMeanDiameter(topBearingFaceOuterDiameter, topBearingFaceInnerDiameter) ?? candidate.nominalDiameter;
+    const bottomBearingMeanDiameter =
+      annularFrictionMeanDiameter(bottomBearingFaceOuterDiameter, bottomBearingFaceInnerDiameter) ?? candidate.nominalDiameter;
+    const effectiveBearingMeanDiameter = Math.min(topBearingMeanDiameter, bottomBearingMeanDiameter);
+    const boltSegments = candidate.useCustomBoltSegments
+      ? clone(candidate.boltSegments)
+      : buildAutoBoltSegments(
+          dashVariant?.nominalDiameterIn ?? candidate.nominalDiameter,
+          candidate.boltModulus,
+          gripVariant?.nominalGripIn ?? (candidate.defaultTopPlateThickness + candidate.defaultBottomPlateThickness),
+          Number(candidate.engagedThreadLength ?? 0.45)
+        );
+    const memberSegments = candidate.useCustomPlateLayers
+      ? clone(candidate.memberSegments)
+      : buildAutoPlateLayers(
+          candidate.defaultPlateWidth,
+          candidate.defaultPlateLength,
+          candidate.defaultTopPlateThickness,
+          candidate.defaultBottomPlateThickness,
+          plateMaterial.modulusPsi,
+          dashVariant?.nominalDiameterIn ?? candidate.nominalDiameter,
+          candidate.defaultPlateCompressionModel,
+          candidate.compressionConeHalfAngleDeg
+        );
+    const bearingGeometry = {
+      source: candidate.washerGeometryManualOverride ? 'manual' as const : dashGeometry ? 'catalog' as const : 'derived' as const,
+      headBearingDiameter: topBearingFaceOuterDiameter,
+      nutOrCollarBearingDiameter: bottomBearingFaceOuterDiameter,
+      washerCompatibilityNote:
+        dashVariant?.collarPart ? `Selected dash maps to collar ${dashVariant.collarPart}.` : fastener.collarCompatibility,
+      fastenerLabel: fastener.label,
+      headStyle: fastener.headStyle,
+      threadDetail: dashVariant?.threadCallout ?? fastener.threadDetail
+    };
+
+    const installation =
+      candidate.installation.model === 'exact_torque'
+        ? {
+            ...candidate.installation,
+            bearingMeanDiameter: stepPrefs.autoBearingArea
+              ? effectiveBearingMeanDiameter
+              : candidate.installation.bearingMeanDiameter
+          }
+        : candidate.installation;
+
+    return {
+      ...candidate,
+      boltSegments,
+      memberSegments,
+      washerStack,
+      underHeadBearingArea: stepPrefs.autoBearingArea ? autoBearingArea : candidate.underHeadBearingArea,
+      installation,
+      bearingGeometry,
+      assembly: buildJointAssemblyInput({
+        ...candidate,
+        boltModulus: candidate.boltModulus,
+        memberSegments,
+        washerStack,
+        bearingGeometry,
+        jointTypePreset: candidate.jointTypePreset,
+        plateBehaviorMode: candidate.plateBehaviorMode,
+        fastenerLabel: fastener.label,
+        headStyle: fastener.headStyle,
+        collarCompatibility: dashVariant?.collarPart ?? fastener.collarCompatibility
+      })
+    };
+  }
   let autoComputedBearingArea =
     $derived(topBearingFaceArea > 0 && bottomBearingFaceArea > 0
       ? Math.min(topBearingFaceArea, bottomBearingFaceArea)
@@ -2357,6 +2549,256 @@
   let heatmapIsFlat = $derived(heatmapValues.length ? Math.abs(heatmapMax - heatmapMin) < 1e-9 : false);
   let envelopeChartHeight = $derived(Math.max(196, 70 + fastenerCaseEnvelopeRows.length * 34));
   let envelopeChartInnerHeight = $derived(Math.max(116, 26 + fastenerCaseEnvelopeRows.length * 28));
+
+  function governingUtilization(result: ReturnType<typeof computeFastenedJointPreload>) {
+    return Math.max(
+      result.checks.serviceLimits.separation.utilization ?? 0,
+      result.checks.serviceLimits.slip.utilization ?? 0,
+      result.checks.proof.utilization ?? 0,
+      result.checks.bearing.underHead.utilization ?? 0,
+      result.checks.bearing.threadBearing.utilization ?? 0,
+      result.checks.bearing.localCrushing.utilization ?? 0,
+      result.checks.threadStrip.internal.utilization ?? 0,
+      result.checks.threadStrip.external.utilization ?? 0,
+      result.checks.fatigue.utilization ?? 0
+    );
+  }
+
+  function evaluateSensitivityDriver(
+    label: string,
+    mutate: (candidate: PreloadForm) => void,
+    note: string
+  ): SensitivityDriver | null {
+    if (!output) return null;
+    const candidate = clone(form);
+    mutate(candidate);
+    try {
+      const next = computeFastenedJointPreload(buildSolverInputFromForm(candidate));
+      const baseUtilization = governingUtilization(output);
+      const perturbedUtilization = governingUtilization(next);
+      const deltaPercent =
+        Math.abs(baseUtilization) > 1e-9
+          ? ((perturbedUtilization - baseUtilization) / Math.abs(baseUtilization)) * 100
+          : perturbedUtilization * 100;
+      return {
+        label,
+        baseUtilization,
+        perturbedUtilization,
+        deltaPercent,
+        note
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  let sensitivityDrivers = $derived.by(() => {
+    if (!output) return [] as SensitivityDriver[];
+    const rows = [
+      output.input.installation.model === 'exact_torque'
+        ? evaluateSensitivityDriver(
+            'Thread friction +5%',
+            (candidate) => {
+              if (candidate.installation.model !== 'exact_torque') return;
+              candidate.installation = {
+                ...candidate.installation,
+                threadFrictionCoeff: Number(candidate.installation.threadFrictionCoeff) * 1.05
+              };
+            },
+            'Measures how tightening friction uncertainty changes governing utilization.'
+          )
+        : evaluateSensitivityDriver(
+            'Legacy scatter +5%',
+            (candidate) => {
+              candidate.installationScatterPercent = Number(candidate.installationScatterPercent) * 1.05;
+              candidate.installationUncertainty = {
+                ...candidate.installationUncertainty,
+                legacyScatterPercent: Number(candidate.installationUncertainty.legacyScatterPercent) * 1.05
+              };
+            },
+            'Fallback driver when exact-torque friction terms are not active.'
+          ),
+      evaluateSensitivityDriver(
+        'Grip / shank length +5%',
+        (candidate) => {
+          candidate.useCustomBoltSegments = true;
+          candidate.boltSegments = clone(candidate.boltSegments).map((segment, index) =>
+            index === 0 ? { ...segment, length: Number(segment.length) * 1.05 } : segment
+          );
+        },
+        'Measures how a longer grip-shank path changes bolt stiffness and load transfer.'
+      ),
+      evaluateSensitivityDriver(
+        'Plate thickness +5%',
+        (candidate) => {
+          if (candidate.useCustomPlateLayers) {
+            candidate.memberSegments = clone(candidate.memberSegments).map((segment) => ({
+              ...segment,
+              length: Number(segment.length) * 1.05
+            }));
+          } else {
+            candidate.defaultTopPlateThickness = Number(candidate.defaultTopPlateThickness) * 1.05;
+            candidate.defaultBottomPlateThickness = Number(candidate.defaultBottomPlateThickness) * 1.05;
+          }
+        },
+        'Measures the response to a thicker clamped stack.'
+      ),
+      evaluateSensitivityDriver(
+        'Washer OD +5%',
+        (candidate) => {
+          candidate.washerGeometryManualOverride = true;
+          candidate.washerStack = {
+            ...candidate.washerStack,
+            enabled: true,
+            outerDiameter: Number(candidate.washerStack.outerDiameter) * 1.05,
+            underHeadOuterDiameter: Number(candidate.washerStack.underHeadOuterDiameter ?? candidate.washerStack.outerDiameter) * 1.05,
+            underNutOuterDiameter: Number(candidate.washerStack.underNutOuterDiameter ?? candidate.washerStack.outerDiameter) * 1.05
+          };
+        },
+        'Measures how additional bearing diameter changes bearing and slip margins.'
+      ),
+      evaluateSensitivityDriver(
+        'Plate modulus +5%',
+        (candidate) => {
+          candidate.useCustomPlateLayers = true;
+          candidate.memberSegments = clone(candidate.memberSegments).map((segment) => ({
+            ...segment,
+            modulus: Number(segment.modulus) * 1.05
+          }));
+        },
+        'Measures member-stiffness influence on load transfer and separation.'
+      )
+    ].filter((entry): entry is SensitivityDriver => Boolean(entry));
+    return rows.sort((a, b) => Math.abs(b.deltaPercent) - Math.abs(a.deltaPercent));
+  });
+
+  function solveBisectionTarget(
+    predicate: (result: ReturnType<typeof computeFastenedJointPreload>) => boolean,
+    mutateCandidate: (candidate: PreloadForm, trial: number) => void,
+    lower: number,
+    upper: number,
+    iterations = 28
+  ): number | null {
+    let low = lower;
+    let high = upper;
+    const lowCandidate = clone(form);
+    mutateCandidate(lowCandidate, low);
+    let lowResult: ReturnType<typeof computeFastenedJointPreload> | null = null;
+    try {
+      lowResult = computeFastenedJointPreload(buildSolverInputFromForm(lowCandidate));
+    } catch {
+      lowResult = null;
+    }
+    if (lowResult && predicate(lowResult)) return low;
+
+    let highResult: ReturnType<typeof computeFastenedJointPreload> | null = null;
+    for (let expand = 0; expand < 6; expand += 1) {
+      const candidate = clone(form);
+      mutateCandidate(candidate, high);
+      try {
+        highResult = computeFastenedJointPreload(buildSolverInputFromForm(candidate));
+      } catch {
+        highResult = null;
+      }
+      if (highResult && predicate(highResult)) break;
+      high *= 1.6;
+    }
+    if (!highResult || !predicate(highResult)) return null;
+
+    for (let index = 0; index < iterations; index += 1) {
+      const mid = (low + high) / 2;
+      const candidate = clone(form);
+      mutateCandidate(candidate, mid);
+      const result = computeFastenedJointPreload(buildSolverInputFromForm(candidate));
+      if (predicate(result)) high = mid;
+      else low = mid;
+    }
+    return high;
+  }
+
+  let inverseSolveCards = $derived.by(() => {
+    if (!output) return [] as InverseSolveCard[];
+    const cards: InverseSolveCard[] = [];
+    const noSlipTarget = solveBisectionTarget(
+      (result) => (result.checks.serviceLimits.slip.utilization ?? Infinity) <= 1,
+      (candidate, trial) => {
+        candidate.installation = {
+          model: 'direct_preload',
+          targetPreload: trial
+        };
+      },
+      0,
+      Math.max(1000, (output.installation.preloadMax ?? output.installation.preload) * 4)
+    );
+    cards.push(
+      noSlipTarget !== null
+        ? {
+            title: 'Required preload for no-slip',
+            value: `${fmt(noSlipTarget, 2)}`,
+            note: 'Direct-preload equivalent needed to drive slip utilization to 1.00 or lower.',
+            severity: noSlipTarget > output.installation.preload ? 'warn' : 'ok'
+          }
+        : {
+            title: 'Required preload for no-slip',
+            value: 'No feasible solve',
+            note: 'The current friction/contact model could not reach slip utilization <= 1 within the bounded search range.',
+            severity: 'fail'
+          }
+    );
+
+    const targetProofUtilization = 0.85;
+    const minimumDiameter = solveBisectionTarget(
+      (result) => (result.checks.proof.utilization ?? Infinity) <= targetProofUtilization,
+      (candidate, trial) => {
+        candidate.nominalDiameter = trial;
+        candidate.tensileStressArea = estimateThreadedArea(trial);
+        if (candidate.useCustomBoltSegments) {
+          candidate.boltSegments = clone(candidate.boltSegments).map((segment, index) => ({
+            ...segment,
+            area: index === candidate.boltSegments.length - 1 ? estimateThreadedArea(trial) : Math.PI * 0.25 * trial * trial
+          }));
+        }
+      },
+      Math.max(0.05, form.nominalDiameter * 0.65),
+      Math.max(form.nominalDiameter * 2.5, form.nominalDiameter + 0.25)
+    );
+    cards.push(
+      minimumDiameter !== null
+        ? {
+            title: 'Minimum nominal diameter for proof margin',
+            value: `${fmt(minimumDiameter, 4)}`,
+            note: `Approximate diameter needed to keep proof utilization at or below ${fmt(targetProofUtilization, 2)}.`,
+            severity: minimumDiameter > form.nominalDiameter ? 'warn' : 'ok'
+          }
+        : {
+            title: 'Minimum nominal diameter for proof margin',
+            value: 'No feasible solve',
+            note: 'Proof margin target could not be met within the bounded diameter search range.',
+            severity: 'fail'
+          }
+    );
+
+    const bearingDemand =
+      output.checks.bearing.governing === 'under_head'
+        ? output.checks.bearing.underHead.demand
+        : output.checks.bearing.governing === 'thread_bearing'
+          ? output.checks.bearing.threadBearing.demand
+          : output.checks.bearing.localCrushing.demand;
+    const bearingAllowable = Number(form.memberBearingAllowable ?? 0);
+    const currentInner = Math.min(topBearingFaceInnerDiameter, bottomBearingFaceInnerDiameter);
+    if (Number.isFinite(Number(bearingDemand)) && bearingDemand && bearingAllowable > 0) {
+      const targetArea = Number(bearingDemand) / (bearingAllowable * 0.85);
+      const requiredOuter = Math.sqrt(currentInner * currentInner + (4 * targetArea) / Math.PI);
+      cards.push({
+        title: 'Minimum governing bearing-face OD',
+        value: `${fmt(requiredOuter, 4)}`,
+        note: 'Equivalent annulus OD needed to keep the governing bearing utilization at or below 0.85.',
+        severity: requiredOuter > Math.max(topBearingFaceOuterDiameter, bottomBearingFaceOuterDiameter) ? 'warn' : 'ok'
+      });
+    }
+
+    return cards;
+  });
 
   function heatmapDisplayRatio(rowIndex: number, columnIndex: number, cell: number): number {
     if (!fastenerGroupResult) return 0;
@@ -4375,6 +4817,82 @@
             <div class="mt-1 text-sm text-white/70">Status: {output.checks.fatigue.status} ({fmt(output.checks.fatigue.utilization, 4)})</div>
           {/if}
         </div>
+      </CardContent>
+    </Card>
+
+    <Card class="glass-card">
+      <CardHeader class="pb-2 pt-4">
+        <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-emerald-300">Design Verdict</CardTitle>
+      </CardHeader>
+      <CardContent class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+          <div class="text-[10px] uppercase tracking-widest text-white/45">Verdict Stack</div>
+          {#if output}
+            <div class="mt-3 text-sm text-white/85">Overall: <span class={statusTone(output.decisionSupport.overall === 'fail' ? 'warning' : output.decisionSupport.overall === 'pass' ? 'ok' : 'unavailable')}>{output.decisionSupport.overall}</span></div>
+            <div class="mt-1 text-sm text-white/70">Installation: {output.decisionSupport.installationRisk.severity} • {output.decisionSupport.installationRisk.note}</div>
+            <div class="mt-1 text-sm text-white/70">Slip: {output.decisionSupport.slipRisk.severity} • {output.decisionSupport.slipRisk.note}</div>
+            <div class="mt-1 text-sm text-white/70">Separation: {output.decisionSupport.separationRisk.severity} • {output.decisionSupport.separationRisk.note}</div>
+            <div class="mt-1 text-sm text-white/70">Strip: {output.decisionSupport.stripRisk.severity} • {output.decisionSupport.stripRisk.note}</div>
+            <div class="mt-1 text-sm text-white/70">Fatigue: {output.decisionSupport.fatigueRisk.severity} • {output.decisionSupport.fatigueRisk.note}</div>
+          {/if}
+        </div>
+        <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+          <div class="text-[10px] uppercase tracking-widest text-white/45">Why This Governs</div>
+          {#if output}
+            <div class="mt-3 text-sm text-white/85">{output.decisionSupport.governing.title}</div>
+            <div class="mt-1 font-mono text-sm text-cyan-300">{output.decisionSupport.governing.equation}</div>
+            <div class="mt-1 text-sm text-white/70">Demand {fmt(output.decisionSupport.governing.demand, 4)} • capacity {fmt(output.decisionSupport.governing.capacity, 4)} • utilization {fmt(output.decisionSupport.governing.utilization, 4)}</div>
+            <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-white/70">
+              {#each output.decisionSupport.governing.recommendations as item}
+                <li>{item}</li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+      </CardContent>
+    </Card>
+
+    <Card class="glass-card">
+      <CardHeader class="pb-2 pt-4">
+        <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Sensitivity Ranking</CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-3">
+        <div class="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/72">
+          Each driver re-solves the current preload model with a bounded +5% perturbation, then ranks the change in governing utilization.
+        </div>
+        <div class="space-y-2">
+          {#each sensitivityDrivers as driver}
+            <div class="rounded-xl border border-white/10 bg-black/20 p-3">
+              <div class="flex items-center justify-between gap-4">
+                <div class="text-sm font-semibold text-white/86">{driver.label}</div>
+                <div class={`font-mono text-sm ${driver.deltaPercent > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>
+                  {driver.deltaPercent >= 0 ? '+' : ''}{fmt(driver.deltaPercent, 2)}%
+                </div>
+              </div>
+              <div class="mt-1 text-sm text-white/70">
+                Governing utilization {fmt(driver.baseUtilization, 4)} → {fmt(driver.perturbedUtilization, 4)}
+              </div>
+              <div class="mt-1 text-xs text-white/55">{driver.note}</div>
+            </div>
+          {/each}
+        </div>
+      </CardContent>
+    </Card>
+
+    <Card class="glass-card">
+      <CardHeader class="pb-2 pt-4">
+        <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-cyan-300">Inverse Solve Targets</CardTitle>
+      </CardHeader>
+      <CardContent class="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        {#each inverseSolveCards as card}
+          <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+            <div class="text-[10px] uppercase tracking-widest text-white/45">{card.title}</div>
+            <div class={`mt-3 font-mono text-lg ${card.severity === 'fail' ? 'text-rose-300' : card.severity === 'warn' ? 'text-amber-300' : 'text-cyan-300'}`}>
+              {card.value}
+            </div>
+            <div class="mt-2 text-sm text-white/70">{card.note}</div>
+          </div>
+        {/each}
       </CardContent>
     </Card>
 

@@ -303,6 +303,7 @@ export type FastenedJointPreloadOutput = {
   stiffness: StiffnessResult;
   service: ServiceEvaluationResult | null;
   checks: StructuralChecksResult;
+  decisionSupport: DecisionSupportResult;
   assumptions: string[];
   modelBasis: ModelBasisResult;
 };
@@ -382,6 +383,36 @@ export type ThreadMechanicsResult = {
   nutOrCollarBearingDiameter: number | null;
   washerCompatibilityNote: string;
   stripCapacityNote: string;
+};
+
+export type VerdictSeverity = 'pass' | 'attention' | 'fail' | 'unknown';
+
+export type VerdictItem = {
+  severity: VerdictSeverity;
+  driver: string;
+  note: string;
+};
+
+export type FailureDecompositionResult = {
+  id: 'separation' | 'slip' | 'proof' | 'bearing' | 'thread_strip' | 'fatigue' | 'none';
+  title: string;
+  equation: string;
+  demand: number | null;
+  capacity: number | null;
+  utilization: number | null;
+  margin: number | null;
+  recommendations: string[];
+};
+
+export type DecisionSupportResult = {
+  overall: VerdictSeverity;
+  installationRisk: VerdictItem;
+  slipRisk: VerdictItem;
+  separationRisk: VerdictItem;
+  stripRisk: VerdictItem;
+  fatigueRisk: VerdictItem;
+  criticalFastenerRisk: VerdictItem;
+  governing: FailureDecompositionResult;
 };
 
 export type FatigueCheck = UtilizationCheck & {
