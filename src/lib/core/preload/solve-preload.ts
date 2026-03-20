@@ -12,7 +12,9 @@ import type {
   InstallationUncertaintyInput,
   InstallationUncertaintyResult,
   InstallationInput,
-  InstallationResult
+  InstallationResult,
+  PreloadInverseTargetResult,
+  PreloadScenarioVariant
 } from './types';
 
 const DEG_TO_RAD = Math.PI / 180;
@@ -139,6 +141,85 @@ function pickWorstCaseScenario(
     utilization: Number.isFinite(Number(worst.utilization)) ? Number(worst.utilization) : null,
     note
   };
+}
+
+function clonePreloadInput(input: FastenedJointPreloadInput): FastenedJointPreloadInput {
+  return JSON.parse(JSON.stringify(input)) as FastenedJointPreloadInput;
+}
+
+function zeroInstallationUncertainty(): InstallationUncertaintyInput {
+  return {
+    legacyScatterPercent: 0,
+    toolAccuracyPercent: 0,
+    threadFrictionPercent: 0,
+    bearingFrictionPercent: 0,
+    prevailingTorquePercent: 0,
+    threadGeometryPercent: 0
+  };
+}
+
+function buildDeterministicDirectPreloadInput(input: FastenedJointPreloadInput, preload: number): FastenedJointPreloadInput {
+  const candidate = clonePreloadInput(input);
+  candidate.installation = {
+    model: 'direct_preload',
+    targetPreload: preload
+  };
+  candidate.installationScatterPercent = 0;
+  candidate.installationUncertainty = zeroInstallationUncertainty();
+  return candidate;
+}
+
+function estimateThreadedArea(nominalDiameter: number): number {
+  const diameter = Number(nominalDiameter);
+  if (!Number.isFinite(diameter) || diameter <= 0) return 0;
+  return Math.PI * 0.25 * diameter * diameter * 0.74;
+}
+
+function solveBisectionTarget(
+  seedInput: FastenedJointPreloadInput,
+  predicate: (result: FastenedJointPreloadOutput) => boolean,
+  mutateCandidate: (candidate: FastenedJointPreloadInput, trial: number) => void,
+  lower: number,
+  upper: number,
+  iterations = 28
+): number | null {
+  let low = lower;
+  let high = upper;
+
+  const lowCandidate = clonePreloadInput(seedInput);
+  mutateCandidate(lowCandidate, low);
+  let lowResult: FastenedJointPreloadOutput | null = null;
+  try {
+    lowResult = computeFastenedJointPreload(lowCandidate);
+  } catch {
+    lowResult = null;
+  }
+  if (lowResult && predicate(lowResult)) return low;
+
+  let highResult: FastenedJointPreloadOutput | null = null;
+  for (let expand = 0; expand < 6; expand += 1) {
+    const candidate = clonePreloadInput(seedInput);
+    mutateCandidate(candidate, high);
+    try {
+      highResult = computeFastenedJointPreload(candidate);
+    } catch {
+      highResult = null;
+    }
+    if (highResult && predicate(highResult)) break;
+    high *= 1.6;
+  }
+
+  if (!highResult || !predicate(highResult)) return null;
+
+  for (let index = 0; index < iterations; index += 1) {
+    const mid = (low + high) / 2;
+    const candidate = clonePreloadInput(seedInput);
+    mutateCandidate(candidate, mid);
+    const result = computeFastenedJointPreload(candidate);
+    if (predicate(result)) high = mid;
+    else low = mid;
+  }
+  return high;
 }
 
 function verdictSeverity(utilization: number | null | undefined): 'pass' | 'attention' | 'fail' | 'unknown' {
@@ -541,6 +622,173 @@ export function computeFastenedJointPreload(input: FastenedJointPreloadInput): F
     assumptions,
     modelBasis
   };
+}
+
+export function buildPreloadScenarioVariants(input: FastenedJointPreloadInput): PreloadScenarioVariant[] {
+  const nominal = computeFastenedJointPreload(input);
+  const cases: Array<{ id: EnvelopeScenarioLabel; preload: number; label: string; note: string }> = [
+    {
+      id: 'min_preload',
+      preload: nominal.installation.preloadMin,
+      label: 'Min preload',
+      note: 'Lower installed-preload bound after explicit installation uncertainty.'
+    },
+    {
+      id: 'nominal_preload',
+      preload: nominal.installation.preload,
+      label: 'Nominal preload',
+      note: 'Nominal installed preload from the selected installation model.'
+    },
+    {
+      id: 'max_preload',
+      preload: nominal.installation.preloadMax,
+      label: 'Max preload',
+      note: 'Upper installed-preload bound after explicit installation uncertainty.'
+    }
+  ];
+
+  return cases.map((entry) => {
+    const resolved = computeFastenedJointPreload(buildDeterministicDirectPreloadInput(input, entry.preload));
+    return {
+      id: entry.id,
+      label: entry.label,
+      preloadInstalled: resolved.installation.preload,
+      preloadEffective: resolved.service?.preloadEffective ?? null,
+      clampForceService: resolved.service?.clampForceService ?? null,
+      boltLoadService: resolved.service?.boltLoadService ?? null,
+      separationUtilization: resolved.checks.serviceLimits.separation.utilization,
+      slipUtilization: resolved.checks.serviceLimits.slip.utilization,
+      proofUtilization: resolved.checks.proof.utilization,
+      note: entry.note
+    };
+  });
+}
+
+export function solveEnvelopeAwareInverseTargets(
+  input: FastenedJointPreloadInput,
+  nominalOutput: FastenedJointPreloadOutput | null = null
+): PreloadInverseTargetResult[] {
+  const output = nominalOutput ?? computeFastenedJointPreload(input);
+  const results: PreloadInverseTargetResult[] = [];
+
+  const noSlipTarget = solveBisectionTarget(
+    input,
+    (candidateResult) => (candidateResult.checks.worstCaseScenarios.slip.utilization ?? Infinity) <= 1,
+    (candidate, trial) => {
+      candidate.installation = {
+        model: 'direct_preload',
+        targetPreload: trial
+      };
+      candidate.installationScatterPercent = input.installationScatterPercent;
+      candidate.installationUncertainty = clonePreloadInput(input).installationUncertainty;
+    },
+    0,
+    Math.max(1000, (output.installation.preloadMax ?? output.installation.preload) * 4)
+  );
+  results.push({
+    id: 'no_slip_preload',
+    label: 'Required preload for no-slip',
+    value: noSlipTarget,
+    unit: 'lbf',
+    note:
+      noSlipTarget !== null
+        ? 'Direct-preload equivalent needed to keep the worst-case slip utilization at or below 1.00.'
+        : 'The current friction/contact model could not reach slip utilization <= 1 within the bounded search range.',
+    severity:
+      noSlipTarget === null
+        ? 'fail'
+        : noSlipTarget > output.installation.preload
+          ? 'attention'
+          : 'pass',
+    feasible: noSlipTarget !== null,
+    governingScenario: output.checks.worstCaseScenarios.slip.scenario,
+    targetUtilization: 1
+  });
+
+  const targetProofUtilization = 0.85;
+  const minimumDiameter = solveBisectionTarget(
+    input,
+    (candidateResult) => (candidateResult.checks.worstCaseScenarios.proof.utilization ?? Infinity) <= targetProofUtilization,
+    (candidate, trial) => {
+      candidate.nominalDiameter = trial;
+      candidate.tensileStressArea = estimateThreadedArea(trial);
+      candidate.installationScatterPercent = input.installationScatterPercent;
+      candidate.installationUncertainty = clonePreloadInput(input).installationUncertainty;
+      if (candidate.boltSegments.length) {
+        candidate.boltSegments = candidate.boltSegments.map((segment, index) => ({
+          ...segment,
+          area:
+            index === candidate.boltSegments.length - 1
+              ? estimateThreadedArea(trial)
+              : Math.PI * 0.25 * trial * trial
+        }));
+      }
+    },
+    Math.max(0.05, input.nominalDiameter * 0.65),
+    Math.max(input.nominalDiameter * 2.5, input.nominalDiameter + 0.25)
+  );
+  results.push({
+    id: 'proof_diameter',
+    label: 'Minimum nominal diameter for proof margin',
+    value: minimumDiameter,
+    unit: 'in',
+    note:
+      minimumDiameter !== null
+        ? `Approximate diameter needed to keep worst-case proof utilization at or below ${targetProofUtilization.toFixed(2)}.`
+        : 'Proof margin target could not be met within the bounded diameter search range.',
+    severity:
+      minimumDiameter === null
+        ? 'fail'
+        : minimumDiameter > input.nominalDiameter
+          ? 'attention'
+          : 'pass',
+    feasible: minimumDiameter !== null,
+    governingScenario: output.checks.worstCaseScenarios.proof.scenario,
+    targetUtilization: targetProofUtilization
+  });
+
+  const governingBearingDemand =
+    output.checks.bearing.governing === 'under_head'
+      ? output.checks.bearing.underHead.demand
+      : output.checks.bearing.governing === 'thread_bearing'
+        ? output.checks.bearing.threadBearing.demand
+        : output.checks.bearing.localCrushing.demand;
+  const bearingAllowable = Number(input.memberBearingAllowable ?? 0);
+  const currentInner = Math.min(
+    Number(input.washerStack?.underHeadInnerDiameter ?? input.washerStack?.innerDiameter ?? input.nominalDiameter),
+    Number(input.washerStack?.underNutInnerDiameter ?? input.washerStack?.innerDiameter ?? input.nominalDiameter)
+  );
+  const requiredOuter =
+    Number.isFinite(Number(governingBearingDemand)) && bearingAllowable > 0
+      ? Math.sqrt(currentInner * currentInner + (4 * (Number(governingBearingDemand) / (bearingAllowable * 0.85))) / Math.PI)
+      : null;
+  results.push({
+    id: 'bearing_face_od',
+    label: 'Minimum governing bearing-face OD',
+    value: Number.isFinite(Number(requiredOuter)) ? Number(requiredOuter) : null,
+    unit: 'in',
+    note:
+      requiredOuter !== null
+        ? 'Equivalent annulus OD needed to keep the governing worst-case bearing utilization at or below 0.85.'
+        : 'Bearing-face OD target is unavailable because the governing bearing demand/capacity is incomplete.',
+    severity:
+      requiredOuter === null
+        ? 'unknown'
+        : requiredOuter >
+            Math.max(
+              Number(input.washerStack?.underHeadOuterDiameter ?? input.washerStack?.outerDiameter ?? 0),
+              Number(input.washerStack?.underNutOuterDiameter ?? input.washerStack?.outerDiameter ?? 0),
+              Number(input.bearingGeometry?.headBearingDiameter ?? 0),
+              Number(input.bearingGeometry?.nutOrCollarBearingDiameter ?? 0)
+            )
+          ? 'attention'
+          : 'pass',
+    feasible: requiredOuter !== null,
+    governingScenario: output.checks.worstCaseScenarios.bearing.scenario,
+    targetUtilization: 0.85
+  });
+
+  return results;
 }
 
 export { buildExactTorqueTerms };

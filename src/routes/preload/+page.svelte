@@ -5074,6 +5074,33 @@
               </div>
             {/each}
           </div>
+          {#if preloadScenarioVariants.length}
+            <div class="rounded-xl border border-cyan-400/15 bg-cyan-500/5 p-4">
+              <div class="mb-2 flex items-center justify-between gap-3">
+                <div class="text-[10px] uppercase tracking-widest text-cyan-100/70">Installed preload scenario strip</div>
+                <div class="text-[10px] text-cyan-100/50">Min / nominal / max installed preload resolved as deterministic service states</div>
+              </div>
+              <div class="grid gap-3 lg:grid-cols-3">
+                {#each preloadScenarioVariants as variant}
+                  <div class="rounded-lg border border-white/8 bg-black/20 p-3 text-xs text-white/74">
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="text-[10px] uppercase tracking-widest text-white/45">{variant.label}</div>
+                      <div class="font-mono text-cyan-200">{fmt(variant.preloadInstalled, 2)} lbf</div>
+                    </div>
+                    <div class="mt-2 grid gap-1">
+                      <div>Effective preload <span class="font-mono text-white/86">{fmt(variant.preloadEffective, 2)}</span></div>
+                      <div>Clamp force <span class="font-mono text-white/86">{fmt(variant.clampForceService, 2)}</span></div>
+                      <div>Bolt load <span class="font-mono text-white/86">{fmt(variant.boltLoadService, 2)}</span></div>
+                      <div>Slip util <span class="font-mono text-white/86">{fmt(variant.slipUtilization, 3)}</span></div>
+                      <div>Separation util <span class="font-mono text-white/86">{fmt(variant.separationUtilization, 3)}</span></div>
+                      <div>Proof util <span class="font-mono text-white/86">{fmt(variant.proofUtilization, 3)}</span></div>
+                    </div>
+                    <div class="mt-2 text-[11px] text-cyan-50/70">{variant.note}</div>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/if}
           <div class="rounded-xl border border-white/10 bg-black/20 p-4">
             <div class="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
               <div>
@@ -5745,6 +5772,9 @@
             <div class={`mt-3 font-mono text-lg ${card.severity === 'fail' ? 'text-rose-300' : card.severity === 'warn' ? 'text-amber-300' : 'text-cyan-300'}`}>
               {card.value}
             </div>
+            {#if card.scenario}
+              <div class="mt-1 text-[11px] uppercase tracking-widest text-white/45">{card.scenario} controls</div>
+            {/if}
             <div class="mt-2 text-sm text-white/70">{card.note}</div>
           </div>
         {/each}

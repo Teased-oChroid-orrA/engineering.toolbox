@@ -2,8 +2,10 @@ import { expect, test } from '@playwright/test';
 import {
   buildJointAssemblyInput,
   buildPreloadEquationSheetHtml,
+  buildPreloadScenarioVariants,
   buildExactTorqueTerms,
   computeFastenedJointPreload,
+  solveEnvelopeAwareInverseTargets,
   solveFastenerGroupPattern,
   solveFastenerGroupPatternCases,
   solveJointStiffness,
@@ -320,6 +322,28 @@ test.describe('preload solver G1 core', () => {
     expect(html).toContain('Worst-Case Scenario Picks');
     expect(html).toContain('Equation Traceability');
     expect(html).toContain('Standards / Method Basis');
+  });
+
+  test('core exports deterministic preload scenario variants and envelope-aware inverse targets', () => {
+    const output = computeFastenedJointPreload(baseInput);
+    const variants = buildPreloadScenarioVariants(baseInput);
+    const inverseTargets = solveEnvelopeAwareInverseTargets(baseInput, output);
+    expect(variants).toHaveLength(3);
+    expect(variants[0].id).toBe('min_preload');
+    expect(variants[1].id).toBe('nominal_preload');
+    expect(variants[2].id).toBe('max_preload');
+    expect(variants[0].preloadInstalled).toBeLessThanOrEqual(variants[1].preloadInstalled);
+    expect(variants[2].preloadInstalled).toBeGreaterThanOrEqual(variants[1].preloadInstalled);
+    expect(inverseTargets).toHaveLength(3);
+    expect(inverseTargets.find((entry) => entry.id === 'no_slip_preload')?.governingScenario).toBe(
+      output.checks.worstCaseScenarios.slip.scenario
+    );
+    expect(inverseTargets.find((entry) => entry.id === 'proof_diameter')?.governingScenario).toBe(
+      output.checks.worstCaseScenarios.proof.scenario
+    );
+    expect(inverseTargets.find((entry) => entry.id === 'bearing_face_od')?.governingScenario).toBe(
+      output.checks.worstCaseScenarios.bearing.scenario
+    );
   });
 
   test('2D fastener pattern solver returns a full influence matrix and critical fastener ranking', () => {

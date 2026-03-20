@@ -101,6 +101,19 @@ function renderCaseSummaryTable(summary: PreloadGroupCaseSummary): string {
     </div>`;
 }
 
+function severityAction(severity: string): string {
+  switch (severity) {
+    case 'fail':
+      return 'Correct the governing input before release.';
+    case 'attention':
+      return 'Review the margin driver and confirm the selected assumption.';
+    case 'pass':
+      return 'No immediate corrective action required.';
+    default:
+      return 'Insufficient data to grade this check.';
+  }
+}
+
 export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput, groupSummary: PreloadGroupCaseSummary | null = null): string {
   const { input, installation, stiffness, service, checks } = output;
   const assembly = buildJointAssemblyInput(input);
@@ -243,11 +256,43 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
   ];
   const governingRows: Array<[string, string]> = [
     ['Governing title', esc(output.decisionSupport.governing.title)],
-    ['Equation', `<code>${esc(output.decisionSupport.governing.equation)}</code>`],
+    ['Equation basis', `<code>${esc(output.decisionSupport.governing.equation)}</code>`],
     ['Demand', fmt(output.decisionSupport.governing.demand, 4)],
     ['Capacity', fmt(output.decisionSupport.governing.capacity, 4)],
     ['Utilization', fmt(output.decisionSupport.governing.utilization, 4)],
     ['Margin', fmt(output.decisionSupport.governing.margin, 4)]
+  ];
+  const decisionRows: Array<[string, string, string, string]> = [
+    [
+      'Installation',
+      esc(output.decisionSupport.installationRisk.severity),
+      esc(output.decisionSupport.installationRisk.driver),
+      esc(output.decisionSupport.installationRisk.note)
+    ],
+    [
+      'Slip',
+      esc(output.decisionSupport.slipRisk.severity),
+      esc(output.decisionSupport.slipRisk.driver),
+      esc(output.decisionSupport.slipRisk.note)
+    ],
+    [
+      'Separation',
+      esc(output.decisionSupport.separationRisk.severity),
+      esc(output.decisionSupport.separationRisk.driver),
+      esc(output.decisionSupport.separationRisk.note)
+    ],
+    [
+      'Strip',
+      esc(output.decisionSupport.stripRisk.severity),
+      esc(output.decisionSupport.stripRisk.driver),
+      esc(output.decisionSupport.stripRisk.note)
+    ],
+    [
+      'Fatigue',
+      esc(output.decisionSupport.fatigueRisk.severity),
+      esc(output.decisionSupport.fatigueRisk.driver),
+      esc(output.decisionSupport.fatigueRisk.note)
+    ]
   ];
   const provenanceRows: Array<[string, string]> = [
     ['Fastener label', esc(output.input.bearingGeometry?.fastenerLabel ?? '—')],
@@ -299,6 +344,28 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
     [
       'Fatigue worst case',
       `${esc(checks.worstCaseScenarios.fatigue.scenario)} • ${fmt(checks.worstCaseScenarios.fatigue.utilization, 3)}`
+    ]
+  ];
+  const compareWorstCaseRows: Array<[string, string]> = [
+    [
+      'Separation control',
+      `${esc(checks.worstCaseScenarios.separation.scenario)} controls at ${fmt(checks.worstCaseScenarios.separation.utilization, 3)}`
+    ],
+    [
+      'Slip control',
+      `${esc(checks.worstCaseScenarios.slip.scenario)} controls at ${fmt(checks.worstCaseScenarios.slip.utilization, 3)}`
+    ],
+    [
+      'Proof control',
+      `${esc(checks.worstCaseScenarios.proof.scenario)} controls at ${fmt(checks.worstCaseScenarios.proof.utilization, 3)}`
+    ],
+    [
+      'Bearing control',
+      `${esc(checks.worstCaseScenarios.bearing.scenario)} controls at ${fmt(checks.worstCaseScenarios.bearing.utilization, 3)}`
+    ],
+    [
+      'Fatigue control',
+      `${esc(checks.worstCaseScenarios.fatigue.scenario)} controls at ${fmt(checks.worstCaseScenarios.fatigue.utilization, 3)}`
     ]
   ];
   const assemblyRows = assembly.rows
@@ -379,17 +446,30 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
 
   <div class="grid" style="margin-top:16px">
     <div class="box">
+      <h2>Decision Summary</h2>
+      <table>
+        <tr><th>Category</th><th>Severity</th><th>Driver</th><th>Action</th></tr>
+        ${decisionRows
+          .map(
+            ([category, severity, driver, note]) =>
+              `<tr><td>${esc(category)}</td><td>${esc(severity)}</td><td>${esc(driver)}</td><td>${esc(severityAction(severity))} ${esc(note)}</td></tr>`
+          )
+          .join('')}
+      </table>
+      <p>This table collapses the governing risks into a single review-oriented view.</p>
+    </div>
+    <div class="box">
       <h2>Design Verdict</h2>
       <table>${renderRows(verdictRows)}</table>
     </div>
+  </div>
+
+  <div class="grid" style="margin-top:16px">
     <div class="box">
       <h2>Why This Fails / Governs</h2>
       <table>${renderRows(governingRows)}</table>
       <ul>${output.decisionSupport.governing.recommendations.map((entry) => `<li>${esc(entry)}</li>`).join('')}</ul>
     </div>
-  </div>
-
-  <div class="grid" style="margin-top:16px">
     <div class="box">
       <h2>Model Basis</h2>
       <table>${renderRows(modelBasisRows)}</table>
@@ -410,18 +490,24 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
     <div class="box">
       <h2>Worst-Case Envelopes</h2>
       <table>${renderRows(envelopeRows)}</table>
-      <p>Each row is reported as min / nominal / max utilization to expose preload scatter and explicit loss contributors.</p>
+      <p>Each row is reported as min / nominal / max utilization so the controlling direction of the envelope remains visible alongside preload scatter and explicit loss contributors.</p>
     </div>
   </div>
 
   <div class="box" style="margin-top:16px">
     <h2>Worst-Case Scenario Picks</h2>
     <table>${renderRows(worstCaseRows)}</table>
-    <p>The report identifies which installed-preload scenario controls each utilization envelope.</p>
+    <p>The report identifies which installed-preload scenario actually controls each utilization envelope rather than implying that all bounds are equally critical.</p>
   </div>
 
   <div class="box" style="margin-top:16px">
-    <h2>Equation Traceability</h2>
+    <h2>Worst-Case Control Interpretation</h2>
+    <table>${renderRows(compareWorstCaseRows)}</table>
+    <p>Use this section to see which preload bound controls each check before jumping to the corresponding corrective action.</p>
+  </div>
+
+  <div class="box" style="margin-top:16px">
+    <h2>Equation Traceability and Substitution</h2>
     <table>${renderRows([
       ['Governing title', esc(output.decisionSupport.governing.title)],
       ['Substitution', `<code>${esc(output.decisionSupport.governing.equation)}</code>`],
@@ -430,7 +516,7 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
       ['Utilization', fmt(output.decisionSupport.governing.utilization, 4)],
       ['Margin', fmt(output.decisionSupport.governing.margin, 4)]
     ])}</table>
-    <p>The report exposes the governing equation label and the exact substituted values used by the active solver state.</p>
+    <p>The report keeps the governing equation label separate from the substituted values so the review chain stays explicit: basis, demand, capacity, utilization, then margin.</p>
   </div>
 
   ${groupSummary ? renderCaseSummaryTable(groupSummary) : ''}

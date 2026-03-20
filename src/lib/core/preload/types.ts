@@ -308,6 +308,31 @@ export type FastenedJointPreloadOutput = {
   modelBasis: ModelBasisResult;
 };
 
+export type PreloadScenarioVariant = {
+  id: EnvelopeScenarioLabel;
+  label: string;
+  preloadInstalled: number;
+  preloadEffective: number | null;
+  clampForceService: number | null;
+  boltLoadService: number | null;
+  separationUtilization: number | null;
+  slipUtilization: number | null;
+  proofUtilization: number | null;
+  note: string;
+};
+
+export type PreloadInverseTargetResult = {
+  id: 'no_slip_preload' | 'proof_diameter' | 'bearing_face_od';
+  label: string;
+  value: number | null;
+  unit: string;
+  note: string;
+  severity: VerdictSeverity;
+  feasible: boolean;
+  governingScenario: EnvelopeScenarioLabel | null;
+  targetUtilization: number | null;
+};
+
 export type PreloadLossBreakdown = {
   embedmentLoss: number;
   coatingCrushLoss: number;
