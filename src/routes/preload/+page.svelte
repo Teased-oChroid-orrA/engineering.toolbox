@@ -2777,6 +2777,25 @@
       ratio: entry.result.criticalEquivalentDemand / caseEnvelopeScale,
       isGoverning: entry.caseId === fastenerGroupCaseResult.governingCaseId
     })) ?? []);
+  let fastenerCaseRankingRows =
+    $derived(
+      fastenerGroupCaseResult?.caseRanking?.map((entry) => ({
+        rank: entry.rank,
+        label: entry.label,
+        criticalFastenerLabel: `F${entry.criticalFastenerIndex + 1}`,
+        demand: entry.criticalEquivalentDemand,
+        isGoverning: entry.caseId === fastenerGroupCaseResult.governingCaseId,
+        caseId: entry.caseId
+      })) ??
+      fastenerCaseEnvelopeRows.map((row, index) => ({
+        rank: index + 1,
+        label: row.label,
+        criticalFastenerLabel: row.criticalFastenerLabel,
+        demand: row.demand,
+        isGoverning: row.isGoverning,
+        caseId: ''
+      }))
+    );
   let fastenerProgressionRows = $derived(
     fastenerGroupResult?.progression.map((entry) => ({
       ...entry,
@@ -2818,6 +2837,7 @@
   let heatmapIsFlat = $derived(heatmapValues.length ? Math.abs(heatmapMax - heatmapMin) < 1e-9 : false);
   let envelopeChartHeight = $derived(Math.max(196, 70 + fastenerCaseEnvelopeRows.length * 34));
   let envelopeChartInnerHeight = $derived(Math.max(116, 26 + fastenerCaseEnvelopeRows.length * 28));
+  let caseRankRibbonColumns = $derived(Math.max(1, fastenerCaseRankingRows.length));
 
   function governingUtilization(result: ReturnType<typeof computeFastenedJointPreload>) {
     return Math.max(
@@ -4606,35 +4626,62 @@
           </div>
         {/if}
         {#if form.adjacentFastenerScreen.enabled}
-          <div class="rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/75">
-            <div>Fasteners in pattern: <span class="font-mono text-cyan-300">{adjacentFastenerCount}</span></div>
-            <div>Solver mode: <span class="font-mono text-cyan-300">{fastenerGroupModeLabel}</span></div>
-            <div>Neighbor count: <span class="font-mono text-cyan-300">{adjacentNeighborCount}</span></div>
-            <div>Governing load case: <span class="font-mono text-amber-200">{governingLoadCaseLabel}</span></div>
+            <div class="rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/75">
+              <div>Fasteners in pattern: <span class="font-mono text-cyan-300">{adjacentFastenerCount}</span></div>
+              <div>Solver mode: <span class="font-mono text-cyan-300">{fastenerGroupModeLabel}</span></div>
+              <div>Neighbor count: <span class="font-mono text-cyan-300">{adjacentNeighborCount}</span></div>
+              <div>Governing load case: <span class="font-mono text-amber-200">{governingLoadCaseLabel}</span></div>
             <div>Attenuation: <span class="font-mono text-cyan-300">{fmt(adjacentTransferAttenuation, 4)}</span></div>
             <div>Axial to each adjacent: <span class="font-mono text-cyan-300">{fmt(adjacentAxialPerNeighbor, 2)}</span></div>
             <div>Transverse to each adjacent: <span class="font-mono text-cyan-300">{fmt(adjacentTransversePerNeighbor, 2)}</span></div>
             <div>Current fastener equivalent: <span class="font-mono text-cyan-300">{fmt(currentFastenerEquivalentLoad, 2)}</span></div>
-            <div>Adjacent fastener equivalent: <span class="font-mono text-cyan-300">{fmt(adjacentFastenerEquivalentLoad, 2)}</span></div>
-            <div class="mt-2">Critical fastener: <span class="font-semibold text-amber-200">{criticalFastenerLabel}</span></div>
-          </div>
-          {#if fastenerCaseEnvelopeRows.length}
-            <div class="rounded-lg border border-white/10 bg-black/20 p-3">
-              <div class="mb-2 text-[10px] uppercase tracking-widest text-white/45">Per-case envelope bars</div>
-              <svg role="img" viewBox={`0 0 320 ${envelopeChartHeight}`} class="h-auto w-full rounded-lg border border-white/8 bg-black/20 p-2" aria-label="Preload fastener-group case envelopes">
-                <rect x="16" y="16" width="288" height={envelopeChartHeight - 32} rx="12" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.08)" />
-                {#each fastenerCaseEnvelopeRows as row}
-                  {@const y = 42 + row.index * 28}
-                  <text x="26" y={y} fill={row.isGoverning ? 'rgba(253,230,138,0.92)' : 'rgba(255,255,255,0.78)'} font-size="10" font-weight={row.isGoverning ? '700' : '400'}>{row.label}</text>
-                  <text x="26" y={y + 12} fill="rgba(255,255,255,0.48)" font-size="8">{row.criticalFastenerLabel}</text>
-                  <rect x="108" y={y - 8} width="140" height="12" rx="6" fill="rgba(255,255,255,0.08)" />
-                  <rect x="108" y={y - 8} width={Math.max(6, row.ratio * 140)} height="12" rx="6" fill={row.isGoverning ? '#fde68a' : '#22d3ee'} />
-                  <text x="286" y={y + 1} text-anchor="end" fill="rgba(255,255,255,0.70)" font-size="9">{fmt(row.demand, 2)}</text>
-                {/each}
+              <div>Adjacent fastener equivalent: <span class="font-mono text-cyan-300">{fmt(adjacentFastenerEquivalentLoad, 2)}</span></div>
+              <div class="mt-2">Critical fastener: <span class="font-semibold text-amber-200">{criticalFastenerLabel}</span></div>
+            </div>
+            {#if fastenerCaseRankingRows.length}
+              <div class="rounded-lg border border-white/10 bg-black/20 p-3">
+                <div class="mb-2 flex items-center justify-between gap-3">
+                  <div class="text-[10px] uppercase tracking-widest text-white/45">Case ranking</div>
+                  <div class="text-[10px] text-white/45">{fastenerGroupModeLabel} mode • {fastenerCaseRankingRows.length} cases</div>
+                </div>
+                <div class="grid gap-2" style={`grid-template-columns: repeat(${Math.min(caseRankRibbonColumns, 3)}, minmax(0, 1fr));`}>
+                  {#each fastenerCaseRankingRows as row}
+                    <div class={`rounded-lg border px-3 py-2 text-xs ${row.isGoverning ? 'border-amber-400/30 bg-amber-500/10 text-amber-100' : 'border-white/10 bg-white/[0.02] text-white/74'}`}>
+                      <div class="flex items-center justify-between gap-2">
+                        <div class="font-semibold">#{row.rank} {row.label}</div>
+                        <div class="text-[10px] uppercase tracking-widest text-white/45">{row.isGoverning ? 'governing' : 'ranked'}</div>
+                      </div>
+                      <div class="mt-1 grid grid-cols-[auto_auto_1fr] gap-x-3 text-[11px]">
+                        <div class="text-white/45">Crit.</div>
+                        <div class="font-mono text-cyan-200">{row.criticalFastenerLabel}</div>
+                        <div class="text-right font-mono text-cyan-200">{fmt(row.demand, 2)}</div>
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+            {#if fastenerCaseEnvelopeRows.length}
+              <div class="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div class="mb-2 flex items-center justify-between gap-3">
+                <div class="text-[10px] uppercase tracking-widest text-white/45">Per-case envelope bars</div>
+                <div class="text-[10px] text-white/45">Peak equivalent demand by load case</div>
+              </div>
+                <svg role="img" viewBox={`0 0 320 ${envelopeChartHeight}`} class="h-auto w-full rounded-lg border border-white/8 bg-black/20 p-2" aria-label="Preload fastener-group case envelopes">
+                  <rect x="16" y="16" width="288" height={envelopeChartHeight - 32} rx="12" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.08)" />
+                  {#each fastenerCaseEnvelopeRows as row}
+                    {@const y = 42 + row.index * 28}
+                    <title>{`${row.label} | critical ${row.criticalFastenerLabel} | peak equivalent demand ${fmt(row.demand, 2)}`}</title>
+                    <text x="26" y={y} fill={row.isGoverning ? 'rgba(253,230,138,0.92)' : 'rgba(255,255,255,0.78)'} font-size="10" font-weight={row.isGoverning ? '700' : '400'}>{row.label}</text>
+                    <text x="26" y={y + 12} fill="rgba(255,255,255,0.48)" font-size="8">{row.criticalFastenerLabel}</text>
+                    <rect x="108" y={y - 8} width="140" height="12" rx="6" fill="rgba(255,255,255,0.08)" />
+                    <rect x="108" y={y - 8} width={Math.max(6, row.ratio * 140)} height="12" rx="6" fill={row.isGoverning ? '#fde68a' : '#22d3ee'} />
+                    <text x="286" y={y + 1} text-anchor="end" fill="rgba(255,255,255,0.70)" font-size="9">{fmt(row.demand, 2)}</text>
+                  {/each}
                 <text x="24" y={envelopeChartHeight - 22} fill="rgba(255,255,255,0.55)" font-size="10">Each bar shows the peak equivalent fastener demand in that load case. The highlighted bar is the governing case.</text>
                 </svg>
               <div class="mt-3 overflow-hidden rounded-lg border border-white/8">
-                <div class="grid grid-cols-[1.4fr_0.8fr_0.9fr_0.6fr] gap-0 border-b border-white/8 bg-white/[0.03] px-3 py-2 text-[10px] uppercase tracking-widest text-white/45">
+                <div class="grid grid-cols-[1.5fr_0.8fr_0.9fr_0.6fr] gap-0 border-b border-white/8 bg-white/[0.03] px-3 py-2 text-[10px] uppercase tracking-widest text-white/45">
                   <div>Case</div>
                   <div>Critical fastener</div>
                   <div class="text-right">Peak eqv</div>
@@ -4642,7 +4689,7 @@
                 </div>
                 <div class="divide-y divide-white/6">
                   {#each fastenerCaseEnvelopeRows as row}
-                    <div class={`grid grid-cols-[1.4fr_0.8fr_0.9fr_0.6fr] gap-0 px-3 py-2 text-xs ${row.isGoverning ? 'bg-amber-500/10 text-amber-100' : 'bg-white/[0.02] text-white/72'}`}>
+                    <div class={`grid grid-cols-[1.5fr_0.8fr_0.9fr_0.6fr] gap-0 px-3 py-2 text-xs ${row.isGoverning ? 'bg-amber-500/10 text-amber-100' : 'bg-white/[0.02] text-white/72'}`}>
                       <div class="pr-2">
                         <div class="font-semibold">{row.label}</div>
                         <div class="text-[11px] text-white/45">{row.isGoverning ? 'governing case' : 'case envelope'}</div>
@@ -4683,7 +4730,10 @@
             </div>
             {#if fastenerProgressionRows.length}
             <div class="rounded-lg border border-white/10 bg-black/20 p-3">
-              <div class="mb-2 text-[10px] uppercase tracking-widest text-white/45">Failure progression</div>
+              <div class="mb-2 flex items-center justify-between gap-3">
+                <div class="text-[10px] uppercase tracking-widest text-white/45">Failure progression</div>
+                <div class="text-[10px] text-white/45">Remove the current governing fastener and recompute the remaining set</div>
+              </div>
               {#if fastenerGroupReportSummary}
                 <div class="mb-2 rounded-lg border border-cyan-400/15 bg-cyan-500/5 px-3 py-2 text-xs text-cyan-100">
                   {fastenerGroupReportSummary.progressionSummary}
@@ -4691,18 +4741,25 @@
               {/if}
               <div class="space-y-2">
                 {#each fastenerProgressionRows as row}
-                    <div class="rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2 text-xs text-white/72">
-                      <div class="flex items-center justify-between gap-3">
-                        <div class="font-semibold text-white/84">Step {row.step}</div>
-                        <div class="font-mono text-amber-200">Next critical {row.criticalLabel}</div>
+                  <div class="grid grid-cols-[auto_1fr] gap-3 rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2 text-xs text-white/72">
+                    <div class="flex flex-col items-center justify-start pt-0.5">
+                      <div class="flex h-8 w-8 items-center justify-center rounded-full border border-cyan-400/30 bg-cyan-500/10 font-mono text-[10px] text-cyan-100">{row.step}</div>
+                      {#if row.step < fastenerProgressionRows.length}
+                        <div class="h-full w-px bg-white/10"></div>
+                      {/if}
+                    </div>
+                    <div>
+                      <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="font-semibold text-white/84">Next critical {row.criticalLabel}</div>
+                        <div class="font-mono text-amber-200">Eqv {fmt(row.criticalEquivalentDemand, 2)}</div>
                       </div>
                       <div class="mt-1 grid grid-cols-1 gap-1 text-[11px] text-white/58 sm:grid-cols-3">
                         <div>Removed: <span class="font-mono text-cyan-200">{row.removedLabel}</span></div>
                         <div>Active fasteners: <span class="font-mono text-cyan-200">{row.activeFastenerCount}</span></div>
-                        <div>Eqv demand: <span class="font-mono text-cyan-200">{fmt(row.criticalEquivalentDemand, 2)}</span></div>
+                        <div>Step note: <span class="text-white/70">{row.note}</span></div>
                       </div>
-                      <div class="mt-1 text-[11px] text-white/48">{row.note}</div>
                     </div>
+                  </div>
                   {/each}
                 </div>
               </div>
@@ -4723,10 +4780,11 @@
                   {@const x = 56 + normX * 208}
                   {@const y = 52 + normY * 116}
                   {@const ratio = fastenerGroupResult.criticalEquivalentDemand > 0 ? fastener.equivalentDemand / fastenerGroupResult.criticalEquivalentDemand : 0}
+                  <title>{`F${fastener.index + 1} row ${fastener.row + 1}, column ${fastener.column + 1} | load share ${fmt(fastener.loadShare, 4)} | eqv ${fmt(fastener.equivalentDemand, 2)}`}</title>
                   <circle cx={x} cy={y} r={10 + ratio * 8} fill={`rgba(${Math.round(34 + 210 * ratio)}, ${Math.round(211 - 90 * ratio)}, ${Math.round(238 - 90 * ratio)}, ${0.38 + ratio * 0.42})`} stroke={fastener.index === fastenerGroupResult.criticalFastenerIndex ? '#fde68a' : 'rgba(255,255,255,0.38)'} stroke-width={fastener.index === fastenerGroupResult.criticalFastenerIndex ? 3 : 1.5} />
                   <text x={x} y={y + 4} text-anchor="middle" fill="rgba(255,255,255,0.88)" font-size="9" font-weight="700">F{fastener.index + 1}</text>
                 {/each}
-                <text x="20" y="198" fill="rgba(255,255,255,0.55)" font-size="10">Loaded edge reference = top-left origin • brighter/hotter circles = higher demand</text>
+                <text x="20" y="198" fill="rgba(255,255,255,0.55)" font-size="10">Loaded edge reference = top-left origin • brighter/hotter circles = higher demand • hover a fastener for row/column and equivalent demand</text>
               </svg>
             </div>
             <div class="rounded-lg border border-white/10 bg-black/20 p-3">
@@ -4739,6 +4797,7 @@
                     {@const x = 40 + columnIndex * size}
                     {@const y = 24 + rowIndex * size}
                     {@const normalized = heatmapDisplayRatio(rowIndex, columnIndex, cell)}
+                    <title>{`F${rowIndex + 1} -> F${columnIndex + 1} coupling ${fmt(cell, 4)}${heatmapIsFlat ? '' : ` normalized ${fmt(normalized, 3)}`}`}</title>
                     <rect
                       x={x}
                       y={y}
@@ -4754,7 +4813,7 @@
                   <text x={52 + fastener.index * size} y="16" fill="rgba(255,255,255,0.5)" font-size="9">F{fastener.index + 1}</text>
                   <text x="10" y={40 + fastener.index * size} fill="rgba(255,255,255,0.5)" font-size="9">F{fastener.index + 1}</text>
                 {/each}
-                <text x="40" y="296" fill="rgba(255,255,255,0.55)" font-size="10">Color is normalized across the current matrix. Dark = weakest coupling, hot = strongest coupling.</text>
+                <text x="40" y="296" fill="rgba(255,255,255,0.55)" font-size="10">Color is normalized across the current matrix. Dark = weakest coupling, hot = strongest coupling. Hover cells for pairwise coupling.</text>
               </svg>
             </div>
           {/if}

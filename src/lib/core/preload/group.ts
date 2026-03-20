@@ -64,6 +64,9 @@ export type FastenerGroupPatternFastenerResult = {
   column: number;
   x: number;
   y: number;
+  interactionStrength?: number;
+  edgeShieldingFactor?: number;
+  redistributionFactor?: number;
   edgeAmplification: number;
   stiffnessWeight: number;
   loadShare: number;
@@ -90,11 +93,15 @@ export type FastenerGroupProgressionStep = {
   activeFastenerCount: number;
   criticalFastenerIndex: number;
   criticalEquivalentDemand: number;
+  redistributionFactor: number;
+  demandRisePercentFromInitial: number;
   note: string;
 };
 
 export type FastenerGroupPatternResult = {
   mode: FastenerGroupMode;
+  activeFastenerCount: number;
+  redistributionFactor: number;
   geometryInfluenceMatrix: number[][];
   fasteners: FastenerGroupPatternFastenerResult[];
   criticalFastenerIndex: number;
@@ -291,7 +298,10 @@ function solvePatternForActiveSet(input: FastenerGroupPatternInput, activeSet?: 
   const { shifted, centroidX, centroidY, rowPitch, columnPitch, edgeDistanceX, edgeDistanceY, polarDenominator } = buildPatternGeometry(input);
   const active = shifted.filter((point) => !activeSet || activeSet.has(point.index));
   const count = Math.max(1, active.length);
+  const totalPatternCount = Math.max(1, shifted.length);
   const geometryInfluenceMatrix = buildInteractionMatrix(active, rowPitch, columnPitch, anisotropyX, anisotropyY);
+  const redistributionAmplification =
+    mode === 'joint_interaction' ? 1 + (Math.sqrt(totalPatternCount / count) - 1) * 0.35 : 1;
   const maxBias = Math.max(
     ...active.map((point) => {
       const xBias = 1 / (1 + point.x / edgeDistanceX);
@@ -318,14 +328,21 @@ function solvePatternForActiveSet(input: FastenerGroupPatternInput, activeSet?: 
     const edgeCentered = clampSignedRatio((normalizedBias - 0.5) * 2);
     const preloadFactor = mode === 'joint_interaction' ? 1 + preloadVariation * edgeCentered : 1;
     const memberStiffnessFactor = mode === 'joint_interaction' ? 1 + memberVariation * edgeCentered : 1;
+    const interactionStrength =
+      count > 1
+        ? (geometryInfluenceMatrix[index].reduce((sum, value) => sum + value, 0) - 1) / (count - 1)
+        : 1;
+    const edgeShieldingFactor = normalizedBias;
     const effectivePreload = preload * preloadFactor;
     const effectiveMemberStiffness = baseMemberStiffness * memberStiffnessFactor;
     const totalStiffness = Math.max(1e-6, baseBoltStiffness + effectiveMemberStiffness);
     const stiffnessWeight = baseBoltStiffness / totalStiffness;
-    const interaction = geometryInfluenceMatrix[index].reduce((sum, value) => sum + value, 0) / count;
-    const combinedWeight = edgeBias[index] * (0.42 + 0.58 * interaction) * (0.52 + 0.48 * stiffnessWeight) * transfer;
+    const combinedWeight =
+      edgeBias[index] * (0.38 + 0.62 * interactionStrength) * (0.52 + 0.48 * stiffnessWeight) * transfer;
     return {
       point,
+      interactionStrength,
+      edgeShieldingFactor,
       edgeAmplification: edgeBias[index],
       stiffnessWeight,
       preloadFactor,
@@ -339,9 +356,11 @@ function solvePatternForActiveSet(input: FastenerGroupPatternInput, activeSet?: 
   const weightSum = fasteners.reduce((sum, item) => sum + item.combinedWeight, 0) || 1;
   const mappedFasteners: FastenerGroupPatternFastenerResult[] = fasteners.map((item, index) => {
     const loadShare = item.combinedWeight / weightSum;
-    const axialLoad = Math.max(0, externalAxial) * loadShare;
-    const directShearX = (externalShearX / count) * transfer * (0.6 + 0.4 * edgeBias[index] / maxBias);
-    const directShearY = (externalShearY / count) * transfer * (0.6 + 0.4 * edgeBias[index] / maxBias);
+    const axialLoad = Math.max(0, externalAxial) * loadShare * redistributionAmplification;
+    const directShearX =
+      (externalShearX / count) * transfer * (0.6 + 0.4 * edgeBias[index] / maxBias) * redistributionAmplification;
+    const directShearY =
+      (externalShearY / count) * transfer * (0.6 + 0.4 * edgeBias[index] / maxBias) * redistributionAmplification;
     const momentScale = externalMomentZ / polarDenominator;
     const momentShearX = -momentScale * item.point.ry;
     const momentShearY = momentScale * item.point.rx;
@@ -356,6 +375,9 @@ function solvePatternForActiveSet(input: FastenerGroupPatternInput, activeSet?: 
       column: item.point.column,
       x: item.point.x,
       y: item.point.y,
+      interactionStrength: item.interactionStrength,
+      edgeShieldingFactor: item.edgeShieldingFactor,
+      redistributionFactor: redistributionAmplification,
       edgeAmplification: item.edgeAmplification,
       stiffnessWeight: item.stiffnessWeight,
       loadShare,
@@ -393,6 +415,8 @@ function solvePatternForActiveSet(input: FastenerGroupPatternInput, activeSet?: 
 
   return {
     mode,
+    activeFastenerCount: count,
+    redistributionFactor: redistributionAmplification,
     geometryInfluenceMatrix,
     fasteners: mappedFasteners,
     criticalFastenerIndex,
@@ -422,6 +446,11 @@ function buildFailureProgression(input: FastenerGroupPatternInput, initial: Fast
       activeFastenerCount: activeSet.size,
       criticalFastenerIndex: current.criticalFastenerIndex,
       criticalEquivalentDemand: current.criticalEquivalentDemand,
+      redistributionFactor: current.redistributionFactor,
+      demandRisePercentFromInitial:
+        initial.criticalEquivalentDemand > 0
+          ? ((current.criticalEquivalentDemand - initial.criticalEquivalentDemand) / initial.criticalEquivalentDemand) * 100
+          : 0,
       note: `After removing ${removed.map((index) => `F${index + 1}`).join(', ')}, the next governing fastener is F${current.criticalFastenerIndex + 1}.`
     });
   }

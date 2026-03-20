@@ -338,6 +338,8 @@ test.describe('preload solver G1 core', () => {
     expect(out.criticalEquivalentDemand).toBeGreaterThan(0);
     expect(out.mode).toBe('screening');
     expect(out.progression.length).toBeGreaterThan(0);
+    expect(out.activeFastenerCount).toBe(6);
+    expect(out.redistributionFactor).toBe(1);
   });
 
   test('joint interaction pattern mode carries preload/member variation and progression output', () => {
@@ -370,6 +372,10 @@ test.describe('preload solver G1 core', () => {
     expect(out.progression).toHaveLength(2);
     expect(out.fasteners.some((fastener) => fastener.preloadFactor !== 1)).toBe(true);
     expect(out.fasteners.some((fastener) => fastener.memberStiffnessFactor !== 1)).toBe(true);
+    expect(out.fasteners.every((fastener) => Number.isFinite(fastener.interactionStrength))).toBe(true);
+    expect(out.fasteners.every((fastener) => Number.isFinite(fastener.edgeShieldingFactor))).toBe(true);
+    expect(out.redistributionFactor).toBeGreaterThanOrEqual(1);
+    expect(out.progression[0].redistributionFactor).toBeGreaterThan(out.redistributionFactor);
   });
 
   test('multiple load cases return a governing case and fastener', () => {
@@ -425,5 +431,6 @@ test.describe('preload solver G1 core', () => {
     expect(out.caseRanking[0].criticalEquivalentDemand).toBeGreaterThanOrEqual(out.caseRanking[1].criticalEquivalentDemand);
     expect(out.envelopeFasteners).toHaveLength(4);
     expect(out.envelopeFasteners.every((entry) => entry.governingCaseId.length > 0)).toBe(true);
+    expect(out.cases[0].result.fasteners.every((entry) => entry.redistributionFactor && entry.redistributionFactor >= 1)).toBe(true);
   });
 });
