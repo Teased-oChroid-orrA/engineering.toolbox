@@ -18,9 +18,11 @@
   import {
     buildJointAssemblyInput,
     buildPreloadEquationSheetHtml,
+    buildPreloadScenarioVariants,
     computeFastenedJointPreload,
     solveFastenerGroupPattern,
     solveFastenerGroupPatternCases,
+    solveEnvelopeAwareInverseTargets,
     PRELOAD_FASTENER_CATALOG,
     PRELOAD_IMPORT_PROVENANCE,
     getPreloadFastener,
@@ -31,7 +33,8 @@
     type FastenedJointPreloadInput,
     type FastenerGroupPatternLoadCaseInput,
     type JointTypePreset,
-    type MemberSegmentInput
+    type MemberSegmentInput,
+    type PreloadScenarioVariant
   } from '$lib/core/preload';
 
   const STORAGE_KEY = 'scd.preload.inputs.v2';
@@ -481,7 +484,8 @@
     title: string;
     value: string;
     note: string;
-    severity: 'ok' | 'warn' | 'fail';
+    severity: 'ok' | 'warn' | 'fail' | 'unknown';
+    scenario?: string;
   };
   type CompareSnapshot = {
     label: string;
@@ -495,6 +499,7 @@
     current: number | null;
     delta: number | null;
     digits?: number;
+    note?: string;
   };
   type CompareGroupMetricRow = {
     label: string;
@@ -3088,132 +3093,31 @@
     return rows.sort((a, b) => Math.abs(b.deltaPercent) - Math.abs(a.deltaPercent));
   });
 
-  function solveBisectionTarget(
-    predicate: (result: ReturnType<typeof computeFastenedJointPreload>) => boolean,
-    mutateCandidate: (candidate: PreloadForm, trial: number) => void,
-    lower: number,
-    upper: number,
-    iterations = 28
-  ): number | null {
-    let low = lower;
-    let high = upper;
-    const lowCandidate = clone(form);
-    mutateCandidate(lowCandidate, low);
-    let lowResult: ReturnType<typeof computeFastenedJointPreload> | null = null;
-    try {
-      lowResult = computeFastenedJointPreload(buildSolverInputFromForm(lowCandidate));
-    } catch {
-      lowResult = null;
-    }
-    if (lowResult && predicate(lowResult)) return low;
-
-    let highResult: ReturnType<typeof computeFastenedJointPreload> | null = null;
-    for (let expand = 0; expand < 6; expand += 1) {
-      const candidate = clone(form);
-      mutateCandidate(candidate, high);
-      try {
-        highResult = computeFastenedJointPreload(buildSolverInputFromForm(candidate));
-      } catch {
-        highResult = null;
-      }
-      if (highResult && predicate(highResult)) break;
-      high *= 1.6;
-    }
-    if (!highResult || !predicate(highResult)) return null;
-
-    for (let index = 0; index < iterations; index += 1) {
-      const mid = (low + high) / 2;
-      const candidate = clone(form);
-      mutateCandidate(candidate, mid);
-      const result = computeFastenedJointPreload(buildSolverInputFromForm(candidate));
-      if (predicate(result)) high = mid;
-      else low = mid;
-    }
-    return high;
-  }
-
   let inverseSolveCards = $derived.by(() => {
     if (!output) return [] as InverseSolveCard[];
-    const cards: InverseSolveCard[] = [];
-    const noSlipTarget = solveBisectionTarget(
-      (result) => (result.checks.serviceLimits.slip.utilization ?? Infinity) <= 1,
-      (candidate, trial) => {
-        candidate.installation = {
-          model: 'direct_preload',
-          targetPreload: trial
-        };
-      },
-      0,
-      Math.max(1000, (output.installation.preloadMax ?? output.installation.preload) * 4)
-    );
-    cards.push(
-      noSlipTarget !== null
-        ? {
-            title: 'Required preload for no-slip',
-            value: `${fmt(noSlipTarget, 2)}`,
-            note: 'Direct-preload equivalent needed to drive slip utilization to 1.00 or lower.',
-            severity: noSlipTarget > output.installation.preload ? 'warn' : 'ok'
-          }
-        : {
-            title: 'Required preload for no-slip',
-            value: 'No feasible solve',
-            note: 'The current friction/contact model could not reach slip utilization <= 1 within the bounded search range.',
-            severity: 'fail'
-          }
-    );
+    return solveEnvelopeAwareInverseTargets(buildSolverInputFromForm(form), output).map((entry) => ({
+      title: entry.label,
+      value: entry.value !== null ? fmt(entry.value, entry.id === 'no_slip_preload' ? 2 : 4) : 'No feasible solve',
+      note: entry.note,
+      severity:
+        entry.severity === 'pass'
+          ? 'ok'
+          : entry.severity === 'attention'
+            ? 'warn'
+            : entry.severity === 'fail'
+              ? 'fail'
+              : 'unknown',
+      scenario: entry.governingScenario ? envelopeScenarioLabel(entry.governingScenario) : undefined
+    }));
+  });
 
-    const targetProofUtilization = 0.85;
-    const minimumDiameter = solveBisectionTarget(
-      (result) => (result.checks.proof.utilization ?? Infinity) <= targetProofUtilization,
-      (candidate, trial) => {
-        candidate.nominalDiameter = trial;
-        candidate.tensileStressArea = estimateThreadedArea(trial);
-        if (candidate.useCustomBoltSegments) {
-          candidate.boltSegments = clone(candidate.boltSegments).map((segment, index) => ({
-            ...segment,
-            area: index === candidate.boltSegments.length - 1 ? estimateThreadedArea(trial) : Math.PI * 0.25 * trial * trial
-          }));
-        }
-      },
-      Math.max(0.05, form.nominalDiameter * 0.65),
-      Math.max(form.nominalDiameter * 2.5, form.nominalDiameter + 0.25)
-    );
-    cards.push(
-      minimumDiameter !== null
-        ? {
-            title: 'Minimum nominal diameter for proof margin',
-            value: `${fmt(minimumDiameter, 4)}`,
-            note: `Approximate diameter needed to keep proof utilization at or below ${fmt(targetProofUtilization, 2)}.`,
-            severity: minimumDiameter > form.nominalDiameter ? 'warn' : 'ok'
-          }
-        : {
-            title: 'Minimum nominal diameter for proof margin',
-            value: 'No feasible solve',
-            note: 'Proof margin target could not be met within the bounded diameter search range.',
-            severity: 'fail'
-          }
-    );
-
-    const bearingDemand =
-      output.checks.bearing.governing === 'under_head'
-        ? output.checks.bearing.underHead.demand
-        : output.checks.bearing.governing === 'thread_bearing'
-          ? output.checks.bearing.threadBearing.demand
-          : output.checks.bearing.localCrushing.demand;
-    const bearingAllowable = Number(form.memberBearingAllowable ?? 0);
-    const currentInner = Math.min(topBearingFaceInnerDiameter, bottomBearingFaceInnerDiameter);
-    if (Number.isFinite(Number(bearingDemand)) && bearingDemand && bearingAllowable > 0) {
-      const targetArea = Number(bearingDemand) / (bearingAllowable * 0.85);
-      const requiredOuter = Math.sqrt(currentInner * currentInner + (4 * targetArea) / Math.PI);
-      cards.push({
-        title: 'Minimum governing bearing-face OD',
-        value: `${fmt(requiredOuter, 4)}`,
-        note: 'Equivalent annulus OD needed to keep the governing bearing utilization at or below 0.85.',
-        severity: requiredOuter > Math.max(topBearingFaceOuterDiameter, bottomBearingFaceOuterDiameter) ? 'warn' : 'ok'
-      });
+  let preloadScenarioVariants = $derived.by(() => {
+    if (!output) return [] as PreloadScenarioVariant[];
+    try {
+      return buildPreloadScenarioVariants(buildSolverInputFromForm(form));
+    } catch {
+      return [] as PreloadScenarioVariant[];
     }
-
-    return cards;
   });
 
   let loadPathRows = $derived.by(() => {
@@ -3604,22 +3508,60 @@
         delta: currentFastenerGroupSummary.progressionSteps - compareBaselineFastenerGroupSummary.progressionSteps,
         digits: 0,
         note: 'How many redistribution/failure steps were simulated.'
+      }
+    ];
+  });
+  let compareLossRows = $derived.by(() => {
+    if (!compareBaseline || !output || !compareBaseline.output.service || !output.service) return [] as CompareMetricRow[];
+    return [
+      {
+        label: 'Faying slip coeff.',
+        baseline: compareBaseline.output.input.fayingSurfaceSlipCoeff ?? null,
+        current: output.input.fayingSurfaceSlipCoeff ?? null,
+        delta:
+          Number(compareBaseline.output.input.fayingSurfaceSlipCoeff ?? 0) > 0 || Number(output.input.fayingSurfaceSlipCoeff ?? 0) > 0
+            ? Number(output.input.fayingSurfaceSlipCoeff ?? 0) - Number(compareBaseline.output.input.fayingSurfaceSlipCoeff ?? 0)
+            : null,
+        digits: 3
       },
       {
-        label: 'Active fasteners',
-        baseline: compareBaselineFastenerGroupSummary.activeFastenerCount,
-        current: currentFastenerGroupSummary.activeFastenerCount,
-        delta: currentFastenerGroupSummary.activeFastenerCount - compareBaselineFastenerGroupSummary.activeFastenerCount,
-        digits: 0,
-        note: 'Fasteners remaining in the governing progression state.'
+        label: 'Friction interfaces',
+        baseline: compareBaseline.output.input.frictionInterfaceCount ?? null,
+        current: output.input.frictionInterfaceCount ?? null,
+        delta:
+          Number.isFinite(Number(compareBaseline.output.input.frictionInterfaceCount)) ||
+          Number.isFinite(Number(output.input.frictionInterfaceCount))
+            ? Number(output.input.frictionInterfaceCount ?? 0) - Number(compareBaseline.output.input.frictionInterfaceCount ?? 0)
+            : null,
+        digits: 0
       },
       {
-        label: 'Case count',
-        baseline: compareBaselineFastenerGroupSummary.caseCount,
-        current: currentFastenerGroupSummary.caseCount,
-        delta: currentFastenerGroupSummary.caseCount - compareBaselineFastenerGroupSummary.caseCount,
-        digits: 0,
-        note: 'Number of load cases in the compare envelope.'
+        label: 'Thermal preload shift',
+        baseline: compareBaseline.output.service.thermalPreloadShift,
+        current: output.service.thermalPreloadShift,
+        delta: output.service.thermalPreloadShift - compareBaseline.output.service.thermalPreloadShift,
+        digits: 4
+      },
+      {
+        label: 'Mechanical loss total',
+        baseline: compareBaseline.output.service.preloadLossBreakdown.mechanicalLossTotal,
+        current: output.service.preloadLossBreakdown.mechanicalLossTotal,
+        delta: output.service.preloadLossBreakdown.mechanicalLossTotal - compareBaseline.output.service.preloadLossBreakdown.mechanicalLossTotal,
+        digits: 4
+      },
+      {
+        label: 'Net preload shift',
+        baseline: compareBaseline.output.service.preloadLossBreakdown.netPreloadShift,
+        current: output.service.preloadLossBreakdown.netPreloadShift,
+        delta: output.service.preloadLossBreakdown.netPreloadShift - compareBaseline.output.service.preloadLossBreakdown.netPreloadShift,
+        digits: 4
+      },
+      {
+        label: 'Effective preload',
+        baseline: compareBaseline.output.service.preloadEffective,
+        current: output.service.preloadEffective,
+        delta: output.service.preloadEffective - compareBaseline.output.service.preloadEffective,
+        digits: 4
       }
     ];
   });
@@ -5843,6 +5785,26 @@
                   <div class="mt-1 font-mono text-cyan-200">Peak {fmt(currentFastenerGroupSummary.governingEquivalentDemand, 2)} • spread {fmt(currentFastenerGroupSummary.envelopeSpread, 2)}</div>
                 </div>
               </div>
+              <div class="mt-3 grid gap-3 md:grid-cols-2">
+                <div class="rounded-lg border border-white/8 bg-black/20 px-3 py-2 text-[11px] text-white/72">
+                  <div class="text-[10px] uppercase tracking-widest text-white/45">Baseline group state</div>
+                  <div class="mt-1 text-white/84">
+                    {compareBaselineFastenerGroupSummary.mode === 'joint_interaction' ? 'Joint interaction' : 'Screening'}
+                    • {compareBaselineFastenerGroupSummary.activeFastenerCount} active
+                    • {compareBaselineFastenerGroupSummary.progressionSteps} progression step(s)
+                    • {compareBaselineFastenerGroupSummary.caseCount} case(s)
+                  </div>
+                </div>
+                <div class="rounded-lg border border-white/8 bg-black/20 px-3 py-2 text-[11px] text-white/72">
+                  <div class="text-[10px] uppercase tracking-widest text-white/45">Current group state</div>
+                  <div class="mt-1 text-white/84">
+                    {currentFastenerGroupSummary.mode === 'joint_interaction' ? 'Joint interaction' : 'Screening'}
+                    • {currentFastenerGroupSummary.activeFastenerCount} active
+                    • {currentFastenerGroupSummary.progressionSteps} progression step(s)
+                    • {currentFastenerGroupSummary.caseCount} case(s)
+                  </div>
+                </div>
+              </div>
               {#if groupCompareRows.length}
                 <div class="mt-3 overflow-hidden rounded-lg border border-white/8">
                   <div class="grid grid-cols-[minmax(0,1.45fr)_0.82fr_0.82fr_0.8fr] gap-0 border-b border-white/8 bg-white/[0.03] px-3 py-2 text-[10px] uppercase tracking-widest text-white/45">
@@ -5858,6 +5820,45 @@
                           <div class="font-semibold text-white/84">{row.label}</div>
                           {#if row.note}
                             <div class="mt-0.5 text-[11px] text-white/45">{row.note}</div>
+                          {/if}
+                        </div>
+                        <div class="font-mono text-right text-white/72">{fmt(row.baseline, row.digits ?? 4)}</div>
+                        <div class="font-mono text-right text-cyan-200">{fmt(row.current, row.digits ?? 4)}</div>
+                        <div class={`font-mono text-right ${Number(row.delta ?? 0) > 0 ? 'text-amber-300' : Number(row.delta ?? 0) < 0 ? 'text-emerald-300' : 'text-white/60'}`}>
+                          {Number(row.delta ?? 0) > 0 ? '+' : ''}{fmt(row.delta, row.digits ?? 4)}
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+              {#if compareLossRows.length}
+                <div class="mt-3 overflow-hidden rounded-lg border border-white/8">
+                  <div class="grid grid-cols-[minmax(0,1.45fr)_0.82fr_0.82fr_0.8fr] gap-0 border-b border-white/8 bg-white/[0.03] px-3 py-2 text-[10px] uppercase tracking-widest text-white/45">
+                    <div>Loss / friction compare</div>
+                    <div class="text-right">Baseline</div>
+                    <div class="text-right">Current</div>
+                    <div class="text-right">Delta</div>
+                  </div>
+                  <div class="divide-y divide-white/6">
+                    {#each compareLossRows as row}
+                      <div class="grid grid-cols-[minmax(0,1.45fr)_0.82fr_0.82fr_0.8fr] gap-0 px-3 py-2 text-xs">
+                        <div class="pr-3">
+                          <div class="font-semibold text-white/84">{row.label}</div>
+                          {#if row.note}
+                            <div class="mt-0.5 text-[11px] text-white/45">
+                              {row.label === 'Thermal preload shift'
+                                ? 'Route exposes service temperature shift directly.'
+                                : row.label === 'Mechanical loss total'
+                                  ? 'Aggregated seating/relaxation/embedment loss term.'
+                                  : row.label === 'Net preload shift'
+                                    ? 'Combined installed preload loss relative to target.'
+                                    : row.label === 'Faying slip coeff.'
+                                      ? 'Friction input used by slip-reserve checks.'
+                                      : row.label === 'Friction interfaces'
+                                        ? 'Number of friction planes available to resist transverse load.'
+                                        : row.note}
+                            </div>
                           {/if}
                         </div>
                         <div class="font-mono text-right text-white/72">{fmt(row.baseline, row.digits ?? 4)}</div>
