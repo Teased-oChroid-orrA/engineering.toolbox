@@ -368,6 +368,40 @@ export function evaluateStructuralChecks(
         note: 'Nominal-only until scatter envelopes are merged at the solver level.'
       }
     },
+    worstCaseScenarios: {
+      separation: {
+        scenario: 'nominal_preload',
+        utilization: separation.utilization,
+        note: 'Nominal-only until scatter envelopes are merged at the solver level.'
+      },
+      slip: {
+        scenario: 'nominal_preload',
+        utilization: slip.utilization,
+        note: 'Nominal-only until scatter envelopes are merged at the solver level.'
+      },
+      proof: {
+        scenario: 'nominal_preload',
+        utilization: proof.utilization,
+        note: 'Nominal-only until scatter envelopes are merged at the solver level.'
+      },
+      bearing: {
+        scenario: 'nominal_preload',
+        utilization: governingBearing
+          ? (governingBearing === 'under_head'
+              ? underHeadBearing
+              : governingBearing === 'thread_bearing'
+                ? threadBearing
+                : localCrushing
+            ).utilization
+          : null,
+        note: 'Nominal-only until scatter envelopes are merged at the solver level.'
+      },
+      fatigue: {
+        scenario: 'nominal_preload',
+        utilization: fatigue.utilization,
+        note: 'Nominal-only until scatter envelopes are merged at the solver level.'
+      }
+    },
     proof,
     bearing: {
       underHead: underHeadBearing,

@@ -164,6 +164,19 @@ test.describe('preload solver G1 core', () => {
     expect(out.modelBasis.uncertaintySummary).toContain('root-sum-square');
     expect(out.decisionSupport.overall).toBeTruthy();
     expect(out.decisionSupport.governing.title).toBeTruthy();
+    expect(out.checks.worstCaseScenarios.separation.scenario).toBeTruthy();
+    expect(out.checks.worstCaseScenarios.slip.scenario).toBeTruthy();
+    expect(out.checks.worstCaseScenarios.proof.scenario).toBeTruthy();
+    expect(out.checks.worstCaseScenarios.bearing.scenario).toBeTruthy();
+    expect(out.checks.worstCaseScenarios.fatigue.scenario).toBeTruthy();
+    expect(out.checks.worstCaseScenarios.proof.utilization).toBeCloseTo(
+      Math.max(
+        Number(out.checks.envelopes.proofUtilization.min ?? Number.NEGATIVE_INFINITY),
+        Number(out.checks.envelopes.proofUtilization.nominal ?? Number.NEGATIVE_INFINITY),
+        Number(out.checks.envelopes.proofUtilization.max ?? Number.NEGATIVE_INFINITY)
+      ),
+      12
+    );
   });
 
   test('joint assembly fallback builds ordered rows from plates and washers', () => {
@@ -304,6 +317,7 @@ test.describe('preload solver G1 core', () => {
     expect(html).toContain('Why This Fails / Governs');
     expect(html).toContain('Input Provenance');
     expect(html).toContain('Worst-Case Envelopes');
+    expect(html).toContain('Worst-Case Scenario Picks');
     expect(html).toContain('Equation Traceability');
     expect(html).toContain('Standards / Method Basis');
   });

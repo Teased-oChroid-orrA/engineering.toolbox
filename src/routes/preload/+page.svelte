@@ -41,6 +41,18 @@
   const STEP_TELEMETRY_KEY = 'scd.preload.step-telemetry.v1';
   const STEP_PREFS_KEY = 'scd.preload.step-prefs.v1';
   type WorkflowStep = 'fastener' | 'materials' | 'geometry' | 'review';
+  type WorstCaseScenarioPick = {
+    scenario: string;
+    utilization: number;
+    note?: string;
+  };
+  type WorstCaseScenarioMap = {
+    separation?: WorstCaseScenarioPick;
+    slip?: WorstCaseScenarioPick;
+    proof?: WorstCaseScenarioPick;
+    bearing?: WorstCaseScenarioPick;
+    fatigue?: WorstCaseScenarioPick;
+  };
   type PreloadForm = Omit<FastenedJointPreloadInput, 'serviceCase' | 'washerStack'> & {
     featureFlags: NonNullable<FastenedJointPreloadInput['featureFlags']>;
     installationUncertainty: NonNullable<FastenedJointPreloadInput['installationUncertainty']>;
@@ -156,6 +168,15 @@
     className = ''
   ) {
     return cn(localButtonBase, localButtonVariants[variant], localButtonSizes[size], className);
+  }
+
+  function formatScenarioLabel(value?: string | null) {
+    if (!value) return 'Nominal-only';
+    return value
+      .replace(/_/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/(^|\s)\w/g, (match) => match.toUpperCase());
   }
 
   function readStoredInputs() {
@@ -475,6 +496,14 @@
     delta: number | null;
     digits?: number;
   };
+  type CompareGroupMetricRow = {
+    label: string;
+    baseline: number | null;
+    current: number | null;
+    delta: number | null;
+    digits?: number;
+    note?: string;
+  };
   let stepSnapshots: Partial<Record<WorkflowStep, StepSnapshot[]>> = $state({});
   let stepHintsSeen: Partial<Record<WorkflowStep, boolean>> = $state({});
   let stepCompletedAt: Partial<Record<WorkflowStep, number>> = $state({});
@@ -506,6 +535,76 @@
   let activePreloadIssueIndex = $state(0);
   let lastConicalAutoSignature = '';
   let compareBaseline = $state<CompareSnapshot | null>(null);
+
+  function buildFastenerGroupCaseResultForForm(
+    candidateForm: PreloadForm,
+    candidateOutput: ReturnType<typeof computeFastenedJointPreload> | null
+  ) {
+    if (!candidateForm.adjacentFastenerScreen.enabled || !candidateOutput) return null;
+    return solveFastenerGroupPatternCases(
+      {
+        mode: candidateForm.adjacentFastenerScreen.mode,
+        rowCount: candidateForm.adjacentFastenerScreen.rowCount,
+        columnCount: candidateForm.adjacentFastenerScreen.columnCount,
+        rowPitch: candidateForm.adjacentFastenerScreen.rowPitch,
+        columnPitch: candidateForm.adjacentFastenerScreen.columnPitch,
+        edgeDistanceX: candidateForm.adjacentFastenerScreen.edgeDistanceX,
+        edgeDistanceY: candidateForm.adjacentFastenerScreen.edgeDistanceY,
+        eccentricityX: candidateForm.adjacentFastenerScreen.eccentricityX,
+        eccentricityY: candidateForm.adjacentFastenerScreen.eccentricityY,
+        plateStiffnessRatioX: candidateForm.adjacentFastenerScreen.plateStiffnessRatioX,
+        plateStiffnessRatioY: candidateForm.adjacentFastenerScreen.plateStiffnessRatioY,
+        bypassLoadFactor: candidateForm.adjacentFastenerScreen.bypassLoadFactor,
+        transferEfficiency: candidateForm.adjacentFastenerScreen.transferEfficiency,
+        preloadVariationPercent: candidateForm.adjacentFastenerScreen.preloadVariationPercent,
+        localMemberStiffnessVariationPercent: candidateForm.adjacentFastenerScreen.localMemberStiffnessVariationPercent,
+        progressionStepLimit: candidateForm.adjacentFastenerScreen.progressionStepLimit,
+        boltStiffness: candidateOutput.stiffness.bolt.stiffness,
+        memberStiffness: candidateOutput.stiffness.members.stiffness,
+        preloadPerFastener: candidateOutput.service?.preloadEffective ?? candidateOutput.installation.preload
+      },
+      candidateForm.adjacentFastenerScreen.loadCases
+    );
+  }
+
+  function summarizeFastenerGroupCaseResult(
+    candidateCaseResult: ReturnType<typeof buildFastenerGroupCaseResultForForm>,
+    candidateGroupResult: ReturnType<typeof solveFastenerGroupPatternCases>['cases'][number]['result'] | null
+  ) {
+    if (!candidateCaseResult || !candidateGroupResult) return null;
+    const caseDemands = candidateCaseResult.cases.map((entry) => entry.result.criticalEquivalentDemand);
+    const governingEquivalentDemand = candidateCaseResult.governingEquivalentDemand;
+    const minimumCaseDemand = caseDemands.length ? Math.min(...caseDemands) : governingEquivalentDemand;
+    return {
+      mode: candidateCaseResult.mode,
+      caseCount: candidateCaseResult.cases.length,
+      governingCaseLabel: candidateCaseResult.governingCaseLabel ?? '—',
+      governingFastenerLabel: `F${candidateGroupResult.criticalFastenerIndex + 1}`,
+      governingEquivalentDemand,
+      minimumCaseDemand,
+      envelopeSpread: Math.max(0, governingEquivalentDemand - minimumCaseDemand),
+      redistributionFactor: candidateGroupResult.redistributionFactor,
+      activeFastenerCount: candidateGroupResult.activeFastenerCount,
+      progressionSteps: candidateGroupResult.progression.length,
+      progressionNote:
+        candidateGroupResult.progression.length > 0
+          ? `Redistribution rises from ${fmt(candidateGroupResult.redistributionFactor, 4)} to ${fmt(candidateGroupResult.progression.at(-1)?.redistributionFactor ?? candidateGroupResult.redistributionFactor, 4)} over ${candidateGroupResult.progression.length} simulated step(s).`
+          : `No redistribution progression steps were simulated for this case set.`
+    };
+  }
+
+  function envelopeScenarioLabel(value: 'min_preload' | 'nominal_preload' | 'max_preload' | null | undefined) {
+    switch (value) {
+      case 'min_preload':
+        return 'Min preload';
+      case 'max_preload':
+        return 'Max preload';
+      case 'nominal_preload':
+        return 'Nominal preload';
+      default:
+        return 'Unavailable';
+    }
+  }
 
   if (typeof window !== 'undefined') {
     const parsed = readStoredInputs();
@@ -2717,34 +2816,27 @@
   ));
   let adjacentNeighborCount = $derived(Math.max(0, adjacentFastenerCount - 1));
   let fastenerGroupCaseResult =
-    $derived(form.adjacentFastenerScreen.enabled && output
-      ? solveFastenerGroupPatternCases({
-          mode: form.adjacentFastenerScreen.mode,
-          rowCount: form.adjacentFastenerScreen.rowCount,
-          columnCount: form.adjacentFastenerScreen.columnCount,
-          rowPitch: form.adjacentFastenerScreen.rowPitch,
-          columnPitch: form.adjacentFastenerScreen.columnPitch,
-          edgeDistanceX: form.adjacentFastenerScreen.edgeDistanceX,
-          edgeDistanceY: form.adjacentFastenerScreen.edgeDistanceY,
-          eccentricityX: form.adjacentFastenerScreen.eccentricityX,
-          eccentricityY: form.adjacentFastenerScreen.eccentricityY,
-          plateStiffnessRatioX: form.adjacentFastenerScreen.plateStiffnessRatioX,
-          plateStiffnessRatioY: form.adjacentFastenerScreen.plateStiffnessRatioY,
-          bypassLoadFactor: form.adjacentFastenerScreen.bypassLoadFactor,
-          transferEfficiency: form.adjacentFastenerScreen.transferEfficiency,
-          preloadVariationPercent: form.adjacentFastenerScreen.preloadVariationPercent,
-          localMemberStiffnessVariationPercent: form.adjacentFastenerScreen.localMemberStiffnessVariationPercent,
-          progressionStepLimit: form.adjacentFastenerScreen.progressionStepLimit,
-          boltStiffness: output.stiffness.bolt.stiffness,
-          memberStiffness: output.stiffness.members.stiffness,
-          preloadPerFastener: output.service?.preloadEffective ?? output.installation.preload
-        }, form.adjacentFastenerScreen.loadCases)
-      : null);
+    $derived(buildFastenerGroupCaseResultForForm(form, output));
+  let compareBaselineGroupCaseResult = $derived(
+    compareBaseline ? buildFastenerGroupCaseResultForForm(compareBaseline.form, compareBaseline.output) : null
+  );
   let activeFastenerGroupCase =
     $derived(fastenerGroupCaseResult?.cases.find((entry) => entry.caseId === fastenerGroupCaseResult.governingCaseId) ??
     fastenerGroupCaseResult?.cases[0] ??
     null);
   let fastenerGroupResult = $derived(activeFastenerGroupCase?.result ?? null);
+  let compareBaselineGroupCase = $derived(
+    compareBaselineGroupCaseResult?.cases.find((entry) => entry.caseId === compareBaselineGroupCaseResult.governingCaseId) ??
+    compareBaselineGroupCaseResult?.cases[0] ??
+    null
+  );
+  let compareBaselineGroupResult = $derived(compareBaselineGroupCase?.result ?? null);
+  let currentFastenerGroupSummary = $derived(
+    summarizeFastenerGroupCaseResult(fastenerGroupCaseResult, fastenerGroupResult)
+  );
+  let compareBaselineFastenerGroupSummary = $derived(
+    summarizeFastenerGroupCaseResult(compareBaselineGroupCaseResult, compareBaselineGroupResult)
+  );
   let adjacentTransferAttenuation = $derived(fastenerGroupResult
     ? Math.max(...fastenerGroupResult.fasteners.slice(1).map((row) => row.edgeAmplification), 0)
     : 0);
@@ -2796,6 +2888,7 @@
         caseId: ''
       }))
     );
+  let fastenerCaseControlRows = $derived(fastenerCaseRankingRows.slice(0, 2));
   let fastenerProgressionRows = $derived(
     fastenerGroupResult?.progression.map((entry) => ({
       ...entry,
@@ -2803,6 +2896,40 @@
       criticalLabel: `F${entry.criticalFastenerIndex + 1}`
     })) ?? []
   );
+  let worstCaseScenarioRows = $derived.by(() => {
+    if (!output) return [] as Array<{
+      key: string;
+      label: string;
+      scenarioLabel: string;
+      utilization: number | null;
+      note: string;
+      isFallback: boolean;
+    }>;
+    const picks = (output.checks as { worstCaseScenarios?: WorstCaseScenarioMap }).worstCaseScenarios;
+    const rows = [
+      { key: 'separation', label: 'Separation', envelope: output.checks.envelopes.separationUtilization, pick: picks?.separation },
+      { key: 'slip', label: 'Slip', envelope: output.checks.envelopes.slipUtilization, pick: picks?.slip },
+      { key: 'proof', label: 'Proof', envelope: output.checks.envelopes.proofUtilization, pick: picks?.proof },
+      { key: 'bearing', label: 'Bearing', envelope: output.checks.envelopes.bearingUtilization, pick: picks?.bearing },
+      { key: 'fatigue', label: 'Fatigue', envelope: output.checks.envelopes.fatigueUtilization, pick: picks?.fatigue }
+    ];
+    return rows.map((row) => {
+      const utilization = row.pick?.utilization ?? row.envelope.nominal ?? null;
+      return {
+        key: row.key,
+        label: row.label,
+        scenarioLabel: formatScenarioLabel(row.pick?.scenario),
+        utilization,
+        note:
+          row.pick?.note ??
+          (row.pick
+            ? 'Controlling scenario reported by the solver.'
+            : 'Nominal envelope only until the solver exposes controlling scenario picks.'),
+        isFallback: !row.pick
+      };
+    });
+  });
+  let hasWorstCaseScenarioPicks = $derived(worstCaseScenarioRows.some((row) => !row.isFallback));
   let fastenerGroupReportSummary = $derived(
     fastenerGroupCaseResult && fastenerGroupResult
       ? {
@@ -2811,7 +2938,7 @@
           governingFastenerLabel: criticalFastenerLabel,
           progressionSummary:
             fastenerProgressionRows.length > 0
-              ? `Failure progression removes the current governing fastener, then recomputes the remaining set. ${fastenerProgressionRows.length} progression step(s) are shown for the current load envelope.`
+              ? `Failure progression removes the current governing fastener, recomputes the remaining set, and shows redistribution from ${fmt(fastenerGroupResult.redistributionFactor, 4)} to ${fmt(fastenerProgressionRows.at(-1)?.redistributionFactor ?? fastenerGroupResult.redistributionFactor, 4)} across ${fastenerProgressionRows.length} step(s).`
               : 'No failure progression steps are available for the current case set.',
           cases: fastenerCaseEnvelopeRows.map((row) => ({
             label: row.label,
@@ -3432,6 +3559,70 @@
           });
       })()
     : []);
+
+  let groupCompareRows = $derived.by(() => {
+    if (!currentFastenerGroupSummary || !compareBaselineFastenerGroupSummary) return [] as CompareGroupMetricRow[];
+    return [
+      {
+        label: 'Governing case demand',
+        baseline: compareBaselineFastenerGroupSummary.governingEquivalentDemand,
+        current: currentFastenerGroupSummary.governingEquivalentDemand,
+        delta:
+          currentFastenerGroupSummary.governingEquivalentDemand - compareBaselineFastenerGroupSummary.governingEquivalentDemand,
+        digits: 2,
+        note: 'Peak equivalent demand across the current case envelope.'
+      },
+      {
+        label: 'Envelope spread',
+        baseline: compareBaselineFastenerGroupSummary.envelopeSpread,
+        current: currentFastenerGroupSummary.envelopeSpread,
+        delta: currentFastenerGroupSummary.envelopeSpread - compareBaselineFastenerGroupSummary.envelopeSpread,
+        digits: 2,
+        note: 'Distance from the weakest to governing load case in the envelope.'
+      },
+      {
+        label: 'Governing fastener demand',
+        baseline: compareBaselineFastenerGroupSummary.governingEquivalentDemand,
+        current: currentFastenerGroupSummary.governingEquivalentDemand,
+        delta:
+          currentFastenerGroupSummary.governingEquivalentDemand - compareBaselineFastenerGroupSummary.governingEquivalentDemand,
+        digits: 2,
+        note: 'Highest equivalent demand on the critical fastener for the governing case.'
+      },
+      {
+        label: 'Redistribution factor',
+        baseline: compareBaselineFastenerGroupSummary.redistributionFactor,
+        current: currentFastenerGroupSummary.redistributionFactor,
+        delta: currentFastenerGroupSummary.redistributionFactor - compareBaselineFastenerGroupSummary.redistributionFactor,
+        digits: 4,
+        note: 'Joint-interaction amplification used during load redistribution.'
+      },
+      {
+        label: 'Progression steps',
+        baseline: compareBaselineFastenerGroupSummary.progressionSteps,
+        current: currentFastenerGroupSummary.progressionSteps,
+        delta: currentFastenerGroupSummary.progressionSteps - compareBaselineFastenerGroupSummary.progressionSteps,
+        digits: 0,
+        note: 'How many redistribution/failure steps were simulated.'
+      },
+      {
+        label: 'Active fasteners',
+        baseline: compareBaselineFastenerGroupSummary.activeFastenerCount,
+        current: currentFastenerGroupSummary.activeFastenerCount,
+        delta: currentFastenerGroupSummary.activeFastenerCount - compareBaselineFastenerGroupSummary.activeFastenerCount,
+        digits: 0,
+        note: 'Fasteners remaining in the governing progression state.'
+      },
+      {
+        label: 'Case count',
+        baseline: compareBaselineFastenerGroupSummary.caseCount,
+        current: currentFastenerGroupSummary.caseCount,
+        delta: currentFastenerGroupSummary.caseCount - compareBaselineFastenerGroupSummary.caseCount,
+        digits: 0,
+        note: 'Number of load cases in the compare envelope.'
+      }
+    ];
+  });
   let coneVisualBottom = $derived(stackVisualRows.length
     ? (() => {
         const apex = memberApexPosition;
@@ -4638,12 +4829,57 @@
               <div>Adjacent fastener equivalent: <span class="font-mono text-cyan-300">{fmt(adjacentFastenerEquivalentLoad, 2)}</span></div>
               <div class="mt-2">Critical fastener: <span class="font-semibold text-amber-200">{criticalFastenerLabel}</span></div>
             </div>
+            {#if currentFastenerGroupSummary}
+              <div class="rounded-lg border border-cyan-400/15 bg-cyan-500/5 p-3 text-xs text-cyan-100">
+                <div class="mb-2 flex items-center justify-between gap-3">
+                  <div class="text-[10px] uppercase tracking-widest text-cyan-100/70">Worst-case envelope summary</div>
+                  <div class="text-[10px] text-cyan-100/55">{currentFastenerGroupSummary.mode === 'joint_interaction' ? 'Joint interaction' : 'Screening'}</div>
+                </div>
+                <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  <div class="rounded-md border border-white/8 bg-black/20 px-3 py-2">
+                    <div class="text-[10px] uppercase tracking-widest text-white/45">Governing case</div>
+                    <div class="mt-1 font-semibold text-white/86">{currentFastenerGroupSummary.governingCaseLabel}</div>
+                  </div>
+                  <div class="rounded-md border border-white/8 bg-black/20 px-3 py-2">
+                    <div class="text-[10px] uppercase tracking-widest text-white/45">Critical fastener</div>
+                    <div class="mt-1 font-semibold text-white/86">{currentFastenerGroupSummary.governingFastenerLabel}</div>
+                  </div>
+                  <div class="rounded-md border border-white/8 bg-black/20 px-3 py-2">
+                    <div class="text-[10px] uppercase tracking-widest text-white/45">Peak eqv demand</div>
+                    <div class="mt-1 font-mono font-semibold text-cyan-200">{fmt(currentFastenerGroupSummary.governingEquivalentDemand, 2)}</div>
+                  </div>
+                  <div class="rounded-md border border-white/8 bg-black/20 px-3 py-2">
+                    <div class="text-[10px] uppercase tracking-widest text-white/45">Progression</div>
+                    <div class="mt-1 font-semibold text-white/86">{currentFastenerGroupSummary.progressionSteps} step(s)</div>
+                  </div>
+                </div>
+                <div class="mt-2 text-[11px] text-cyan-50/78">{currentFastenerGroupSummary.progressionNote}</div>
+              </div>
+            {/if}
             {#if fastenerCaseRankingRows.length}
               <div class="rounded-lg border border-white/10 bg-black/20 p-3">
                 <div class="mb-2 flex items-center justify-between gap-3">
-                  <div class="text-[10px] uppercase tracking-widest text-white/45">Case ranking</div>
+                  <div class="text-[10px] uppercase tracking-widest text-white/45">Worst-case envelope ranking</div>
                   <div class="text-[10px] text-white/45">{fastenerGroupModeLabel} mode • {fastenerCaseRankingRows.length} cases</div>
                 </div>
+                {#if fastenerCaseControlRows.length}
+                  <div class="mb-3 grid gap-2 sm:grid-cols-2">
+                    {#each fastenerCaseControlRows as row, index}
+                      <div class={`rounded-lg border px-3 py-2 text-xs ${index === 0 ? 'border-amber-400/30 bg-amber-500/10 text-amber-100' : 'border-white/10 bg-white/[0.02] text-white/74'}`}>
+                        <div class="flex items-center justify-between gap-2">
+                          <div class="text-[10px] uppercase tracking-widest text-white/45">{index === 0 ? 'Controlling case' : 'Next case'}</div>
+                          <div class="text-[10px] uppercase tracking-widest text-white/45">#{row.rank}</div>
+                        </div>
+                        <div class="mt-1 font-semibold">{row.label}</div>
+                        <div class="mt-1 grid grid-cols-[auto_auto_1fr] gap-x-3 text-[11px]">
+                          <div class="text-white/45">Crit.</div>
+                          <div class="font-mono text-cyan-200">{row.criticalFastenerLabel}</div>
+                          <div class="text-right font-mono text-cyan-200">{fmt(row.demand, 2)}</div>
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
                 <div class="grid gap-2" style={`grid-template-columns: repeat(${Math.min(caseRankRibbonColumns, 3)}, minmax(0, 1fr));`}>
                   {#each fastenerCaseRankingRows as row}
                     <div class={`rounded-lg border px-3 py-2 text-xs ${row.isGoverning ? 'border-amber-400/30 bg-amber-500/10 text-amber-100' : 'border-white/10 bg-white/[0.02] text-white/74'}`}>
@@ -4731,14 +4967,17 @@
             {#if fastenerProgressionRows.length}
             <div class="rounded-lg border border-white/10 bg-black/20 p-3">
               <div class="mb-2 flex items-center justify-between gap-3">
-                <div class="text-[10px] uppercase tracking-widest text-white/45">Failure progression</div>
-                <div class="text-[10px] text-white/45">Remove the current governing fastener and recompute the remaining set</div>
+                <div class="text-[10px] uppercase tracking-widest text-white/45">Redistribution progression</div>
+                <div class="text-[10px] text-white/45">Remove the current governing fastener, then track how the envelope shifts.</div>
               </div>
               {#if fastenerGroupReportSummary}
                 <div class="mb-2 rounded-lg border border-cyan-400/15 bg-cyan-500/5 px-3 py-2 text-xs text-cyan-100">
                   {fastenerGroupReportSummary.progressionSummary}
                 </div>
               {/if}
+              <div class="mb-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[11px] text-white/60">
+                Each step shows the removal order, the remaining active fastener count, and the newly governing fastener after redistribution.
+              </div>
               <div class="space-y-2">
                 {#each fastenerProgressionRows as row}
                   <div class="grid grid-cols-[auto_1fr] gap-3 rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2 text-xs text-white/72">
@@ -5434,6 +5673,43 @@
             <div class="mt-1 text-sm text-white/70">Status: {output.checks.fatigue.status} ({fmt(output.checks.fatigue.utilization, 4)})</div>
           {/if}
         </div>
+
+        <div class="rounded-xl border border-white/10 bg-black/20 p-4 md:col-span-2">
+          <div class="flex items-center justify-between gap-3">
+            <div class="text-[10px] uppercase tracking-widest text-white/45">Worst-Case Control Picks</div>
+            <div class="text-[10px] text-white/45">
+              {#if hasWorstCaseScenarioPicks}
+                solver-controlled scenarios
+              {:else}
+                nominal-only fallback
+              {/if}
+            </div>
+          </div>
+          {#if worstCaseScenarioRows.length}
+            <div class="mt-3 overflow-hidden rounded-lg border border-white/8">
+              <div class="grid grid-cols-[0.9fr_1fr_0.8fr_1.4fr] gap-0 border-b border-white/8 bg-white/[0.03] px-3 py-2 text-[10px] uppercase tracking-widest text-white/45">
+                <div>Check</div>
+                <div>Controlling scenario</div>
+                <div class="text-right">Util.</div>
+                <div>Note</div>
+              </div>
+              <div class="divide-y divide-white/6">
+                {#each worstCaseScenarioRows as row}
+                  <div class={`grid grid-cols-[0.9fr_1fr_0.8fr_1.4fr] gap-0 px-3 py-2 text-xs ${row.isFallback ? 'bg-white/[0.015] text-white/68' : 'bg-cyan-500/5 text-cyan-50'}`}>
+                    <div class="font-semibold text-white/84">{row.label}</div>
+                    <div class="font-mono text-cyan-200">{row.scenarioLabel}</div>
+                    <div class="font-mono text-right text-cyan-200">{row.utilization == null ? '—' : fmt(row.utilization, 3)}</div>
+                    <div class="pl-2 text-white/68">{row.note}</div>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {:else}
+            <div class="mt-3 rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/70">
+              The solver has not exposed controlling scenario picks yet. The nominal envelope remains available below, and this panel will populate automatically when the bound result object provides scenario labels.
+            </div>
+          {/if}
+        </div>
       </CardContent>
     </Card>
 
@@ -5547,6 +5823,55 @@
             Baseline <span class="text-cyan-200">{compareBaseline.label}</span> captured {new Date(compareBaseline.capturedAt).toLocaleTimeString()}.
             Current case <span class="text-cyan-200">{selectedFastener.label} • {jointPresetLabel(form.jointTypePreset)}</span>.
           </div>
+          {#if compareBaselineFastenerGroupSummary && currentFastenerGroupSummary}
+            <div class="rounded-xl border border-cyan-400/15 bg-cyan-500/5 p-4">
+              <div class="mb-2 flex items-center justify-between gap-3">
+                <div class="text-[10px] uppercase tracking-widest text-cyan-100/70">Case envelope compare</div>
+                <div class="text-[10px] text-cyan-100/50">Worst-case case, critical fastener, progression consequence</div>
+              </div>
+              <div class="grid gap-3 md:grid-cols-2">
+                <div class="rounded-lg border border-white/8 bg-black/20 p-3 text-xs text-white/75">
+                  <div class="text-[10px] uppercase tracking-widest text-white/45">Baseline</div>
+                  <div class="mt-1 font-semibold text-white/86">{compareBaselineFastenerGroupSummary.governingCaseLabel}</div>
+                  <div class="mt-1 text-white/60">Critical {compareBaselineFastenerGroupSummary.governingFastenerLabel}</div>
+                  <div class="mt-1 font-mono text-cyan-200">Peak {fmt(compareBaselineFastenerGroupSummary.governingEquivalentDemand, 2)} • spread {fmt(compareBaselineFastenerGroupSummary.envelopeSpread, 2)}</div>
+                </div>
+                <div class="rounded-lg border border-white/8 bg-black/20 p-3 text-xs text-white/75">
+                  <div class="text-[10px] uppercase tracking-widest text-white/45">Current</div>
+                  <div class="mt-1 font-semibold text-white/86">{currentFastenerGroupSummary.governingCaseLabel}</div>
+                  <div class="mt-1 text-white/60">Critical {currentFastenerGroupSummary.governingFastenerLabel}</div>
+                  <div class="mt-1 font-mono text-cyan-200">Peak {fmt(currentFastenerGroupSummary.governingEquivalentDemand, 2)} • spread {fmt(currentFastenerGroupSummary.envelopeSpread, 2)}</div>
+                </div>
+              </div>
+              {#if groupCompareRows.length}
+                <div class="mt-3 overflow-hidden rounded-lg border border-white/8">
+                  <div class="grid grid-cols-[minmax(0,1.45fr)_0.82fr_0.82fr_0.8fr] gap-0 border-b border-white/8 bg-white/[0.03] px-3 py-2 text-[10px] uppercase tracking-widest text-white/45">
+                    <div>Group metric</div>
+                    <div class="text-right">Baseline</div>
+                    <div class="text-right">Current</div>
+                    <div class="text-right">Delta</div>
+                  </div>
+                  <div class="divide-y divide-white/6">
+                    {#each groupCompareRows as row}
+                      <div class="grid grid-cols-[minmax(0,1.45fr)_0.82fr_0.82fr_0.8fr] gap-0 px-3 py-2 text-xs">
+                        <div class="pr-3">
+                          <div class="font-semibold text-white/84">{row.label}</div>
+                          {#if row.note}
+                            <div class="mt-0.5 text-[11px] text-white/45">{row.note}</div>
+                          {/if}
+                        </div>
+                        <div class="font-mono text-right text-white/72">{fmt(row.baseline, row.digits ?? 4)}</div>
+                        <div class="font-mono text-right text-cyan-200">{fmt(row.current, row.digits ?? 4)}</div>
+                        <div class={`font-mono text-right ${Number(row.delta ?? 0) > 0 ? 'text-amber-300' : Number(row.delta ?? 0) < 0 ? 'text-emerald-300' : 'text-white/60'}`}>
+                          {Number(row.delta ?? 0) > 0 ? '+' : ''}{fmt(row.delta, row.digits ?? 4)}
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+            </div>
+          {/if}
           <div class="overflow-x-auto rounded-xl border border-white/10 bg-black/20">
             <div class="grid min-w-[640px] grid-cols-[minmax(0,1.4fr)_0.8fr_0.8fr_0.8fr] gap-x-3 px-4 py-3 text-[10px] uppercase tracking-widest text-white/40">
               <div>Metric</div>
@@ -5619,6 +5944,39 @@
                 <div>Proof min / nominal / max: <span class="font-mono text-white/85">{fmt(output.checks.envelopes.proofUtilization.min, 3)} / {fmt(output.checks.envelopes.proofUtilization.nominal, 3)} / {fmt(output.checks.envelopes.proofUtilization.max, 3)}</span></div>
                 <div>Bearing min / nominal / max: <span class="font-mono text-white/85">{fmt(output.checks.envelopes.bearingUtilization.min, 3)} / {fmt(output.checks.envelopes.bearingUtilization.nominal, 3)} / {fmt(output.checks.envelopes.bearingUtilization.max, 3)}</span></div>
                 <div>Fatigue min / nominal / max: <span class="font-mono text-white/85">{fmt(output.checks.envelopes.fatigueUtilization.min, 3)} / {fmt(output.checks.envelopes.fatigueUtilization.nominal, 3)} / {fmt(output.checks.envelopes.fatigueUtilization.max, 3)}</span></div>
+              </div>
+              <div class="mt-4 rounded-lg border border-cyan-400/15 bg-cyan-500/5 p-3">
+                <div class="text-[10px] uppercase tracking-widest text-cyan-100/70">Controlling preload scenario</div>
+                <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                  <div class="rounded-md border border-white/8 bg-black/20 px-3 py-2 text-xs text-white/72">
+                    <div class="text-[10px] uppercase tracking-widest text-white/40">Separation</div>
+                    <div class="mt-1 font-semibold text-white/86">{envelopeScenarioLabel(output.checks.worstCaseScenarios.separation.scenario)}</div>
+                    <div class="mt-1 font-mono text-cyan-200">{fmt(output.checks.worstCaseScenarios.separation.utilization, 3)}</div>
+                  </div>
+                  <div class="rounded-md border border-white/8 bg-black/20 px-3 py-2 text-xs text-white/72">
+                    <div class="text-[10px] uppercase tracking-widest text-white/40">Slip</div>
+                    <div class="mt-1 font-semibold text-white/86">{envelopeScenarioLabel(output.checks.worstCaseScenarios.slip.scenario)}</div>
+                    <div class="mt-1 font-mono text-cyan-200">{fmt(output.checks.worstCaseScenarios.slip.utilization, 3)}</div>
+                  </div>
+                  <div class="rounded-md border border-white/8 bg-black/20 px-3 py-2 text-xs text-white/72">
+                    <div class="text-[10px] uppercase tracking-widest text-white/40">Proof</div>
+                    <div class="mt-1 font-semibold text-white/86">{envelopeScenarioLabel(output.checks.worstCaseScenarios.proof.scenario)}</div>
+                    <div class="mt-1 font-mono text-cyan-200">{fmt(output.checks.worstCaseScenarios.proof.utilization, 3)}</div>
+                  </div>
+                  <div class="rounded-md border border-white/8 bg-black/20 px-3 py-2 text-xs text-white/72">
+                    <div class="text-[10px] uppercase tracking-widest text-white/40">Bearing</div>
+                    <div class="mt-1 font-semibold text-white/86">{envelopeScenarioLabel(output.checks.worstCaseScenarios.bearing.scenario)}</div>
+                    <div class="mt-1 font-mono text-cyan-200">{fmt(output.checks.worstCaseScenarios.bearing.utilization, 3)}</div>
+                  </div>
+                  <div class="rounded-md border border-white/8 bg-black/20 px-3 py-2 text-xs text-white/72 sm:col-span-2">
+                    <div class="text-[10px] uppercase tracking-widest text-white/40">Fatigue</div>
+                    <div class="mt-1 font-semibold text-white/86">{envelopeScenarioLabel(output.checks.worstCaseScenarios.fatigue.scenario)}</div>
+                    <div class="mt-1 font-mono text-cyan-200">{fmt(output.checks.worstCaseScenarios.fatigue.utilization, 3)}</div>
+                  </div>
+                </div>
+                <div class="mt-2 text-[11px] text-cyan-50/70">
+                  This identifies which installed-preload scenario actually controls each check instead of only showing the envelope bounds.
+                </div>
               </div>
             </div>
           </div>

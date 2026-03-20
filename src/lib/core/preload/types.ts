@@ -430,6 +430,14 @@ export type CheckEnvelope = {
   note: string;
 };
 
+export type EnvelopeScenarioLabel = 'min_preload' | 'nominal_preload' | 'max_preload';
+
+export type WorstCaseScenarioResult = {
+  scenario: EnvelopeScenarioLabel;
+  utilization: number | null;
+  note: string;
+};
+
 export type StructuralChecksResult = {
   serviceLimits: {
     separation: UtilizationCheck;
@@ -446,6 +454,13 @@ export type StructuralChecksResult = {
     proofUtilization: CheckEnvelope;
     bearingUtilization: CheckEnvelope;
     fatigueUtilization: CheckEnvelope;
+  };
+  worstCaseScenarios: {
+    separation: WorstCaseScenarioResult;
+    slip: WorstCaseScenarioResult;
+    proof: WorstCaseScenarioResult;
+    bearing: WorstCaseScenarioResult;
+    fatigue: WorstCaseScenarioResult;
   };
   proof: UtilizationCheck;
   bearing: {

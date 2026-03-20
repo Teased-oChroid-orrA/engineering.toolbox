@@ -5,6 +5,7 @@ import { buildJointAssemblyInput } from './assembly';
 import type {
   CheckEnvelope,
   DecisionSupportResult,
+  EnvelopeScenarioLabel,
   ExactTorqueTerms,
   FastenedJointPreloadInput,
   FastenedJointPreloadOutput,
@@ -112,6 +113,30 @@ function buildEnvelope(
     min: Number.isFinite(Number(min)) ? Number(min) : null,
     nominal: Number.isFinite(Number(nominal)) ? Number(nominal) : null,
     max: Number.isFinite(Number(max)) ? Number(max) : null,
+    note
+  };
+}
+
+function pickWorstCaseScenario(
+  envelope: CheckEnvelope,
+  note: string
+): { scenario: EnvelopeScenarioLabel; utilization: number | null; note: string } {
+  const candidates: Array<{ scenario: EnvelopeScenarioLabel; utilization: number | null }> = [
+    { scenario: 'min_preload', utilization: envelope.min },
+    { scenario: 'nominal_preload', utilization: envelope.nominal },
+    { scenario: 'max_preload', utilization: envelope.max }
+  ];
+  let worst = candidates[1];
+  for (const candidate of candidates) {
+    const value = Number(candidate.utilization);
+    const current = Number(worst.utilization);
+    if (Number.isFinite(value) && (!Number.isFinite(current) || value > current)) {
+      worst = candidate;
+    }
+  }
+  return {
+    scenario: worst.scenario,
+    utilization: Number.isFinite(Number(worst.utilization)) ? Number(worst.utilization) : null,
     note
   };
 }
@@ -432,6 +457,28 @@ export function computeFastenedJointPreload(input: FastenedJointPreloadInput): F
       checks.fatigue.utilization,
       checksMax.fatigue.utilization,
       'Fatigue envelope from installation preload scatter superposed with explicit mean and alternating loads.'
+    )
+  };
+  checks.worstCaseScenarios = {
+    separation: pickWorstCaseScenario(
+      checks.envelopes.separationUtilization,
+      'Worst-case separation utilization across min/nominal/max installed preload.'
+    ),
+    slip: pickWorstCaseScenario(
+      checks.envelopes.slipUtilization,
+      'Worst-case slip utilization across min/nominal/max installed preload.'
+    ),
+    proof: pickWorstCaseScenario(
+      checks.envelopes.proofUtilization,
+      'Worst-case proof utilization across min/nominal/max installed preload.'
+    ),
+    bearing: pickWorstCaseScenario(
+      checks.envelopes.bearingUtilization,
+      'Worst-case bearing/crushing utilization across min/nominal/max installed preload.'
+    ),
+    fatigue: pickWorstCaseScenario(
+      checks.envelopes.fatigueUtilization,
+      'Worst-case fatigue utilization across min/nominal/max installed preload.'
     )
   };
   if (service && serviceMin && serviceMax) {

@@ -279,6 +279,28 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
       `${fmt(checks.envelopes.fatigueUtilization.min, 3)} / ${fmt(checks.envelopes.fatigueUtilization.nominal, 3)} / ${fmt(checks.envelopes.fatigueUtilization.max, 3)}`
     ]
   ];
+  const worstCaseRows: Array<[string, string]> = [
+    [
+      'Separation worst case',
+      `${esc(checks.worstCaseScenarios.separation.scenario)} • ${fmt(checks.worstCaseScenarios.separation.utilization, 3)}`
+    ],
+    [
+      'Slip worst case',
+      `${esc(checks.worstCaseScenarios.slip.scenario)} • ${fmt(checks.worstCaseScenarios.slip.utilization, 3)}`
+    ],
+    [
+      'Proof worst case',
+      `${esc(checks.worstCaseScenarios.proof.scenario)} • ${fmt(checks.worstCaseScenarios.proof.utilization, 3)}`
+    ],
+    [
+      'Bearing worst case',
+      `${esc(checks.worstCaseScenarios.bearing.scenario)} • ${fmt(checks.worstCaseScenarios.bearing.utilization, 3)}`
+    ],
+    [
+      'Fatigue worst case',
+      `${esc(checks.worstCaseScenarios.fatigue.scenario)} • ${fmt(checks.worstCaseScenarios.fatigue.utilization, 3)}`
+    ]
+  ];
   const assemblyRows = assembly.rows
     .map(
       (row) =>
@@ -390,6 +412,12 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
       <table>${renderRows(envelopeRows)}</table>
       <p>Each row is reported as min / nominal / max utilization to expose preload scatter and explicit loss contributors.</p>
     </div>
+  </div>
+
+  <div class="box" style="margin-top:16px">
+    <h2>Worst-Case Scenario Picks</h2>
+    <table>${renderRows(worstCaseRows)}</table>
+    <p>The report identifies which installed-preload scenario controls each utilization envelope.</p>
   </div>
 
   <div class="box" style="margin-top:16px">
