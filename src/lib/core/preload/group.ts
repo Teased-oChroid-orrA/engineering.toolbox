@@ -120,6 +120,25 @@ export type FastenerGroupPatternCaseResult = {
   result: FastenerGroupPatternResult;
 };
 
+export type FastenerGroupCaseRankingEntry = {
+  rank: number;
+  caseId: string;
+  label: string;
+  criticalFastenerIndex: number;
+  criticalEquivalentDemand: number;
+};
+
+export type FastenerGroupEnvelopeFastenerResult = {
+  index: number;
+  row: number;
+  column: number;
+  x: number;
+  y: number;
+  governingCaseId: string;
+  governingCaseLabel: string;
+  equivalentDemand: number;
+};
+
 export type FastenerGroupPatternCasesResult = {
   mode: FastenerGroupMode;
   cases: FastenerGroupPatternCaseResult[];
@@ -127,6 +146,8 @@ export type FastenerGroupPatternCasesResult = {
   governingCaseLabel: string | null;
   governingFastenerIndex: number | null;
   governingEquivalentDemand: number;
+  caseRanking: FastenerGroupCaseRankingEntry[];
+  envelopeFasteners: FastenerGroupEnvelopeFastenerResult[];
 };
 
 function clamp01(value: number) {
@@ -436,6 +457,43 @@ export function solveFastenerGroupPatternCases(
       externalMomentZ: loadCase.externalMomentZ
     })
   }));
+  const caseRanking = [...cases]
+    .sort((left, right) => right.result.criticalEquivalentDemand - left.result.criticalEquivalentDemand)
+    .map((entry, index) => ({
+      rank: index + 1,
+      caseId: entry.caseId,
+      label: entry.label,
+      criticalFastenerIndex: entry.result.criticalFastenerIndex,
+      criticalEquivalentDemand: entry.result.criticalEquivalentDemand
+    }));
+
+  const envelopeFasteners = cases.length
+    ? cases[0].result.fasteners.map((fastener) => {
+        let governingCaseId = cases[0].caseId;
+        let governingCaseLabel = cases[0].label;
+        let equivalentDemand = cases[0].result.fasteners.find((candidate) => candidate.index === fastener.index)?.equivalentDemand ?? 0;
+
+        for (const entry of cases.slice(1)) {
+          const match = entry.result.fasteners.find((candidate) => candidate.index === fastener.index);
+          if (match && match.equivalentDemand > equivalentDemand) {
+            equivalentDemand = match.equivalentDemand;
+            governingCaseId = entry.caseId;
+            governingCaseLabel = entry.label;
+          }
+        }
+
+        return {
+          index: fastener.index,
+          row: fastener.row,
+          column: fastener.column,
+          x: fastener.x,
+          y: fastener.y,
+          governingCaseId,
+          governingCaseLabel,
+          equivalentDemand
+        };
+      })
+    : [];
 
   let governingCaseId: string | null = null;
   let governingCaseLabel: string | null = null;
@@ -457,6 +515,8 @@ export function solveFastenerGroupPatternCases(
     governingCaseId,
     governingCaseLabel,
     governingFastenerIndex,
-    governingEquivalentDemand
+    governingEquivalentDemand,
+    caseRanking,
+    envelopeFasteners
   };
 }

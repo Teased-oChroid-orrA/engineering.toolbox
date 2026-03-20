@@ -421,5 +421,9 @@ test.describe('preload solver G1 core', () => {
     expect(out.governingEquivalentDemand).toBeGreaterThan(0);
     expect(out.mode).toBe('joint_interaction');
     expect(out.cases.every((entry) => entry.result.progression.length === 2)).toBe(true);
+    expect(out.caseRanking).toHaveLength(2);
+    expect(out.caseRanking[0].criticalEquivalentDemand).toBeGreaterThanOrEqual(out.caseRanking[1].criticalEquivalentDemand);
+    expect(out.envelopeFasteners).toHaveLength(4);
+    expect(out.envelopeFasteners.every((entry) => entry.governingCaseId.length > 0)).toBe(true);
   });
 });

@@ -1704,7 +1704,7 @@
     if (!output) return;
     exportError = '';
     try {
-      const html = buildPreloadEquationSheetHtml(output);
+      const html = buildPreloadEquationSheetHtml(output, fastenerGroupReportSummary);
       await exportPdfFromHtml(html, 'Fastened Joint Preload Analysis');
     } catch (error) {
       exportError = error instanceof Error ? error.message : 'Preload report export failed.';
@@ -2783,6 +2783,33 @@
       removedLabel: entry.removedFastenerIndices.map((index) => `F${index + 1}`).join(', '),
       criticalLabel: `F${entry.criticalFastenerIndex + 1}`
     })) ?? []
+  );
+  let fastenerGroupReportSummary = $derived(
+    fastenerGroupCaseResult && fastenerGroupResult
+      ? {
+          mode: fastenerGroupCaseResult.mode,
+          governingCaseLabel: governingLoadCaseLabel,
+          governingFastenerLabel: criticalFastenerLabel,
+          progressionSummary:
+            fastenerProgressionRows.length > 0
+              ? `Failure progression removes the current governing fastener, then recomputes the remaining set. ${fastenerProgressionRows.length} progression step(s) are shown for the current load envelope.`
+              : 'No failure progression steps are available for the current case set.',
+          cases: fastenerCaseEnvelopeRows.map((row) => ({
+            label: row.label,
+            criticalFastenerLabel: row.criticalFastenerLabel,
+            criticalEquivalentDemand: row.demand,
+            isGoverning: row.isGoverning
+          })),
+          progression: fastenerProgressionRows.map((row) => ({
+            step: row.step,
+            removedLabel: row.removedLabel,
+            activeFastenerCount: row.activeFastenerCount,
+            criticalLabel: row.criticalLabel,
+            criticalEquivalentDemand: row.criticalEquivalentDemand,
+            note: row.note
+          }))
+        }
+      : null
   );
   let coneReachLength = $derived(Math.min(stackTotalLength / 2, (Math.max(topBearingFaceOuterDiameter, bottomBearingFaceOuterDiameter) - form.nominalDiameter) / Math.max(compressionConeSlope, 1e-6)));
   let heatmapValues = $derived(fastenerGroupResult ? fastenerGroupResult.geometryInfluenceMatrix.flat() : []);
@@ -4593,7 +4620,7 @@
           </div>
           {#if fastenerCaseEnvelopeRows.length}
             <div class="rounded-lg border border-white/10 bg-black/20 p-3">
-              <div class="mb-2 text-[10px] uppercase tracking-widest text-white/45">Per-case critical envelopes</div>
+              <div class="mb-2 text-[10px] uppercase tracking-widest text-white/45">Per-case envelope bars</div>
               <svg role="img" viewBox={`0 0 320 ${envelopeChartHeight}`} class="h-auto w-full rounded-lg border border-white/8 bg-black/20 p-2" aria-label="Preload fastener-group case envelopes">
                 <rect x="16" y="16" width="288" height={envelopeChartHeight - 32} rx="12" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.08)" />
                 {#each fastenerCaseEnvelopeRows as row}
@@ -4605,7 +4632,28 @@
                   <text x="286" y={y + 1} text-anchor="end" fill="rgba(255,255,255,0.70)" font-size="9">{fmt(row.demand, 2)}</text>
                 {/each}
                 <text x="24" y={envelopeChartHeight - 22} fill="rgba(255,255,255,0.55)" font-size="10">Each bar shows the peak equivalent fastener demand in that load case. The highlighted bar is the governing case.</text>
-              </svg>
+                </svg>
+              <div class="mt-3 overflow-hidden rounded-lg border border-white/8">
+                <div class="grid grid-cols-[1.4fr_0.8fr_0.9fr_0.6fr] gap-0 border-b border-white/8 bg-white/[0.03] px-3 py-2 text-[10px] uppercase tracking-widest text-white/45">
+                  <div>Case</div>
+                  <div>Critical fastener</div>
+                  <div class="text-right">Peak eqv</div>
+                  <div class="text-right">Gov.</div>
+                </div>
+                <div class="divide-y divide-white/6">
+                  {#each fastenerCaseEnvelopeRows as row}
+                    <div class={`grid grid-cols-[1.4fr_0.8fr_0.9fr_0.6fr] gap-0 px-3 py-2 text-xs ${row.isGoverning ? 'bg-amber-500/10 text-amber-100' : 'bg-white/[0.02] text-white/72'}`}>
+                      <div class="pr-2">
+                        <div class="font-semibold">{row.label}</div>
+                        <div class="text-[11px] text-white/45">{row.isGoverning ? 'governing case' : 'case envelope'}</div>
+                      </div>
+                      <div class="font-mono text-cyan-200">{row.criticalFastenerLabel}</div>
+                      <div class="font-mono text-right text-cyan-200">{fmt(row.demand, 2)}</div>
+                      <div class="text-right font-semibold">{row.isGoverning ? 'yes' : 'no'}</div>
+                    </div>
+                  {/each}
+                </div>
+              </div>
             </div>
           {/if}
           {#if fastenerGroupResult}
@@ -4634,10 +4682,15 @@
               <div class="mt-3 text-xs text-white/55">{fastenerGroupResult.note}</div>
             </div>
             {#if fastenerProgressionRows.length}
-              <div class="rounded-lg border border-white/10 bg-black/20 p-3">
-                <div class="mb-2 text-[10px] uppercase tracking-widest text-white/45">Failure progression</div>
-                <div class="space-y-2">
-                  {#each fastenerProgressionRows as row}
+            <div class="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div class="mb-2 text-[10px] uppercase tracking-widest text-white/45">Failure progression</div>
+              {#if fastenerGroupReportSummary}
+                <div class="mb-2 rounded-lg border border-cyan-400/15 bg-cyan-500/5 px-3 py-2 text-xs text-cyan-100">
+                  {fastenerGroupReportSummary.progressionSummary}
+                </div>
+              {/if}
+              <div class="space-y-2">
+                {#each fastenerProgressionRows as row}
                     <div class="rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2 text-xs text-white/72">
                       <div class="flex items-center justify-between gap-3">
                         <div class="font-semibold text-white/84">Step {row.step}</div>

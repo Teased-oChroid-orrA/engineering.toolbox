@@ -1,6 +1,27 @@
 import { buildJointAssemblyInput } from './assembly';
 import type { FastenedJointPreloadOutput } from './types';
 
+export type PreloadGroupCaseSummary = {
+  mode: 'screening' | 'joint_interaction';
+  governingCaseLabel: string | null;
+  governingFastenerLabel: string | null;
+  progressionSummary: string;
+  cases: Array<{
+    label: string;
+    criticalFastenerLabel: string;
+    criticalEquivalentDemand: number;
+    isGoverning: boolean;
+  }>;
+  progression: Array<{
+    step: number;
+    removedLabel: string;
+    activeFastenerCount: number;
+    criticalLabel: string;
+    criticalEquivalentDemand: number;
+    note: string;
+  }>;
+};
+
 function esc(value: unknown): string {
   return String(value).replace(/[&<>"']/g, (char) => {
     switch (char) {
@@ -31,7 +52,56 @@ function renderRows(rows: Array<[string, string]>): string {
     .join('');
 }
 
-export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput): string {
+function renderCaseSummaryTable(summary: PreloadGroupCaseSummary): string {
+  const rows = summary.cases
+    .map(
+      (entry) => `
+        <tr${entry.isGoverning ? ' class="governing"' : ''}>
+          <td>${esc(entry.label)}</td>
+          <td>${esc(entry.criticalFastenerLabel)}</td>
+          <td>${fmt(entry.criticalEquivalentDemand, 4)}</td>
+          <td>${entry.isGoverning ? 'yes' : 'no'}</td>
+        </tr>`
+    )
+    .join('');
+
+  const progressionRows = summary.progression
+    .map(
+      (entry) => `
+        <tr>
+          <td>Step ${entry.step}</td>
+          <td>${esc(entry.removedLabel)}</td>
+          <td>${entry.activeFastenerCount}</td>
+          <td>${esc(entry.criticalLabel)}</td>
+          <td>${fmt(entry.criticalEquivalentDemand, 4)}</td>
+          <td>${esc(entry.note)}</td>
+        </tr>`
+    )
+    .join('');
+
+  return `
+    <div class="grid" style="margin-top:16px">
+      <div class="box">
+        <h2>Per-Case Critical Summary</h2>
+        <table>
+          <tr><th>Case</th><th>Critical fastener</th><th>Peak eqv demand</th><th>Governing</th></tr>
+          ${rows}
+        </table>
+        <p>Governing case: <span class="mono">${esc(summary.governingCaseLabel ?? '—')}</span>. Governing fastener: <span class="mono">${esc(summary.governingFastenerLabel ?? '—')}</span>.</p>
+        <p>${esc(summary.progressionSummary)}</p>
+      </div>
+      <div class="box">
+        <h2>Failure Progression</h2>
+        <table>
+          <tr><th>Step</th><th>Removed</th><th>Active</th><th>Next critical</th><th>Eqv demand</th><th>Note</th></tr>
+          ${progressionRows}
+        </table>
+        <p>Progression removes the current governing fastener and recomputes the remaining set to show redistribution order.</p>
+      </div>
+    </div>`;
+}
+
+export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput, groupSummary: PreloadGroupCaseSummary | null = null): string {
   const { input, installation, stiffness, service, checks } = output;
   const assembly = buildJointAssemblyInput(input);
   const date = new Date().toISOString().slice(0, 10);
@@ -334,6 +404,8 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
     ])}</table>
     <p>The report exposes the governing equation label and the exact substituted values used by the active solver state.</p>
   </div>
+
+  ${groupSummary ? renderCaseSummaryTable(groupSummary) : ''}
 
   <h2>Bolt Segments</h2>
   <table>
