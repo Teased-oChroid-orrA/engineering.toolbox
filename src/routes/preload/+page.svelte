@@ -17,7 +17,9 @@
   import { cn } from '$lib/utils';
   import {
     buildJointAssemblyInput,
+    defaultPreloadInverseTargetSettings,
     buildPreloadEquationSheetHtml,
+    buildPreloadComparePacks,
     buildPreloadScenarioVariants,
     computeFastenedJointPreload,
     solveFastenerGroupPattern,
@@ -34,8 +36,17 @@
     type FastenerGroupPatternLoadCaseInput,
     type JointTypePreset,
     type MemberSegmentInput,
+    type PreloadInverseTargetSettings,
     type PreloadScenarioVariant
   } from '$lib/core/preload';
+  import {
+    buildLoadTransferStages,
+    comparePackBaselineCase,
+    comparePackDeltaTone,
+    comparePackMetricRows,
+    mapInverseTargetCards,
+    type InverseSolveCardViewModel
+  } from '$lib/core/preload/reviewModels';
 
   const STORAGE_KEY = 'scd.preload.inputs.v2';
   const LEGACY_STORAGE_KEYS = ['scd.preload.inputs.v1'];
@@ -480,13 +491,6 @@
     deltaPercent: number;
     note: string;
   };
-  type InverseSolveCard = {
-    title: string;
-    value: string;
-    note: string;
-    severity: 'ok' | 'warn' | 'fail' | 'unknown';
-    scenario?: string;
-  };
   type CompareSnapshot = {
     label: string;
     capturedAt: number;
@@ -540,6 +544,7 @@
   let activePreloadIssueIndex = $state(0);
   let lastConicalAutoSignature = '';
   let compareBaseline = $state<CompareSnapshot | null>(null);
+  let inverseSolvePreferences = $state<PreloadInverseTargetSettings>(defaultPreloadInverseTargetSettings());
 
   function buildFastenerGroupCaseResultForForm(
     candidateForm: PreloadForm,
@@ -598,7 +603,7 @@
     };
   }
 
-  function envelopeScenarioLabel(value: 'min_preload' | 'nominal_preload' | 'max_preload' | null | undefined) {
+  function envelopeScenarioLabel(value: string | null | undefined) {
     switch (value) {
       case 'min_preload':
         return 'Min preload';
@@ -1808,7 +1813,7 @@
     if (!output) return;
     exportError = '';
     try {
-      const html = buildPreloadEquationSheetHtml(output, fastenerGroupReportSummary);
+      const html = buildPreloadEquationSheetHtml(output, fastenerGroupReportSummary, inverseSolvePreferences);
       await exportPdfFromHtml(html, 'Fastened Joint Preload Analysis');
     } catch (error) {
       exportError = error instanceof Error ? error.message : 'Preload report export failed.';
@@ -2901,6 +2906,20 @@
       criticalLabel: `F${entry.criticalFastenerIndex + 1}`
     })) ?? []
   );
+  let fastenerLoadTransferStages = $derived(
+    fastenerGroupResult ? buildLoadTransferStages(fastenerGroupResult) : []
+  );
+  let loadTransferPeakDemand = $derived(
+    fastenerLoadTransferStages.length
+      ? Math.max(...fastenerLoadTransferStages.map((stage) => stage.criticalEquivalentDemand), 1)
+      : 1
+  );
+  let loadTransferPeakShare = $derived(
+    fastenerLoadTransferStages.length
+      ? Math.max(...fastenerLoadTransferStages.map((stage) => stage.criticalLoadShare), 0.0001)
+      : 0.0001
+  );
+  let loadTransferSvgWidth = $derived(Math.max(420, 44 + fastenerLoadTransferStages.length * 172));
   let worstCaseScenarioRows = $derived.by(() => {
     if (!output) return [] as Array<{
       key: string;
@@ -2957,6 +2976,10 @@
             activeFastenerCount: row.activeFastenerCount,
             criticalLabel: row.criticalLabel,
             criticalEquivalentDemand: row.criticalEquivalentDemand,
+            criticalLoadShare: row.criticalLoadShare,
+            criticalAxialLoad: row.criticalAxialLoad,
+            criticalShearMagnitude: row.criticalShearMagnitude,
+            activeFastenerIndices: row.activeFastenerIndices,
             note: row.note
           }))
         }
@@ -3094,22 +3117,22 @@
   });
 
   let inverseSolveCards = $derived.by(() => {
-    if (!output) return [] as InverseSolveCard[];
-    return solveEnvelopeAwareInverseTargets(buildSolverInputFromForm(form), output).map((entry) => ({
-      title: entry.label,
-      value: entry.value !== null ? fmt(entry.value, entry.id === 'no_slip_preload' ? 2 : 4) : 'No feasible solve',
-      note: entry.note,
-      severity:
-        entry.severity === 'pass'
-          ? 'ok'
-          : entry.severity === 'attention'
-            ? 'warn'
-            : entry.severity === 'fail'
-              ? 'fail'
-              : 'unknown',
-      scenario: entry.governingScenario ? envelopeScenarioLabel(entry.governingScenario) : undefined
-    }));
+    if (!output) return [] as InverseSolveCardViewModel[];
+    return mapInverseTargetCards(
+      solveEnvelopeAwareInverseTargets(buildSolverInputFromForm(form), output, inverseSolvePreferences),
+      fmt,
+      envelopeScenarioLabel
+    );
   });
+  let preloadComparePacks = $derived.by(() => {
+    if (!output) return [];
+    try {
+      return buildPreloadComparePacks(buildSolverInputFromForm(form));
+    } catch {
+      return [];
+    }
+  });
+  let supplementalComparePacks = $derived(preloadComparePacks.filter((pack) => pack.id !== 'installed_preload'));
 
   let preloadScenarioVariants = $derived.by(() => {
     if (!output) return [] as PreloadScenarioVariant[];
@@ -4909,8 +4932,8 @@
             {#if fastenerProgressionRows.length}
             <div class="rounded-lg border border-white/10 bg-black/20 p-3">
               <div class="mb-2 flex items-center justify-between gap-3">
-                <div class="text-[10px] uppercase tracking-widest text-white/45">Redistribution progression</div>
-                <div class="text-[10px] text-white/45">Remove the current governing fastener, then track how the envelope shifts.</div>
+                <div class="text-[10px] uppercase tracking-widest text-white/45">Load-transfer progression</div>
+                <div class="text-[10px] text-white/45">Governing case only. Remove the current critical fastener and watch the remaining pattern re-balance.</div>
               </div>
               {#if fastenerGroupReportSummary}
                 <div class="mb-2 rounded-lg border border-cyan-400/15 bg-cyan-500/5 px-3 py-2 text-xs text-cyan-100">
@@ -4918,31 +4941,87 @@
                 </div>
               {/if}
               <div class="mb-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[11px] text-white/60">
-                Each step shows the removal order, the remaining active fastener count, and the newly governing fastener after redistribution.
+                Each stage keeps the governing-case layout fixed, fades removed fasteners, and shows how the next critical fastener inherits load share and equivalent demand.
               </div>
-              <div class="space-y-2">
-                {#each fastenerProgressionRows as row}
-                  <div class="grid grid-cols-[auto_1fr] gap-3 rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2 text-xs text-white/72">
-                    <div class="flex flex-col items-center justify-start pt-0.5">
-                      <div class="flex h-8 w-8 items-center justify-center rounded-full border border-cyan-400/30 bg-cyan-500/10 font-mono text-[10px] text-cyan-100">{row.step}</div>
-                      {#if row.step < fastenerProgressionRows.length}
-                        <div class="h-full w-px bg-white/10"></div>
-                      {/if}
+              <div class="overflow-x-auto rounded-lg border border-white/8 bg-black/20">
+                <svg role="img" viewBox={`0 0 ${loadTransferSvgWidth} 248`} class="h-auto min-w-full p-2" aria-label="Preload load-transfer progression">
+                  <rect x="12" y="16" width={loadTransferSvgWidth - 24} height="216" rx="14" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.08)" />
+                  {#each fastenerLoadTransferStages as stage, index}
+                    {@const stageX = 24 + index * 172}
+                    {@const stageDemandRatio = loadTransferPeakDemand > 0 ? stage.criticalEquivalentDemand / loadTransferPeakDemand : 0}
+                    {@const stageShareRatio = loadTransferPeakShare > 0 ? stage.criticalLoadShare / loadTransferPeakShare : 0}
+                    <rect
+                      x={stageX}
+                      y="34"
+                      width="144"
+                      height="168"
+                      rx="12"
+                      fill={stage.step === 0 ? 'rgba(34,211,238,0.08)' : 'rgba(255,255,255,0.03)'}
+                      stroke={stage.step === 0 ? 'rgba(34,211,238,0.25)' : 'rgba(255,255,255,0.10)'}
+                    />
+                    <text x={stageX + 12} y="52" fill="rgba(255,255,255,0.52)" font-size="10">{stage.title}</text>
+                    <text x={stageX + 132} y="52" text-anchor="end" fill="rgba(255,255,255,0.45)" font-size="10">{stage.activeFastenerCount} active</text>
+                    <text x={stageX + 12} y="70" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="700">{stage.criticalLabel} governs</text>
+                    <text x={stageX + 132} y="70" text-anchor="end" fill="rgba(253,230,138,0.92)" font-size="12">{fmt(stage.criticalEquivalentDemand, 2)}</text>
+                    <text x={stageX + 12} y="86" fill="rgba(255,255,255,0.50)" font-size="9">Removed: {stage.removedLabel}</text>
+                    <text x={stageX + 12} y="100" fill="rgba(255,255,255,0.50)" font-size="9">Redistribution {fmt(stage.redistributionFactor, 3)}</text>
+                    <rect x={stageX + 12} y="108" width="120" height="8" rx="4" fill="rgba(255,255,255,0.08)" />
+                    <rect x={stageX + 12} y="108" width={Math.max(8, stageDemandRatio * 120)} height="8" rx="4" fill="#fde68a" />
+                    <text x={stageX + 12} y="128" fill="rgba(255,255,255,0.50)" font-size="9">Critical load share {fmt(stage.criticalLoadShare, 3)}</text>
+                    <rect x={stageX + 12} y="134" width="120" height="7" rx="3.5" fill="rgba(255,255,255,0.08)" />
+                    <rect x={stageX + 12} y="134" width={Math.max(6, stageShareRatio * 120)} height="7" rx="3.5" fill="#22d3ee" />
+                    {#each fastenerGroupResult.fasteners as layoutFastener}
+                      {@const activeFastener = stage.fasteners.find((candidate) => candidate.index === layoutFastener.index) ?? null}
+                      {@const cx = stageX + 26 + layoutFastener.column * 28}
+                      {@const cy = 164 + layoutFastener.row * 24}
+                      {@const circleRadius = activeFastener ? 4 + Math.min(5, (activeFastener.equivalentDemand / Math.max(loadTransferPeakDemand, 1)) * 5) : 4}
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={circleRadius}
+                        fill={
+                          !activeFastener
+                            ? 'rgba(255,255,255,0.08)'
+                            : activeFastener.index === stage.criticalFastenerIndex
+                              ? '#fde68a'
+                              : 'rgba(34,211,238,0.72)'
+                        }
+                        stroke={!activeFastener ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.55)'}
+                      />
+                      <text x={cx} y={cy + 16} text-anchor="middle" fill="rgba(255,255,255,0.46)" font-size="8">F{layoutFastener.index + 1}</text>
+                    {/each}
+                    {#if index < fastenerLoadTransferStages.length - 1}
+                      <path d={`M ${stageX + 144} 118 L ${stageX + 164} 118`} stroke="rgba(255,255,255,0.22)" stroke-width="1.5" />
+                      <path d={`M ${stageX + 160} 114 L ${stageX + 164} 118 L ${stageX + 160} 122`} stroke="rgba(255,255,255,0.22)" stroke-width="1.5" fill="none" />
+                    {/if}
+                  {/each}
+                  <text x="24" y="222" fill="rgba(255,255,255,0.55)" font-size="10">
+                    Circle size tracks active equivalent demand at each stage. Faded circles show removed fasteners staying fixed in the governing-case layout.
+                  </text>
+                </svg>
+              </div>
+              <div class="mt-3 overflow-hidden rounded-lg border border-white/8">
+                <div class="grid grid-cols-[0.7fr_1fr_0.8fr_0.85fr_0.85fr_0.85fr] gap-0 border-b border-white/8 bg-white/[0.03] px-3 py-2 text-[10px] uppercase tracking-widest text-white/45">
+                  <div>Stage</div>
+                  <div>Removed</div>
+                  <div class="text-right">Critical</div>
+                  <div class="text-right">Eqv</div>
+                  <div class="text-right">Share</div>
+                  <div class="text-right">Redistrib.</div>
+                </div>
+                <div class="divide-y divide-white/6">
+                  {#each fastenerLoadTransferStages as stage}
+                    <div class={`grid grid-cols-[0.7fr_1fr_0.8fr_0.85fr_0.85fr_0.85fr] gap-0 px-3 py-2 text-xs ${stage.step === 0 ? 'bg-cyan-500/6 text-cyan-50' : 'bg-white/[0.02] text-white/72'}`}>
+                      <div class="font-semibold">{stage.title}</div>
+                      <div class="pr-3 text-white/64">{stage.removedLabel}</div>
+                      <div class="text-right font-mono text-cyan-200">{stage.criticalLabel}</div>
+                      <div class="text-right font-mono text-amber-200">{fmt(stage.criticalEquivalentDemand, 2)}</div>
+                      <div class="text-right font-mono text-cyan-200">{fmt(stage.criticalLoadShare, 3)}</div>
+                      <div class="text-right font-mono text-white/72">{fmt(stage.redistributionFactor, 3)}</div>
                     </div>
-                    <div>
-                      <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div class="font-semibold text-white/84">Next critical {row.criticalLabel}</div>
-                        <div class="font-mono text-amber-200">Eqv {fmt(row.criticalEquivalentDemand, 2)}</div>
-                      </div>
-                      <div class="mt-1 grid grid-cols-1 gap-1 text-[11px] text-white/58 sm:grid-cols-3">
-                        <div>Removed: <span class="font-mono text-cyan-200">{row.removedLabel}</span></div>
-                        <div>Active fasteners: <span class="font-mono text-cyan-200">{row.activeFastenerCount}</span></div>
-                        <div>Step note: <span class="text-white/70">{row.note}</span></div>
-                      </div>
-                    </div>
-                  </div>
                   {/each}
                 </div>
+              </div>
               </div>
             {/if}
             <div class="rounded-lg border border-white/10 bg-black/20 p-3">
@@ -5765,19 +5844,51 @@
       <CardHeader class="pb-2 pt-4">
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-cyan-300">Inverse Solve Targets</CardTitle>
       </CardHeader>
-      <CardContent class="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        {#each inverseSolveCards as card}
-          <div class="rounded-xl border border-white/10 bg-black/20 p-4">
-            <div class="text-[10px] uppercase tracking-widest text-white/45">{card.title}</div>
-            <div class={`mt-3 font-mono text-lg ${card.severity === 'fail' ? 'text-rose-300' : card.severity === 'warn' ? 'text-amber-300' : 'text-cyan-300'}`}>
-              {card.value}
+      <CardContent class="space-y-4">
+        <div class="grid gap-3 md:grid-cols-2">
+          <div class="rounded-xl border border-white/10 bg-black/20 p-3">
+            <div class="text-[10px] uppercase tracking-widest text-white/45">Design thresholds</div>
+            <div class="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-5">
+              <div class="space-y-1">
+                <Label class="text-white/60">Slip target</Label>
+                <Input type="number" step="0.01" min="0.1" max="1.2" bind:value={inverseSolvePreferences.slipMaxUtilization} />
+              </div>
+              <div class="space-y-1">
+                <Label class="text-white/60">Separation target</Label>
+                <Input type="number" step="0.01" min="0.1" max="1.2" bind:value={inverseSolvePreferences.separationMaxUtilization} />
+              </div>
+              <div class="space-y-1">
+                <Label class="text-white/60">Proof target</Label>
+                <Input type="number" step="0.01" min="0.1" max="1.2" bind:value={inverseSolvePreferences.proofMaxUtilization} />
+              </div>
+              <div class="space-y-1">
+                <Label class="text-white/60">Bearing target</Label>
+                <Input type="number" step="0.01" min="0.1" max="1.2" bind:value={inverseSolvePreferences.bearingMaxUtilization} />
+              </div>
+              <div class="space-y-1">
+                <Label class="text-white/60">Fatigue target</Label>
+                <Input type="number" step="0.01" min="0.1" max="1.2" bind:value={inverseSolvePreferences.fatigueMaxUtilization} />
+              </div>
             </div>
-            {#if card.scenario}
-              <div class="mt-1 text-[11px] uppercase tracking-widest text-white/45">{card.scenario} controls</div>
-            {/if}
-            <div class="mt-2 text-sm text-white/70">{card.note}</div>
+            <div class="mt-2 text-[11px] text-white/55">
+              These thresholds drive all inverse targets shown below and keep the review intent explicit in both the UI and exported report.
+            </div>
           </div>
-        {/each}
+        </div>
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {#each inverseSolveCards as card}
+            <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div class="text-[10px] uppercase tracking-widest text-white/45">{card.title}</div>
+              <div class={`mt-3 font-mono text-lg ${card.severity === 'fail' ? 'text-rose-300' : card.severity === 'warn' ? 'text-amber-300' : 'text-cyan-300'}`}>
+                {card.value}
+              </div>
+              {#if card.scenario}
+                <div class="mt-1 text-[11px] uppercase tracking-widest text-white/45">{card.scenario} controls</div>
+              {/if}
+              <div class="mt-2 text-sm text-white/70">{card.note}</div>
+            </div>
+          {/each}
+        </div>
       </CardContent>
     </Card>
 
@@ -5786,6 +5897,56 @@
         <CardTitle class="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Scenario Compare</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
+        {#if supplementalComparePacks.length}
+          <div class="space-y-3">
+            <div class="rounded-xl border border-cyan-400/15 bg-cyan-500/5 p-4 text-sm text-cyan-50/80">
+              Thermal, friction, and preload-loss packs are now resolved as explicit compare cases from the live input, even before you capture a manual baseline.
+            </div>
+            {#each supplementalComparePacks as pack}
+              {@const baselineCase = comparePackBaselineCase(pack)}
+              <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div class="text-[10px] uppercase tracking-widest text-white/45">{pack.label}</div>
+                    <div class="mt-1 text-sm text-white/75">{pack.description}</div>
+                  </div>
+                  <div class="text-[10px] uppercase tracking-widest text-cyan-100/60">
+                    Baseline: {baselineCase?.label ?? 'Unavailable'}
+                  </div>
+                </div>
+                <div class="mt-3 grid gap-3 xl:grid-cols-3">
+                  {#each pack.cases as packCase}
+                    <div class={`rounded-lg border p-3 text-xs ${packCase.id === pack.baselineCaseId ? 'border-cyan-400/25 bg-cyan-500/8 text-cyan-50' : 'border-white/8 bg-white/[0.02] text-white/74'}`}>
+                      <div class="flex items-center justify-between gap-3">
+                        <div class="font-semibold text-white/88">{packCase.label}</div>
+                        <div class="text-[10px] uppercase tracking-widest text-white/45">
+                          {packCase.metrics.separationState ? packCase.metrics.separationState.replaceAll('_', ' ') : 'state n/a'}
+                        </div>
+                      </div>
+                      <div class="mt-2 text-[11px] text-white/60">{packCase.note}</div>
+                      <div class="mt-3 space-y-2">
+                        {#each comparePackMetricRows(pack, packCase.id) as row}
+                          <div class="rounded-md border border-white/8 bg-black/20 px-3 py-2">
+                            <div class="flex items-center justify-between gap-3">
+                              <div class="text-[11px] text-white/65">{row.label}</div>
+                              <div class="text-right">
+                                <div class="font-mono text-cyan-200">{fmt(row.value, row.digits)}</div>
+                                <div class={`font-mono text-[11px] ${comparePackDeltaTone(row)}`}>
+                                  {row.delta != null ? `${row.delta > 0 ? '+' : ''}${fmt(row.delta, row.digits)}` : '—'}
+                                </div>
+                              </div>
+                            </div>
+                            <div class="mt-1 text-[10px] text-white/40">{row.note}</div>
+                          </div>
+                        {/each}
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
         <div class="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onclick={captureCompareBaseline} disabled={!output}>Capture Current as Baseline</Button>
           <Button size="sm" variant="ghost" onclick={clearCompareBaseline} disabled={!compareBaseline}>Clear Baseline</Button>

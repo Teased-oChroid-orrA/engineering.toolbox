@@ -22,8 +22,10 @@
   export let recipeNotice: string | null;
   export let recipeName: string;
   export let recipeTags: string;
+  export let snapshotName: string;
   export let importMode: 'current' | 'file';
   export let recipes: Recipe[];
+  export let workspaceSnapshots: any[];
   export let datasetLabel: string;
   export let schemaSampleN: number;
   export let totalFilteredCount: number;
@@ -37,6 +39,7 @@
   export let schemaOutliers: any[];
   export let schemaRelationshipHints: any[];
   export let schemaDrift: any;
+  export let schemaBaselineCount: number;
   export let colTypes: any[];
   export let headers: string[];
   export let schemaFiltered: any[];
@@ -84,10 +87,13 @@
   export let clearColumnSelection: () => void;
   export let toggleVisibleCol: (idx: number) => void;
   export let saveCurrentAsRecipe: () => void;
+  export let saveCurrentAsSnapshot: () => void;
   export let exportRecipesCurrent: () => Promise<void>;
   export let importRecipesFile: (file: File, mode: 'current' | 'file') => Promise<void>;
   export let toggleRecipeFavorite: (id: string) => void;
   export let applyRecipe: (r: Recipe) => Promise<void>;
+  export let applyWorkspaceSnapshot: (snapshot: any) => Promise<void>;
+  export let deleteWorkspaceSnapshot: (id: string) => void;
   export let deleteRecipe: (id: string) => void;
   export let setSchemaDriftBaseline: () => void;
   export let schemaActionTarget: (idx: number) => void;
@@ -116,20 +122,26 @@
         {recipeNotice}
         {recipeName}
         {recipeTags}
+        {snapshotName}
         {hasLoaded}
         {importMode}
         {recipes}
+        {workspaceSnapshots}
         onClose={() => (showRecipeModal = false)}
         onReset={() => resetModalPos('recipes')}
         onBeginDrag={(e: MouseEvent) => beginDragModal('recipes', e)}
         onSetRecipeName={(v: string) => (recipeName = v)}
         onSetRecipeTags={(v: string) => (recipeTags = v)}
+        onSetSnapshotName={(v: string) => (snapshotName = v)}
         onSave={saveCurrentAsRecipe}
+        onSaveSnapshot={saveCurrentAsSnapshot}
         onExport={exportRecipesCurrent}
         onImport={importRecipesFile}
         onSetImportMode={(v: 'current' | 'file') => (importMode = v)}
         onToggleFavorite={toggleRecipeFavorite}
         onApply={applyRecipe}
+        onApplySnapshot={applyWorkspaceSnapshot}
+        onDeleteSnapshot={deleteWorkspaceSnapshot}
         onDelete={deleteRecipe}
       />
     {/await}
@@ -158,6 +170,7 @@
         {schemaOutliers}
         {schemaRelationshipHints}
         {schemaDrift}
+        {schemaBaselineCount}
         {colTypes}
         {headers}
         {schemaFiltered}

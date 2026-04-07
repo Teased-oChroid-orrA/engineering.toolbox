@@ -8,20 +8,26 @@
     recipeNotice = null,
     recipeName = '',
     recipeTags = '',
+    snapshotName = '',
     hasLoaded = false,
     importMode = 'current',
     recipes = [],
+    workspaceSnapshots = [],
     onClose,
     onReset,
     onBeginDrag,
     onSetRecipeName,
     onSetRecipeTags,
+    onSetSnapshotName,
     onSave,
+    onSaveSnapshot,
     onExport,
     onImport,
     onSetImportMode,
     onToggleFavorite,
     onApply,
+    onApplySnapshot,
+    onDeleteSnapshot,
     onDelete
   } = $props<{
     open: boolean;
@@ -30,20 +36,26 @@
     recipeNotice: string | null;
     recipeName: string;
     recipeTags: string;
+    snapshotName: string;
     hasLoaded: boolean;
     importMode: 'current' | 'file';
     recipes: any[];
+    workspaceSnapshots: any[];
     onClose: () => void;
     onReset: () => void;
     onBeginDrag: (e: MouseEvent) => void;
     onSetRecipeName: (v: string) => void;
     onSetRecipeTags: (v: string) => void;
+    onSetSnapshotName: (v: string) => void;
     onSave: () => void;
+    onSaveSnapshot: () => void;
     onExport: () => void;
     onImport: (file: File, mode: 'current' | 'file') => Promise<void> | void;
     onSetImportMode: (v: 'current' | 'file') => void;
     onToggleFavorite: (id: string) => void;
     onApply: (r: any) => void;
+    onApplySnapshot: (r: any) => void;
+    onDeleteSnapshot: (id: string) => void;
     onDelete: (id: string) => void;
   }>();
 </script>
@@ -58,7 +70,7 @@
       </div>
       <div class="flex items-center justify-between gap-3">
         <div>
-          <div class="text-sm font-semibold text-white">View Recipes</div>
+          <div class="text-sm font-semibold text-white">Recipes + Workspace Snapshots</div>
           {#if recipeNotice}
             <div class="text-xs text-white/70 mt-1">{recipeNotice}</div>
           {/if}
@@ -75,6 +87,37 @@
           <input class="input input-sm glass-input" value={recipeTags} oninput={(e) => onSetRecipeTags((e.currentTarget as HTMLInputElement).value)} />
         </label>
         <button class="btn btn-sm variant-filled" onclick={onSave} disabled={!hasLoaded}>Save current</button>
+      </div>
+      <div class="mt-3 rounded-xl border border-white/10 p-4 inspector-pop-sub" data-testid="inspector-workspace-snapshots">
+        <div class="flex flex-wrap items-end gap-2">
+          <label class="flex-1 flex flex-col gap-1">
+            <span class="text-[10px] uppercase tracking-widest text-white/50">Workspace snapshot</span>
+            <input class="input input-sm glass-input" value={snapshotName} oninput={(e) => onSetSnapshotName((e.currentTarget as HTMLInputElement).value)} placeholder="Current analysis workspace" />
+          </label>
+          <button class="btn btn-sm variant-soft" onclick={onSaveSnapshot} disabled={!hasLoaded}>Save snapshot</button>
+        </div>
+        <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 max-h-[24vh] overflow-auto pr-1">
+          {#if (workspaceSnapshots?.length ?? 0) === 0}
+            <div class="text-sm text-white/55">No workspace snapshots saved yet.</div>
+          {:else}
+            {#each workspaceSnapshots as snapshot (snapshot.id)}
+              <div class="glass-panel rounded-xl border border-white/10 p-4">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <div class="text-xs font-semibold text-white/85">{snapshot.name}</div>
+                    <div class="mt-1 text-[11px] text-white/55">
+                      {snapshot.datasetLabel || '(current dataset)'} • {new Date(snapshot.createdAt).toLocaleString()}
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn btn-xs variant-soft" onclick={() => onApplySnapshot(snapshot)} disabled={!hasLoaded}>Apply</button>
+                    <button class="btn btn-xs variant-soft" onclick={() => onDeleteSnapshot(snapshot.id)}>Delete</button>
+                  </div>
+                </div>
+              </div>
+            {/each}
+          {/if}
+        </div>
       </div>
       <div class="mt-3 flex flex-wrap gap-2 items-center">
         <button class="btn btn-sm variant-soft" onclick={onExport} disabled={!hasLoaded}>Export…</button>

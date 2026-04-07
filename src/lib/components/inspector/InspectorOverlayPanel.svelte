@@ -13,8 +13,10 @@
   export let recipeNotice: any = '';
   export let recipeName = '';
   export let recipeTags = '';
+  export let snapshotName = '';
   export let importMode: any = 'merge';
   export let recipes: any[] = [];
+  export let workspaceSnapshots: any[] = [];
   export let datasetLabel = '(none)';
   export let schemaSampleN = 5000;
   export let totalFilteredCount = 0;
@@ -28,6 +30,7 @@
   export let schemaOutliers: any = [];
   export let schemaRelationshipHints: any = [];
   export let schemaDrift: any = null;
+  export let schemaBaselineCount = 0;
   export let colTypes: any[] = [];
   export let headers: string[] = [];
   export let schemaFiltered: any = [];
@@ -74,10 +77,13 @@
   export let clearColumnSelection: () => void = () => {};
   export let toggleVisibleCol: (i: number) => void = () => {};
   export let saveCurrentAsRecipe: any = () => {};
+  export let saveCurrentAsSnapshot: any = () => {};
   export let exportRecipesCurrent: () => void = () => {};
   export let importRecipesFile: any = () => {};
   export let toggleRecipeFavorite: (id: string) => void = () => {};
   export let applyRecipe: any = () => {};
+  export let applyWorkspaceSnapshot: any = () => {};
+  export let deleteWorkspaceSnapshot: (id: string) => void = () => {};
   export let deleteRecipe: (id: string) => void = () => {};
   export let setSchemaDriftBaseline: () => void = () => {};
   export let schemaActionTarget: (idx: number) => void = () => {};
@@ -111,8 +117,10 @@
   bind:recipeNotice
   bind:recipeName
   bind:recipeTags
+  bind:snapshotName
   bind:importMode
   {recipes}
+  {workspaceSnapshots}
   {datasetLabel}
   bind:schemaSampleN
   {totalFilteredCount}
@@ -126,6 +134,7 @@
   {schemaOutliers}
   {schemaRelationshipHints}
   {schemaDrift}
+  {schemaBaselineCount}
   {colTypes}
   {headers}
   {schemaFiltered}
@@ -172,10 +181,13 @@
   {clearColumnSelection}
   {toggleVisibleCol}
   {saveCurrentAsRecipe}
+  {saveCurrentAsSnapshot}
   {exportRecipesCurrent}
   {importRecipesFile}
   {toggleRecipeFavorite}
   {applyRecipe}
+  {applyWorkspaceSnapshot}
+  {deleteWorkspaceSnapshot}
   {deleteRecipe}
   {setSchemaDriftBaseline}
   {schemaActionTarget}

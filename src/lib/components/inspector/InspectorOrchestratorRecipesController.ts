@@ -56,7 +56,12 @@ export async function importRecipesFile(ctx: RecipesControllerContext, file: Fil
       return;
     }
 
-    const next = ctx.mergeImportedRecipes(ctx.recipes ?? [], obj.recipes ?? []);
+    const next = ctx.mergeImportedRecipes({
+      payload: obj,
+      targetId,
+      targetLabel,
+      existing: ctx.recipes ?? []
+    });
     if (targetId === ctx.datasetId) ctx.recipes = next;
     ctx.persistRecipesForDataset(targetId, targetLabel, next);
     ctx.recipeNotice = `Imported ${next.length} recipe(s).`;
@@ -145,6 +150,44 @@ export function saveCurrentAsRecipe(ctx: RecipesControllerContext) {
   ctx.recipeNotice = 'Saved.';
   ctx.recipeName = '';
   ctx.recipeTags = '';
+}
+
+export function saveCurrentAsSnapshot(ctx: RecipesControllerContext) {
+  if (!ctx.hasLoaded) {
+    ctx.recipeNotice = 'Load a dataset first.';
+    return;
+  }
+  const name = (ctx.snapshotName ?? '').trim() || `${ctx.datasetLabel || 'Dataset'} workspace`;
+  const next = {
+    id: ctx.newRecipeId(),
+    name,
+    createdAt: Date.now(),
+    datasetId: ctx.datasetId,
+    datasetLabel: ctx.datasetLabel,
+    state: ctx.captureState(),
+    favorite: false
+  };
+  ctx.workspaceSnapshots = [next, ...(ctx.workspaceSnapshots ?? [])];
+  ctx.persistWorkspaceSnapshotsToStore(ctx.WORKSPACE_SNAPSHOTS_KEY, ctx.workspaceSnapshots);
+  ctx.snapshotName = '';
+  ctx.recipeNotice = 'Workspace snapshot saved.';
+  setTimeout(() => (ctx.recipeNotice = null), 1400);
+}
+
+export async function applyWorkspaceSnapshot(ctx: RecipesControllerContext, snapshot: any) {
+  if (!snapshot?.state) return;
+  if (snapshot.datasetId && ctx.datasetId && snapshot.datasetId !== ctx.datasetId) {
+    ctx.recipeNotice = 'Load the matching dataset before applying this workspace snapshot.';
+    return;
+  }
+  await ctx.applyState(snapshot.state);
+  ctx.recipeNotice = `Applied snapshot: ${snapshot.name}`;
+  setTimeout(() => (ctx.recipeNotice = null), 1400);
+}
+
+export function deleteWorkspaceSnapshot(ctx: RecipesControllerContext, id: string) {
+  ctx.workspaceSnapshots = (ctx.workspaceSnapshots ?? []).filter((entry: any) => entry.id !== id);
+  ctx.persistWorkspaceSnapshotsToStore(ctx.WORKSPACE_SNAPSHOTS_KEY, ctx.workspaceSnapshots);
 }
 
 export async function applyRecipe(ctx: RecipesControllerContext, r: any) {

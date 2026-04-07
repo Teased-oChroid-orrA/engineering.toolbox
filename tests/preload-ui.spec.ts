@@ -11,7 +11,6 @@ async function goToPreloadGeometry(page: import('@playwright/test').Page) {
 test('preload route renders solver outputs and report action', async ({ page }) => {
   await page.goto('/#/preload');
   await expect(page.locator('#app-content-root[data-route-ready="preload"]')).toBeVisible();
-  await expect(page.getByText('Fastened Joint Preload Analysis')).toBeVisible();
   await expect(page.locator('button', { hasText: '1. Pick Fastener' }).first()).toBeVisible();
   await goToPreloadReview(page);
   await expect(page.getByText('Joint Section Model')).toBeVisible();
@@ -29,10 +28,14 @@ test('preload route renders solver outputs and report action', async ({ page }) 
   await expect(page.getByText('Adjacent Fastener Screening')).toBeVisible();
   await expect(page.getByText('Load cases')).toBeVisible();
   await expect(page.getByLabel('Preload bolt pattern map')).toBeVisible();
+  await expect(page.getByLabel('Preload load-transfer progression')).toBeVisible();
   await expect(page.getByLabel('Preload fastener-group case envelopes')).toBeVisible();
   await expect(page.getByLabel('Preload geometry influence matrix heatmap')).toBeVisible();
   await expect(page.getByText('Import provenance')).toBeVisible();
   await expect(page.getByText('TRS / Monogram Aerospace')).toBeVisible();
+  await expect(page.getByText('Thermal compare pack')).toBeVisible();
+  await expect(page.getByText('Friction compare pack')).toBeVisible();
+  await expect(page.getByText('Loss compare pack')).toBeVisible();
 
   await goToPreloadGeometry(page);
   await expect(page.getByText('Physical layers remain rectangular plates.')).toBeVisible();

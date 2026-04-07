@@ -57,11 +57,59 @@ export const bushingInputsSchema = z.object({
   matBushing: z.string().min(1),
   friction: z.number().min(0),
   dT: z.number(),
+  assemblyHousingTemperature: z.number().optional(),
+  assemblyBushingTemperature: z.number().optional(),
+  processRouteId: z.enum(['press_fit_only', 'press_fit_finish_ream', 'line_ream_repair', 'thermal_assist_install', 'bonded_joint']).optional(),
+  standardsBasis: z.enum(['shop_default', 'faa_ac_43_13', 'nas_ms', 'sae_ams', 'oem_srm']).optional(),
+  standardsRevision: z.string().optional(),
+  processSpec: z.string().optional(),
+  approvalNotes: z.string().optional(),
+  criticality: z.enum(['general', 'primary_structure', 'repair']).optional(),
   minWallStraight: z.number().positive(),
   minWallNeck: z.number().positive(),
   endConstraint: z.enum(['free', 'one_end', 'both_ends']).optional(),
   load: z.number().optional(),
-  thetaDeg: z.number().optional(),
+  edgeLoadAngleDeg: z.number().positive().optional(),
+  serviceTemperatureHot: z.number().optional(),
+  serviceTemperatureCold: z.number().optional(),
+  finishReamAllowance: z.number().nonnegative().optional(),
+  wearAllowance: z.number().nonnegative().optional(),
+  loadSpectrum: z.enum(['static', 'oscillating', 'rotating']).optional(),
+  oscillationAngleDeg: z.number().min(0).optional(),
+  oscillationFreqHz: z.number().min(0).optional(),
+  dutyCyclePct: z.number().min(0).max(100).optional(),
+  lubricationMode: z.enum(['dry', 'greased', 'oiled', 'solid_film']).optional(),
+  contaminationLevel: z.enum(['clean', 'shop', 'dirty', 'abrasive']).optional(),
+  surfaceRoughnessRaUm: z.number().positive().optional(),
+  shaftHardnessHrc: z.number().positive().optional(),
+  misalignmentDeg: z.number().min(0).optional(),
+  measuredPart: z
+    .object({
+      enabled: z.boolean().optional(),
+      basis: z.enum(['nominal', 'measured']).optional(),
+      bore: z
+        .object({
+          actual: z.number().positive().optional(),
+          tolPlus: z.number().nonnegative().optional(),
+          tolMinus: z.number().nonnegative().optional(),
+          roundness: z.number().nonnegative().optional(),
+          ra: z.number().nonnegative().optional()
+        })
+        .optional(),
+      id: z
+        .object({
+          actual: z.number().positive().optional(),
+          tolPlus: z.number().nonnegative().optional(),
+          tolMinus: z.number().nonnegative().optional(),
+          roundness: z.number().nonnegative().optional(),
+          ra: z.number().nonnegative().optional()
+        })
+        .optional(),
+      edgeDist: z.number().nonnegative().optional(),
+      housingWidth: z.number().nonnegative().optional(),
+      notes: z.string().optional()
+    })
+    .optional(),
   idCS: z
     .object({
       enabled: z.boolean().optional(),
@@ -139,6 +187,38 @@ export function validateBushingInputs(input: BushingInputs): BushingWarning[] {
       message: 'Reamer-fixed bore capability requires lock bore to remain enabled.',
       severity: 'info'
     });
+  }
+  if (Number.isFinite(input.dutyCyclePct) && (Number(input.dutyCyclePct) < 0 || Number(input.dutyCyclePct) > 100)) {
+    warnings.push({
+      code: 'INPUT_SCHEMA_INVALID',
+      message: 'Duty cycle should stay between 0 and 100 percent.',
+      severity: 'warning'
+    });
+  }
+  if (input.measuredPart?.enabled && input.measuredPart.basis === 'measured') {
+    const measuredBore = Number(input.measuredPart.bore?.actual);
+    const measuredId = Number(input.measuredPart.id?.actual);
+    if (Number.isFinite(measuredBore) && Number.isFinite(measuredId) && measuredId >= measuredBore) {
+      warnings.push({
+        code: 'BUSHING_ID_GE_BORE',
+        message: 'Measured ID should be smaller than measured bore diameter.',
+        severity: 'warning'
+      });
+    }
+    if (Number.isFinite(input.measuredPart.edgeDist) && Number(input.measuredPart.edgeDist) < 0) {
+      warnings.push({
+        code: 'INPUT_SCHEMA_INVALID',
+        message: 'Measured edge distance should be nonnegative.',
+        severity: 'warning'
+      });
+    }
+    if (Number.isFinite(input.measuredPart.housingWidth) && Number(input.measuredPart.housingWidth) <= 0) {
+      warnings.push({
+        code: 'INPUT_SCHEMA_INVALID',
+        message: 'Measured surrounding width should be positive.',
+        severity: 'warning'
+      });
+    }
   }
   if (input.idType === 'countersink') {
     if (Number.isFinite(input.csDia) && Number.isFinite(input.idBushing) && input.csDia < input.idBushing) {

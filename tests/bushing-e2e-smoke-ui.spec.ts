@@ -54,7 +54,8 @@ test.describe('bushing e2e smoke UI', () => {
   test('switches profile type and keeps results visible', async ({ page }) => {
     const viewport = page.locator('svg[viewBox="0 0 660 660"]').first();
     await expect(viewport).toContainText('Housing section');
-    await expect(viewport).toContainText('Bushing face');
+    await expect(viewport).toContainText('OD band');
+    await expect(viewport).toContainText('Hole open');
     await expect(viewport).not.toContainText('Flange thk');
     await expect(viewport).not.toContainText('Ext CS depth');
 
@@ -69,6 +70,32 @@ test.describe('bushing e2e smoke UI', () => {
     await page.getByRole('button', { name: "C'Sink" }).first().click();
     await expect(viewport).toContainText('Ext CS depth');
     await expect(viewport).not.toContainText('Flange thk');
+  });
+
+  test('clicking sketch features updates the active dimension focus', async ({ page }) => {
+    await page.waitForLoadState('domcontentloaded');
+    await page.evaluate(() => {
+      localStorage.removeItem('scd.bushing.inputs.v16');
+      localStorage.removeItem('scd.bushing.inputs.v15');
+    });
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Bushing Toolbox' })).toBeVisible();
+
+    await expect(page.getByText('Active: OD band')).toBeVisible();
+    await expect(page.locator('svg [data-dimension-target="id"]').first()).toBeVisible();
+    await page.locator('svg [data-dimension-target="id"]').first().click({ force: true });
+    await expect(page.getByText('Active: ID')).toBeVisible();
+
+    await expect(page.locator('svg [data-dimension-target="length"]').first()).toBeVisible();
+    await page.locator('svg [data-dimension-target="length"]').first().click({ force: true });
+    await expect(page.getByText('Active: Length')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Flanged' }).first().click();
+    await page.getByText('5. Drafting / Export').scrollIntoViewIfNeeded();
+    await expect(page.getByText(/D3 renderer active|Drafting needs attention.|Drafting has advisory notices./).first()).toBeVisible();
+    await expect(page.locator('svg text[data-dimension-target="flangeThk"]').first()).toBeVisible();
+    await page.locator('svg text[data-dimension-target="flangeThk"]').first().click({ force: true });
+    await expect(page.getByText('Active: Flange thickness')).toBeVisible();
   });
 
   test('internal countersink mode gates editable fields and syncs derived value', async ({ page }) => {

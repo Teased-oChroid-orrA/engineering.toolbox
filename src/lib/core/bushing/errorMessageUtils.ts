@@ -14,6 +14,41 @@ export interface FriendlyMessage {
   technicalCode?: string;
 }
 
+const MM_PER_IN = 25.4;
+const MAX_PRACTICAL_EDGE_DISTANCE_IN = 100;
+const MAX_EDGE_DISTANCE_MULTIPLIER = 10;
+
+function toInches(value: number, units: string): number {
+  return units === 'mm' ? value / MM_PER_IN : value;
+}
+
+function isPracticalEdgeDistanceTarget(
+  requiredValue: number | undefined,
+  actualValue: number | undefined,
+  units: string
+): boolean {
+  if (!Number.isFinite(requiredValue)) return false;
+  const requiredIn = toInches(Number(requiredValue), units);
+  if (!Number.isFinite(requiredIn) || requiredIn <= 0 || requiredIn > MAX_PRACTICAL_EDGE_DISTANCE_IN) return false;
+  if (!Number.isFinite(actualValue) || Number(actualValue) <= 0) return true;
+  const actualIn = toInches(Number(actualValue), units);
+  if (!Number.isFinite(actualIn) || actualIn <= 0) return false;
+  return requiredIn / actualIn <= MAX_EDGE_DISTANCE_MULTIPLIER;
+}
+
+function formatEdgeDistanceSuggestion(
+  requiredValue: number | undefined,
+  actualValue: number | undefined,
+  units: string,
+  fallback: string
+): string {
+  if (!isPracticalEdgeDistanceTarget(requiredValue, actualValue, units)) {
+    return fallback;
+  }
+
+  return `Increase edge distance to at least ${Number(requiredValue).toFixed(3)} ${units} (currently ${Number(actualValue).toFixed(3)} ${units}).`;
+}
+
 /**
  * Convert technical warning code to user-friendly message
  * @param code - Technical warning code (e.g., "EDGE_DISTANCE_SEQUENCE_FAIL")
@@ -35,9 +70,15 @@ export function makeFriendlyMessage(
       return {
         title: 'Edge Distance Too Small',
         description: `The bushing is too close to the plate edge. This can cause failure during installation or under load.`,
-        suggestion: context?.requiredValue
-          ? `Increase edge distance to at least ${context.requiredValue.toFixed(3)} ${units} (currently ${context.actualValue?.toFixed(3) || '?'} ${units}).`
-          : 'Increase the edge distance value in the Geometry section.',
+        suggestion:
+          context?.requiredValue != null
+            ? formatEdgeDistanceSuggestion(
+                context.requiredValue,
+                context.actualValue,
+                units,
+                'This load and geometry combination is outside a practical edge-distance range. Reduce load, enlarge the surrounding structure, or move the bore farther from the edge before relying on this case.'
+              )
+            : 'Increase the edge distance value in the Geometry section.',
         severity: 'error',
         technicalCode: code
       };
@@ -46,9 +87,15 @@ export function makeFriendlyMessage(
       return {
         title: 'Insufficient Bearing Strength',
         description: 'The edge distance is too small to support the required bearing strength.',
-        suggestion: context?.requiredValue
-          ? `Increase edge distance to at least ${context.requiredValue.toFixed(3)} ${units}.`
-          : 'Increase the edge distance or reduce the applied load.',
+        suggestion:
+          context?.requiredValue != null
+            ? formatEdgeDistanceSuggestion(
+                context.requiredValue,
+                context.actualValue,
+                units,
+                'Required edge distance is outside a practical range for the current load case. Reduce the applied load, increase surrounding width, or select a different repair geometry instead of chasing this target directly.'
+              )
+            : 'Increase the edge distance or reduce the applied load.',
         severity: 'error',
         technicalCode: code
       };

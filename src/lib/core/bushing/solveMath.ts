@@ -102,7 +102,12 @@ export function buildOdTolerance(bore: ToleranceRange, targetInterference: Toler
 export function enforceBoreBandForTarget(
   bore: ToleranceRange,
   targetInterference: ToleranceRange,
-  capability?: { minAchievableTolWidth?: number }
+  capability?: { minAchievableTolWidth?: number },
+  policy?: {
+    preserveBoreNominal?: boolean;
+    allowBoreNominalShift?: boolean;
+    maxBoreNominalShift?: number;
+  }
 ): { adjusted: ToleranceRange; changed: boolean; note?: string } {
   const boreWidth = Math.max(0, bore.upper - bore.lower);
   const targetWidth = Math.max(0, targetInterference.upper - targetInterference.lower);
@@ -116,13 +121,28 @@ export function enforceBoreBandForTarget(
     };
   }
 
-  const half = Math.max(0, targetWidth / 2);
-  const lower = Math.max(1e-6, bore.nominal - half);
-  const upper = Math.max(lower, bore.nominal + half);
+  // Preserve the entered minimum clean-up size by never moving the lower bore
+  // limit downward. Tightening starts from the upper side; optional shift then
+  // moves the tightened band only in the increasing direction.
+  let lower = Math.max(1e-6, bore.upper - targetWidth);
+  let upper = Math.max(lower, bore.upper);
+  if (Boolean(policy?.allowBoreNominalShift) && !Boolean(policy?.preserveBoreNominal)) {
+    const maxShift = Math.max(0, Number(policy?.maxBoreNominalShift ?? 0));
+    if (maxShift > EPS) {
+      const desiredNominal = Math.max(bore.nominal, lower);
+      const currentNominal = clamp(bore.nominal, lower, upper);
+      const shift = clamp(desiredNominal - currentNominal, 0, maxShift);
+      lower += shift;
+      upper += shift;
+    }
+  }
   return {
-    adjusted: makeRange('limits', lower, upper, bore.nominal),
+    adjusted: makeRange('limits', lower, upper, clamp(bore.nominal, lower, upper)),
     changed: true,
-    note: 'Bore tolerance was auto-adjusted to satisfy strict interference containment.'
+    note:
+      Boolean(policy?.allowBoreNominalShift) && !Boolean(policy?.preserveBoreNominal)
+        ? 'Bore tolerance was tightened while preserving the entered minimum bore, then shifted upward within the allowed limit.'
+        : 'Bore tolerance was tightened from the upper side while preserving the entered minimum bore.'
   };
 }
 

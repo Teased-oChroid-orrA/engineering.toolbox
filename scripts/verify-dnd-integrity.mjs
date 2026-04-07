@@ -80,62 +80,45 @@ for (const check of requiredChecks) {
   }
 }
 
-// Check 4: Verify NativeDragLane is properly implemented
-console.log('[DnD Integrity] Checking NativeDragLane patterns...');
-const nativeLanePath = path.join(root, 'src/lib/components/bushing/NativeDragLane.svelte');
-const nativeLaneSrc = fs.readFileSync(nativeLanePath, 'utf8');
+// Check 4: Verify the current draggable card wrapper exposes the expected DnD markers.
+console.log('[DnD Integrity] Checking BushingDraggableCard contract...');
+const draggableCardPath = path.join(root, 'src/lib/components/bushing/BushingDraggableCard.svelte');
+const draggableCardSrc = fs.readFileSync(draggableCardPath, 'utf8');
 
-// Verify native implementation patterns
-const requiredNativeChecks = [
-  { pattern: /draggable={enabled}/i, description: 'draggable attribute with enabled prop' },
-  { pattern: /dispatch\(['"]finalize['"],\s*{/, description: 'finalize event dispatch' },
-  { pattern: /ondragstart/i, description: 'native ondragstart handler' },
-  { pattern: /ondrop/i, description: 'native ondrop handler' }
+const requiredDraggableChecks = [
+  { pattern: /data-dnd-card=\{cardId\}/, description: 'stable card id marker' },
+  { pattern: /data-dnd-lane=\{column\}/, description: 'lane marker' },
+  { pattern: /data-drag-enabled=\{dragEnabled \? '1' : '0'\}/, description: 'drag-enabled flag' },
+  { pattern: /role="listitem"/, description: 'listitem role' },
+  { pattern: /\{#if dragEnabled\}/, description: 'conditional move controls' }
 ];
 
-for (const check of requiredNativeChecks) {
-  if (!check.pattern.test(nativeLaneSrc)) {
-    failures.push(`NativeDragLane missing pattern: ${check.description}`);
+for (const check of requiredDraggableChecks) {
+  if (!check.pattern.test(draggableCardSrc)) {
+    failures.push(`BushingDraggableCard missing pattern: ${check.description}`);
   } else {
     console.log(`  ✓ Found pattern: ${check.description}`);
   }
 }
 
-// Verify it's NOT using complex state management
-const antipatterns = [
-  { pattern: /let workingItems/, description: 'should not use workingItems state' }
+// Check 5: Verify the diagnostics panel still persists and reorders its nested layout.
+console.log('[DnD Integrity] Checking diagnostics panel reordering...');
+const diagnosticsPanelPath = path.join(root, 'src/lib/components/bushing/BushingDiagnosticsPanel.svelte');
+const diagnosticsPanelSrc = fs.readFileSync(diagnosticsPanelPath, 'utf8');
+
+const requiredDiagnosticsChecks = [
+  { pattern: /loadNestedDiagnosticsLayout/, description: 'nested diagnostics layout load' },
+  { pattern: /persistNestedDiagnosticsLayout/, description: 'nested diagnostics layout persist' },
+  { pattern: /normalizeOrder/, description: 'nested diagnostics order normalization' },
+  { pattern: /reorderList/, description: 'nested diagnostics reorder helper' },
+  { pattern: /__SCD_BUSHING_TEST_REORDER_DIAG__/, description: 'test hook for diagnostics reorder' }
 ];
 
-for (const anti of antipatterns) {
-  if (anti.pattern.test(nativeLaneSrc)) {
-    console.log(`  ⚠ Warning: Found antipattern - ${anti.description}`);
+for (const check of requiredDiagnosticsChecks) {
+  if (!check.pattern.test(diagnosticsPanelSrc)) {
+    failures.push(`BushingDiagnosticsPanel missing pattern: ${check.description}`);
   } else {
-    console.log(`  ✓ Clean: ${anti.description}`);
-  }
-}
-
-// Check 5: Verify FreePositionContainer uses 'export const' for unused props
-console.log('[DnD Integrity] Checking FreePositionContainer export patterns...');
-const freePositionPath = path.join(root, 'src/lib/components/bushing/BushingFreePositionContainer.svelte');
-const freePositionSrc = fs.readFileSync(freePositionPath, 'utf8');
-
-// Count export let vs export const
-const exportLetMatches = freePositionSrc.match(/export let \w+/g) || [];
-const exportConstMatches = freePositionSrc.match(/export const \w+/g) || [];
-
-console.log(`  Found ${exportLetMatches.length} 'export let' and ${exportConstMatches.length} 'export const'`);
-
-// Check if the props that should be const are const
-const propsToBeConst = ['form', 'results', 'draftingView', 'useLegacyRenderer', 'renderMode', 
-                         'traceEnabled', 'cacheStats', 'renderInitNotice', 'visualDiagnostics', 
-                         'renderDiagnostics', 'onExportSvg', 'onExportPdf', 'toggleRendererMode', 
-                         'toggleTraceMode', 'handleRenderInitFailure', 'showInformationView', 'isFailed'];
-
-for (const prop of propsToBeConst) {
-  const letPattern = new RegExp(`export let ${prop}\\b`);
-  if (letPattern.test(freePositionSrc)) {
-    // This is acceptable, just informational
-    console.log(`  ℹ Found 'export let ${prop}' (consider 'export const' if unused internally)`);
+    console.log(`  ✓ Found pattern: ${check.description}`);
   }
 }
 

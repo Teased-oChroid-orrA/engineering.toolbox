@@ -260,15 +260,15 @@ body {
   }
 
   .bushing-depth-1 {
-    --bushing-tilt-x: 0.75deg;
-    --bushing-tilt-y: -0.65deg;
-    --bushing-lift-y: -3px;
+    --bushing-tilt-x: 0.45deg;
+    --bushing-tilt-y: -0.35deg;
+    --bushing-lift-y: -2px;
   }
 
   .bushing-depth-2 {
-    --bushing-tilt-x: 2.2deg;
-    --bushing-tilt-y: -2deg;
-    --bushing-lift-y: -6px;
+    --bushing-tilt-x: 0.75deg;
+    --bushing-tilt-y: -0.55deg;
+    --bushing-lift-y: -2.5px;
   }
 
   .bush-card-title {

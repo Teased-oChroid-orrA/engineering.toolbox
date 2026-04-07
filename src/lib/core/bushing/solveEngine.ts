@@ -4,6 +4,7 @@ import { computeMinimumBushingWall, resolveBushingSectionParams } from '../share
 import type { BushingOutput, BushingWarning, InterferenceEnforcementReasonCode, ToleranceRange } from './types';
 import { clamp, toPsiFromKsi, resolveTolerance, buildOdTolerance, enforceBoreBandForTarget, containmentViolations, csDiaToleranceFromBase, csDepthToleranceFromBase, makeRange, solveCountersink, EPS } from './solveMath';
 import { normalizeBushingInputs } from './normalize';
+import { buildBushingEngineeringReview } from './engineeringReview';
 
 const getMat = (id: string | undefined) => MATERIALS.find((m) => m.id === id) || MATERIALS[0];
 
@@ -31,6 +32,8 @@ type CalcState = {
   delta: number;
   deltaUser: number;
   deltaThermal: number;
+  installDelta: number;
+  assemblyThermalDelta: number;
   csSolvedId: { dia: number; depth: number; angleDeg: number };
   csSolvedOd: { dia: number; depth: number; angleDeg: number };
   csInternalDiaTol: ToleranceRange;
@@ -52,6 +55,7 @@ type CalcState = {
   termB: number;
   termH: number;
   pressure: number;
+  installPressure: number;
   stressHoopHousing: number;
   stressHoopBushing: number;
   stressAxialHousing: number;
@@ -59,12 +63,14 @@ type CalcState = {
   axialConstraintFactor: number;
   axialLengthFactor: number;
   installForce: number;
+  retainedInstallForce: number;
   e_required_seq: number;
   edActual: number;
   edMinSequence: number;
   edMinStrength: number;
   candidates: Array<{ name: string; margin: number }>;
   governing: { name: string; margin: number };
+  engineeringReview: Pick<BushingOutput, 'serviceEnvelope' | 'dutyScreen' | 'process' | 'review'>;
 };
 
 type LameSample = { r: number; sigmaR: number; sigmaTheta: number; sigmaAxial: number };
@@ -86,6 +92,16 @@ type LameRegionField = {
     maxAbsAxialAt: number;
   };
 };
+
+function referenceTemperature(units: 'imperial' | 'metric'): number {
+  return units === 'metric' ? 20 : 70;
+}
+
+function absoluteTemperatureToDeltaF(value: number | undefined, units: 'imperial' | 'metric'): number | null {
+  if (!Number.isFinite(Number(value))) return null;
+  const ref = referenceTemperature(units);
+  return units === 'metric' ? (Number(value) - ref) * 1.8 : Number(value) - ref;
+}
 
 function lameStressAtRadius(
   r: number,
@@ -202,7 +218,7 @@ export function computeState(input: ReturnType<typeof normalizeBushingInputs>): 
       odFit.notes.push('Strict interference enforcement is blocked because bore is locked (reamer-fixed).');
       enforcementReasonCodes.push('BLOCKED_BORE_LOCKED');
     } else {
-      const enforcedBore = enforceBoreBandForTarget(boreTol, interferenceTol, input.boreCapability);
+      const enforcedBore = enforceBoreBandForTarget(boreTol, interferenceTol, input.boreCapability, policy);
       if (enforcedBore.changed) {
         boreTol = enforcedBore.adjusted;
         odFit = buildOdTolerance(boreTol, interferenceTol);
@@ -234,6 +250,15 @@ export function computeState(input: ReturnType<typeof normalizeBushingInputs>): 
   const deltaThermal = ((matBushing.alpha_uF ?? 0) - (matHousing.alpha_uF ?? 0)) * 1e-6 * boreTol.nominal * dT_F;
   const deltaUser = odFit.achievedInterference.nominal;
   const delta = deltaUser + deltaThermal;
+  const housingAssemblyDeltaF = absoluteTemperatureToDeltaF(input.assemblyHousingTemperature, input.units) ?? 0;
+  const bushingAssemblyDeltaF = absoluteTemperatureToDeltaF(input.assemblyBushingTemperature, input.units) ?? 0;
+  const assemblyThermalDelta =
+    ((matBushing.alpha_uF ?? 0) * bushingAssemblyDeltaF - (matHousing.alpha_uF ?? 0) * housingAssemblyDeltaF) *
+    1e-6 *
+    boreTol.nominal;
+  const hasAssemblyThermalAssist =
+    Number.isFinite(Number(input.assemblyHousingTemperature)) || Number.isFinite(Number(input.assemblyBushingTemperature));
+  const installDelta = deltaUser + (hasAssemblyThermalAssist ? assemblyThermalDelta : deltaThermal);
 
   const csSolvedId = (input.idCS?.enabled ?? input.idType === 'countersink')
     ? solveCountersink(input.csMode, input.csDia, input.csDepth, input.csAngle, input.idBushing)
@@ -350,6 +375,7 @@ export function computeState(input: ReturnType<typeof normalizeBushingInputs>): 
     (((effectiveODHousing ** 2 + boreTol.nominal ** 2) / (effectiveODHousing ** 2 - boreTol.nominal ** 2)) +
       (matHousing.nu ?? 0.33));
   const pressure = delta > 0 ? delta / (termB + termH) : 0;
+  const installPressure = installDelta > 0 ? installDelta / (termB + termH) : 0;
   const stressHoopHousing =
     pressure * ((effectiveODHousing ** 2 + boreTol.nominal ** 2) / (effectiveODHousing ** 2 - boreTol.nominal ** 2));
   const stressHoopBushing =
@@ -360,8 +386,10 @@ export function computeState(input: ReturnType<typeof normalizeBushingInputs>): 
   const axialScale = axialConstraintFactor * axialLengthFactor;
   const stressAxialHousing = axialScale * (matHousing.nu ?? 0.33) * stressHoopHousing;
   const stressAxialBushing = axialScale * (matBushing.nu ?? 0.33) * stressHoopBushing;
-  const installForce =
+  const retainedInstallForce =
     (Number.isFinite(input.friction) ? input.friction : 0.15) * pressure * (Math.PI * boreTol.nominal * input.housingLen);
+  const installForce =
+    (Number.isFinite(input.friction) ? input.friction : 0.15) * installPressure * (Math.PI * boreTol.nominal * input.housingLen);
 
   const profile =
     input.bushingType === 'countersink'
@@ -378,7 +406,9 @@ export function computeState(input: ReturnType<typeof normalizeBushingInputs>): 
         ]
       : [{ d_top: odInstalled, d_bottom: odInstalled, height: input.housingLen, role: 'parent' }];
   const t_eff_seq = calculateUniversalBearing(profile).t_eff_sequence || input.housingLen;
-  const sinTheta = Math.max(1e-6, Math.sin(Math.max(1e-6, Math.abs(input.thetaDeg ?? 40)) * (Math.PI / 180)));
+  const edgeLoadAngleDeg =
+    Number.isFinite(Number(input.edgeLoadAngleDeg)) && Number(input.edgeLoadAngleDeg) > 0 ? Number(input.edgeLoadAngleDeg) : 40;
+  const sinTheta = Math.max(1e-6, Math.sin(Math.abs(edgeLoadAngleDeg) * (Math.PI / 180)));
   const Fbru_eff = toPsiFromKsi(matHousing.Fbru_ksi || matHousing.Sy_ksi || 0) + 0.8 * pressure;
   const tau = toPsiFromKsi(matHousing.Fsu_ksi || matHousing.Sy_ksi || 0);
   const e_required_seq = tau > 0 ? (boreTol.nominal * Fbru_eff) / (2 * tau * sinTheta) : Infinity;
@@ -389,14 +419,30 @@ export function computeState(input: ReturnType<typeof normalizeBushingInputs>): 
   const edMinSequence = e_required_seq > 0 ? e_required_seq / boreTol.nominal : Infinity;
   const edMinStrength = e_required_strength > 0 ? e_required_strength / boreTol.nominal : Infinity;
   const edActual = boreTol.nominal > 0 ? input.edgeDist / boreTol.nominal : Infinity;
+  const sequenceEvaluated = Number.isFinite(edMinSequence) && edMinSequence > 0;
+  const strengthEvaluated = Number.isFinite(edMinStrength) && edMinStrength > 0;
+  const sequenceMargin = sequenceEvaluated ? edActual / edMinSequence - 1 : Infinity;
+  const strengthMargin = strengthEvaluated ? edActual / edMinStrength - 1 : Infinity;
 
   const candidates = [
-    { name: 'Edge distance (sequencing)', margin: edActual / edMinSequence - 1 },
-    { name: 'Edge distance (strength)', margin: edActual / edMinStrength - 1 },
+    { name: 'Edge distance (sequencing)', margin: sequenceMargin },
+    { name: 'Edge distance (strength)', margin: strengthMargin },
     { name: 'Straight wall thickness', margin: wallStraight / input.minWallStraight - 1 },
     { name: 'Neck wall thickness', margin: wallNeck / input.minWallNeck - 1 }
   ];
   const governing = candidates.reduce((best, cur) => (cur.margin < best.margin ? cur : best), candidates[0]);
+  const engineeringReview = buildBushingEngineeringReview({
+    input,
+    material: matBushing,
+    housingMaterial: matHousing,
+    effectiveInterference: delta,
+    pressure,
+    stressHoopBushing,
+    termB,
+    termH,
+    installForce,
+    retainedInstallForce
+  });
 
   return {
     input,
@@ -422,6 +468,8 @@ export function computeState(input: ReturnType<typeof normalizeBushingInputs>): 
     delta,
     deltaUser,
     deltaThermal,
+    installDelta,
+    assemblyThermalDelta,
     csSolvedId,
     csSolvedOd,
     csInternalDiaTol,
@@ -443,6 +491,7 @@ export function computeState(input: ReturnType<typeof normalizeBushingInputs>): 
     termB,
     termH,
     pressure,
+    installPressure,
     stressHoopHousing,
     stressHoopBushing,
     stressAxialHousing,
@@ -450,12 +499,14 @@ export function computeState(input: ReturnType<typeof normalizeBushingInputs>): 
     axialConstraintFactor,
     axialLengthFactor,
     installForce,
+    retainedInstallForce,
     e_required_seq,
     edActual,
     edMinSequence,
     edMinStrength,
     candidates,
-    governing
+    governing,
+    engineeringReview
   };
 }
 
@@ -469,8 +520,12 @@ export function buildWarnings(validationWarnings: BushingWarning[], s: CalcState
   if (s.failStraight) push('STRAIGHT_WALL_BELOW_MIN', 'Straight wall thickness below minimum.', 'error');
   if (s.failNeck) push('NECK_WALL_BELOW_MIN', 'Neck wall thickness below minimum.', 'error');
   if (s.delta <= 0) push('NET_CLEARANCE_FIT', 'Net interference is negative (clearance fit after thermal).', 'warning');
-  if (s.edActual / s.edMinSequence - 1 < 0) push('EDGE_DISTANCE_SEQUENCE_FAIL', 'Edge distance sequencing margin is below zero.', 'error');
-  if (s.edActual / s.edMinStrength - 1 < 0) push('EDGE_DISTANCE_STRENGTH_FAIL', 'Edge distance strength margin is below zero.', 'error');
+  if (Number.isFinite(s.edMinSequence) && s.edMinSequence > 0 && s.edActual / s.edMinSequence - 1 < 0) {
+    push('EDGE_DISTANCE_SEQUENCE_FAIL', 'Edge distance sequencing margin is below zero.', 'error');
+  }
+  if (Number.isFinite(s.edMinStrength) && s.edMinStrength > 0 && s.edActual / s.edMinStrength - 1 < 0) {
+    push('EDGE_DISTANCE_STRENGTH_FAIL', 'Edge distance strength margin is below zero.', 'error');
+  }
   if (s.internalCsInvalid) push('INTERNAL_CS_GEOMETRY_INVALID', 'Internal countersink geometry is invalid for the selected mode.', 'warning');
   if (s.externalCsInvalid) push('EXTERNAL_CS_GEOMETRY_INVALID', 'External countersink geometry is invalid for the selected mode.', 'warning');
   if (s.toleranceStatus === 'infeasible') {
@@ -478,6 +533,19 @@ export function buildWarnings(validationWarnings: BushingWarning[], s: CalcState
   }
   if (s.enforcementEnabled && s.enforcementBlocked) {
     push('INTERFERENCE_ENFORCEMENT_BLOCKED', 'Interference enforcement is enabled but full containment could not be satisfied under current constraints.', 'error');
+  }
+  if (s.engineeringReview.serviceEnvelope.states.some((state) => state.id !== 'free' && state.fitClass === 'clearance')) {
+    push('SERVICE_STATE_CLEARANCE', 'At least one service state trends to a clearance condition. Review thermal and wear allowances.', 'warning');
+  }
+  if (s.engineeringReview.dutyScreen.wearRisk === 'high' || s.engineeringReview.dutyScreen.wearRisk === 'severe' || s.engineeringReview.dutyScreen.pvUtilization > 0.85) {
+    push('DUTY_SCREEN_HIGH_RISK', 'Duty screening indicates elevated wear/PV risk for the entered service conditions.', 'warning');
+  }
+  if (s.engineeringReview.review.approvalRequired) {
+    push(
+      'APPROVAL_REVIEW_REQUIRED',
+      'Entered process/criticality conditions require explicit engineering approval traceability.',
+      s.engineeringReview.review.decision === 'hold' ? 'error' : 'warning'
+    );
   }
   return { warningCodes, warnings };
 }
@@ -499,6 +567,21 @@ export function toOutput(s: CalcState, warningCodes: BushingWarning[], warnings:
     s.matHousing.nu ?? 0.33,
     s.axialConstraintFactor * s.axialLengthFactor
   );
+  const measuredPart = s.input.measuredPart;
+  const measuredEnabled = Boolean(measuredPart?.enabled && measuredPart?.basis === 'measured');
+  const measuredOverrides = [
+    Number.isFinite(measuredPart?.bore?.actual) ? 'Measured bore applied to fit solve.' : null,
+    Number.isFinite(measuredPart?.id?.actual) ? 'Measured ID applied to service and profile solve.' : null,
+    Number.isFinite(measuredPart?.edgeDist) ? 'Measured edge distance applied to geometry checks.' : null,
+    Number.isFinite(measuredPart?.housingWidth) ? 'Measured surrounding width applied to finite-plate geometry.' : null
+  ].filter((entry): entry is string => Boolean(entry));
+  const measuredNotes = [
+    String(measuredPart?.notes ?? '').trim() || null,
+    Number.isFinite(measuredPart?.bore?.roundness) ? `Measured bore roundness recorded: ${Number(measuredPart?.bore?.roundness).toFixed(0)} um.` : null,
+    Number.isFinite(measuredPart?.bore?.ra) ? `Measured bore finish recorded: Ra ${Number(measuredPart?.bore?.ra).toFixed(2)} um.` : null,
+    Number.isFinite(measuredPart?.id?.roundness) ? `Measured ID roundness recorded: ${Number(measuredPart?.id?.roundness).toFixed(0)} um.` : null,
+    Number.isFinite(measuredPart?.id?.ra) ? `Measured ID finish recorded: Ra ${Number(measuredPart?.id?.ra).toFixed(2)} um.` : null
+  ].filter((entry): entry is string => Boolean(entry));
 
   return {
     sleeveWall: s.wallStraight,
@@ -556,12 +639,25 @@ export function toOutput(s: CalcState, warningCodes: BushingWarning[], warnings:
       edActual: s.edActual,
       edMinSequence: s.edMinSequence,
       edMinStrength: s.edMinStrength,
-      governing: s.edMinSequence >= s.edMinStrength ? 'sequencing' : 'strength'
+      governing:
+        Number.isFinite(s.edMinSequence) && s.edMinSequence > 0 && (!Number.isFinite(s.edMinStrength) || s.edMinStrength <= 0)
+          ? 'sequencing'
+          : Number.isFinite(s.edMinStrength) && s.edMinStrength > 0 && (!Number.isFinite(s.edMinSequence) || s.edMinSequence <= 0)
+            ? 'strength'
+            : Number.isFinite(s.edMinSequence) && s.edMinSequence > 0 && Number.isFinite(s.edMinStrength) && s.edMinStrength > 0
+              ? s.edMinSequence >= s.edMinStrength
+                ? 'sequencing'
+                : 'strength'
+              : 'unknown'
     },
     physics: {
       deltaEffective: s.delta,
+      installDeltaEffective: s.installDelta,
       contactPressure: s.pressure,
+      installContactPressure: s.installPressure,
       installForce: s.installForce,
+      retainedInstallForce: s.retainedInstallForce,
+      assemblyThermalDelta: s.assemblyThermalDelta,
       stressHoopHousing: s.stressHoopHousing,
       stressHoopBushing: s.stressHoopBushing,
       stressAxialHousing: s.stressAxialHousing,
@@ -583,6 +679,22 @@ export function toOutput(s: CalcState, warningCodes: BushingWarning[], warnings:
       csInternal: s.csSolvedId,
       csExternal: s.csSolvedOd,
       isSaturationActive: s.input.housingWidth > s.w_eff || s.input.edgeDist > s.e_eff
+    },
+    serviceEnvelope: s.engineeringReview.serviceEnvelope,
+    dutyScreen: s.engineeringReview.dutyScreen,
+    process: s.engineeringReview.process,
+    review: s.engineeringReview.review,
+    inputBasis: {
+      bore: measuredEnabled && Number.isFinite(measuredPart?.bore?.actual) ? 'measured' : 'nominal',
+      id: measuredEnabled && Number.isFinite(measuredPart?.id?.actual) ? 'measured' : 'nominal',
+      edgeDist: measuredEnabled && Number.isFinite(measuredPart?.edgeDist) ? 'measured' : 'nominal',
+      housingWidth: measuredEnabled && Number.isFinite(measuredPart?.housingWidth) ? 'measured' : 'nominal'
+    },
+    measuredPartSummary: {
+      applied: measuredEnabled && measuredOverrides.length > 0,
+      basis: measuredEnabled ? 'measured' : 'nominal',
+      overrides: measuredOverrides,
+      notes: measuredNotes
     },
     tolerance: {
       status: s.toleranceStatus,

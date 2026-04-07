@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { Badge, Card } from '$lib/components/ui';
   import { cn } from '$lib/utils';
   import BushingDrafting from '$lib/drafting/bushing/BushingDrafting.svelte';
@@ -19,6 +20,7 @@
     renderDiagnostics = [],
     onExportSvg = () => {},
     onExportPdf = () => {},
+    onExportJson = () => {},
     onToggleRendererMode = () => {},
     onToggleTraceMode = () => {},
     onRenderDiagnostics = () => {},
@@ -37,6 +39,7 @@
     renderDiagnostics?: BushingRenderDiagnostic[];
     onExportSvg?: () => void;
     onExportPdf?: () => void;
+    onExportJson?: () => void;
     onToggleRendererMode?: () => void;
     onToggleTraceMode?: () => void;
     onRenderDiagnostics?: (diag: BushingRenderDiagnostic[]) => void;
@@ -54,10 +57,52 @@
       detailCount: issues.length
     };
   });
+
+  let draftingHost = $state<HTMLDivElement | null>(null);
+  let draftingActivated = $state(false);
+  let draftingVisibleRatio = $state(0);
+  let draftingPinned = $state(false);
+  let draftingShouldRender = $derived(draftingActivated && (draftingPinned || draftingVisibleRatio >= 0.38));
+
+  function activateDraftingWhenIdle() {
+    if (draftingActivated) return;
+    const idleScheduler =
+      typeof window !== 'undefined' && 'requestIdleCallback' in window
+        ? (window.requestIdleCallback as (callback: IdleRequestCallback, options?: IdleRequestOptions) => number)
+        : null;
+    if (idleScheduler) {
+      idleScheduler(() => {
+        draftingActivated = true;
+      }, { timeout: 250 });
+      return;
+    }
+    setTimeout(() => {
+      draftingActivated = true;
+    }, 80);
+  }
+
+  onMount(() => {
+    if (!draftingHost || typeof IntersectionObserver === 'undefined') {
+      activateDraftingWhenIdle();
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const ratio = Math.max(...entries.map((entry) => entry.intersectionRatio), 0);
+        draftingVisibleRatio = ratio;
+        if (entries.some((entry) => entry.isIntersecting && entry.intersectionRatio >= 0.42)) {
+          activateDraftingWhenIdle();
+        }
+      },
+      { rootMargin: '40px 0px', threshold: [0, 0.18, 0.42] }
+    );
+    observer.observe(draftingHost);
+    return () => observer.disconnect();
+  });
 </script>
 
-<Card class="min-h-[620px] flex flex-col overflow-hidden border-teal-500/20 bg-teal-500/10 backdrop-blur-sm relative group p-0 bushing-pop-card bushing-no-tilt bushing-depth-2">
-  <div class="border-b border-teal-500/10 bg-teal-900/20 px-4 py-3 z-10 backdrop-blur-sm shrink-0 flex justify-between items-center">
+<Card class="drafting-shell min-h-[560px] flex flex-col overflow-hidden border-teal-500/16 bg-[#071a26] relative group p-0 bushing-pop-card bushing-no-tilt bushing-depth-1">
+  <div class="border-b border-teal-500/10 bg-[#0a2130] px-4 py-3 z-10 shrink-0 flex justify-between items-center">
     <div class="relative z-20 flex items-center gap-2">
       <span class="font-medium text-teal-100/90 text-sm">5. Drafting / Export</span>
       {#if isInfinitePlate}
@@ -72,6 +117,7 @@
         <span class="text-[10px] font-mono text-teal-100/60">Export</span>
         <button aria-label="Export SVG" class="rounded-md border border-teal-200/10 bg-teal-500/5 px-2 py-1 text-[10px] font-mono text-teal-100/80 hover:bg-teal-500/10" onclick={onExportSvg}>SVG</button>
         <button aria-label="Export PDF" class="rounded-md border border-teal-200/10 bg-teal-500/5 px-2 py-1 text-[10px] font-mono text-teal-100/80 hover:bg-teal-500/10" onclick={onExportPdf}>PDF</button>
+        <button aria-label="Export JSON" class="rounded-md border border-teal-200/10 bg-teal-500/5 px-2 py-1 text-[10px] font-mono text-teal-100/80 hover:bg-teal-500/10" onclick={onExportJson}>JSON</button>
       </div>
       <div class="flex items-center gap-2 rounded-md border border-teal-200/10 bg-teal-500/5 px-2 py-1">
         <span class="text-[10px] font-mono text-teal-100/60">View</span>
@@ -114,19 +160,44 @@
         <div class="mt-1 text-[10px] opacity-90">{renderHealth.primary}</div>
       </div>
     {/if}
-    <div class="relative mx-auto aspect-square w-full max-w-[1100px] min-h-[620px] min-w-[620px] rounded-xl border border-teal-400/20 bg-[#031624]/55 backdrop-blur-sm overflow-auto [resize:both]">
-      <div class="absolute inset-0 opacity-[0.06] pointer-events-none" style="background-image: radial-gradient(#2dd4bf 1px, transparent 1px); background-size: 18px 18px;"></div>
-      <div class="h-full w-full min-h-[620px] min-w-[620px]">
-        <BushingDrafting
-          inputs={draftingView}
-          legacyMode={useLegacyRenderer}
-          {renderMode}
-          onRenderDiagnostics={(diag) => onRenderDiagnostics(diag)}
-          onRenderInitFailure={onRenderInitFailure}
-        />
-      </div>
-      <div class="absolute right-2 bottom-2 text-[10px] font-mono text-cyan-200/65 pointer-events-none">
-        Drag corner to resize
+    <div
+      class="drafting-stage relative mx-auto w-full max-w-[1040px]"
+      bind:this={draftingHost}
+      role="presentation"
+      onmouseenter={() => {
+        draftingPinned = true;
+        activateDraftingWhenIdle();
+      }}
+      onmouseleave={() => {
+        draftingPinned = false;
+      }}
+      onfocusin={() => {
+        draftingPinned = true;
+        activateDraftingWhenIdle();
+      }}
+      onfocusout={() => {
+        draftingPinned = false;
+      }}
+    >
+      <div class="absolute inset-0 opacity-[0.055] pointer-events-none" style="background-image: radial-gradient(#2dd4bf 1px, transparent 1px); background-size: 18px 18px;"></div>
+      <div class="drafting-viewport relative overflow-hidden rounded-xl border border-teal-400/18 bg-[#041724]">
+        {#if draftingShouldRender}
+          <div class="aspect-[1/1] w-full min-h-[520px]">
+            <BushingDrafting
+              inputs={draftingView}
+              legacyMode={useLegacyRenderer}
+              {renderMode}
+              onRenderDiagnostics={(diag) => onRenderDiagnostics(diag)}
+              onRenderInitFailure={onRenderInitFailure}
+            />
+          </div>
+        {:else}
+          <div class="flex min-h-[520px] items-center justify-center px-6 text-center">
+            <div class="max-w-md rounded-2xl border border-teal-300/18 bg-black/24 px-5 py-4 text-[12px] leading-relaxed text-cyan-100/82">
+              Interactive sketch will load when this card is mostly in view. Export actions already use the solved drafting model; the live renderer stays deferred offscreen to keep scrolling responsive.
+            </div>
+          </div>
+        {/if}
       </div>
     </div>
     {#if advancedMode && (visualDiagnostics.length || renderDiagnostics.length)}
@@ -168,3 +239,20 @@
     {/if}
   </div>
 </Card>
+
+<style>
+  .drafting-shell {
+    contain: layout paint;
+  }
+
+  .drafting-stage {
+    content-visibility: auto;
+    contain-intrinsic-size: 760px 760px;
+  }
+
+  .drafting-viewport {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.03),
+      0 12px 30px rgba(2, 8, 23, 0.16);
+  }
+</style>

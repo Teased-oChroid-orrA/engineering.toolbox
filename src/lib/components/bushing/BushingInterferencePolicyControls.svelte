@@ -1,13 +1,25 @@
 <script lang="ts">
   import { Input, Label, Select } from '$lib/components/ui';
   import type { BushingInputs, BushingOutput } from '$lib/core/bushing';
+  import {
+    describeReamerEntryForDisplay,
+    type ReamerCatalogEntry
+  } from '$lib/core/bushing/reamerCatalog';
 
   let {
     form = $bindable(),
-    results
+    results,
+    reamerCatalogEntries = [],
+    selectedReamerEntry = null,
+    hasCustomReamerCatalog = false,
+    onImportReamerCsv = async (_file: File) => {}
   }: {
     form: BushingInputs;
     results: BushingOutput;
+    reamerCatalogEntries?: ReamerCatalogEntry[];
+    selectedReamerEntry?: ReamerCatalogEntry | null;
+    hasCustomReamerCatalog?: boolean;
+    onImportReamerCsv?: (file: File) => Promise<void> | void;
   } = $props();
 
   const CAPABILITY_MODE_ITEMS = [
@@ -39,8 +51,8 @@
 
   const presetDescription = (preset: PolicyPreset) => {
     if (preset === 'hold_requested_range') return 'Do not reshape the bore band. Report any conflict directly.';
-    if (preset === 'tighten_bore_only') return 'Allow bore tolerance width reduction, but keep bore nominal fixed.';
-    return 'Allow bore tolerance reduction and nominal shift within the permitted shift limit.';
+    if (preset === 'tighten_bore_only') return 'Tighten from the upper side only so the entered minimum bore is preserved.';
+    return 'Tighten from the upper side, then allow an upward-only shift within the permitted limit.';
   };
 
   const resolvePreset = (policy: NonNullable<BushingInputs['interferencePolicy']>): PolicyPreset => {
@@ -90,9 +102,11 @@
     if (!enforcementEnabled) return 'Strict containment is off. The solver reports the fit window but does not try to reshape the bore band.';
     if (reamerFixed) return 'Strict containment is on. Bore stays locked because the bore process is reamer-fixed.';
     if (activePreset === 'hold_requested_range') return 'Strict containment is on. The solver will hold the requested bore limits and report a conflict if they cannot satisfy the target interference window.';
-    if (activePreset === 'tighten_bore_only') return 'Strict containment is on. The solver may narrow the bore range, but the bore nominal stays fixed.';
-    return 'Strict containment is on. The solver may narrow the bore range and shift the bore nominal within the allowed limit.';
+    if (activePreset === 'tighten_bore_only') return 'Strict containment is on. The solver may tighten the bore from the upper side, but it will not reduce the entered minimum bore.';
+    return 'Strict containment is on. The solver may tighten the bore from the upper side and then shift the tightened band upward within the allowed limit.';
   });
+  let builtinEntries = $derived(reamerCatalogEntries.filter((entry) => entry.source === 'builtin'));
+  let customEntries = $derived(reamerCatalogEntries.filter((entry) => entry.source === 'custom'));
 </script>
 
 <div class="space-y-2">
@@ -113,9 +127,56 @@
     <Select bind:value={form.boreCapability!.mode} items={CAPABILITY_MODE_ITEMS} />
     <div class="text-[10px] text-cyan-200/70">{capabilitySummary(capability.mode)}</div>
   </div>
+  <div class="rounded-md border border-white/10 bg-black/20 px-3 py-3 text-xs text-white/80 space-y-2">
+    <div class="flex items-center justify-between gap-2">
+      <div>
+        <div class="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/85">Reamer Catalog</div>
+        <div class="mt-1 text-[10px] text-white/60">
+          Built-in aerospace catalog plus optional custom CSV import for shop-specific reamer inventories.
+        </div>
+      </div>
+      <label class="btn btn-xs variant-soft cursor-pointer">
+        Load CSV
+        <input
+          class="hidden"
+          type="file"
+          accept=".csv,text/csv"
+          onchange={async (event) => {
+            const file = (event.currentTarget as HTMLInputElement).files?.[0];
+            if (!file) return;
+            await onImportReamerCsv(file);
+            (event.currentTarget as HTMLInputElement).value = '';
+          }}
+        />
+      </label>
+    </div>
+    <div class="grid gap-2">
+      <div class="flex items-center justify-between gap-2 text-[10px] text-white/60">
+        <div>{hasCustomReamerCatalog ? `${customEntries.length} custom entries loaded.` : 'No custom reamer CSV loaded.'}</div>
+        <div>{builtinEntries.length} built-in aerospace entries available.</div>
+      </div>
+        <div class="rounded-md border border-white/10 bg-black/25 px-2 py-2 text-[10px] text-white/65">
+          Reamer selection now happens directly in the Geometry bore section and the Internal Profile `ID` section so tooling choice is made where the diameter is defined.
+        </div>
+      {#if selectedReamerEntry}
+        <div class="rounded-md border border-cyan-300/20 bg-cyan-500/10 px-2 py-2 text-[10px] text-cyan-100/90">
+          <div class="font-semibold uppercase tracking-wide text-[9px]">
+            Active bore reamer • {selectedReamerEntry.sizeLabel} • {selectedReamerEntry.availabilityTier}
+            {#if selectedReamerEntry.preferredRank}
+              • Preferred #{selectedReamerEntry.preferredRank}
+            {/if}
+          </div>
+          <div class="mt-1">{describeReamerEntryForDisplay(selectedReamerEntry, form.units)}</div>
+        </div>
+      {/if}
+    </div>
+  </div>
   {#if enforcementEnabled}
     <div class="space-y-1">
       <Label class="text-white/70">Solver behavior when limits conflict</Label>
+      <div class="rounded-md border border-cyan-300/20 bg-cyan-500/10 px-2 py-2 text-[10px] text-cyan-100/85">
+        If the entered bore minimum represents clean-up of a damaged hole, the solver now preserves that minimum and only tightens from the upper side. Upward nominal shift is only used when you explicitly allow it.
+      </div>
       <div class="grid grid-cols-1 gap-2">
         {#each (['hold_requested_range', 'tighten_bore_only', 'tighten_and_shift'] satisfies PolicyPreset[]) as preset}
           {@const disabled = reamerFixed && preset !== 'hold_requested_range'}

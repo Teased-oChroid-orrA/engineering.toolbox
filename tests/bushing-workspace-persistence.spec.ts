@@ -2,9 +2,11 @@ import { expect, test } from '@playwright/test';
 import {
   BUSHING_UI_KEY_V1,
   BUSHING_WORKSPACE_KEY_V1,
+  loadBushingEngineeringState,
   loadBushingRuntimeState,
   loadBushingUiState,
   loadTopLevelLayout,
+  persistBushingEngineeringState,
   persistBushingRuntimeState,
   persistBushingUiState
 } from '../src/lib/components/bushing/BushingLayoutPersistence';
@@ -70,16 +72,63 @@ function withMockWindow(fn: (storage: LocalStorageMock) => void) {
 test.describe('bushing workspace persistence', () => {
   test('persists UI and runtime into the unified workspace object', () => {
     withMockWindow((storage) => {
-      persistBushingUiState({ uxMode: 'advanced', useFreePositioning: true });
+      persistBushingUiState({ uxMode: 'advanced', workflowMode: 'review', useFreePositioning: true });
       persistBushingRuntimeState({ useLegacyRenderer: true, traceEnabled: true });
+      persistBushingEngineeringState({
+        selectedReamerEntryId: 'builtin:1_4:0.2500',
+        selectedIdReamerEntryId: 'builtin:3_16:0.1875',
+        sessionCustomReamerEntry: {
+          id: 'session:bore:test',
+          source: 'custom',
+          sizeLabel: 'Custom Bore',
+          nominalIn: 0.3125,
+          toolTolerancePlusIn: 0.0002,
+          toolToleranceMinusIn: 0,
+          availabilityTier: 'special',
+          preferredRank: null,
+          sourceFamily: 'session_custom',
+          sourceUrls: [],
+          notes: 'session'
+        },
+        sessionCustomIdReamerEntry: {
+          id: 'session:id:test',
+          source: 'custom',
+          sizeLabel: 'Custom ID',
+          nominalIn: 0.1875,
+          toolTolerancePlusIn: 0.0002,
+          toolToleranceMinusIn: 0,
+          availabilityTier: 'special',
+          preferredRank: null,
+          sourceFamily: 'session_custom',
+          sourceUrls: [],
+          notes: 'session'
+        },
+        customReamerCsv: 'size_label,nominal_in,tool_tolerance_plus_in,tool_tolerance_minus_in,availability_tier,preferred_rank,source_family,source_urls,notes',
+        activeComparePresetIds: ['baseline'],
+        scenarioPresets: [
+          {
+            id: 'baseline',
+            name: 'Baseline',
+            createdAt: 1,
+            form: { units: 'imperial' } as any
+          }
+        ]
+      });
 
-      expect(loadBushingUiState()).toEqual({ uxMode: 'advanced', useFreePositioning: true });
+      expect(loadBushingUiState()).toEqual({ uxMode: 'advanced', workflowMode: 'review', useFreePositioning: true });
       expect(loadBushingRuntimeState()).toEqual({ useLegacyRenderer: true, traceEnabled: true });
+      expect(loadBushingEngineeringState().selectedReamerEntryId).toBe('builtin:1_4:0.2500');
+      expect(loadBushingEngineeringState().selectedIdReamerEntryId).toBe('builtin:3_16:0.1875');
+      expect(loadBushingEngineeringState().activeComparePresetIds).toEqual(['baseline']);
+      expect(loadBushingEngineeringState().sessionCustomReamerEntry?.sizeLabel).toBe('Custom Bore');
+      expect(loadBushingEngineeringState().sessionCustomIdReamerEntry?.sizeLabel).toBe('Custom ID');
 
       const workspace = JSON.parse(storage.getItem(BUSHING_WORKSPACE_KEY_V1) ?? '{}');
-      expect(workspace.ui).toEqual({ uxMode: 'advanced', useFreePositioning: true });
+      expect(workspace.ui).toEqual({ uxMode: 'advanced', workflowMode: 'review', useFreePositioning: true });
       expect(workspace.runtime).toEqual({ useLegacyRenderer: true, traceEnabled: true });
-      expect(JSON.parse(storage.getItem(BUSHING_UI_KEY_V1) ?? '{}')).toEqual({ uxMode: 'advanced', useFreePositioning: true });
+      expect(workspace.engineering.selectedReamerEntryId).toBe('builtin:1_4:0.2500');
+      expect(workspace.engineering.selectedIdReamerEntryId).toBe('builtin:3_16:0.1875');
+      expect(JSON.parse(storage.getItem(BUSHING_UI_KEY_V1) ?? '{}')).toEqual({ uxMode: 'advanced', workflowMode: 'review', useFreePositioning: true });
     });
   });
 

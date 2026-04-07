@@ -41,6 +41,7 @@ import type {
   DialogMod,
 } from './InspectorStateTypes';
 import type { Recipe } from './InspectorRecipesController';
+import type { WorkspaceSnapshot } from './InspectorRecipesController';
 
 /**
  * Specialized context types for specific controller domains.
@@ -122,9 +123,11 @@ export type RecipesControllerContext = Pick<
   | 'datasetId'
   | 'datasetLabel'
   | 'recipes'
+  | 'workspaceSnapshots'
   | 'recipeNotice'
   | 'recipeName'
   | 'recipeTags'
+  | 'snapshotName'
   | 'autoRestoreEnabled'
   | 'hasLoaded'
   | 'headers'
@@ -139,12 +142,15 @@ export type RecipesControllerContext = Pick<
   LEGACY_RECIPES_STORE_KEYS: string[];
   LAST_STATE_STORE_KEY: string;
   LEGACY_LAST_STATE_KEYS: string[];
+  WORKSPACE_SNAPSHOTS_KEY: string;
   loadRecipesForDatasetFromStore: (key: string, legacyKeys: string[], dsId: string) => Recipe[];
   persistRecipesForDatasetToStore: (key: string, legacyKeys: string[], dsId: string, label: string, recipes: Recipe[]) => void;
   loadLastStateForDatasetFromStore: (key: string, legacyKeys: string[], dsId: string) => { state: any; autoRestore: boolean };
   persistLastStateForDatasetToStore: (key: string, legacyKeys: string[], dsId: string, state: any, autoRestore: boolean) => void;
+  loadWorkspaceSnapshotsFromStore: (key: string) => WorkspaceSnapshot[];
+  persistWorkspaceSnapshotsToStore: (key: string, snapshots: WorkspaceSnapshot[]) => void;
   buildRecipeExportBlob: (data: { datasetId: string; datasetLabel: string; recipes: Recipe[] }) => any;
-  mergeImportedRecipes: (existing: Recipe[], imported: Recipe[]) => Recipe[];
+  mergeImportedRecipes: (args: { payload: any; targetId: string; targetLabel: string; existing: Recipe[] }) => Recipe[];
   newRecipeId: () => string;
   captureState: () => any;
   applyState: (state: any) => Promise<void>;

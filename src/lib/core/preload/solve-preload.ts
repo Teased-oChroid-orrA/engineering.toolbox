@@ -13,11 +13,28 @@ import type {
   InstallationUncertaintyResult,
   InstallationInput,
   InstallationResult,
+  PreloadCompareCase,
+  PreloadCompareMetricSnapshot,
+  PreloadComparePack,
+  PreloadComparePackId,
+  PreloadInverseTargetSettings,
   PreloadInverseTargetResult,
   PreloadScenarioVariant
 } from './types';
 
 const DEG_TO_RAD = Math.PI / 180;
+const COMPARE_PACK_CACHE_LIMIT = 12;
+const comparePackCache = new Map<string, PreloadComparePack[]>();
+
+export function defaultPreloadInverseTargetSettings(): PreloadInverseTargetSettings {
+  return {
+    slipMaxUtilization: 1,
+    separationMaxUtilization: 1,
+    proofMaxUtilization: 0.85,
+    bearingMaxUtilization: 0.85,
+    fatigueMaxUtilization: 0.85
+  };
+}
 
 function assertPositive(name: string, value: number): void {
   if (!Number.isFinite(value) || value <= 0) {
@@ -147,6 +164,25 @@ function clonePreloadInput(input: FastenedJointPreloadInput): FastenedJointPrelo
   return JSON.parse(JSON.stringify(input)) as FastenedJointPreloadInput;
 }
 
+function cloneComparePacks(packs: PreloadComparePack[]): PreloadComparePack[] {
+  return JSON.parse(JSON.stringify(packs)) as PreloadComparePack[];
+}
+
+function getCachedComparePacks(key: string): PreloadComparePack[] | null {
+  const cached = comparePackCache.get(key);
+  if (!cached) return null;
+  comparePackCache.delete(key);
+  comparePackCache.set(key, cached);
+  return cloneComparePacks(cached);
+}
+
+function setCachedComparePacks(key: string, packs: PreloadComparePack[]) {
+  comparePackCache.set(key, cloneComparePacks(packs));
+  if (comparePackCache.size <= COMPARE_PACK_CACHE_LIMIT) return;
+  const oldestKey = comparePackCache.keys().next().value as string | undefined;
+  if (oldestKey) comparePackCache.delete(oldestKey);
+}
+
 function zeroInstallationUncertainty(): InstallationUncertaintyInput {
   return {
     legacyScatterPercent: 0,
@@ -167,6 +203,95 @@ function buildDeterministicDirectPreloadInput(input: FastenedJointPreloadInput, 
   candidate.installationScatterPercent = 0;
   candidate.installationUncertainty = zeroInstallationUncertainty();
   return candidate;
+}
+
+function governingBearingUtilization(output: FastenedJointPreloadOutput): number | null {
+  if (output.checks.bearing.governing === 'under_head') return output.checks.bearing.underHead.utilization;
+  if (output.checks.bearing.governing === 'thread_bearing') return output.checks.bearing.threadBearing.utilization;
+  if (output.checks.bearing.governing === 'local_crushing') return output.checks.bearing.localCrushing.utilization;
+  return null;
+}
+
+function buildDefaultServiceCase(
+  serviceCase: FastenedJointPreloadInput['serviceCase']
+): NonNullable<FastenedJointPreloadInput['serviceCase']> {
+  return {
+    externalAxialLoad: 0,
+    externalTransverseLoad: 0,
+    meanAxialLoad: 0,
+    alternatingAxialLoad: 0,
+    temperatureChange: 0,
+    embedmentSettlement: 0,
+    coatingCrushLoss: 0,
+    washerSeatingLoss: 0,
+    relaxationLossPercent: 0,
+    creepLossPercent: 0,
+    ...(serviceCase ?? {})
+  };
+}
+
+function scaleValue(value: number, factor: number, floorIncrement = 0): number {
+  if (value <= 0) return factor >= 1 ? floorIncrement : 0;
+  return Math.max(0, value * factor + (factor >= 1 ? floorIncrement : 0));
+}
+
+function collectCompareMetrics(result: FastenedJointPreloadOutput): PreloadCompareMetricSnapshot {
+  return {
+    preloadInstalled: result.installation.preload,
+    preloadEffective: result.service?.preloadEffective ?? null,
+    clampForceService: result.service?.clampForceService ?? null,
+    boltLoadService: result.service?.boltLoadService ?? null,
+    separationUtilization: result.checks.serviceLimits.separation.utilization,
+    slipUtilization: result.checks.serviceLimits.slip.utilization,
+    proofUtilization: result.checks.proof.utilization,
+    bearingUtilization: governingBearingUtilization(result),
+    fatigueUtilization: result.checks.fatigue.utilization,
+    thermalPreloadShift: result.service?.thermalPreloadShift ?? null,
+    mechanicalLossTotal: result.service?.preloadLossBreakdown.mechanicalLossTotal ?? null,
+    netPreloadShift: result.service?.preloadLossBreakdown.netPreloadShift ?? null,
+    separationState: result.service?.separationState ?? null,
+    fayingSurfaceSlipCoeff: result.input.fayingSurfaceSlipCoeff ?? null,
+    frictionInterfaceCount: result.input.frictionInterfaceCount ?? null
+  };
+}
+
+function buildCompareCase(
+  input: FastenedJointPreloadInput,
+  packId: PreloadComparePackId,
+  id: string,
+  label: string,
+  note: string,
+  mutate: (candidate: FastenedJointPreloadInput) => void
+): PreloadCompareCase {
+  const candidate = clonePreloadInput(input);
+  mutate(candidate);
+  const result = computeFastenedJointPreload(candidate);
+  return {
+    id,
+    packId,
+    label,
+    note,
+    result,
+    metrics: collectCompareMetrics(result)
+  };
+}
+
+function buildInstalledPreloadCompareCase(
+  input: FastenedJointPreloadInput,
+  id: EnvelopeScenarioLabel,
+  label: string,
+  note: string,
+  preload: number
+): PreloadCompareCase {
+  const result = computeFastenedJointPreload(buildDeterministicDirectPreloadInput(input, preload));
+  return {
+    id,
+    packId: 'installed_preload',
+    label,
+    note,
+    result,
+    metrics: collectCompareMetrics(result)
+  };
 }
 
 function estimateThreadedArea(nominalDiameter: number): number {
@@ -625,55 +750,239 @@ export function computeFastenedJointPreload(input: FastenedJointPreloadInput): F
 }
 
 export function buildPreloadScenarioVariants(input: FastenedJointPreloadInput): PreloadScenarioVariant[] {
+  const pack = buildPreloadComparePacks(input).find((entry) => entry.id === 'installed_preload');
+  return (
+    pack?.cases.map((entry) => ({
+      id: entry.id as EnvelopeScenarioLabel,
+      label: entry.label,
+      preloadInstalled: entry.metrics.preloadInstalled,
+      preloadEffective: entry.metrics.preloadEffective,
+      clampForceService: entry.metrics.clampForceService,
+      boltLoadService: entry.metrics.boltLoadService,
+      separationUtilization: entry.metrics.separationUtilization,
+      slipUtilization: entry.metrics.slipUtilization,
+      proofUtilization: entry.metrics.proofUtilization,
+      note: entry.note
+    })) ?? []
+  );
+}
+
+export function buildPreloadComparePacks(input: FastenedJointPreloadInput): PreloadComparePack[] {
+  const cacheKey = JSON.stringify(input);
+  const cached = getCachedComparePacks(cacheKey);
+  if (cached) return cached;
   const nominal = computeFastenedJointPreload(input);
-  const cases: Array<{ id: EnvelopeScenarioLabel; preload: number; label: string; note: string }> = [
+  const baselineServiceCase = buildDefaultServiceCase(input.serviceCase);
+  const baselineSlipCoeff = Math.max(0.05, Number(input.fayingSurfaceSlipCoeff ?? 0.22));
+  const thermalSpan = Math.max(40, Math.abs(Number(baselineServiceCase.temperatureChange ?? 0)));
+  const installedPreloadCases = [
+    buildInstalledPreloadCompareCase(
+      input,
+      'min_preload',
+      'Min preload',
+      'Lower installed-preload bound after explicit installation uncertainty.',
+      nominal.installation.preloadMin
+    ),
+    buildInstalledPreloadCompareCase(
+      input,
+      'nominal_preload',
+      'Nominal preload',
+      'Nominal installed preload from the selected installation model.',
+      nominal.installation.preload
+    ),
+    buildInstalledPreloadCompareCase(
+      input,
+      'max_preload',
+      'Max preload',
+      'Upper installed-preload bound after explicit installation uncertainty.',
+      nominal.installation.preloadMax
+    )
+  ];
+  const lossReliefCase = buildCompareCase(
+    input,
+    'preload_loss',
+    'loss_relief',
+    'Loss relief',
+    'Cuts the explicit seating, crush, relaxation, creep, and embedment losses to show recovery potential.',
+    (candidate) => {
+      const next = buildDefaultServiceCase(candidate.serviceCase);
+      candidate.serviceCase = {
+        ...next,
+        embedmentSettlement: scaleValue(Number(next.embedmentSettlement ?? 0), 0.5),
+        coatingCrushLoss: scaleValue(Number(next.coatingCrushLoss ?? 0), 0.5),
+        washerSeatingLoss: scaleValue(Number(next.washerSeatingLoss ?? 0), 0.5),
+        relaxationLossPercent: scaleValue(Number(next.relaxationLossPercent ?? 0), 0.5),
+        creepLossPercent: scaleValue(Number(next.creepLossPercent ?? 0), 0.5)
+      };
+    }
+  );
+  const lossBaselineCase = buildCompareCase(
+    input,
+    'preload_loss',
+    'loss_baseline',
+    'Baseline loss',
+    'Current explicit preload-loss inputs resolved with the live solver.',
+    () => {}
+  );
+  const lossPenaltyCase = buildCompareCase(
+    input,
+    'preload_loss',
+    'loss_penalty',
+    'Loss penalty',
+    'Amplifies embedment, seating, crush, relaxation, and creep to show the retained-clamp downside.',
+    (candidate) => {
+      const next = buildDefaultServiceCase(candidate.serviceCase);
+      candidate.serviceCase = {
+        ...next,
+        embedmentSettlement: scaleValue(Number(next.embedmentSettlement ?? 0), 1.5, 0.00004),
+        coatingCrushLoss: scaleValue(Number(next.coatingCrushLoss ?? 0), 1.5, 2),
+        washerSeatingLoss: scaleValue(Number(next.washerSeatingLoss ?? 0), 1.5, 2),
+        relaxationLossPercent: scaleValue(Number(next.relaxationLossPercent ?? 0), 1.5, 0.5),
+        creepLossPercent: scaleValue(Number(next.creepLossPercent ?? 0), 1.5, 0.5)
+      };
+    }
+  );
+
+  const packs: PreloadComparePack[] = [
     {
-      id: 'min_preload',
-      preload: nominal.installation.preloadMin,
-      label: 'Min preload',
-      note: 'Lower installed-preload bound after explicit installation uncertainty.'
+      id: 'installed_preload',
+      label: 'Installed preload strip',
+      description: 'Min / nominal / max installed preload resolved as deterministic direct-preload cases.',
+      baselineCaseId: 'nominal_preload',
+      cases: installedPreloadCases
     },
     {
-      id: 'nominal_preload',
-      preload: nominal.installation.preload,
-      label: 'Nominal preload',
-      note: 'Nominal installed preload from the selected installation model.'
+      id: 'thermal',
+      label: 'Thermal compare pack',
+      description: 'Cold / baseline / hot temperature excursions resolved against the live service case.',
+      baselineCaseId: 'thermal_baseline',
+      cases: [
+        buildCompareCase(
+          input,
+          'thermal',
+          'thermal_cold',
+          'Cold soak',
+          `Shifts service temperature by -${thermalSpan.toFixed(0)} from the current baseline.`,
+          (candidate) => {
+            const next = buildDefaultServiceCase(candidate.serviceCase);
+            candidate.serviceCase = {
+              ...next,
+              temperatureChange: Number(baselineServiceCase.temperatureChange ?? 0) - thermalSpan
+            };
+          }
+        ),
+        buildCompareCase(
+          input,
+          'thermal',
+          'thermal_baseline',
+          'Baseline thermal',
+          'Resolves the current service temperature without additional perturbation.',
+          (candidate) => {
+            candidate.serviceCase = buildDefaultServiceCase(candidate.serviceCase);
+          }
+        ),
+        buildCompareCase(
+          input,
+          'thermal',
+          'thermal_hot',
+          'Hot soak',
+          `Shifts service temperature by +${thermalSpan.toFixed(0)} from the current baseline.`,
+          (candidate) => {
+            const next = buildDefaultServiceCase(candidate.serviceCase);
+            candidate.serviceCase = {
+              ...next,
+              temperatureChange: Number(baselineServiceCase.temperatureChange ?? 0) + thermalSpan
+            };
+          }
+        )
+      ]
     },
     {
-      id: 'max_preload',
-      preload: nominal.installation.preloadMax,
-      label: 'Max preload',
-      note: 'Upper installed-preload bound after explicit installation uncertainty.'
+      id: 'friction',
+      label: 'Friction compare pack',
+      description: 'Shows how tightening friction and slip coefficient changes move the governing state.',
+      baselineCaseId: 'friction_baseline',
+      cases: [
+        buildCompareCase(
+          input,
+          'friction',
+          'friction_penalty',
+          'Friction penalty',
+          'Higher tightening friction and lower interface slip coefficient reduce retained margin.',
+          (candidate) => {
+            candidate.fayingSurfaceSlipCoeff = Math.max(0.05, baselineSlipCoeff * 0.85);
+            if (candidate.installation.model === 'exact_torque') {
+              candidate.installation = {
+                ...candidate.installation,
+                threadFrictionCoeff: Math.max(0, Number(candidate.installation.threadFrictionCoeff) * 1.12),
+                bearingFrictionCoeff: Math.max(0, Number(candidate.installation.bearingFrictionCoeff) * 1.12)
+              };
+            }
+          }
+        ),
+        buildCompareCase(
+          input,
+          'friction',
+          'friction_baseline',
+          'Baseline friction',
+          'Current tightening and faying-surface friction inputs.',
+          () => {}
+        ),
+        buildCompareCase(
+          input,
+          'friction',
+          'friction_relief',
+          'Friction relief',
+          'Lower tightening friction and higher interface slip coefficient improve the compare case.',
+          (candidate) => {
+            candidate.fayingSurfaceSlipCoeff = baselineSlipCoeff * 1.15;
+            if (candidate.installation.model === 'exact_torque') {
+              candidate.installation = {
+                ...candidate.installation,
+                threadFrictionCoeff: Math.max(0, Number(candidate.installation.threadFrictionCoeff) * 0.88),
+                bearingFrictionCoeff: Math.max(0, Number(candidate.installation.bearingFrictionCoeff) * 0.88)
+              };
+            }
+          }
+        )
+      ]
+    },
+    {
+      id: 'preload_loss',
+      label: 'Loss compare pack',
+      description: 'Compares how explicit preload-loss assumptions change clamp retention and downstream checks.',
+      baselineCaseId: 'loss_baseline',
+      cases: [lossReliefCase, lossBaselineCase, lossPenaltyCase]
     }
   ];
-
-  return cases.map((entry) => {
-    const resolved = computeFastenedJointPreload(buildDeterministicDirectPreloadInput(input, entry.preload));
-    return {
-      id: entry.id,
-      label: entry.label,
-      preloadInstalled: resolved.installation.preload,
-      preloadEffective: resolved.service?.preloadEffective ?? null,
-      clampForceService: resolved.service?.clampForceService ?? null,
-      boltLoadService: resolved.service?.boltLoadService ?? null,
-      separationUtilization: resolved.checks.serviceLimits.separation.utilization,
-      slipUtilization: resolved.checks.serviceLimits.slip.utilization,
-      proofUtilization: resolved.checks.proof.utilization,
-      note: entry.note
-    };
-  });
+  setCachedComparePacks(cacheKey, packs);
+  return cloneComparePacks(packs);
 }
 
 export function solveEnvelopeAwareInverseTargets(
   input: FastenedJointPreloadInput,
-  nominalOutput: FastenedJointPreloadOutput | null = null
+  nominalOutput: FastenedJointPreloadOutput | null = null,
+  settings: Partial<PreloadInverseTargetSettings> = {}
 ): PreloadInverseTargetResult[] {
   const output = nominalOutput ?? computeFastenedJointPreload(input);
+  const proofMaxUtilization =
+    settings.proofMaxUtilization ?? settings.proofTargetUtilization ?? defaultPreloadInverseTargetSettings().proofMaxUtilization;
+  const fatigueMaxUtilization =
+    settings.fatigueMaxUtilization ??
+    settings.fatigueTargetUtilization ??
+    defaultPreloadInverseTargetSettings().fatigueMaxUtilization;
+  const resolvedSettings = {
+    ...defaultPreloadInverseTargetSettings(),
+    ...settings,
+    proofMaxUtilization,
+    fatigueMaxUtilization
+  };
   const results: PreloadInverseTargetResult[] = [];
 
   const noSlipTarget = solveBisectionTarget(
     input,
-    (candidateResult) => (candidateResult.checks.worstCaseScenarios.slip.utilization ?? Infinity) <= 1,
+    (candidateResult) =>
+      (candidateResult.checks.worstCaseScenarios.slip.utilization ?? Infinity) <= resolvedSettings.slipMaxUtilization,
     (candidate, trial) => {
       candidate.installation = {
         model: 'direct_preload',
@@ -692,8 +1001,8 @@ export function solveEnvelopeAwareInverseTargets(
     unit: 'lbf',
     note:
       noSlipTarget !== null
-        ? 'Direct-preload equivalent needed to keep the worst-case slip utilization at or below 1.00.'
-        : 'The current friction/contact model could not reach slip utilization <= 1 within the bounded search range.',
+        ? `Direct-preload equivalent needed to keep the worst-case slip utilization at or below ${resolvedSettings.slipMaxUtilization.toFixed(2)}.`
+        : `The current friction/contact model could not reach slip utilization <= ${resolvedSettings.slipMaxUtilization.toFixed(2)} within the bounded search range.`,
     severity:
       noSlipTarget === null
         ? 'fail'
@@ -702,10 +1011,60 @@ export function solveEnvelopeAwareInverseTargets(
           : 'pass',
     feasible: noSlipTarget !== null,
     governingScenario: output.checks.worstCaseScenarios.slip.scenario,
-    targetUtilization: 1
+    targetUtilization: resolvedSettings.slipMaxUtilization
   });
 
-  const targetProofUtilization = 0.85;
+  if (!output.service || output.checks.serviceLimits.separation.status === 'unavailable') {
+    results.push({
+      id: 'separation_preload',
+      label: 'Required preload for no-separation',
+      value: null,
+      unit: 'lbf',
+      note: 'Separation preload target is unavailable until the route has an explicit service case to evaluate.',
+      severity: 'unknown',
+      feasible: false,
+      governingScenario: output.checks.worstCaseScenarios.separation.scenario,
+      targetUtilization: resolvedSettings.separationMaxUtilization
+    });
+  } else {
+    const noSeparationTarget = solveBisectionTarget(
+      input,
+      (candidateResult) =>
+        (candidateResult.checks.worstCaseScenarios.separation.utilization ?? Infinity) <=
+        resolvedSettings.separationMaxUtilization,
+      (candidate, trial) => {
+        candidate.installation = {
+          model: 'direct_preload',
+          targetPreload: trial
+        };
+        candidate.installationScatterPercent = input.installationScatterPercent;
+        candidate.installationUncertainty = clonePreloadInput(input).installationUncertainty;
+      },
+      0,
+      Math.max(1000, (output.installation.preloadMax ?? output.installation.preload) * 4)
+    );
+    results.push({
+      id: 'separation_preload',
+      label: 'Required preload for no-separation',
+      value: noSeparationTarget,
+      unit: 'lbf',
+      note:
+        noSeparationTarget !== null
+          ? `Direct-preload equivalent needed to keep the worst-case separation utilization at or below ${resolvedSettings.separationMaxUtilization.toFixed(2)}.`
+          : `The current loss and service-load combination could not reach separation utilization <= ${resolvedSettings.separationMaxUtilization.toFixed(2)} within the bounded search range.`,
+      severity:
+        noSeparationTarget === null
+          ? 'fail'
+          : noSeparationTarget > output.installation.preload
+            ? 'attention'
+            : 'pass',
+      feasible: noSeparationTarget !== null,
+      governingScenario: output.checks.worstCaseScenarios.separation.scenario,
+      targetUtilization: resolvedSettings.separationMaxUtilization
+    });
+  }
+
+  const targetProofUtilization = resolvedSettings.proofMaxUtilization;
   const minimumDiameter = solveBisectionTarget(
     input,
     (candidateResult) => (candidateResult.checks.worstCaseScenarios.proof.utilization ?? Infinity) <= targetProofUtilization,
@@ -760,7 +1119,10 @@ export function solveEnvelopeAwareInverseTargets(
   );
   const requiredOuter =
     Number.isFinite(Number(governingBearingDemand)) && bearingAllowable > 0
-      ? Math.sqrt(currentInner * currentInner + (4 * (Number(governingBearingDemand) / (bearingAllowable * 0.85))) / Math.PI)
+      ? Math.sqrt(
+          currentInner * currentInner +
+            (4 * (Number(governingBearingDemand) / (bearingAllowable * resolvedSettings.bearingMaxUtilization))) / Math.PI
+        )
       : null;
   results.push({
     id: 'bearing_face_od',
@@ -769,7 +1131,7 @@ export function solveEnvelopeAwareInverseTargets(
     unit: 'in',
     note:
       requiredOuter !== null
-        ? 'Equivalent annulus OD needed to keep the governing worst-case bearing utilization at or below 0.85.'
+        ? `Equivalent annulus OD needed to keep the governing worst-case bearing utilization at or below ${resolvedSettings.bearingMaxUtilization.toFixed(2)}.`
         : 'Bearing-face OD target is unavailable because the governing bearing demand/capacity is incomplete.',
     severity:
       requiredOuter === null
@@ -785,8 +1147,65 @@ export function solveEnvelopeAwareInverseTargets(
           : 'pass',
     feasible: requiredOuter !== null,
     governingScenario: output.checks.worstCaseScenarios.bearing.scenario,
-    targetUtilization: 0.85
+    targetUtilization: resolvedSettings.bearingMaxUtilization
   });
+
+  const targetFatigueUtilization = resolvedSettings.fatigueMaxUtilization;
+  if (output.checks.fatigue.status === 'unavailable') {
+    results.push({
+      id: 'fatigue_diameter',
+      label: 'Minimum nominal diameter for fatigue margin',
+      value: null,
+      unit: 'in',
+      note: 'Fatigue target is unavailable until endurance and ultimate inputs are supplied.',
+      severity: 'unknown',
+      feasible: false,
+      governingScenario: output.checks.worstCaseScenarios.fatigue.scenario,
+      targetUtilization: targetFatigueUtilization
+    });
+  } else {
+    const fatigueDiameter = solveBisectionTarget(
+      input,
+      (candidateResult) =>
+        (candidateResult.checks.worstCaseScenarios.fatigue.utilization ?? Infinity) <= targetFatigueUtilization,
+      (candidate, trial) => {
+        candidate.nominalDiameter = trial;
+        candidate.tensileStressArea = estimateThreadedArea(trial);
+        candidate.installationScatterPercent = input.installationScatterPercent;
+        candidate.installationUncertainty = clonePreloadInput(input).installationUncertainty;
+        if (candidate.boltSegments.length) {
+          candidate.boltSegments = candidate.boltSegments.map((segment, index) => ({
+            ...segment,
+            area:
+              index === candidate.boltSegments.length - 1
+                ? estimateThreadedArea(trial)
+                : Math.PI * 0.25 * trial * trial
+          }));
+        }
+      },
+      Math.max(0.05, input.nominalDiameter * 0.65),
+      Math.max(input.nominalDiameter * 2.5, input.nominalDiameter + 0.25)
+    );
+    results.push({
+      id: 'fatigue_diameter',
+      label: 'Minimum nominal diameter for fatigue margin',
+      value: fatigueDiameter,
+      unit: 'in',
+      note:
+        fatigueDiameter !== null
+          ? `Approximate diameter needed to keep worst-case fatigue utilization at or below ${targetFatigueUtilization.toFixed(2)}.`
+          : 'Fatigue diameter target could not be met within the bounded search range.',
+      severity:
+        fatigueDiameter === null
+          ? 'fail'
+          : fatigueDiameter > input.nominalDiameter
+            ? 'attention'
+            : 'pass',
+      feasible: fatigueDiameter !== null,
+      governingScenario: output.checks.worstCaseScenarios.fatigue.scenario,
+      targetUtilization: targetFatigueUtilization
+    });
+  }
 
   return results;
 }

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   buildJointAssemblyInput,
+  buildPreloadComparePacks,
   buildPreloadEquationSheetHtml,
   buildPreloadScenarioVariants,
   buildExactTorqueTerms,
@@ -304,7 +305,68 @@ test.describe('preload solver G1 core', () => {
 
   test('equation sheet report includes explicit intermediate values', () => {
     const out = computeFastenedJointPreload(baseInput);
-    const html = buildPreloadEquationSheetHtml(out);
+    const groupCases = solveFastenerGroupPatternCases(
+      {
+        mode: 'joint_interaction',
+        rowCount: 2,
+        columnCount: 2,
+        rowPitch: 1.5,
+        columnPitch: 1.75,
+        edgeDistanceX: 1.0,
+        edgeDistanceY: 0.9,
+        eccentricityX: 0.2,
+        eccentricityY: 0.1,
+        plateStiffnessRatioX: 1.2,
+        plateStiffnessRatioY: 0.9,
+        bypassLoadFactor: 0.2,
+        transferEfficiency: 0.65,
+        boltStiffness: 100_000,
+        memberStiffness: 240_000,
+        preloadPerFastener: 4200,
+        preloadVariationPercent: 10,
+        localMemberStiffnessVariationPercent: 15,
+        progressionStepLimit: 2
+      },
+      [
+        {
+          id: 'review-case',
+          label: 'Review case',
+          externalAxialLoad: 300,
+          externalShearX: 180,
+          externalShearY: 60,
+          externalMomentZ: 140
+        }
+      ]
+    );
+    const caseResult = groupCases.cases[0]?.result;
+    const html = buildPreloadEquationSheetHtml(
+      out,
+      caseResult
+        ? {
+            mode: groupCases.mode,
+            governingCaseLabel: groupCases.governingCaseLabel,
+            governingFastenerLabel: `F${caseResult.criticalFastenerIndex + 1}`,
+            progressionSummary: 'Redistribution rises across staged failure progression.',
+            cases: groupCases.cases.map((entry) => ({
+              label: entry.label,
+              criticalFastenerLabel: `F${entry.result.criticalFastenerIndex + 1}`,
+              criticalEquivalentDemand: entry.result.criticalEquivalentDemand,
+              isGoverning: entry.caseId === groupCases.governingCaseId
+            })),
+            progression: caseResult.progression.map((entry) => ({
+              step: entry.step,
+              removedLabel: entry.removedFastenerIndices.map((index) => `F${index + 1}`).join(', '),
+              activeFastenerCount: entry.activeFastenerCount,
+              criticalLabel: `F${entry.criticalFastenerIndex + 1}`,
+              criticalEquivalentDemand: entry.criticalEquivalentDemand,
+              note: entry.note,
+              criticalLoadShare: entry.criticalLoadShare,
+              criticalAxialLoad: entry.criticalAxialLoad,
+              criticalShearMagnitude: entry.criticalShearMagnitude
+            }))
+          }
+        : null
+    );
     expect(html).toContain('Fastened Joint Preload Analysis');
     expect(html).toContain('Joint constant C');
     expect(html).toContain('Self-loosening risk');
@@ -322,11 +384,20 @@ test.describe('preload solver G1 core', () => {
     expect(html).toContain('Worst-Case Scenario Picks');
     expect(html).toContain('Equation Traceability');
     expect(html).toContain('Standards / Method Basis');
+    expect(html).toContain('Compare Packs');
+    expect(html).toContain('Thermal compare pack');
+    expect(html).toContain('Friction compare pack');
+    expect(html).toContain('Loss compare pack');
+    expect(html).toContain('Inverse Solve Targets');
+    expect(html).toContain('Required preload for no-separation');
+    expect(html).toContain('Minimum nominal diameter for fatigue margin');
+    expect(html).toContain('Load-Transfer Progression');
   });
 
   test('core exports deterministic preload scenario variants and envelope-aware inverse targets', () => {
     const output = computeFastenedJointPreload(baseInput);
     const variants = buildPreloadScenarioVariants(baseInput);
+    const comparePacks = buildPreloadComparePacks(baseInput);
     const inverseTargets = solveEnvelopeAwareInverseTargets(baseInput, output);
     expect(variants).toHaveLength(3);
     expect(variants[0].id).toBe('min_preload');
@@ -334,15 +405,23 @@ test.describe('preload solver G1 core', () => {
     expect(variants[2].id).toBe('max_preload');
     expect(variants[0].preloadInstalled).toBeLessThanOrEqual(variants[1].preloadInstalled);
     expect(variants[2].preloadInstalled).toBeGreaterThanOrEqual(variants[1].preloadInstalled);
-    expect(inverseTargets).toHaveLength(3);
+    expect(comparePacks.map((pack) => pack.id)).toEqual(['installed_preload', 'thermal', 'friction', 'preload_loss']);
+    expect(comparePacks.every((pack) => pack.cases.length === 3)).toBeTruthy();
+    expect(inverseTargets).toHaveLength(5);
     expect(inverseTargets.find((entry) => entry.id === 'no_slip_preload')?.governingScenario).toBe(
       output.checks.worstCaseScenarios.slip.scenario
+    );
+    expect(inverseTargets.find((entry) => entry.id === 'separation_preload')?.governingScenario).toBe(
+      output.checks.worstCaseScenarios.separation.scenario
     );
     expect(inverseTargets.find((entry) => entry.id === 'proof_diameter')?.governingScenario).toBe(
       output.checks.worstCaseScenarios.proof.scenario
     );
     expect(inverseTargets.find((entry) => entry.id === 'bearing_face_od')?.governingScenario).toBe(
       output.checks.worstCaseScenarios.bearing.scenario
+    );
+    expect(inverseTargets.find((entry) => entry.id === 'fatigue_diameter')?.governingScenario).toBe(
+      output.checks.worstCaseScenarios.fatigue.scenario
     );
   });
 
@@ -414,6 +493,9 @@ test.describe('preload solver G1 core', () => {
     expect(out.fasteners.every((fastener) => Number.isFinite(fastener.edgeShieldingFactor))).toBe(true);
     expect(out.redistributionFactor).toBeGreaterThanOrEqual(1);
     expect(out.progression[0].redistributionFactor).toBeGreaterThan(out.redistributionFactor);
+    expect(out.progression[0].fasteners.length).toBe(out.progression[0].activeFastenerCount);
+    expect(out.progression[0].removedFastenerIndex).toBeGreaterThanOrEqual(0);
+    expect(out.progression[0].criticalLoadShare).toBeGreaterThan(0);
   });
 
   test('multiple load cases return a governing case and fastener', () => {

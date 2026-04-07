@@ -30,7 +30,7 @@ import type {
   GateToken,
   DialogMod,
 } from './InspectorStateTypes';
-import type { Recipe } from './InspectorRecipesController';
+import type { Recipe, WorkspaceSnapshot } from './InspectorRecipesController';
 
 /**
  * Core controller context interface.
@@ -169,9 +169,11 @@ export interface InspectorControllerContext {
   // Recipes
   // ============================================================================
   recipes: Recipe[];
+  workspaceSnapshots: WorkspaceSnapshot[];
   recipeNotice: string | null;
   recipeName: string;
   recipeTags: string;
+  snapshotName: string;
   autoRestoreEnabled: boolean;
 
   // ============================================================================

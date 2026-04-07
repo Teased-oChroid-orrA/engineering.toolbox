@@ -51,9 +51,9 @@
               </div>
             {/if}
           {:else}
-            <div class="text-sm font-semibold text-cyan-100">Fit Physics</div>
-            <div class="text-white/80">This panel quantifies assembly fit mechanics. Interference produces radial contact pressure through member elastic compliance; install force is estimated from friction, pressure, and engagement length.</div>
-            <div class="text-white/80">Tolerance rows are displayed as `nominal (-minus, +plus)`. `Bushing OD` is the solver-selected band, `Target interference` is the requested fit window, and `Achieved interference` is the resulting stack-up.</div>
+            <div class="text-sm font-semibold text-cyan-100">Fit Envelope</div>
+            <div class="text-white/80">This panel summarizes the fit story from requested target, to achieved stack-up, to settled current-state interference after thermal correction. Interference produces radial contact pressure through member elastic compliance; install force is estimated from friction, pressure, and engagement length.</div>
+            <div class="text-white/80">Min / max rows show the actual envelope. `Bushing OD` is the solver-selected band, `Requested` is the target containment window, `Achieved` is the raw stack-up, and `Settled` is the current effective fit after thermal correction.</div>
             <div class="rounded-md border border-cyan-300/25 bg-cyan-500/5 p-2 text-[12px] text-cyan-100/95">
               Current effective interference: <span class="font-mono">{fmt(results.physics.deltaEffective, 4)}</span>
             </div>

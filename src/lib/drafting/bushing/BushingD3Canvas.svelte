@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { resolveBushingSectionParams } from '../../core/shared/bushingProfileGeometry';
+  import { makeRange } from '../../core/bushing/solveMath';
   import type { CanonicalDraftScene } from './BushingDraftRenderer';
   import { buildBushingSectionProfile } from './bushingSectionProfileBuilder';
   import type { BushingRenderMode, BushingScene } from './bushingSceneModel';
@@ -21,12 +24,17 @@
   } = $props();
 
   const SECTION_SIZE = 660;
-  type DimensionKey = 'od' | 'id' | 'length' | 'flange' | 'extCs' | 'intCs';
+  type DimensionKey = 'od' | 'id' | 'length' | 'flangeOd' | 'flangeThk' | 'extCsDia' | 'extCsDepth' | 'intCsDia' | 'intCsDepth';
 
   let zoom = $state(1);
   let showViews = $state(true);
   let selectedDimension = $state<DimensionKey>('od');
+  let hoveredDimension = $state<DimensionKey | null>(null);
+  let externalHoveredDimension = $state<DimensionKey | null>(null);
+  let tooltip = $state<{ x: number; y: number; key: DimensionKey } | null>(null);
+  let rootEl = $state<HTMLDivElement | null>(null);
   let previousGeometrySig = $state('');
+  let previousDiagnosticsSig = $state('');
   let isLegacyView = $derived(renderMode === 'legacy');
 
   let featureState = $derived.by(() => {
@@ -50,6 +58,13 @@
   let sectionBuild = $derived.by(() => {
     try {
       return buildBushingSectionProfile((viewModel ?? {}) as any);
+    } catch {
+      return null;
+    }
+  });
+  let sectionParams = $derived.by(() => {
+    try {
+      return resolveBushingSectionParams((viewModel ?? {}) as any, { mode: 'render' });
     } catch {
       return null;
     }
@@ -88,16 +103,17 @@
     const scale = sharedGeometryScale;
     if (!build || !scale) return null;
     const centerX = SECTION_SIZE * 0.5;
+    const housingOpeningDia = featureState.bore;
     const outerFaceDia = featureState.isFlanged
       ? featureState.flangeOd
       : featureState.extCs?.dia
         ? Number(featureState.extCs.dia)
-        : featureState.outer;
+        : housingOpeningDia;
     const innerFaceDia = featureState.intCs?.dia
       ? Number(featureState.intCs.dia)
       : Math.max(featureState.inner, featureState.bore);
     const rHousingOuter = build.dims.rHousing * scale;
-    const rHousingOpening = build.dims.rInner * scale;
+    const rHousingOpening = (housingOpeningDia / 2) * scale;
     const rBushingOuter = (outerFaceDia / 2) * scale;
     const rBushingInner = (innerFaceDia / 2) * scale;
     const maxRadius = Math.max(rHousingOuter, rBushingOuter, rBushingInner, 1e-6);
@@ -128,25 +144,91 @@
       flangeThk: flangeThk.toFixed(3),
       extCsDia: extCs?.dia ? Number(extCs.dia).toFixed(3) : '---',
       extCsDepth: extCs?.depth ? Number(extCs.depth).toFixed(3) : '---',
-      intCsDia: intCs?.dia ? Number(intCs.dia).toFixed(3) : '---'
+      intCsDia: intCs?.dia ? Number(intCs.dia).toFixed(3) : '---',
+      intCsDepth: intCs?.depth ? Number(intCs.depth).toFixed(3) : '---'
     };
   });
 
   function setDimensionFocus(next: DimensionKey) {
     selectedDimension = next;
+    hoveredDimension = null;
+  }
+
+  const outerFaceDimension = $derived<DimensionKey>(featureState.isFlanged ? 'flangeOd' : featureState.extCs ? 'extCsDia' : 'od');
+  const innerFaceDimension = $derived<DimensionKey>(featureState.intCs ? 'intCsDia' : 'id');
+
+  function activeDimension(dim: DimensionKey): boolean {
+    return (externalHoveredDimension ?? hoveredDimension ?? selectedDimension) === dim;
+  }
+
+  function setTooltipForDimension(dim: DimensionKey, event?: MouseEvent) {
+    if (!rootEl || !event) {
+      tooltip = dim ? { x: 24, y: 88, key: dim } : null;
+      return;
+    }
+    const rect = rootEl.getBoundingClientRect();
+    tooltip = {
+      key: dim,
+      x: Math.max(18, Math.min(rect.width - 210, event.clientX - rect.left + 14)),
+      y: Math.max(54, Math.min(rect.height - 86, event.clientY - rect.top + 14))
+    };
+  }
+
+  function interactiveAttrs(dim: DimensionKey) {
+    return {
+      onclick: () => setDimensionFocus(dim),
+      onmouseenter: (event: MouseEvent) => {
+        hoveredDimension = dim;
+        setTooltipForDimension(dim, event);
+      },
+      onmousemove: (event: MouseEvent) => {
+        if (hoveredDimension === dim) setTooltipForDimension(dim, event);
+      },
+      onmouseleave: () => {
+        hoveredDimension = null;
+        tooltip = null;
+      }
+    };
   }
 
   function highlightColor(dim: DimensionKey): string {
-    if (selectedDimension !== dim) return 'rgba(148,163,184,0.72)';
-    if (dim === 'od' || dim === 'flange') return '#cbd5e1';
-    if (dim === 'id' || dim === 'intCs') return '#5eead4';
+    if (!activeDimension(dim)) return 'rgba(148,163,184,0.72)';
+    if (dim === 'od' || dim === 'flangeOd' || dim === 'flangeThk') return '#cbd5e1';
+    if (dim === 'id' || dim === 'intCsDia' || dim === 'intCsDepth') return '#5eead4';
     if (dim === 'length') return '#93c5fd';
     return '#f0abfc';
   }
 
   function highlightOpacity(dim: DimensionKey): number {
-    return selectedDimension === dim ? 1 : 0.62;
+    return activeDimension(dim) ? 1 : 0.62;
   }
+
+  function isDimensionKey(value: unknown): value is DimensionKey {
+    return value === 'od' || value === 'id' || value === 'length' || value === 'flangeOd' || value === 'flangeThk' || value === 'extCsDia' || value === 'extCsDepth' || value === 'intCsDia' || value === 'intCsDepth';
+  }
+
+  onMount(() => {
+    if (typeof window === 'undefined') return;
+    const handleHover = (event: Event) => {
+      const target = (event as CustomEvent<{ target?: unknown }>).detail?.target;
+      externalHoveredDimension = isDimensionKey(target) ? target : null;
+      if (!isDimensionKey(target)) tooltip = null;
+    };
+    const handleSelect = (event: Event) => {
+      const target = (event as CustomEvent<{ target?: unknown }>).detail?.target;
+      if (isDimensionKey(target)) {
+        selectedDimension = target;
+        externalHoveredDimension = target;
+        setTooltipForDimension(target);
+      }
+    };
+    window.addEventListener('bushing-sketch-hover', handleHover as EventListener);
+    window.addEventListener('bushing-sketch-select', handleSelect as EventListener);
+    return () => {
+      window.removeEventListener('bushing-sketch-hover', handleHover as EventListener);
+      window.removeEventListener('bushing-sketch-select', handleSelect as EventListener);
+    };
+  });
 
   $effect(() => {
     const state = featureState;
@@ -173,11 +255,11 @@
     const prev = JSON.parse(previousGeometrySig) as Record<string, unknown>;
     const changed = Object.keys(sigObj).filter((key) => JSON.stringify((sigObj as Record<string, unknown>)[key]) !== JSON.stringify(prev[key]));
     if (changed.some((key) => key.startsWith('extCs') || key === 'bushingType')) {
-      selectedDimension = state.extCs ? 'extCs' : state.isFlanged ? 'flange' : 'od';
+      selectedDimension = state.extCs ? 'extCsDia' : state.isFlanged ? 'flangeOd' : 'od';
     } else if (changed.some((key) => key.startsWith('intCs') || key === 'idType')) {
-      selectedDimension = state.intCs ? 'intCs' : 'id';
+      selectedDimension = state.intCs ? 'intCsDia' : 'id';
     } else if (changed.includes('flangeOd') || changed.includes('flangeThk') || changed.includes('isFlanged')) {
-      selectedDimension = state.isFlanged ? 'flange' : 'od';
+      selectedDimension = state.isFlanged ? 'flangeOd' : 'od';
     } else if (changed.includes('length')) {
       selectedDimension = 'length';
     } else if (changed.includes('outer')) {
@@ -198,14 +280,18 @@
       {
         severity: 'info',
         code: 'D3_INTERACTION_HINT',
-        message: 'Use + / - to zoom, Reset to reframe, Top toggle to show or hide the inset, and the dimension chips to focus callouts.'
+        message: 'Use + / - to zoom, Reset to reframe, Top toggle to show or hide the inset, and click directly on section or top-view features to focus dimensions.'
       }
     ];
   }
 
   $effect(() => {
     try {
-      onDiagnostics(diagnosticsForScene());
+      const diagnostics = diagnosticsForScene();
+      const nextSig = JSON.stringify(diagnostics);
+      if (nextSig === previousDiagnosticsSig) return;
+      previousDiagnosticsSig = nextSig;
+      onDiagnostics(diagnostics);
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'Unknown D3 render error.';
       onInitFailure(reason);
@@ -215,9 +301,93 @@
   $effect(() => {
     showViews = !isLegacyView;
   });
+
+  const toDisplayLength = (value: number) => (String(viewModel?.units ?? 'imperial') === 'metric' ? value * 25.4 : value);
+  const lengthUnit = () => (String(viewModel?.units ?? 'imperial') === 'metric' ? 'mm' : 'in');
+  const fmtRange = (lower: number, upper: number, digits = String(viewModel?.units ?? 'imperial') === 'metric' ? 3 : 4) =>
+    `${toDisplayLength(lower).toFixed(digits)} / ${toDisplayLength(upper).toFixed(digits)} ${lengthUnit()}`;
+  const fixedRange = (value: number) => makeRange('limits', value, value, value);
+  const measuredIdRange = $derived.by(() => {
+    if (viewModel?.measuredPart?.enabled && viewModel?.measuredPart?.basis === 'measured' && Number.isFinite(viewModel?.measuredPart?.id?.actual)) {
+      const actual = Number(viewModel?.measuredPart?.id?.actual);
+      return makeRange('limits', actual - Number(viewModel?.measuredPart?.id?.tolMinus ?? 0), actual + Number(viewModel?.measuredPart?.id?.tolPlus ?? 0), actual);
+    }
+    return fixedRange(Number(viewModel?.idBushing ?? featureState.inner));
+  });
+  const tooltipInfo = $derived.by(() => {
+    const key = tooltip?.key ?? externalHoveredDimension ?? hoveredDimension ?? null;
+    if (!key) return null;
+    const tolerance = viewModel?.tolerance;
+    const outerCsDia = tolerance?.csExternalDia ?? fixedRange(Number(viewModel?.geometry?.csExternal?.dia ?? featureState.extCs?.dia ?? 0));
+    const outerCsDepth = tolerance?.csExternalDepth ?? fixedRange(Number(viewModel?.geometry?.csExternal?.depth ?? featureState.extCs?.depth ?? 0));
+    const innerCsDia = tolerance?.csInternalDia ?? fixedRange(Number(viewModel?.geometry?.csInternal?.dia ?? featureState.intCs?.dia ?? 0));
+    const innerCsDepth = tolerance?.csInternalDepth ?? fixedRange(Number(viewModel?.geometry?.csInternal?.depth ?? featureState.intCs?.depth ?? 0));
+    const infoMap: Record<DimensionKey, { title: string; value: string; note: string }> = {
+      od: {
+        title: 'Bushing OD Band',
+        value: fmtRange(tolerance?.odBushing.lower ?? Number(viewModel?.geometry?.odBushing ?? featureState.outer), tolerance?.odBushing.upper ?? Number(viewModel?.geometry?.odBushing ?? featureState.outer)),
+        note: 'fit-driving installed OD band'
+      },
+      id: {
+        title: 'Bushing ID',
+        value: fmtRange(measuredIdRange.lower, measuredIdRange.upper),
+        note: 'through-bore / straight internal diameter'
+      },
+      length: {
+        title: 'Section Length',
+        value: fmtRange(Number(viewModel?.housingLen ?? featureState.length), Number(viewModel?.housingLen ?? featureState.length)),
+        note: 'engaged section length'
+      },
+      flangeOd: {
+        title: 'Flange OD',
+        value: fmtRange(Number(viewModel?.flangeOd ?? featureState.flangeOd), Number(viewModel?.flangeOd ?? featureState.flangeOd)),
+        note: 'outer flange face diameter'
+      },
+      flangeThk: {
+        title: 'Flange Thickness',
+        value: fmtRange(Number(viewModel?.flangeThk ?? featureState.flangeThk), Number(viewModel?.flangeThk ?? featureState.flangeThk)),
+        note: 'axial flange seat thickness'
+      },
+      extCsDia: {
+        title: 'External CS Dia',
+        value: fmtRange(outerCsDia.lower, outerCsDia.upper),
+        note: 'external countersink face diameter'
+      },
+      extCsDepth: {
+        title: 'External CS Depth',
+        value: fmtRange(outerCsDepth.lower, outerCsDepth.upper),
+        note: 'external countersink depth'
+      },
+      intCsDia: {
+        title: 'Internal CS Dia',
+        value: fmtRange(innerCsDia.lower, innerCsDia.upper),
+        note: 'internal countersink face diameter'
+      },
+      intCsDepth: {
+        title: 'Internal CS Depth',
+        value: fmtRange(innerCsDepth.lower, innerCsDepth.upper),
+        note: 'internal countersink depth'
+      }
+    };
+    return infoMap[key];
+  });
+
+  function activeDimensionLabel(dim: DimensionKey): string {
+    switch (dim) {
+      case 'od': return 'OD band';
+      case 'id': return 'ID';
+      case 'length': return 'Length';
+      case 'flangeOd': return 'Flange OD';
+      case 'flangeThk': return 'Flange thickness';
+      case 'extCsDia': return 'External CS dia';
+      case 'extCsDepth': return 'External CS depth';
+      case 'intCsDia': return 'Internal CS dia';
+      case 'intCsDepth': return 'Internal CS depth';
+    }
+  }
 </script>
 
-<div class="relative h-full w-full overflow-hidden rounded-xl">
+<div class="relative h-full w-full overflow-hidden rounded-xl" bind:this={rootEl}>
   <svg
     data-bushing-export-root="true"
     viewBox={`0 0 ${SECTION_SIZE} ${SECTION_SIZE}`}
@@ -252,35 +422,201 @@
           stroke-dasharray={`${8 / sectionView.scale} ${8 / sectionView.scale}`}
           opacity="0.38" />
         <path
+          data-dimension-target="od"
           d={sectionBuild.paths.leftHousingPath}
           fill="url(#d3HousingHatch)"
           stroke={highlightColor('od')}
           stroke-width={(selectedDimension === 'od' ? 1.8 : 1.1) / sectionView.scale}
-          opacity={highlightOpacity('od')} />
+          opacity={highlightOpacity('od')}
+          cursor="pointer"
+          {...interactiveAttrs('od')} />
         <path
+          data-dimension-target="od"
           d={sectionBuild.paths.rightHousingPath}
           fill="url(#d3HousingHatch)"
           stroke={highlightColor('od')}
           stroke-width={(selectedDimension === 'od' ? 1.8 : 1.1) / sectionView.scale}
-          opacity={highlightOpacity('od')} />
+          opacity={highlightOpacity('od')}
+          cursor="pointer"
+          {...interactiveAttrs('od')} />
         <path
+          data-dimension-target="od"
           d={sectionBuild.paths.leftBushingPath}
           fill={featureState.isFlanged ? 'url(#d3FlangeHatch)' : 'url(#d3BushingHatch)'}
-          stroke={featureState.isFlanged ? highlightColor('flange') : highlightColor('id')}
-          stroke-width={((featureState.isFlanged && selectedDimension === 'flange') || (!featureState.isFlanged && selectedDimension === 'id') ? 1.8 : 1.1) / sectionView.scale}
-          opacity={featureState.isFlanged ? highlightOpacity('flange') : highlightOpacity('id')} />
+          stroke={highlightColor('od')}
+          stroke-width={(activeDimension('od') ? 1.8 : 1.1) / sectionView.scale}
+          opacity={highlightOpacity('od')}
+          cursor="pointer"
+          {...interactiveAttrs('od')} />
         <path
+          data-dimension-target="od"
           d={sectionBuild.paths.rightBushingPath}
           fill="url(#d3BushingHatch)"
-          stroke={highlightColor(featureState.extCs ? 'extCs' : 'id')}
-          stroke-width={((featureState.extCs && selectedDimension === 'extCs') || (!featureState.extCs && selectedDimension === 'id') ? 1.8 : 1.1) / sectionView.scale}
-          opacity={featureState.extCs ? highlightOpacity('extCs') : highlightOpacity('id')} />
+          stroke={highlightColor('od')}
+          stroke-width={(activeDimension('od') ? 1.8 : 1.1) / sectionView.scale}
+          opacity={highlightOpacity('od')}
+          cursor="pointer"
+          {...interactiveAttrs('od')} />
         <path
+          data-dimension-target="id"
           d={sectionBuild.paths.boreVoidPath}
           fill="rgba(4, 24, 38, 0.96)"
-          stroke={highlightColor(featureState.intCs ? 'intCs' : 'id')}
-          stroke-width={((featureState.intCs && selectedDimension === 'intCs') || (!featureState.intCs && selectedDimension === 'id') ? 1.6 : 1.0) / sectionView.scale}
-          opacity={featureState.intCs ? highlightOpacity('intCs') : 0.92} />
+          stroke={highlightColor('id')}
+          stroke-width={(activeDimension('id') ? 1.6 : 1.0) / sectionView.scale}
+          opacity={0.92}
+          cursor="pointer"
+          {...interactiveAttrs('id')} />
+        {#if sectionParams}
+          <line
+            x1={-sectionParams.rOuter}
+            y1={sectionParams.zBottom}
+            x2={-sectionParams.rOuter}
+            y2={sectionParams.zExt}
+            stroke={highlightColor('od')}
+            stroke-width={(activeDimension('od') ? 6 : 5) / sectionView.scale}
+            stroke-linecap="round"
+            opacity="0.001"
+            cursor="pointer"
+            {...interactiveAttrs('od')} />
+          <line
+            x1={sectionParams.rOuter}
+            y1={sectionParams.zBottom}
+            x2={sectionParams.rOuter}
+            y2={sectionParams.zExt}
+            stroke={highlightColor('od')}
+            stroke-width={(activeDimension('od') ? 6 : 5) / sectionView.scale}
+            stroke-linecap="round"
+            opacity="0.001"
+            cursor="pointer"
+            {...interactiveAttrs('od')} />
+          <line
+            x1={-sectionParams.rInner}
+            y1={sectionParams.zBottom}
+            x2={-sectionParams.rInner}
+            y2={sectionParams.zInt}
+            stroke={highlightColor('id')}
+            stroke-width={(activeDimension('id') ? 6 : 5) / sectionView.scale}
+            stroke-linecap="round"
+            opacity="0.001"
+            cursor="pointer"
+            {...interactiveAttrs('id')} />
+          <line
+            x1={sectionParams.rInner}
+            y1={sectionParams.zBottom}
+            x2={sectionParams.rInner}
+            y2={sectionParams.zInt}
+            stroke={highlightColor('id')}
+            stroke-width={(activeDimension('id') ? 6 : 5) / sectionView.scale}
+            stroke-linecap="round"
+            opacity="0.001"
+            cursor="pointer"
+            {...interactiveAttrs('id')} />
+          {#if featureState.isFlanged}
+            <line
+              x1={-sectionParams.flangeR}
+              y1={sectionParams.zFlangeTop}
+              x2={sectionParams.flangeR}
+              y2={sectionParams.zFlangeTop}
+              stroke={highlightColor('flangeOd')}
+              stroke-width={(activeDimension('flangeOd') ? 6 : 5) / sectionView.scale}
+              stroke-linecap="round"
+              opacity="0.001"
+              cursor="pointer"
+              {...interactiveAttrs('flangeOd')} />
+            <line
+              x1={-sectionParams.flangeR}
+              y1={sectionParams.zFlangeTop}
+              x2={-sectionParams.flangeR}
+              y2={sectionParams.zTop}
+              stroke={highlightColor('flangeThk')}
+              stroke-width={(activeDimension('flangeThk') ? 6 : 5) / sectionView.scale}
+              stroke-linecap="round"
+              opacity="0.001"
+              cursor="pointer"
+              {...interactiveAttrs('flangeThk')} />
+            <line
+              x1={sectionParams.flangeR}
+              y1={sectionParams.zFlangeTop}
+              x2={sectionParams.flangeR}
+              y2={sectionParams.zTop}
+              stroke={highlightColor('flangeThk')}
+              stroke-width={(activeDimension('flangeThk') ? 6 : 5) / sectionView.scale}
+              stroke-linecap="round"
+              opacity="0.001"
+              cursor="pointer"
+              {...interactiveAttrs('flangeThk')} />
+          {/if}
+          {#if featureState.extCs}
+            <line
+              x1={-sectionParams.extTop}
+              y1={sectionParams.zTop}
+              x2={sectionParams.extTop}
+              y2={sectionParams.zTop}
+              stroke={highlightColor('extCsDia')}
+              stroke-width={(activeDimension('extCsDia') ? 6 : 5) / sectionView.scale}
+              stroke-linecap="round"
+              opacity="0.001"
+              cursor="pointer"
+              {...interactiveAttrs('extCsDia')} />
+            <line
+              x1={-sectionParams.extTop}
+              y1={sectionParams.zTop}
+              x2={-sectionParams.rOuter}
+              y2={sectionParams.zExt}
+              stroke={highlightColor('extCsDepth')}
+              stroke-width={(activeDimension('extCsDepth') ? 6 : 5) / sectionView.scale}
+              stroke-linecap="round"
+              opacity="0.001"
+              cursor="pointer"
+              {...interactiveAttrs('extCsDepth')} />
+            <line
+              x1={sectionParams.extTop}
+              y1={sectionParams.zTop}
+              x2={sectionParams.rOuter}
+              y2={sectionParams.zExt}
+              stroke={highlightColor('extCsDepth')}
+              stroke-width={(activeDimension('extCsDepth') ? 6 : 5) / sectionView.scale}
+              stroke-linecap="round"
+              opacity="0.001"
+              cursor="pointer"
+              {...interactiveAttrs('extCsDepth')} />
+          {/if}
+          {#if featureState.intCs}
+            <line
+              x1={-sectionParams.intTop}
+              y1={sectionParams.innerTopZ}
+              x2={sectionParams.intTop}
+              y2={sectionParams.innerTopZ}
+              stroke={highlightColor('intCsDia')}
+              stroke-width={(activeDimension('intCsDia') ? 6 : 5) / sectionView.scale}
+              stroke-linecap="round"
+              opacity="0.001"
+              cursor="pointer"
+              {...interactiveAttrs('intCsDia')} />
+            <line
+              x1={-sectionParams.intTop}
+              y1={sectionParams.innerTopZ}
+              x2={-sectionParams.rInner}
+              y2={sectionParams.zInt}
+              stroke={highlightColor('intCsDepth')}
+              stroke-width={(activeDimension('intCsDepth') ? 6 : 5) / sectionView.scale}
+              stroke-linecap="round"
+              opacity="0.001"
+              cursor="pointer"
+              {...interactiveAttrs('intCsDepth')} />
+            <line
+              x1={sectionParams.intTop}
+              y1={sectionParams.innerTopZ}
+              x2={sectionParams.rInner}
+              y2={sectionParams.zInt}
+              stroke={highlightColor('intCsDepth')}
+              stroke-width={(activeDimension('intCsDepth') ? 6 : 5) / sectionView.scale}
+              stroke-linecap="round"
+              opacity="0.001"
+              cursor="pointer"
+              {...interactiveAttrs('intCsDepth')} />
+          {/if}
+        {/if}
       </g>
     {/if}
 
@@ -333,42 +669,51 @@
         <text x={topPlanView.panel.x + 12} y={topPlanView.panel.y + 16} fill="#cbd5e1" font-size="10" font-family="ui-monospace, SFMono-Regular">Top View</text>
         <line x1={topPlanView.cx - 64} y1={topPlanView.cy} x2={topPlanView.cx + 64} y2={topPlanView.cy} stroke="#60a5fa" stroke-width="1" stroke-dasharray="7 6" opacity="0.24" />
         <line x1={topPlanView.cx} y1={topPlanView.cy - 64} x2={topPlanView.cx} y2={topPlanView.cy + 64} stroke="#60a5fa" stroke-width="1" stroke-dasharray="7 6" opacity="0.24" />
-        <circle cx={topPlanView.cx} cy={topPlanView.cy} r={topPlanView.rHousingOuter} fill="url(#d3HousingHatch)" stroke="rgba(203,213,225,0.55)" stroke-width="1" />
-        <circle cx={topPlanView.cx} cy={topPlanView.cy} r={topPlanView.rHousingOpening} fill="rgba(4, 24, 38, 0.96)" stroke="rgba(203,213,225,0.3)" stroke-width="1" />
+        <circle data-dimension-target="od" cx={topPlanView.cx} cy={topPlanView.cy} r={topPlanView.rHousingOuter} fill="url(#d3HousingHatch)" stroke="rgba(203,213,225,0.55)" stroke-width="1" cursor="pointer" {...interactiveAttrs('od')} />
+        <circle data-dimension-target="od" cx={topPlanView.cx} cy={topPlanView.cy} r={topPlanView.rHousingOpening} fill="rgba(4, 24, 38, 0.96)" stroke={highlightColor('od')} stroke-width={activeDimension('od') ? '1.4' : '1'} opacity={highlightOpacity('od')} cursor="pointer" {...interactiveAttrs('od')} />
         <circle
+          data-dimension-target={outerFaceDimension}
           cx={topPlanView.cx}
           cy={topPlanView.cy}
           r={topPlanView.rBushingOuter}
           fill={featureState.isFlanged ? 'url(#d3FlangeHatch)' : featureState.extCs ? 'rgba(240,171,252,0.14)' : 'url(#d3BushingHatch)'}
-          stroke={highlightColor(featureState.isFlanged ? 'flange' : featureState.extCs ? 'extCs' : 'od')}
-          stroke-width={selectedDimension === (featureState.isFlanged ? 'flange' : featureState.extCs ? 'extCs' : 'od') ? '1.5' : '1'}
-          opacity={highlightOpacity(featureState.isFlanged ? 'flange' : featureState.extCs ? 'extCs' : 'od')} />
+          stroke={highlightColor(outerFaceDimension)}
+          stroke-width={activeDimension(outerFaceDimension) ? '1.5' : '1'}
+          opacity={highlightOpacity(outerFaceDimension)}
+          cursor="pointer"
+          {...interactiveAttrs(outerFaceDimension)} />
         <circle
+          data-dimension-target={innerFaceDimension}
           cx={topPlanView.cx}
           cy={topPlanView.cy}
           r={topPlanView.rBushingInner}
           fill="rgba(2, 16, 28, 0.98)"
-          stroke={highlightColor(featureState.intCs ? 'intCs' : 'id')}
-          stroke-width={selectedDimension === (featureState.intCs ? 'intCs' : 'id') ? '1.5' : '1'}
-          opacity={highlightOpacity(featureState.intCs ? 'intCs' : 'id')} />
+          stroke={highlightColor(innerFaceDimension)}
+          stroke-width={activeDimension(innerFaceDimension) ? '1.5' : '1'}
+          opacity={highlightOpacity(innerFaceDimension)}
+          cursor="pointer"
+          {...interactiveAttrs(innerFaceDimension)} />
 
         <line x1={topPlanView.cx + topPlanView.rHousingOpening} y1={topPlanView.cy - 24} x2={topPlanView.panel.x + topPlanView.panel.w + 8} y2={topPlanView.cy - 24} stroke="rgba(203,213,225,0.24)" stroke-width="1" />
         <line x1={topPlanView.cx + topPlanView.rBushingOuter} y1={topPlanView.cy} x2={topPlanView.panel.x + topPlanView.panel.w + 8} y2={topPlanView.cy} stroke="rgba(203,213,225,0.24)" stroke-width="1" />
         <line x1={topPlanView.cx + topPlanView.rBushingInner} y1={topPlanView.cy + 24} x2={topPlanView.panel.x + topPlanView.panel.w + 8} y2={topPlanView.cy + 24} stroke="rgba(203,213,225,0.24)" stroke-width="1" />
 
-        <text x={topPlanView.panel.x + topPlanView.panel.w + 12} y={topPlanView.cy - 24} fill="rgba(203,213,225,0.82)" font-size="8.5" font-family="ui-monospace, SFMono-Regular">Face open {featureState.bore.toFixed(3)}"</text>
-        <text x={topPlanView.panel.x + topPlanView.panel.w + 12} y={topPlanView.cy} fill={highlightColor(featureState.isFlanged ? 'flange' : featureState.extCs ? 'extCs' : 'od')} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity(featureState.isFlanged ? 'flange' : featureState.extCs ? 'extCs' : 'od')}>
-          {featureState.isFlanged ? `Flange face ${topPlanView.outerFaceDia.toFixed(3)}"` : featureState.extCs ? `CS face ${topPlanView.outerFaceDia.toFixed(3)}"` : `Bushing face ${topPlanView.outerFaceDia.toFixed(3)}"`}
+        <text data-dimension-target="od" x={topPlanView.panel.x + topPlanView.panel.w + 12} y={topPlanView.cy - 24} fill={highlightColor('od')} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('od')} cursor="pointer" {...interactiveAttrs('od')}>Hole open {featureState.bore.toFixed(3)}"</text>
+        <text data-dimension-target={outerFaceDimension} x={topPlanView.panel.x + topPlanView.panel.w + 12} y={topPlanView.cy} fill={highlightColor(outerFaceDimension)} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity(outerFaceDimension)} cursor="pointer" {...interactiveAttrs(outerFaceDimension)}>
+          {featureState.isFlanged ? `Flange face ${topPlanView.outerFaceDia.toFixed(3)}"` : featureState.extCs ? `CS face ${topPlanView.outerFaceDia.toFixed(3)}"` : `OD band ${topPlanView.outerFaceDia.toFixed(3)}"`}
         </text>
-        <text x={topPlanView.panel.x + topPlanView.panel.w + 12} y={topPlanView.cy + 24} fill={highlightColor(featureState.intCs ? 'intCs' : 'id')} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity(featureState.intCs ? 'intCs' : 'id')}>
+        <text data-dimension-target={innerFaceDimension} x={topPlanView.panel.x + topPlanView.panel.w + 12} y={topPlanView.cy + 24} fill={highlightColor(innerFaceDimension)} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity(innerFaceDimension)} cursor="pointer" {...interactiveAttrs(innerFaceDimension)}>
           {featureState.intCs ? `Int CS open ${topPlanView.innerFaceDia.toFixed(3)}"` : `Through ID ${topPlanView.innerFaceDia.toFixed(3)}"`}
         </text>
 
-        <text x={topPlanView.panel.x} y={topPlanView.panel.y + topPlanView.panel.h + 14} fill={highlightColor('length')} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('length')}>Length {dimensionalLabels.length}"</text>
+        <text data-dimension-target="length" x={topPlanView.panel.x} y={topPlanView.panel.y + topPlanView.panel.h + 14} fill={highlightColor('length')} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('length')} cursor="pointer" {...interactiveAttrs('length')}>Length {dimensionalLabels.length}"</text>
         {#if featureState.isFlanged}
-          <text x={topPlanView.panel.x + 96} y={topPlanView.panel.y + topPlanView.panel.h + 14} fill={highlightColor('flange')} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('flange')}>Flange thk {dimensionalLabels.flangeThk}"</text>
+          <text data-dimension-target="flangeThk" x={topPlanView.panel.x + 96} y={topPlanView.panel.y + topPlanView.panel.h + 14} fill={highlightColor('flangeThk')} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('flangeThk')} cursor="pointer" {...interactiveAttrs('flangeThk')}>Flange thk {dimensionalLabels.flangeThk}"</text>
         {:else if featureState.extCs}
-          <text x={topPlanView.panel.x + 96} y={topPlanView.panel.y + topPlanView.panel.h + 14} fill={highlightColor('extCs')} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('extCs')}>Ext CS depth {dimensionalLabels.extCsDepth}"</text>
+          <text data-dimension-target="extCsDepth" x={topPlanView.panel.x + 96} y={topPlanView.panel.y + topPlanView.panel.h + 14} fill={highlightColor('extCsDepth')} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('extCsDepth')} cursor="pointer" {...interactiveAttrs('extCsDepth')}>Ext CS depth {dimensionalLabels.extCsDepth}"</text>
+        {/if}
+        {#if featureState.intCs}
+          <text data-dimension-target="intCsDepth" x={topPlanView.panel.x + 196} y={topPlanView.panel.y + topPlanView.panel.h + 14} fill={highlightColor('intCsDepth')} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('intCsDepth')} cursor="pointer" {...interactiveAttrs('intCsDepth')}>Int CS depth {dimensionalLabels.intCsDepth}"</text>
         {/if}
       </g>
     {/if}
@@ -411,20 +756,24 @@
     {/if}
   </div>
   {#if !isLegacyView}
-  <div class="absolute right-3 top-14 flex w-[104px] flex-col gap-1 rounded-md border border-cyan-300/20 bg-cyan-500/8 p-2">
-    <div class="text-[9px] font-mono uppercase tracking-[0.18em] text-cyan-100/70">Focus</div>
-    <button class="rounded-md border px-2 py-1 text-left text-[10px] font-mono" style={`border-color:${highlightColor('od')};color:${highlightColor('od')};background:${selectedDimension === 'od' ? 'rgba(148,163,184,0.16)' : 'rgba(148,163,184,0.08)'}`} onclick={() => setDimensionFocus('od')}>OD</button>
-    <button class="rounded-md border px-2 py-1 text-left text-[10px] font-mono" style={`border-color:${highlightColor('id')};color:${highlightColor('id')};background:${selectedDimension === 'id' ? 'rgba(94,234,212,0.16)' : 'rgba(94,234,212,0.08)'}`} onclick={() => setDimensionFocus('id')}>Bore / ID</button>
-    <button class="rounded-md border px-2 py-1 text-left text-[10px] font-mono" style={`border-color:${highlightColor('length')};color:${highlightColor('length')};background:${selectedDimension === 'length' ? 'rgba(147,197,253,0.16)' : 'rgba(147,197,253,0.08)'}`} onclick={() => setDimensionFocus('length')}>Length</button>
-    {#if featureState.isFlanged}
-      <button class="rounded-md border px-2 py-1 text-left text-[10px] font-mono" style={`border-color:${highlightColor('flange')};color:${highlightColor('flange')};background:${selectedDimension === 'flange' ? 'rgba(240,171,252,0.16)' : 'rgba(240,171,252,0.08)'}`} onclick={() => setDimensionFocus('flange')}>Flange</button>
-    {/if}
-    {#if featureState.extCs}
-      <button class="rounded-md border px-2 py-1 text-left text-[10px] font-mono" style={`border-color:${highlightColor('extCs')};color:${highlightColor('extCs')};background:${selectedDimension === 'extCs' ? 'rgba(240,171,252,0.16)' : 'rgba(240,171,252,0.08)'}`} onclick={() => setDimensionFocus('extCs')}>Ext CS</button>
-    {/if}
-    {#if featureState.intCs}
-      <button class="rounded-md border px-2 py-1 text-left text-[10px] font-mono" style={`border-color:${highlightColor('intCs')};color:${highlightColor('intCs')};background:${selectedDimension === 'intCs' ? 'rgba(94,234,212,0.16)' : 'rgba(94,234,212,0.08)'}`} onclick={() => setDimensionFocus('intCs')}>Int CS</button>
-    {/if}
+  <div class="absolute right-3 top-14 flex w-[180px] flex-col gap-1 rounded-md border border-cyan-300/20 bg-cyan-500/8 p-2">
+    <div class="text-[9px] font-mono uppercase tracking-[0.18em] text-cyan-100/70">Interactive Focus</div>
+    <div class="text-[10px] font-mono leading-relaxed text-cyan-100/82">
+      Hover or click exact profile edges and inset labels to inspect the active diameter, thickness, or countersink depth.
+    </div>
+    <div class="rounded-md border border-white/10 bg-black/22 px-2 py-1 text-[10px] font-mono text-white/78">
+      Active: {activeDimensionLabel(selectedDimension)}
+    </div>
   </div>
+  {/if}
+  {#if tooltipInfo && tooltip}
+    <div
+      class="pointer-events-none absolute z-20 min-w-[184px] max-w-[220px] rounded-xl border border-cyan-300/25 bg-slate-950/96 px-3 py-2 shadow-[0_12px_32px_rgba(2,8,23,0.34)]"
+      style={`left:${tooltip.x}px; top:${tooltip.y}px;`}
+    >
+      <div class="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/82">{tooltipInfo.title}</div>
+      <div class="mt-1 text-sm font-semibold text-slate-100">{tooltipInfo.value}</div>
+      <div class="mt-1 text-[10px] text-white/58">{tooltipInfo.note}</div>
+    </div>
   {/if}
 </div>

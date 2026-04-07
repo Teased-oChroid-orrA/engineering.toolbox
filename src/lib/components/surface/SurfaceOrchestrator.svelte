@@ -2159,7 +2159,7 @@ $effect(() => {
   hitWorker.postMessage({
     type: 'setGeometry',
     points: projected.map((point) => ({ x: point.x, y: point.y })),
-    edges
+    edges: edges.map((edge) => [edge[0], edge[1]] as Edge)
   });
 });
 $effect(() => {

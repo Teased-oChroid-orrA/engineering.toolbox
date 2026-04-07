@@ -74,6 +74,8 @@ function getDefaultForm(): BushingInputs {
     matBushing: 'bronze',
     friction: 0.15,
     dT: 0,
+    assemblyHousingTemperature: undefined,
+    assemblyBushingTemperature: undefined,
     minWallStraight: 0.05,
     minWallNeck: 0.04,
     endConstraint: 'free'

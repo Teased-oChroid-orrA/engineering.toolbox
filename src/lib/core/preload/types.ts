@@ -321,8 +321,60 @@ export type PreloadScenarioVariant = {
   note: string;
 };
 
+export type PreloadComparePackId = 'installed_preload' | 'thermal' | 'friction' | 'preload_loss';
+
+export type PreloadCompareMetricSnapshot = {
+  preloadInstalled: number;
+  preloadEffective: number | null;
+  clampForceService: number | null;
+  boltLoadService: number | null;
+  separationUtilization: number | null;
+  slipUtilization: number | null;
+  proofUtilization: number | null;
+  bearingUtilization: number | null;
+  fatigueUtilization: number | null;
+  thermalPreloadShift: number | null;
+  mechanicalLossTotal: number | null;
+  netPreloadShift: number | null;
+  separationState: SeparationState | null;
+  fayingSurfaceSlipCoeff: number | null;
+  frictionInterfaceCount: number | null;
+};
+
+export type PreloadCompareCase = {
+  id: string;
+  packId: PreloadComparePackId;
+  label: string;
+  note: string;
+  result: FastenedJointPreloadOutput;
+  metrics: PreloadCompareMetricSnapshot;
+};
+
+export type PreloadComparePack = {
+  id: PreloadComparePackId;
+  label: string;
+  description: string;
+  baselineCaseId: string;
+  cases: PreloadCompareCase[];
+};
+
+export type PreloadInverseTargetSettings = {
+  slipMaxUtilization: number;
+  separationMaxUtilization: number;
+  proofMaxUtilization: number;
+  bearingMaxUtilization: number;
+  fatigueMaxUtilization: number;
+  proofTargetUtilization?: number;
+  fatigueTargetUtilization?: number;
+};
+
 export type PreloadInverseTargetResult = {
-  id: 'no_slip_preload' | 'proof_diameter' | 'bearing_face_od';
+  id:
+    | 'no_slip_preload'
+    | 'separation_preload'
+    | 'proof_diameter'
+    | 'bearing_face_od'
+    | 'fatigue_diameter';
   label: string;
   value: number | null;
   unit: string;
@@ -331,6 +383,11 @@ export type PreloadInverseTargetResult = {
   feasible: boolean;
   governingScenario: EnvelopeScenarioLabel | null;
   targetUtilization: number | null;
+};
+
+export type PreloadInverseTargetPreferences = {
+  proofTargetUtilization?: number;
+  fatigueTargetUtilization?: number;
 };
 
 export type PreloadLossBreakdown = {

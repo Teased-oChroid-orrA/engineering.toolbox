@@ -1,9 +1,74 @@
 import type {
   BushingCandidate,
+  BushingContaminationLevel,
+  BushingCriticality,
+  BushingLoadSpectrum,
+  BushingLubricationMode,
+  BushingProcessRouteId,
+  BushingStandardsBasis,
   BushingWarning,
   InterferenceEnforcementReasonCode,
   ToleranceRange
 } from './typePrimitives';
+
+export type BushingServiceState = {
+  id: 'free' | 'installed' | 'finish_reamed' | 'cold' | 'hot' | 'worn';
+  label: string;
+  effectiveInterference: number;
+  contactPressure: number;
+  projectedId: number;
+  idChangeFromFree: number;
+  fitClass: 'interference' | 'transition' | 'clearance';
+  note: string;
+};
+
+export type BushingDutyScreen = {
+  loadSpectrum: BushingLoadSpectrum;
+  lubricationMode: BushingLubricationMode;
+  contaminationLevel: BushingContaminationLevel;
+  specificLoadPsi: number;
+  specificLoadMpa: number;
+  slidingVelocityMps: number;
+  pv: number;
+  pvLimit: number;
+  pvUtilization: number;
+  wearRisk: 'low' | 'moderate' | 'high' | 'severe';
+  riskScore: number;
+  dominantDrivers: string[];
+  lifeEstimateHours: number | null;
+};
+
+export type BushingProcessReview = {
+  routeId: BushingProcessRouteId;
+  routeLabel: string;
+  toleranceClass: string;
+  recommendedRaUm: number;
+  roundnessTargetUm: number;
+  finishMachiningRequired: boolean;
+  thermalAssistRecommended: boolean;
+  assemblyThermalAssistActive: boolean;
+  installForceBand: { low: number; nominal: number; high: number };
+  removalForce: number;
+  notes: string[];
+};
+
+export type BushingApprovalReview = {
+  standardsBasis: BushingStandardsBasis;
+  standardsRevision: string;
+  processSpec: string;
+  criticality: BushingCriticality;
+  approvalRequired: boolean;
+  decision: 'pass' | 'review' | 'hold';
+  traceabilityRefs: string[];
+  assumptions: string[];
+};
+
+export type BushingMeasuredPartSummary = {
+  applied: boolean;
+  basis: 'nominal' | 'measured';
+  overrides: string[];
+  notes: string[];
+};
 
 export type BushingOutput = {
   sleeveWall: number;
@@ -89,8 +154,12 @@ export type BushingOutput = {
   governing: { name: string; margin: number };
   physics: {
     deltaEffective: number;
+    installDeltaEffective: number;
     contactPressure: number;
+    installContactPressure: number;
     installForce: number;
+    retainedInstallForce: number;
+    assemblyThermalDelta: number;
     stressHoopHousing: number;
     stressHoopBushing: number;
     marginHousing: number;
@@ -109,6 +178,22 @@ export type BushingOutput = {
     csExternal: { dia: number; depth: number; angleDeg: number };
     isSaturationActive: boolean;
   };
+  serviceEnvelope: {
+    states: BushingServiceState[];
+    governingStateId: BushingServiceState['id'];
+    governingStateLabel: string;
+    finishMachiningRequired: boolean;
+  };
+  dutyScreen: BushingDutyScreen;
+  process: BushingProcessReview;
+  review: BushingApprovalReview;
+  inputBasis: {
+    bore: 'nominal' | 'measured';
+    id: 'nominal' | 'measured';
+    edgeDist: 'nominal' | 'measured';
+    housingWidth: 'nominal' | 'measured';
+  };
+  measuredPartSummary: BushingMeasuredPartSummary;
   tolerance: {
     status: 'ok' | 'clamped' | 'infeasible';
     notes: string[];

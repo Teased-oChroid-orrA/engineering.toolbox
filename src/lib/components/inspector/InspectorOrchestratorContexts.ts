@@ -645,10 +645,13 @@ export function recipesControllerCtx(state: {
   LEGACY_RECIPES_STORE_KEYS: string[];
   LAST_STATE_STORE_KEY: string;
   LEGACY_LAST_STATE_KEYS: string[];
+  WORKSPACE_SNAPSHOTS_KEY: string;
   loadRecipesForDatasetFromStore: any;
   persistRecipesForDatasetToStore: any;
   loadLastStateForDatasetFromStore: any;
   persistLastStateForDatasetToStore: any;
+  loadWorkspaceSnapshotsFromStore: any;
+  persistWorkspaceSnapshotsToStore: any;
   buildRecipeExportBlob: any;
   mergeImportedRecipes: any;
   toCsvText: any;
@@ -661,6 +664,7 @@ export function recipesControllerCtx(state: {
   datasetId: string;
   datasetLabel: string;
   recipes: Recipe[];
+  workspaceSnapshots: any[];
   recipeNotice: string | null;
   hasLoaded: boolean;
   headers: string[];
@@ -674,16 +678,20 @@ export function recipesControllerCtx(state: {
   invoke: any;
   recipeName: string;
   recipeTags: string;
+  snapshotName: string;
 }) {
   return {
     RECIPES_STORE_KEY: state.RECIPES_STORE_KEY,
     LEGACY_RECIPES_STORE_KEYS: state.LEGACY_RECIPES_STORE_KEYS,
     LAST_STATE_STORE_KEY: state.LAST_STATE_STORE_KEY,
     LEGACY_LAST_STATE_KEYS: state.LEGACY_LAST_STATE_KEYS,
+    WORKSPACE_SNAPSHOTS_KEY: state.WORKSPACE_SNAPSHOTS_KEY,
     loadRecipesForDatasetFromStore: state.loadRecipesForDatasetFromStore,
     persistRecipesForDatasetToStore: state.persistRecipesForDatasetToStore,
     loadLastStateForDatasetFromStore: state.loadLastStateForDatasetFromStore,
     persistLastStateForDatasetToStore: state.persistLastStateForDatasetToStore,
+    loadWorkspaceSnapshotsFromStore: state.loadWorkspaceSnapshotsFromStore,
+    persistWorkspaceSnapshotsToStore: state.persistWorkspaceSnapshotsToStore,
     buildRecipeExportBlob: state.buildRecipeExportBlob,
     mergeImportedRecipes: state.mergeImportedRecipes,
     toCsvText: state.toCsvText,
@@ -698,6 +706,8 @@ export function recipesControllerCtx(state: {
     get datasetLabel() { return state.datasetLabel; },
     get recipes() { return state.recipes; },
     set recipes(v: Recipe[]) { state.recipes = v; },
+    get workspaceSnapshots() { return state.workspaceSnapshots; },
+    set workspaceSnapshots(v: any[]) { state.workspaceSnapshots = v; },
     get recipeNotice() { return state.recipeNotice; },
     set recipeNotice(v: string | null) { state.recipeNotice = v; },
     get hasLoaded() { return state.hasLoaded; },
@@ -713,7 +723,9 @@ export function recipesControllerCtx(state: {
     get recipeName() { return state.recipeName; },
     set recipeName(v: string) { state.recipeName = v; },
     get recipeTags() { return state.recipeTags; },
-    set recipeTags(v: string) { state.recipeTags = v; }
+    set recipeTags(v: string) { state.recipeTags = v; },
+    get snapshotName() { return state.snapshotName; },
+    set snapshotName(v: string) { state.snapshotName = v; }
   };
 }
 

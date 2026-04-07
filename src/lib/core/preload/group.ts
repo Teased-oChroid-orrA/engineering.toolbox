@@ -89,12 +89,18 @@ export type FastenerGroupPatternFastenerResult = {
 
 export type FastenerGroupProgressionStep = {
   step: number;
+  removedFastenerIndex: number;
   removedFastenerIndices: number[];
+  activeFastenerIndices: number[];
   activeFastenerCount: number;
   criticalFastenerIndex: number;
   criticalEquivalentDemand: number;
+  criticalLoadShare: number;
+  criticalAxialLoad: number;
+  criticalShearMagnitude: number;
   redistributionFactor: number;
   demandRisePercentFromInitial: number;
+  fasteners: FastenerGroupPatternFastenerResult[];
   note: string;
 };
 
@@ -436,21 +442,31 @@ function buildFailureProgression(input: FastenerGroupPatternInput, initial: Fast
   let current = initial;
 
   for (let step = 1; step <= maxSteps; step += 1) {
-    removed.push(current.criticalFastenerIndex);
-    activeSet.delete(current.criticalFastenerIndex);
+    const removedFastenerIndex = current.criticalFastenerIndex;
+    removed.push(removedFastenerIndex);
+    activeSet.delete(removedFastenerIndex);
     if (!activeSet.size) break;
     current = solvePatternForActiveSet(input, activeSet);
+    const criticalFastener = current.fasteners.find((fastener) => fastener.index === current.criticalFastenerIndex);
     steps.push({
       step,
+      removedFastenerIndex,
       removedFastenerIndices: [...removed],
+      activeFastenerIndices: current.fasteners.map((fastener) => fastener.index),
       activeFastenerCount: activeSet.size,
       criticalFastenerIndex: current.criticalFastenerIndex,
       criticalEquivalentDemand: current.criticalEquivalentDemand,
+      criticalLoadShare: criticalFastener?.loadShare ?? 0,
+      criticalAxialLoad: criticalFastener?.axialLoad ?? 0,
+      criticalShearMagnitude: criticalFastener
+        ? Math.hypot(criticalFastener.totalShearX, criticalFastener.totalShearY)
+        : 0,
       redistributionFactor: current.redistributionFactor,
       demandRisePercentFromInitial:
         initial.criticalEquivalentDemand > 0
           ? ((current.criticalEquivalentDemand - initial.criticalEquivalentDemand) / initial.criticalEquivalentDemand) * 100
           : 0,
+      fasteners: current.fasteners,
       note: `After removing ${removed.map((index) => `F${index + 1}`).join(', ')}, the next governing fastener is F${current.criticalFastenerIndex + 1}.`
     });
   }

@@ -1,12 +1,44 @@
 <script lang="ts">
   import { Badge, Card, CardContent } from '$lib/components/ui';
   import type { BushingInputs, BushingOutput } from '$lib/core/bushing';
+  import type { ReamerCatalogEntry } from '$lib/core/bushing/reamerCatalog';
   import { formatToleranceRange, scaleValueToToleranceRange, splitToleranceRangeDisplay } from '$lib/core/bushing/tolerancePresentation';
   import { makeRange } from '$lib/core/bushing/solveMath';
   import BushingLameStressPlot from './BushingLameStressPlot.svelte';
   import BushingEnforcementDetails from './BushingEnforcementDetails.svelte';
+  import BushingServiceReviewPanel from './BushingServiceReviewPanel.svelte';
+  import BushingGoverningBanner from './BushingGoverningBanner.svelte';
+  import BushingDeltaStrip from './BushingDeltaStrip.svelte';
+  import type { BushingWorkflowMode } from './BushingLayoutPersistence';
 
-  let { form, results, guidedMode = true }: { form: BushingInputs; results: BushingOutput; guidedMode?: boolean } = $props();
+  type CompareCase = {
+    id: string;
+    name: string;
+    results: BushingOutput;
+    deltaMargin: number;
+    deltaInstallForce: number;
+    deltaContactPressure: number;
+  };
+
+  let {
+    form,
+    results,
+    guidedMode = true,
+    workflowMode = 'quick',
+    compareCases = [],
+    selectedReamer = null,
+    selectedIdReamer = null,
+    previousSnapshot = null
+  }: {
+    form: BushingInputs;
+    results: BushingOutput;
+    guidedMode?: boolean;
+    workflowMode?: BushingWorkflowMode;
+    compareCases?: CompareCase[];
+    selectedReamer?: ReamerCatalogEntry | null;
+    selectedIdReamer?: ReamerCatalogEntry | null;
+    previousSnapshot?: { label: string; results: BushingOutput } | null;
+  } = $props();
   let infoDialog = $state<'safety' | 'fit' | null>(null);
 
   const PSI_TO_MPA = 0.006894757;
@@ -131,32 +163,74 @@
 </script>
 
 <div class="space-y-3">
-  <Card class="border border-cyan-300/20 bg-cyan-500/8 bushing-pop-card bushing-depth-1">
-    <CardContent class="pt-4 text-sm">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div class="text-[10px] font-bold uppercase tracking-wide text-cyan-100/85">Decision Summary</div>
-          <div class="mt-1 text-base font-semibold text-slate-100">{results.governing.name}</div>
+  <BushingGoverningBanner {form} {results} />
+  <BushingDeltaStrip {form} current={results} previous={previousSnapshot} />
+
+  {#key workflowMode}
+    {#if workflowMode === 'review'}
+      <BushingServiceReviewPanel {form} {results} />
+    {:else}
+      <Card class="border border-white/10 bg-black/25 bushing-pop-card bushing-depth-0">
+        <CardContent class="pt-4 text-[11px] text-white/70">
+          Quick Solve is showing fit, margin, and compare essentials only. Switch to `Engineering Review` for service envelope, duty screen, process approval, and Lamé field detail.
+        </CardContent>
+      </Card>
+    {/if}
+  {/key}
+
+  {#if selectedReamer || selectedIdReamer || compareCases.length}
+    <Card class="border border-white/10 bg-black/25 bushing-pop-card bushing-depth-1" data-testid="bushing-compare-summary">
+      <CardContent class="pt-4 space-y-3 text-sm">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="text-[10px] font-bold uppercase tracking-wide text-cyan-100/85">Process Snapshot</div>
+          <div class="flex flex-wrap gap-2">
+            {#if selectedReamer}
+              <Badge variant="outline" class="border-cyan-300/35 text-cyan-100">
+                Bore {selectedReamer.sizeLabel}
+              </Badge>
+            {/if}
+            {#if selectedIdReamer}
+              <Badge variant="outline" class="border-amber-300/35 text-amber-100">
+                ID {selectedIdReamer.sizeLabel}
+              </Badge>
+            {/if}
+          </div>
         </div>
-        <Badge variant="outline" class={failed ? 'border-amber-400/40 text-amber-200' : 'border-emerald-400/40 text-emerald-200'}>
-          {failed ? 'Action Needed' : 'Within Limits'}
-        </Badge>
-      </div>
-      <div class="mt-2 text-xs text-slate-200/82">
-        Governing margin: <span class={failed ? valFail : valOk}>{fmt(results.governing.margin, 3)}</span>.
-        {#if failed}
-          Revisit geometry or profile inputs before relying on export.
-        {:else}
-          Review Drafting / Export, then open diagnostics only if you need deeper traceability.
+        {#if selectedReamer}
+          <div class="rounded-md border border-cyan-300/20 bg-cyan-500/10 px-3 py-2 text-[11px] text-cyan-100/88">
+            Bore reamer: {selectedReamer.sizeLabel} at {selectedReamer.nominalIn.toFixed(4)} in with +{selectedReamer.toolTolerancePlusIn.toFixed(4)}/-{selectedReamer.toolToleranceMinusIn.toFixed(4)} tooling tolerance.
+          </div>
         {/if}
-      </div>
-      {#if guidedMode}
-        <div class="mt-2 rounded-md border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-white/75">
-          Guided workflow: confirm the governing reason first, then review fit windows and stresses separately below.
-        </div>
-      {/if}
-    </CardContent>
-  </Card>
+        {#if selectedIdReamer}
+          <div class="rounded-md border border-amber-300/20 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100/88">
+            ID reamer: {selectedIdReamer.sizeLabel} at {selectedIdReamer.nominalIn.toFixed(4)} in with +{selectedIdReamer.toolTolerancePlusIn.toFixed(4)}/-{selectedIdReamer.toolToleranceMinusIn.toFixed(4)} tooling tolerance.
+          </div>
+        {/if}
+        {#if compareCases.length}
+          <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
+            {#each compareCases as entry (entry.id)}
+              <div class="rounded-md border border-white/10 bg-black/30 px-3 py-3 text-[11px] text-white/82">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="font-semibold text-white/90">{entry.name}</div>
+                  <Badge variant="outline" class={entry.results.governing.margin >= 0 ? 'border-emerald-400/30 text-emerald-200' : 'border-amber-400/30 text-amber-200'}>
+                    {entry.results.governing.margin >= 0 ? 'PASS' : 'ATTN'}
+                  </Badge>
+                </div>
+                <div class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
+                  <div>Margin: <span class={entry.results.governing.margin >= 0 ? valOk : valFail}>{fmt(entry.results.governing.margin, 3)}</span></div>
+                  <div>Δ margin: <span class={entry.deltaMargin >= 0 ? valOk : valFail}>{fmt(entry.deltaMargin, 3)}</span></div>
+                  <div>Install force: {fmtForceTol(entry.results.physics.installForce)}</div>
+                  <div>Δ force: <span class={entry.deltaInstallForce <= 0 ? valOk : valInfo}>{fmt(entry.deltaInstallForce, 0)}</span> {forceUnit()}</div>
+                  <div>Contact pressure: {fmtStressTol(entry.results.physics.contactPressure)}</div>
+                  <div>Δ pressure: <span class={entry.deltaContactPressure <= 0 ? valOk : valInfo}>{fmt(entry.deltaContactPressure, form.units === 'metric' ? 1 : 2)}</span> {stressUnit()}</div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </CardContent>
+    </Card>
+  {/if}
 
   <div class="flex items-center justify-between">
     <h3 class="text-sm font-semibold text-slate-100">Results Summary</h3>
@@ -241,100 +315,48 @@
     </div>
   </div>
 
-  <div
-    class="cursor-pointer"
-    role="button"
-    tabindex="0"
-    onclick={() => (infoDialog = 'fit')}
-    onkeydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (infoDialog = 'fit')}>
-      <Card
-        id="bushing-fit-card"
-        class={`bushing-results-card bushing-pop-card bushing-depth-2 ${fitFailed ? 'border border-amber-300/55' : ''}`}>
-      <CardContent class="pt-5 text-sm space-y-1.5">
-        <div class="text-[10px] mb-2 uppercase tracking-wide text-indigo-200/95 font-bold">Fit Physics</div>
-        <div class="results-ruled min-w-0 space-y-2">
-          <div class="results-row">
-            <span class="results-label text-slate-100/95 font-medium">Effective Interference</span>
-            <span class={`results-nominal text-[0.92rem] font-semibold ${positiveInterference ? valOk : valFail}`}>{splitTolText(effectiveInterferenceRange).nominal}</span>
-            <span class="results-tolerance text-slate-300/88">{splitTolText(effectiveInterferenceRange).tolerance}</span>
-            <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
-          </div>
-          {#if results.tolerance.csExternalDia}
-            <div class="results-row">
-              <span class="results-label text-slate-100/95 font-medium">External CS Dia</span>
-              <span class="results-nominal text-cyan-200 font-semibold">{splitTolText(results.tolerance.csExternalDia).nominal}</span>
-              <span class="results-tolerance text-slate-300/88">{splitTolText(results.tolerance.csExternalDia).tolerance}</span>
-              <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
-            </div>
-          {/if}
-          {#if results.tolerance.csInternalDia}
-            <div class="results-row">
-              <span class="results-label text-slate-100/95 font-medium">Internal CS Dia</span>
-              <span class="results-nominal text-cyan-200 font-semibold">{splitTolText(results.tolerance.csInternalDia).nominal}</span>
-              <span class="results-tolerance text-slate-300/88">{splitTolText(results.tolerance.csInternalDia).tolerance}</span>
-              <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
-            </div>
-          {/if}
-          <div class="results-row">
-            <span class="results-label text-slate-100/95 font-medium">Bushing OD</span>
-            <span class={`results-nominal text-[0.92rem] font-semibold ${odContained ? valOk : valFail}`}>{splitTolText(results.tolerance.odBushing).nominal}</span>
-            <span class="results-tolerance text-slate-300/88">{splitTolText(results.tolerance.odBushing).tolerance}</span>
-            <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
-          </div>
-          {#if results.tolerance.csExternalDepth}
-            <div class="results-row">
-              <span class="results-label text-slate-100/95 font-medium">External CS Depth</span>
-              <span class="results-nominal text-cyan-200 font-semibold">{splitTolText(results.tolerance.csExternalDepth).nominal}</span>
-              <span class="results-tolerance text-slate-300/88">{splitTolText(results.tolerance.csExternalDepth).tolerance}</span>
-              <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
-            </div>
-          {/if}
-          {#if results.tolerance.csInternalDepth}
-            <div class="results-row">
-              <span class="results-label text-slate-100/95 font-medium">Internal CS Depth</span>
-              <span class="results-nominal text-cyan-200 font-semibold">{splitTolText(results.tolerance.csInternalDepth).nominal}</span>
-              <span class="results-tolerance text-slate-300/88">{splitTolText(results.tolerance.csInternalDepth).tolerance}</span>
-              <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
-            </div>
-          {/if}
-          <div class="results-row results-row--range">
-            <span class="results-label text-slate-100/95 font-medium">Interference Target</span>
-            <span class={`results-range text-[0.92rem] font-semibold ${valInfo}`}>{fmtMinMax(results.tolerance.interferenceTarget)}</span>
-            <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
-          </div>
-          <div class="results-row results-row--range">
-            <span class="results-label text-slate-100/95 font-medium">Interference Achieved</span>
-            <span class={`results-range text-[0.92rem] font-semibold ${achievedWithinTarget ? valOk : valFail}`}>{fmtMinMax(results.tolerance.achievedInterference)}</span>
-            <span class="results-unit text-slate-100 font-semibold">{lengthUnit()}</span>
-          </div>
+  <Card
+    id="bushing-fit-card"
+    class={`bushing-results-card bushing-pop-card bushing-depth-1 ${fitFailed ? 'border border-amber-300/35 bg-amber-500/[0.04]' : 'border border-white/10 bg-black/18'}`}>
+    <CardContent class="pt-4 text-sm space-y-2.5">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="text-[10px] uppercase tracking-wide text-indigo-200/92 font-bold">Fit Containment Notes</div>
+        <Badge variant="outline" class={fitFailed ? 'border-amber-300/35 text-amber-200' : 'border-cyan-300/30 text-cyan-100'}>
+          {results.tolerance.status.toUpperCase()}
+        </Badge>
+      </div>
+      {#if results.tolerance.status === 'infeasible'}
+        <div class="rounded-md border border-amber-300/50 bg-amber-500/15 p-2 text-[11px] text-amber-100">
+          <div class="font-semibold">What failed: tolerance bands are incompatible for full-range containment.</div>
+          <div class="mt-1">Why: bore band width ({fmtBand(boreBandWidth)}) exceeds target interference width ({fmtBand(targetBandWidth)}), so no single OD band can satisfy every combination.</div>
+          <div class="mt-1">Next: widen the target interference band or narrow the bore tolerance band.</div>
         </div>
-        {#if results.tolerance.status === 'infeasible'}
-          <div class="mt-2 rounded-md border border-amber-300/50 bg-amber-500/15 p-2 text-[11px] text-amber-100">
-            <div class="font-semibold">What failed: tolerance bands are incompatible for full-range containment.</div>
-            <div class="mt-1">Why: bore band width ({fmtBand(boreBandWidth)}) exceeds target interference width ({fmtBand(targetBandWidth)}), so no single OD band can satisfy every combination.</div>
-            <div class="mt-1">Next: widen the target interference band or narrow the bore tolerance band.</div>
-          </div>
-        {:else if results.tolerance.status === 'clamped'}
-          <div class="mt-2 rounded-md border border-cyan-300/40 bg-cyan-500/12 p-2 text-[11px] text-cyan-100">
-            <div class="font-semibold">OD nominal was clamped to stay within the requested interference band.</div>
-            <div class="mt-1">Next: confirm the shifted OD is acceptable, or revisit the target interference window.</div>
-          </div>
-        {/if}
-        {#if displayToleranceNotes.length}
-          <div class="mt-2 space-y-1">
-            {#each displayToleranceNotes as n}
-              <div class="rounded-md border border-white/10 bg-black/25 px-2 py-1 text-[10px] text-white/75">{n}</div>
-            {/each}
-          </div>
-        {/if}
-        <BushingEnforcementDetails {form} {results} />
-      </CardContent>
-    </Card>
-  </div>
+      {:else if results.tolerance.status === 'clamped'}
+        <div class="rounded-md border border-cyan-300/40 bg-cyan-500/12 p-2 text-[11px] text-cyan-100">
+          <div class="font-semibold">OD nominal was clamped to stay within the requested interference band.</div>
+          <div class="mt-1">Next: confirm the shifted OD is acceptable, or revisit the target interference window.</div>
+        </div>
+      {:else}
+        <div class="rounded-md border border-white/10 bg-black/22 p-2 text-[11px] text-white/74">
+          Achieved fit remains inside the requested target window with the current containment settings.
+        </div>
+      {/if}
+      {#if displayToleranceNotes.length}
+        <div class="space-y-1">
+          {#each displayToleranceNotes as n}
+            <div class="rounded-md border border-white/10 bg-black/25 px-2 py-1 text-[10px] text-white/75">{n}</div>
+          {/each}
+        </div>
+      {/if}
+      <BushingEnforcementDetails {form} {results} />
+    </CardContent>
+  </Card>
 
-  <Card class="bushing-results-card bushing-pop-card bushing-depth-1">
-    <CardContent class="pt-4 space-y-2 text-sm">
-      <div class="text-[10px] uppercase tracking-wide text-indigo-200/95 font-bold">Lamé Stress Field (Full Distribution)</div>
+  {#key `lame-${workflowMode}`}
+    {#if workflowMode === 'review'}
+    <Card class="bushing-results-card bushing-pop-card bushing-depth-1">
+      <CardContent class="pt-4 space-y-2 text-sm">
+        <div class="text-[10px] uppercase tracking-wide text-indigo-200/95 font-bold">Lamé Stress Field (Full Distribution)</div>
       <div class="grid grid-cols-1 gap-2 text-[12px] text-white/85 md:grid-cols-2">
         <div class="rounded-md border border-white/10 bg-black/20 p-2">
           <div class="font-semibold text-emerald-200">Bushing Boundaries</div>
@@ -426,8 +448,10 @@
         Lamé boundary ranges follow the effective interference tolerance envelope shown above.
       </div>
       <BushingLameStressPlot field={results.lame.field} />
-    </CardContent>
-  </Card>
+      </CardContent>
+    </Card>
+    {/if}
+  {/key}
 </div>
 
 {#if infoDialog !== null}

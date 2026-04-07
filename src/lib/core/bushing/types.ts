@@ -1,5 +1,11 @@
 import type {
   BoreProcessCapability,
+  BushingContaminationLevel,
+  BushingCriticality,
+  BushingLoadSpectrum,
+  BushingLubricationMode,
+  BushingProcessRouteId,
+  BushingStandardsBasis,
   CSMode,
   CountersinkInput,
   InterferenceEnforcementPolicy,
@@ -8,8 +14,14 @@ import type {
 
 export type {
   BushingCandidate,
+  BushingContaminationLevel,
+  BushingCriticality,
+  BushingLoadSpectrum,
+  BushingLubricationMode,
   BushingWarningCode,
   BushingWarning,
+  BushingProcessRouteId,
+  BushingStandardsBasis,
   MaterialProps,
   ToleranceRange,
   InterferenceEnforcementReasonCode,
@@ -21,6 +33,24 @@ export type {
 } from './typePrimitives';
 
 export type { BushingOutput } from './outputTypes';
+
+export type BushingMeasuredDimension = {
+  actual?: number;
+  tolPlus?: number;
+  tolMinus?: number;
+  roundness?: number;
+  ra?: number;
+};
+
+export type BushingMeasuredPart = {
+  enabled?: boolean;
+  basis?: 'nominal' | 'measured';
+  bore?: BushingMeasuredDimension;
+  id?: BushingMeasuredDimension;
+  edgeDist?: number;
+  housingWidth?: number;
+  notes?: string;
+};
 
 export type BushingInputs = {
   units: 'imperial' | 'metric';
@@ -67,13 +97,35 @@ export type BushingInputs = {
   matBushing: string;
   friction: number;
   dT: number;
+  assemblyHousingTemperature?: number;
+  assemblyBushingTemperature?: number;
+  processRouteId?: BushingProcessRouteId;
+  standardsBasis?: BushingStandardsBasis;
+  standardsRevision?: string;
+  processSpec?: string;
+  approvalNotes?: string;
+  criticality?: BushingCriticality;
   minWallStraight: number;
   minWallNeck: number;
   endConstraint?: 'free' | 'one_end' | 'both_ends';
   load?: number;
-  thetaDeg?: number;
+  edgeLoadAngleDeg?: number;
+  serviceTemperatureHot?: number;
+  serviceTemperatureCold?: number;
+  finishReamAllowance?: number;
+  wearAllowance?: number;
+  loadSpectrum?: BushingLoadSpectrum;
+  oscillationAngleDeg?: number;
+  oscillationFreqHz?: number;
+  dutyCyclePct?: number;
+  lubricationMode?: BushingLubricationMode;
+  contaminationLevel?: BushingContaminationLevel;
+  surfaceRoughnessRaUm?: number;
+  shaftHardnessHrc?: number;
+  misalignmentDeg?: number;
   idCS?: CountersinkInput;
   odCS?: CountersinkInput;
+  measuredPart?: BushingMeasuredPart;
 };
 
 export type BushingInputsRaw = Partial<BushingInputs> & {
@@ -130,7 +182,39 @@ export type BushingInputsRaw = Partial<BushingInputs> & {
   mat_bushing?: string;
   min_wall_straight?: number;
   min_wall_neck?: number;
+  process_route_id?: BushingProcessRouteId;
+  standards_basis?: BushingStandardsBasis;
+  standards_revision?: string;
+  process_spec?: string;
+  approval_notes?: string;
+  criticality?: BushingCriticality;
   end_constraint?: 'free' | 'one_end' | 'both_ends';
+  service_temperature_hot?: number;
+  service_temperature_cold?: number;
+  finish_ream_allowance?: number;
+  wear_allowance?: number;
+  load_spectrum?: BushingLoadSpectrum;
+  oscillation_angle_deg?: number;
+  oscillation_freq_hz?: number;
+  duty_cycle_pct?: number;
+  lubrication_mode?: BushingLubricationMode;
+  contamination_level?: BushingContaminationLevel;
+  surface_roughness_ra_um?: number;
+  shaft_hardness_hrc?: number;
+  misalignment_deg?: number;
+  thetaDeg?: number;
+  edgeLoadAngleDeg?: number;
+  edge_load_angle_deg?: number;
+  failure_plane_angle_deg?: number;
+  assemblyHousingTemperature?: number;
+  assemblyBushingTemperature?: number;
+  assembly_housing_temperature?: number;
+  assembly_bushing_temperature?: number;
   t1?: number;
   t2?: number;
+  measuredPart?: Partial<BushingMeasuredPart>;
+  measured_part?: Partial<BushingMeasuredPart> & {
+    edge_dist?: number;
+    housing_width?: number;
+  };
 };

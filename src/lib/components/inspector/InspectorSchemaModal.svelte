@@ -20,6 +20,7 @@
     schemaOutliers = [],
     schemaRelationshipHints = [],
     schemaDrift = [],
+    schemaBaselineCount = 0,
     colTypes = [],
     headers = [],
     schemaFiltered = [],
@@ -38,6 +39,12 @@
     onActionDate,
     onAddTopToCategory
   } = $props<any>();
+
+  let driftSummary = $derived.by(() => ({
+    added: (schemaDrift ?? []).filter((entry: any) => entry.kind === 'added').length,
+    removed: (schemaDrift ?? []).filter((entry: any) => entry.kind === 'removed').length,
+    changed: (schemaDrift ?? []).filter((entry: any) => entry.kind === 'changed').length
+  }));
 </script>
 
 {#if open}
@@ -79,6 +86,62 @@
       </div>
       <div class="mt-3 flex flex-wrap gap-2">
         <button class="btn btn-xs variant-soft" onclick={onSetDriftBaseline}>Set drift baseline</button>
+      </div>
+      <div class="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[1.3fr_1fr]">
+        <div class="rounded-xl border border-white/10 inspector-pop-sub p-4" data-testid="inspector-schema-drift-summary">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <div class="text-[10px] uppercase tracking-widest text-white/50">Schema drift</div>
+              <div class="mt-1 text-sm font-semibold text-white">Baseline compare</div>
+            </div>
+            <div class="text-[11px] text-white/60">
+              {schemaBaselineCount ? `${schemaBaselineCount} baseline columns captured` : 'No baseline captured yet'}
+            </div>
+          </div>
+          {#if !schemaBaselineCount}
+            <div class="mt-3 text-xs text-white/60">Capture a baseline, then refresh after a dataset or filter change to see type, null-rate, and cardinality drift.</div>
+          {:else}
+            <div class="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+              <div class="rounded-lg border border-cyan-300/20 bg-cyan-500/10 px-2 py-2 text-cyan-100">
+                <div class="text-[10px] uppercase tracking-wide text-cyan-100/70">Changed</div>
+                <div class="mt-1 text-lg font-semibold">{driftSummary.changed}</div>
+              </div>
+              <div class="rounded-lg border border-emerald-300/20 bg-emerald-500/10 px-2 py-2 text-emerald-100">
+                <div class="text-[10px] uppercase tracking-wide text-emerald-100/70">Added</div>
+                <div class="mt-1 text-lg font-semibold">{driftSummary.added}</div>
+              </div>
+              <div class="rounded-lg border border-amber-300/20 bg-amber-500/10 px-2 py-2 text-amber-100">
+                <div class="text-[10px] uppercase tracking-wide text-amber-100/70">Removed</div>
+                <div class="mt-1 text-lg font-semibold">{driftSummary.removed}</div>
+              </div>
+            </div>
+            <div class="mt-3 space-y-2">
+              {#if (schemaDrift?.length ?? 0) === 0}
+                <div class="text-xs text-white/60">No drift above threshold in the current sample.</div>
+              {:else}
+                {#each schemaDrift as drift (drift.kind + ':' + drift.idx)}
+                  <div class="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/78">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="font-medium text-white/88">{drift.name}</div>
+                      <div class="font-mono text-white/60">{drift.kind} • {drift.drift}</div>
+                    </div>
+                    <div class="mt-1 text-white/62">{drift.reason}</div>
+                  </div>
+                {/each}
+              {/if}
+            </div>
+          {/if}
+        </div>
+        <div class="rounded-xl border border-white/10 inspector-pop-sub p-4">
+          <div class="text-[10px] uppercase tracking-widest text-white/50">Suggested actions</div>
+          <div class="mt-3 space-y-2 text-xs text-white/75">
+            <div>Category candidates: {(schemaSuggested?.categorical?.length ?? 0)}</div>
+            <div>Numeric candidates: {(schemaSuggested?.numeric?.length ?? 0)}</div>
+            <div>Date candidates: {(schemaSuggested?.date?.length ?? 0)}</div>
+            <div>Relationship hints: {(schemaRelationshipHints?.length ?? 0)}</div>
+            <div>Outlier hints: {(schemaOutliers?.length ?? 0)}</div>
+          </div>
+        </div>
       </div>
       <div class="mt-4 max-h-[60vh] overflow-auto rounded-xl border border-white/10 inspector-pop-sub">
         <table class="min-w-full text-xs">

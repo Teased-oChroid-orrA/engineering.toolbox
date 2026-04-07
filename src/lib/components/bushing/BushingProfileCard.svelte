@@ -2,14 +2,21 @@
   import { Card, CardContent, CardHeader, CardTitle, Input, Label, Select } from '$lib/components/ui';
   import { cn } from '$lib/utils';
   import { solveCountersink, type BushingInputs } from '$lib/core/bushing';
+  import { describeReamerEntryForDisplay, type ReamerCatalogEntry } from '$lib/core/bushing/reamerCatalog';
   import BushingCsInput from './BushingCsInput.svelte';
 
   let {
     form = $bindable(),
-    odInstalled = 0
+    odInstalled = 0,
+    selectedIdReamerEntry = null,
+    onOpenReamerPicker = () => {},
+    onClearIdReamerEntry = () => {}
   }: {
     form: BushingInputs;
     odInstalled?: number;
+    selectedIdReamerEntry?: ReamerCatalogEntry | null;
+    onOpenReamerPicker?: (target: 'id') => void;
+    onClearIdReamerEntry?: () => void;
   } = $props();
 
   const CS_MODES = [
@@ -34,6 +41,13 @@
   let externalDepthToleranceVisible = $derived(!externalCsBlocked && !externalCsDepthDisabled);
   let internalComputedLabel = $derived(computedFieldLabel(form.csMode, false));
   let externalComputedLabel = $derived(computedFieldLabel(form.extCsMode, true));
+  let idReamerActive = $derived(Boolean(selectedIdReamerEntry));
+  let measuredIdActive = $derived(Boolean(form.measuredPart?.enabled));
+
+  $effect(() => {
+    if (!form.measuredPart) form.measuredPart = { enabled: false, basis: 'nominal', bore: {}, id: {} };
+    if (!form.measuredPart.id) form.measuredPart.id = {};
+  });
 
   $effect(() => {
     setCountersinkMode('csMode', internalCsMode);
@@ -155,7 +169,68 @@
         </div>
       </div>
       <div class="mt-3 grid grid-cols-1 gap-3">
-        <div class="space-y-1"><Label class="text-white/70">ID</Label><Input type="number" step="0.0001" bind:value={form.idBushing} /></div>
+        <div class="rounded-2xl border border-cyan-300/18 bg-cyan-500/10 p-3 text-[11px] text-cyan-100/88">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div class="font-semibold uppercase tracking-[0.18em] text-[10px] text-cyan-100/90">ID Definition Source</div>
+              <div class="mt-1 text-sm font-semibold text-white">
+                {#if selectedIdReamerEntry}
+                  Reamer-defined ID
+                {:else}
+                  Manual ID input
+                {/if}
+              </div>
+              <div class="mt-1 text-white/70">
+                {#if selectedIdReamerEntry}
+                  {describeReamerEntryForDisplay(selectedIdReamerEntry, form.units)}
+                {:else}
+                  Pick a tooling size for the internal diameter, or stay manual when you want direct numeric entry.
+                {/if}
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="rounded-full bg-cyan-300 px-3 py-1.5 text-[11px] font-semibold text-slate-950 transition-colors hover:bg-cyan-200"
+                data-testid="bushing-id-reamer-open"
+                onclick={() => onOpenReamerPicker('id')}
+              >
+                {selectedIdReamerEntry ? 'Change reamer' : 'Select reamer'}
+              </button>
+              {#if selectedIdReamerEntry}
+                <button
+                  type="button"
+                  class="rounded-full border border-white/14 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 transition-colors hover:bg-white/[0.08]"
+                  onclick={onClearIdReamerEntry}
+                >
+                  Manual
+                </button>
+              {/if}
+            </div>
+          </div>
+        </div>
+        <div class="space-y-1">
+          <Label class="text-white/70">ID</Label>
+          <Input type="number" step="0.0001" bind:value={form.idBushing} disabled={idReamerActive} />
+        </div>
+        {#if measuredIdActive}
+          <div class="grid grid-cols-2 gap-3 rounded-xl border border-white/10 bg-slate-950/25 p-3">
+            <div class="space-y-1">
+              <Label class="text-white/70">Measured ID</Label>
+              <Input type="number" step="0.0001" bind:value={form.measuredPart!.id!.actual} />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="space-y-1">
+                <Label class="text-white/70">ID +Tol</Label>
+                <Input type="number" min="0" step="0.0001" bind:value={form.measuredPart!.id!.tolPlus} />
+              </div>
+              <div class="space-y-1">
+                <Label class="text-white/70">ID -Tol</Label>
+                <Input type="number" min="0" step="0.0001" bind:value={form.measuredPart!.id!.tolMinus} />
+              </div>
+            </div>
+          </div>
+        {/if}
         {#if form.idType === 'countersink'}
           <div class="space-y-3">
             <div>

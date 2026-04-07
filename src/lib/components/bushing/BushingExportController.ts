@@ -1,12 +1,23 @@
 import { renderDraftingSheetSvg } from '$lib/drafting/core/render';
 import { exportPdfFromHtml, exportSvg, exportSvgText } from '$lib/drafting/core/export';
 import type { BushingInputs, BushingOutput } from '$lib/core/bushing';
-import { buildBushingDraftMeta, buildBushingReportHtml } from './BushingReportBuilder';
+import { buildBushingAuditBundle, buildBushingDraftMeta, buildBushingReportHtml } from './BushingReportBuilder';
+import type { ReamerCatalogEntry } from '$lib/core/bushing/reamerCatalog';
 
 type ExportContext = {
   form: BushingInputs;
   results: BushingOutput;
   draftingView: unknown;
+  selectedReamer?: ReamerCatalogEntry | null;
+  selectedIdReamer?: ReamerCatalogEntry | null;
+  compareCases?: Array<{
+    id: string;
+    name: string;
+    results: BushingOutput;
+    deltaMargin: number;
+    deltaInstallForce: number;
+    deltaContactPressure: number;
+  }>;
 };
 
 function ensureStandaloneSvgNamespaces(svgText: string): string {
@@ -33,7 +44,11 @@ function getLiveBushingSvgText(): string | null {
 
 export function prepareBushingExportArtifacts(ctx: ExportContext): { svgText: string; html: string } {
   const svgText = renderDraftingSheetSvg('bushing', ctx.draftingView, buildBushingDraftMeta(ctx.form, ctx.results));
-  const html = buildBushingReportHtml(svgText, ctx.form, ctx.results);
+  const html = buildBushingReportHtml(svgText, ctx.form, ctx.results, undefined, {
+    selectedReamer: ctx.selectedReamer,
+    selectedIdReamer: ctx.selectedIdReamer,
+    compareCases: ctx.compareCases
+  });
   return { svgText, html };
 }
 
@@ -55,7 +70,28 @@ export async function exportBushingSvg(ctx: ExportContext): Promise<void> {
 export async function exportBushingPdf(ctx: ExportContext): Promise<void> {
   const liveSvgText = getLiveBushingSvgText();
   const html = liveSvgText
-    ? buildBushingReportHtml(liveSvgText, ctx.form, ctx.results)
+    ? buildBushingReportHtml(liveSvgText, ctx.form, ctx.results, undefined, {
+        selectedReamer: ctx.selectedReamer,
+        selectedIdReamer: ctx.selectedIdReamer,
+        compareCases: ctx.compareCases
+      })
     : prepareBushingExportArtifacts(ctx).html;
   await exportPdfFromHtml(html, 'Structural Companion - Bushing Report');
+}
+
+export async function exportBushingJson(ctx: ExportContext): Promise<void> {
+  const bundle = buildBushingAuditBundle(ctx.form, ctx.results, {
+    selectedReamer: ctx.selectedReamer,
+    selectedIdReamer: ctx.selectedIdReamer,
+    compareCases: ctx.compareCases
+  });
+  const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'bushing_audit_bundle.json';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }

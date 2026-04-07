@@ -5,6 +5,8 @@ import {
   type LeftCardId,
   type RightCardId
 } from './BushingCardLayoutController';
+import type { BushingInputs } from '$lib/core/bushing';
+import { isReamerCatalogEntry, type ReamerCatalogEntry } from '$lib/core/bushing/reamerCatalog';
 import { bushingLogger } from '$lib/utils/loggers';
 
 export const LAYOUT_KEY_V2 = 'scd.bushing.layout.v2';
@@ -17,9 +19,35 @@ export const BUSHING_UI_KEY_V1 = 'scd.bushing.ui.v1';
 export const BUSHING_WORKSPACE_KEY_V1 = 'scd.bushing.workspace.v1';
 
 export type BushingUxMode = 'guided' | 'advanced';
+export type BushingWorkflowMode = 'quick' | 'review';
+export type BushingRepairStrategyId =
+  | 'light_cleanup_ream'
+  | 'finish_ream_after_install'
+  | 'oversize_repair'
+  | 'thermal_assist';
 export type BushingUiState = {
   uxMode: BushingUxMode;
+  workflowMode: BushingWorkflowMode;
   useFreePositioning: boolean;
+};
+export type BushingScenarioPreset = {
+  id: string;
+  name: string;
+  createdAt: number;
+  form: BushingInputs;
+};
+export type BushingEngineeringState = {
+  scenarioPresets: BushingScenarioPreset[];
+  activeComparePresetIds: string[];
+  repairCompareEnabled: boolean;
+  activeRepairStrategies: BushingRepairStrategyId[];
+  cleanupDelta: number;
+  oversizeStep: number;
+  customReamerCsv: string | null;
+  selectedReamerEntryId: string | null;
+  selectedIdReamerEntryId: string | null;
+  sessionCustomReamerEntry: ReamerCatalogEntry | null;
+  sessionCustomIdReamerEntry: ReamerCatalogEntry | null;
 };
 export type BushingWorkspaceState = {
   ui: BushingUiState;
@@ -30,6 +58,21 @@ export type BushingWorkspaceState = {
     useLegacyRenderer: boolean;
     traceEnabled: boolean;
   };
+  engineering: BushingEngineeringState;
+};
+
+const DEFAULT_ENGINEERING_STATE: BushingEngineeringState = {
+  scenarioPresets: [],
+  activeComparePresetIds: [],
+  repairCompareEnabled: false,
+  activeRepairStrategies: ['light_cleanup_ream', 'finish_ream_after_install', 'oversize_repair', 'thermal_assist'],
+  cleanupDelta: 0.0005,
+  oversizeStep: 0.015625,
+  customReamerCsv: null,
+  selectedReamerEntryId: null,
+  selectedIdReamerEntryId: null,
+  sessionCustomReamerEntry: null,
+  sessionCustomIdReamerEntry: null
 };
 
 function parseJson(raw: string | null): any | null {
@@ -50,18 +93,66 @@ function readWorkspace(): BushingWorkspaceState | null {
     const rightCardOrder = normalizeOrder(parsed?.layout?.rightCardOrder, RIGHT_DEFAULT_ORDER);
     const diagnosticsOrder = Array.isArray(parsed?.diagnosticsOrder) ? parsed.diagnosticsOrder.filter((x: unknown) => typeof x === 'string') : [];
     const uxMode: BushingUxMode = parsed?.ui?.uxMode === 'advanced' ? 'advanced' : 'guided';
+    const workflowMode: BushingWorkflowMode = parsed?.ui?.workflowMode === 'review' ? 'review' : 'quick';
     const useFreePositioning = Boolean(parsed?.ui?.useFreePositioning);
     const dndEnabled = typeof parsed?.dndEnabled === 'boolean' ? parsed.dndEnabled : true;
     const runtime = {
       useLegacyRenderer: Boolean(parsed?.runtime?.useLegacyRenderer),
       traceEnabled: Boolean(parsed?.runtime?.traceEnabled)
     };
+    const scenarioPresets = Array.isArray(parsed?.engineering?.scenarioPresets)
+      ? parsed.engineering.scenarioPresets
+          .filter(
+            (entry: unknown) =>
+              !!entry &&
+              typeof entry === 'object' &&
+              typeof (entry as { id?: unknown }).id === 'string' &&
+              typeof (entry as { name?: unknown }).name === 'string' &&
+              typeof (entry as { createdAt?: unknown }).createdAt === 'number' &&
+              typeof (entry as { form?: unknown }).form === 'object'
+          )
+          .slice(0, 24)
+      : [];
+    const activeComparePresetIds = Array.isArray(parsed?.engineering?.activeComparePresetIds)
+      ? parsed.engineering.activeComparePresetIds.filter((x: unknown) => typeof x === 'string').slice(0, 8)
+      : [];
+    const activeRepairStrategies = Array.isArray(parsed?.engineering?.activeRepairStrategies)
+      ? parsed.engineering.activeRepairStrategies
+          .filter((x: unknown) => x === 'light_cleanup_ream' || x === 'finish_ream_after_install' || x === 'oversize_repair' || x === 'thermal_assist')
+          .slice(0, 8)
+      : DEFAULT_ENGINEERING_STATE.activeRepairStrategies;
+    const engineering: BushingEngineeringState = {
+      scenarioPresets,
+      activeComparePresetIds,
+      repairCompareEnabled: Boolean(parsed?.engineering?.repairCompareEnabled),
+      activeRepairStrategies,
+      cleanupDelta:
+        Number.isFinite(Number(parsed?.engineering?.cleanupDelta)) && Number(parsed.engineering.cleanupDelta) >= 0
+          ? Number(parsed.engineering.cleanupDelta)
+          : DEFAULT_ENGINEERING_STATE.cleanupDelta,
+      oversizeStep:
+        Number.isFinite(Number(parsed?.engineering?.oversizeStep)) && Number(parsed.engineering.oversizeStep) >= 0
+          ? Number(parsed.engineering.oversizeStep)
+          : DEFAULT_ENGINEERING_STATE.oversizeStep,
+      customReamerCsv: typeof parsed?.engineering?.customReamerCsv === 'string' ? parsed.engineering.customReamerCsv : null,
+      selectedReamerEntryId:
+        typeof parsed?.engineering?.selectedReamerEntryId === 'string' ? parsed.engineering.selectedReamerEntryId : null,
+      selectedIdReamerEntryId:
+        typeof parsed?.engineering?.selectedIdReamerEntryId === 'string' ? parsed.engineering.selectedIdReamerEntryId : null,
+      sessionCustomReamerEntry: isReamerCatalogEntry(parsed?.engineering?.sessionCustomReamerEntry)
+        ? parsed.engineering.sessionCustomReamerEntry
+        : null,
+      sessionCustomIdReamerEntry: isReamerCatalogEntry(parsed?.engineering?.sessionCustomIdReamerEntry)
+        ? parsed.engineering.sessionCustomIdReamerEntry
+        : null
+    };
     return {
-      ui: { uxMode, useFreePositioning },
+      ui: { uxMode, workflowMode, useFreePositioning },
       layout: { leftCardOrder, rightCardOrder },
       diagnosticsOrder,
       dndEnabled,
-      runtime
+      runtime,
+      engineering
     };
   } catch (err) {
     bushingLogger.warn('Malformed bushing workspace state; clearing to defaults', err);
@@ -78,18 +169,20 @@ function writeWorkspacePatch(patch: Partial<BushingWorkspaceState>): void {
   if (typeof window === 'undefined') return;
   try {
     const current = readWorkspace() ?? {
-      ui: { uxMode: 'guided' as BushingUxMode, useFreePositioning: false },
+      ui: { uxMode: 'guided' as BushingUxMode, workflowMode: 'quick' as BushingWorkflowMode, useFreePositioning: false },
       layout: { leftCardOrder: [...LEFT_DEFAULT_ORDER], rightCardOrder: [...RIGHT_DEFAULT_ORDER] },
       diagnosticsOrder: [],
       dndEnabled: true,
-      runtime: { useLegacyRenderer: false, traceEnabled: false }
+      runtime: { useLegacyRenderer: false, traceEnabled: false },
+      engineering: { ...DEFAULT_ENGINEERING_STATE }
     };
     const next: BushingWorkspaceState = {
       ...current,
       ...patch,
       ui: { ...current.ui, ...(patch.ui ?? {}) },
       layout: { ...current.layout, ...(patch.layout ?? {}) },
-      runtime: { ...current.runtime, ...(patch.runtime ?? {}) }
+      runtime: { ...current.runtime, ...(patch.runtime ?? {}) },
+      engineering: { ...current.engineering, ...(patch.engineering ?? {}) }
     };
     localStorage.setItem(BUSHING_WORKSPACE_KEY_V1, JSON.stringify(next));
   } catch (err) {
@@ -213,15 +306,16 @@ export function readBushingDndEnabled(): boolean {
 }
 
 export function loadBushingUiState(): BushingUiState {
-  if (typeof window === 'undefined') return { uxMode: 'guided', useFreePositioning: false };
+  if (typeof window === 'undefined') return { uxMode: 'guided', workflowMode: 'quick', useFreePositioning: false };
   const parsed = parseJson(localStorage.getItem(BUSHING_UI_KEY_V1));
   const uxMode: BushingUxMode = parsed?.uxMode === 'advanced' ? 'advanced' : 'guided';
+  const workflowMode: BushingWorkflowMode = parsed?.workflowMode === 'review' ? 'review' : 'quick';
   const useFreePositioning =
     typeof parsed?.useFreePositioning === 'boolean'
       ? parsed.useFreePositioning
       : localStorage.getItem('scd.bushing.freePositioning.enabled') === '1' ||
         localStorage.getItem('scd.bushing.freePositioning.enabled') === 'true';
-  return { uxMode, useFreePositioning };
+  return { uxMode, workflowMode, useFreePositioning };
 }
 
 export function persistBushingUiState(state: BushingUiState): void {
@@ -253,4 +347,14 @@ export function persistBushingDndEnabled(v: boolean): void {
   if (typeof window === 'undefined') return;
   writeWorkspacePatch({ dndEnabled: v });
   localStorage.setItem(DND_ENABLED_KEY, v ? '1' : '0');
+}
+
+export function loadBushingEngineeringState(): BushingEngineeringState {
+  const workspace = readWorkspace();
+  return workspace?.engineering ? { ...DEFAULT_ENGINEERING_STATE, ...workspace.engineering } : { ...DEFAULT_ENGINEERING_STATE };
+}
+
+export function persistBushingEngineeringState(state: Partial<BushingEngineeringState>): void {
+  if (typeof window === 'undefined') return;
+  writeWorkspacePatch({ engineering: { ...loadBushingEngineeringState(), ...state } });
 }

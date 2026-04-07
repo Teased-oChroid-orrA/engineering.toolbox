@@ -1,5 +1,12 @@
 import { buildJointAssemblyInput } from './assembly';
-import type { FastenedJointPreloadOutput } from './types';
+import { buildPreloadComparePacks, solveEnvelopeAwareInverseTargets } from './solve-preload';
+import type {
+  FastenedJointPreloadOutput,
+  PreloadComparePack,
+  PreloadCompareMetricSnapshot,
+  PreloadInverseTargetSettings,
+  PreloadInverseTargetResult
+} from './types';
 
 export type PreloadGroupCaseSummary = {
   mode: 'screening' | 'joint_interaction';
@@ -18,6 +25,10 @@ export type PreloadGroupCaseSummary = {
     activeFastenerCount: number;
     criticalLabel: string;
     criticalEquivalentDemand: number;
+    criticalLoadShare?: number;
+    criticalAxialLoad?: number;
+    criticalShearMagnitude?: number;
+    activeFastenerIndices?: number[];
     note: string;
   }>;
 };
@@ -69,11 +80,15 @@ function renderCaseSummaryTable(summary: PreloadGroupCaseSummary): string {
     .map(
       (entry) => `
         <tr>
-          <td>Step ${entry.step}</td>
+          <td>Stage ${entry.step}</td>
           <td>${esc(entry.removedLabel)}</td>
           <td>${entry.activeFastenerCount}</td>
+          <td>${entry.activeFastenerIndices?.length ? esc(entry.activeFastenerIndices.map((index) => `F${index + 1}`).join(', ')) : '—'}</td>
           <td>${esc(entry.criticalLabel)}</td>
           <td>${fmt(entry.criticalEquivalentDemand, 4)}</td>
+          <td>${entry.criticalLoadShare == null ? '—' : fmt(entry.criticalLoadShare, 4)}</td>
+          <td>${entry.criticalAxialLoad == null ? '—' : fmt(entry.criticalAxialLoad, 2)}</td>
+          <td>${entry.criticalShearMagnitude == null ? '—' : fmt(entry.criticalShearMagnitude, 2)}</td>
           <td>${esc(entry.note)}</td>
         </tr>`
     )
@@ -91,13 +106,115 @@ function renderCaseSummaryTable(summary: PreloadGroupCaseSummary): string {
         <p>${esc(summary.progressionSummary)}</p>
       </div>
       <div class="box">
-        <h2>Failure Progression</h2>
+        <h2>Load-Transfer Progression</h2>
         <table>
-          <tr><th>Step</th><th>Removed</th><th>Active</th><th>Next critical</th><th>Eqv demand</th><th>Note</th></tr>
+          <tr><th>Stage</th><th>Removed</th><th>Active</th><th>Active set</th><th>Next critical</th><th>Eqv demand</th><th>Load share</th><th>Axial load</th><th>Shear mag.</th><th>Note</th></tr>
           ${progressionRows}
         </table>
         <p>Progression removes the current governing fastener and recomputes the remaining set to show redistribution order.</p>
       </div>
+    </div>`;
+}
+
+function renderInverseTargetSection(rows: PreloadInverseTargetResult[]): string {
+  const body = rows
+    .map(
+      (entry) => `
+        <tr${entry.feasible ? '' : ' class="unavailable"'}>
+          <td>${esc(entry.label)}</td>
+          <td class="mono">${entry.value === null ? 'No feasible solve' : fmt(entry.value, entry.unit === 'lbf' ? 2 : 4)}</td>
+          <td>${esc(entry.unit)}</td>
+          <td>${esc(entry.severity)}</td>
+          <td>${entry.governingScenario ? esc(entry.governingScenario) : '—'}</td>
+          <td>${esc(entry.note)}</td>
+        </tr>`
+    )
+    .join('');
+
+  return `
+    <div class="box" style="margin-top:16px">
+      <h2>Inverse Solve Targets</h2>
+      <table>
+        <tr><th>Target</th><th>Value</th><th>Unit</th><th>Severity</th><th>Scenario</th><th>Note</th></tr>
+        ${body}
+      </table>
+      <p>The export now includes separation and fatigue targets alongside the existing preload, proof, and bearing inverses.</p>
+    </div>`;
+}
+
+type CompareMetricKey = Exclude<keyof PreloadCompareMetricSnapshot, 'separationState'>;
+
+function compareMetricRows(pack: PreloadComparePack): Array<{ label: string; key: CompareMetricKey; digits: number }> {
+  switch (pack.id) {
+    case 'installed_preload':
+      return [
+        { label: 'Installed preload', key: 'preloadInstalled', digits: 2 },
+        { label: 'Effective preload', key: 'preloadEffective', digits: 2 },
+        { label: 'Clamp force', key: 'clampForceService', digits: 2 },
+        { label: 'Separation util.', key: 'separationUtilization', digits: 3 },
+        { label: 'Slip util.', key: 'slipUtilization', digits: 3 },
+        { label: 'Proof util.', key: 'proofUtilization', digits: 3 }
+      ];
+    case 'thermal':
+      return [
+        { label: 'Thermal shift', key: 'thermalPreloadShift', digits: 4 },
+        { label: 'Effective preload', key: 'preloadEffective', digits: 2 },
+        { label: 'Separation util.', key: 'separationUtilization', digits: 3 },
+        { label: 'Fatigue util.', key: 'fatigueUtilization', digits: 3 }
+      ];
+    case 'friction':
+      return [
+        { label: 'Slip coeff.', key: 'fayingSurfaceSlipCoeff', digits: 3 },
+        { label: 'Installed preload', key: 'preloadInstalled', digits: 2 },
+        { label: 'Slip util.', key: 'slipUtilization', digits: 3 },
+        { label: 'Separation util.', key: 'separationUtilization', digits: 3 }
+      ];
+    case 'preload_loss':
+      return [
+        { label: 'Mechanical loss', key: 'mechanicalLossTotal', digits: 4 },
+        { label: 'Net preload shift', key: 'netPreloadShift', digits: 4 },
+        { label: 'Effective preload', key: 'preloadEffective', digits: 2 },
+        { label: 'Separation util.', key: 'separationUtilization', digits: 3 }
+      ];
+    default:
+      return [];
+  }
+}
+
+function renderComparePackSection(pack: PreloadComparePack): string {
+  const columns = compareMetricRows(pack);
+  const rows = pack.cases
+    .map((entry) => {
+      const cells = columns
+        .map((column) => `<td>${fmt(entry.metrics[column.key], column.digits)}</td>`)
+        .join('');
+      return `
+        <tr${entry.id === pack.baselineCaseId ? ' class="governing"' : ''}>
+          <td>${esc(entry.label)}</td>
+          ${cells}
+          <td>${esc(entry.note)}</td>
+        </tr>`;
+    })
+    .join('');
+
+  return `
+    <div class="box" style="margin-top:16px">
+      <h2>${esc(pack.label)}</h2>
+      <p>${esc(pack.description)}</p>
+      <table>
+        <tr><th>Case</th>${columns.map((column) => `<th>${esc(column.label)}</th>`).join('')}<th>Note</th></tr>
+        ${rows}
+      </table>
+      <p>Baseline case: <span class="mono">${esc(pack.baselineCaseId)}</span>.</p>
+    </div>`;
+}
+
+function renderComparePacksSection(packs: PreloadComparePack[]): string {
+  return `
+    <div class="box" style="margin-top:16px">
+      <h2>Compare Packs</h2>
+      <p>The export now includes first-class compare cases for installed preload, thermal drift, friction variation, and explicit preload-loss assumptions.</p>
+      ${packs.map((pack) => renderComparePackSection(pack)).join('')}
     </div>`;
 }
 
@@ -114,9 +231,15 @@ function severityAction(severity: string): string {
   }
 }
 
-export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput, groupSummary: PreloadGroupCaseSummary | null = null): string {
+export function buildPreloadEquationSheetHtml(
+  output: FastenedJointPreloadOutput,
+  groupSummary: PreloadGroupCaseSummary | null = null,
+  inverseTargetSettings?: PreloadInverseTargetSettings
+): string {
   const { input, installation, stiffness, service, checks } = output;
   const assembly = buildJointAssemblyInput(input);
+  const comparePacks = buildPreloadComparePacks(input);
+  const inverseTargets = solveEnvelopeAwareInverseTargets(input, output, inverseTargetSettings);
   const date = new Date().toISOString().slice(0, 10);
   const installationRows: Array<[string, string]> = [
     ['Installation model', esc(installation.model)],
@@ -346,6 +469,8 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
       `${esc(checks.worstCaseScenarios.fatigue.scenario)} • ${fmt(checks.worstCaseScenarios.fatigue.utilization, 3)}`
     ]
   ];
+  const comparePackSections = renderComparePacksSection(comparePacks);
+  const inverseTargetSection = renderInverseTargetSection(inverseTargets);
   const compareWorstCaseRows: Array<[string, string]> = [
     [
       'Separation control',
@@ -516,8 +641,12 @@ export function buildPreloadEquationSheetHtml(output: FastenedJointPreloadOutput
       ['Utilization', fmt(output.decisionSupport.governing.utilization, 4)],
       ['Margin', fmt(output.decisionSupport.governing.margin, 4)]
     ])}</table>
-    <p>The report keeps the governing equation label separate from the substituted values so the review chain stays explicit: basis, demand, capacity, utilization, then margin.</p>
+      <p>The report keeps the governing equation label separate from the substituted values so the review chain stays explicit: basis, demand, capacity, utilization, then margin.</p>
   </div>
+
+  ${comparePackSections}
+
+  ${inverseTargetSection}
 
   ${groupSummary ? renderCaseSummaryTable(groupSummary) : ''}
 

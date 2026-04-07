@@ -24,6 +24,7 @@ const unitStep = (form: BushingInputs) => (form.units === 'metric' ? 0.025 : 0.0
 const toleranceStep = (form: BushingInputs) => (form.units === 'metric' ? 0.005 : 0.0001);
 const roundStep = (value: number, step: number) => Math.max(0, Math.ceil(value / step) * step);
 const snap = (value: number, digits = 4) => Number(value.toFixed(digits));
+const finitePositive = (value: number | null | undefined) => Number.isFinite(Number(value)) && Number(value) > 0;
 
 export function buildBushingWarningEntries(
   form: BushingInputs,
@@ -31,10 +32,11 @@ export function buildBushingWarningEntries(
   { updateForm, updateInterferencePolicy, updateBoreCapability }: GuidanceMutators
 ): BushingWarningEntry[] {
   const boreRef = Number(form.boreNominal ?? form.boreDia ?? 0);
-  const edgeRequiredAbs = Math.max(
-    (results.edgeDistance.edMinSequence || 0) * Math.max(boreRef, 0),
-    (results.edgeDistance.edMinStrength || 0) * Math.max(boreRef, 0)
-  );
+  const edgeRequiredCandidates = [
+    finitePositive(results.edgeDistance.edMinSequence) ? Number(results.edgeDistance.edMinSequence) * Math.max(boreRef, 0) : null,
+    finitePositive(results.edgeDistance.edMinStrength) ? Number(results.edgeDistance.edMinStrength) * Math.max(boreRef, 0) : null
+  ].filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
+  const edgeRequiredAbs = edgeRequiredCandidates.length ? Math.max(...edgeRequiredCandidates) : null;
   const odRef = Number(results.geometry.odBushing ?? boreRef + (form.interferenceNominal ?? form.interference ?? 0));
   const idTarget = snap(Math.max(0, boreRef - unitStep(form)), 4);
   const csInternalDiaTarget = snap(Math.max(form.idBushing, (form.csDia || 0), form.idBushing + unitStep(form)), 4);
@@ -45,13 +47,15 @@ export function buildBushingWarningEntries(
       case 'EDGE_DISTANCE_SEQUENCE_FAIL':
       case 'EDGE_DISTANCE_STRENGTH_FAIL':
         return [
-          {
-            label: `Set edge distance to ${snap(roundStep(edgeRequiredAbs, unitStep(form)), 4)}`,
-            target: 'bushing-geometry-card',
-            run: () => {
-              updateForm({ edgeDist: snap(roundStep(edgeRequiredAbs, unitStep(form)), 4) });
-            }
-          },
+          ...(finitePositive(edgeRequiredAbs)
+            ? [{
+                label: `Set edge distance to ${snap(roundStep(Number(edgeRequiredAbs), unitStep(form)), 4)}`,
+                target: 'bushing-geometry-card',
+                run: () => {
+                  updateForm({ edgeDist: snap(roundStep(Number(edgeRequiredAbs), unitStep(form)), 4) });
+                }
+              } satisfies BushingGuidanceAction]
+            : []),
           {
             label: 'Focus Geometry',
             target: 'bushing-geometry-card',

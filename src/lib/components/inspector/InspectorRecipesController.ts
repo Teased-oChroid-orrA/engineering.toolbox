@@ -47,6 +47,16 @@ export const normalizeRecipeTags = (value: string) =>
 export type DatasetRecipePack = { label: string; recipes: Recipe[] };
 export type RecipesStore = { v: 3; datasets: Record<string, DatasetRecipePack> };
 export type LastStateStore = { v: 3; datasets: Record<string, { autoRestore: boolean; state: RecipeState }> };
+export type WorkspaceSnapshot = {
+  id: string;
+  name: string;
+  createdAt: number;
+  datasetId: string | null;
+  datasetLabel: string;
+  state: RecipeState;
+  favorite?: boolean;
+};
+export type WorkspaceSnapshotStore = { v: 1; snapshots: WorkspaceSnapshot[] };
 
 export function getRecipesStore(recipesKey: string, legacyKeys: string[]): RecipesStore {
   const raw = safeLocalStorageGet(recipesKey);
@@ -153,7 +163,7 @@ export function newRecipeId() {
   return Math.random().toString(16).slice(2) + '-' + Date.now().toString(16);
 }
 
-export function downloadText(name: string, text: string, mime = 'text/plain;charset=utf-8') {
+export function downloadText(text: string, name: string, mime = 'text/plain;charset=utf-8') {
   const blob = new Blob([text], { type: mime });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -215,6 +225,43 @@ export function mergeImportedRecipes(args: {
     return rr;
   }).filter(Boolean);
   return dedupeRecipesById([...incoming, ...args.existing]).slice(0, 200);
+}
+
+export function getWorkspaceSnapshotStore(key: string): WorkspaceSnapshotStore {
+  const raw = safeLocalStorageGet(key);
+  if (!raw) return { v: 1, snapshots: [] };
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.v === 1 && Array.isArray(parsed.snapshots)) {
+      return {
+        v: 1,
+        snapshots: parsed.snapshots.filter(
+          (entry: unknown) =>
+            !!entry &&
+            typeof entry === 'object' &&
+            typeof (entry as { id?: unknown }).id === 'string' &&
+            typeof (entry as { name?: unknown }).name === 'string' &&
+            typeof (entry as { createdAt?: unknown }).createdAt === 'number' &&
+            typeof (entry as { state?: unknown }).state === 'object'
+        )
+      };
+    }
+  } catch {}
+  return { v: 1, snapshots: [] };
+}
+
+export function setWorkspaceSnapshotStore(key: string, store: WorkspaceSnapshotStore) {
+  safeLocalStorageSet(key, JSON.stringify(store));
+}
+
+export function loadWorkspaceSnapshots(key: string): WorkspaceSnapshot[] {
+  return getWorkspaceSnapshotStore(key).snapshots
+    .slice()
+    .sort((a, b) => Number(!!b.favorite) - Number(!!a.favorite) || b.createdAt - a.createdAt);
+}
+
+export function persistWorkspaceSnapshots(key: string, snapshots: WorkspaceSnapshot[]) {
+  setWorkspaceSnapshotStore(key, { v: 1, snapshots: (snapshots ?? []).slice(0, 100) });
 }
 
 export function toCsvText(headers: string[], rows: string[][]) {

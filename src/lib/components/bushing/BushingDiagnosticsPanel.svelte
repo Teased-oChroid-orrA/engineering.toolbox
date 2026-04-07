@@ -304,7 +304,7 @@
           <div class="text-sm font-semibold text-cyan-100">Edge Distance</div>
           <div class="text-white/80">`e/D` is a nondimensional edge-distance adequacy ratio. `Actual e/D` is your configuration ratio; minimum requirements are generated from two mechanisms: sequencing robustness and local strength demand.</div>
           <div class="text-white/80">`Sequencing` means the installation/load-transfer progression stays stable as the joint is assembled and loaded in real service order. Practically, enough ligament is required so local deformation does not prematurely redirect or spike load path before full seating and bearing distribution are established.</div>
-          <div class="text-white/80">`Min (Seq)` protects process/installation sequencing behavior and load-path development. `Min (Strength)` protects against insufficient ligament under the selected loading assumptions. Both are evaluated independently; the larger required value is controlling for acceptance.</div>
+          <div class="text-white/80">`Min (Seq)` protects process/installation sequencing behavior and load-path development using the dedicated failure-plane angle referenced from the applied load direction. `Min (Strength)` protects against insufficient ligament under the selected loading assumptions. Both are evaluated independently; the larger required value is controlling for acceptance.</div>
           <div class="text-white/80">When `Actual e/D` is below the controlling minimum, edge distance governs regardless of positive material-yield margins elsewhere.</div>
           {#if edgeFailed}
             <div class="rounded-md border border-amber-300/50 bg-amber-500/15 p-2 text-[12px] text-amber-100">

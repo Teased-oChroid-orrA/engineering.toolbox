@@ -134,10 +134,30 @@ export function computeSchemaDrift(schemaStats: SchemaColStat[], baseline: Schem
   if (!baseline?.length || !(schemaStats?.length ?? 0)) return [];
   const base = new Map<number, SchemaColStat>();
   for (const s of baseline) base.set(s.idx, s);
-  const out: { idx: number; name: string; drift: number; reason: string }[] = [];
+  const seen = new Set<number>();
+  const out: {
+    idx: number;
+    name: string;
+    drift: number;
+    reason: string;
+    kind: 'changed' | 'added' | 'removed';
+    baselineType?: ColType;
+    currentType?: ColType;
+  }[] = [];
   for (const s of schemaStats ?? []) {
     const b = base.get(s.idx);
-    if (!b) continue;
+    if (!b) {
+      out.push({
+        idx: s.idx,
+        name: s.name,
+        drift: 1,
+        reason: `Column added with type ${s.type}.`,
+        kind: 'added',
+        currentType: s.type
+      });
+      continue;
+    }
+    seen.add(s.idx);
     const dEmpty = Math.abs((s.emptyPct ?? 0) - (b.emptyPct ?? 0)) / 100;
     const dDistinct = Math.abs((s.distinctRatio ?? 0) - (b.distinctRatio ?? 0));
     const dType = s.type === b.type ? 0 : 0.5;
@@ -147,7 +167,21 @@ export function computeSchemaDrift(schemaStats: SchemaColStat[], baseline: Schem
       idx: s.idx,
       name: s.name,
       drift: Number(drift.toFixed(2)),
-      reason: `empty ${(b.emptyPct ?? 0).toFixed(1)}%→${(s.emptyPct ?? 0).toFixed(1)}%, distinct ${(b.distinctRatio ?? 0).toFixed(2)}→${(s.distinctRatio ?? 0).toFixed(2)}`
+      reason: `empty ${(b.emptyPct ?? 0).toFixed(1)}%→${(s.emptyPct ?? 0).toFixed(1)}%, distinct ${(b.distinctRatio ?? 0).toFixed(2)}→${(s.distinctRatio ?? 0).toFixed(2)}`,
+      kind: 'changed',
+      baselineType: b.type,
+      currentType: s.type
+    });
+  }
+  for (const b of baseline) {
+    if (seen.has(b.idx)) continue;
+    out.push({
+      idx: b.idx,
+      name: b.name,
+      drift: 1,
+      reason: `Column removed from current schema. Baseline type was ${b.type}.`,
+      kind: 'removed',
+      baselineType: b.type
     });
   }
   return out.sort((a, b) => b.drift - a.drift).slice(0, 10);

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { computeBushing } from '../src/lib/core/bushing';
+import { makeFriendlyMessage } from '../src/lib/core/bushing/errorMessageUtils';
 import { baseBushingInput } from './bushing-fixture';
 
 test.describe('bushing solver regression', () => {
@@ -113,6 +114,66 @@ test.describe('bushing solver regression', () => {
     expect(Number.isFinite(out.pressure)).toBeTruthy();
   });
 
+  test('returns service-envelope, duty, process, and review outputs', async () => {
+    const out = computeBushing({
+      ...baseBushingInput,
+      processRouteId: 'press_fit_finish_ream',
+      standardsBasis: 'faa_ac_43_13',
+      standardsRevision: 'current',
+      processSpec: 'repair traveler 17',
+      criticality: 'repair',
+      serviceTemperatureHot: 90,
+      serviceTemperatureCold: -65,
+      finishReamAllowance: 0.0006,
+      wearAllowance: 0.0004,
+      load: 1800,
+      edgeLoadAngleDeg: 35,
+      loadSpectrum: 'oscillating',
+      oscillationAngleDeg: 24,
+      oscillationFreqHz: 0.8,
+      dutyCyclePct: 70,
+      lubricationMode: 'greased',
+      contaminationLevel: 'shop',
+      surfaceRoughnessRaUm: 0.8,
+      shaftHardnessHrc: 42,
+      misalignmentDeg: 0.08
+    });
+
+    expect(out.serviceEnvelope.states).toHaveLength(6);
+    expect(out.serviceEnvelope.governingStateLabel.length).toBeGreaterThan(0);
+    expect(out.dutyScreen.pvLimit).toBeGreaterThan(0);
+    expect(out.process.routeId).toBe('press_fit_finish_ream');
+    expect(out.process.finishMachiningRequired).toBeTruthy();
+    expect(out.review.standardsBasis).toBe('faa_ac_43_13');
+    expect(out.review.approvalRequired).toBeTruthy();
+  });
+
+  test('raises service and duty warnings for a harsh hot oscillating case', async () => {
+    const out = computeBushing({
+      ...baseBushingInput,
+      processRouteId: 'line_ream_repair',
+      criticality: 'primary_structure',
+      serviceTemperatureHot: 180,
+      serviceTemperatureCold: -120,
+      wearAllowance: 0.001,
+      load: 4200,
+      edgeLoadAngleDeg: 20,
+      loadSpectrum: 'oscillating',
+      oscillationAngleDeg: 40,
+      oscillationFreqHz: 3,
+      dutyCyclePct: 90,
+      lubricationMode: 'dry',
+      contaminationLevel: 'abrasive',
+      surfaceRoughnessRaUm: 2.4,
+      shaftHardnessHrc: 28,
+      misalignmentDeg: 0.35
+    });
+
+    expect(out.dutyScreen.wearRisk === 'high' || out.dutyScreen.wearRisk === 'severe').toBeTruthy();
+    expect(out.warningCodes.some((w) => w.code === 'DUTY_SCREEN_HIGH_RISK')).toBeTruthy();
+    expect(out.warningCodes.some((w) => w.code === 'APPROVAL_REVIEW_REQUIRED')).toBeTruthy();
+  });
+
   test('strict interference enforcement reports blocked state when bore is locked', async () => {
     const out = computeBushing({
       ...baseBushingInput,
@@ -161,7 +222,31 @@ test.describe('bushing solver regression', () => {
     expect(out.tolerance.enforcement.reasonCodes).toContain('AUTO_ADJUST_BORE_WIDTH');
     expect(out.tolerance.achievedInterference.lower + 1e-9).toBeGreaterThanOrEqual(out.tolerance.interferenceTarget.lower);
     expect(out.tolerance.achievedInterference.upper - 1e-9).toBeLessThanOrEqual(out.tolerance.interferenceTarget.upper);
-    expect(out.tolerance.bore.nominal).toBeCloseTo(0.5, 9);
+    expect(out.tolerance.bore.lower + 1e-9).toBeGreaterThanOrEqual(0.5);
+    expect(out.tolerance.bore.upper).toBeCloseTo(0.5007, 9);
+  });
+
+  test('strict interference tightening preserves the entered minimum bore and tightens from the upper side', async () => {
+    const out = computeBushing({
+      ...baseBushingInput,
+      boreTolMode: 'limits',
+      boreLower: 0.5,
+      boreUpper: 0.5008,
+      interferenceTolMode: 'limits',
+      interferenceLower: 0.0022,
+      interferenceUpper: 0.0026,
+      interferencePolicy: {
+        enabled: true,
+        lockBore: false,
+        preserveBoreNominal: true,
+        allowBoreNominalShift: false
+      }
+    });
+
+    expect(out.tolerance.enforcement.satisfied).toBeTruthy();
+    expect(out.tolerance.bore.lower + 1e-9).toBeGreaterThanOrEqual(0.5);
+    expect(out.tolerance.bore.upper).toBeCloseTo(0.5008, 9);
+    expect(out.tolerance.bore.lower).toBeCloseTo(0.5004, 9);
   });
 
   test('strict interference enforcement is blocked by bore capability floor', async () => {
@@ -221,5 +306,107 @@ test.describe('bushing solver regression', () => {
     expect(Number.isFinite(out.geometry.csInternal.dia)).toBeTruthy();
     expect(out.tolerance.csExternalDia?.lower ?? 0).toBeGreaterThanOrEqual(out.tolerance.odBushing.lower);
     expect(out.tolerance.csInternalDia?.lower ?? 0).toBeGreaterThanOrEqual(baseBushingInput.idBushing);
+  });
+
+  test('baseline service-state and review outputs remain low risk with simple static loading', async () => {
+    const out = computeBushing({
+      ...baseBushingInput,
+      load: 250,
+      loadSpectrum: 'static',
+      lubricationMode: 'greased',
+      contaminationLevel: 'clean',
+      surfaceRoughnessRaUm: 1.2,
+      shaftHardnessHrc: 36,
+      misalignmentDeg: 0.02,
+      processRouteId: 'press_fit_only',
+      standardsBasis: 'shop_default',
+      criticality: 'general'
+    });
+
+    expect(out.serviceEnvelope.states.length).toBeGreaterThanOrEqual(5);
+    expect(out.serviceEnvelope.governingStateId).not.toBe('free');
+    expect(out.dutyScreen.wearRisk).toBe('low');
+    expect(out.review.approvalRequired).toBeFalsy();
+    expect(out.review.decision).toBe('pass');
+    expect(out.process.routeId).toBe('press_fit_only');
+    expect(out.process.installForceBand.nominal).toBeGreaterThan(0);
+  });
+
+  test('high-risk duty and service-envelope conditions trigger review and warning codes', async () => {
+    const out = computeBushing({
+      ...baseBushingInput,
+      load: 12000,
+      loadSpectrum: 'oscillating',
+      oscillationAngleDeg: 140,
+      oscillationFreqHz: 18,
+      dutyCyclePct: 95,
+      lubricationMode: 'dry',
+      contaminationLevel: 'abrasive',
+      surfaceRoughnessRaUm: 3.2,
+      shaftHardnessHrc: 24,
+      misalignmentDeg: 0.35,
+      serviceTemperatureHot: 220,
+      serviceTemperatureCold: -20,
+      finishReamAllowance: 0.002,
+      wearAllowance: 0.001,
+      processRouteId: 'line_ream_repair',
+      standardsBasis: 'faa_ac_43_13',
+      standardsRevision: 'AC 43.13-1B',
+      criticality: 'primary_structure',
+      approvalNotes: 'Engineering approval required before release.'
+    });
+
+    expect(out.dutyScreen.pvUtilization).toBeGreaterThan(1);
+    expect(out.dutyScreen.wearRisk === 'high' || out.dutyScreen.wearRisk === 'severe').toBeTruthy();
+    expect(out.review.approvalRequired).toBeTruthy();
+    expect(['review', 'hold']).toContain(out.review.decision);
+    expect(out.warningCodes.some((w) => w.code === 'DUTY_SCREEN_HIGH_RISK')).toBeTruthy();
+    expect(out.warningCodes.some((w) => w.code === 'APPROVAL_REVIEW_REQUIRED')).toBeTruthy();
+    expect(out.warningCodes.some((w) => w.code === 'SERVICE_STATE_CLEARANCE')).toBeTruthy();
+    expect(out.serviceEnvelope.states.some((state) => state.fitClass === 'clearance')).toBeTruthy();
+  });
+
+  test('edge-distance friendly message avoids absurd literal recommendations', async () => {
+    const friendly = makeFriendlyMessage('EDGE_DISTANCE_STRENGTH_FAIL', {
+      units: 'in',
+      actualValue: 0.42,
+      requiredValue: 32959.789
+    });
+
+    expect(friendly.suggestion).not.toContain('32959.789 in');
+    expect(friendly.suggestion).toContain('outside a practical range');
+  });
+
+  test('edge-distance sequencing falls back to a sane default when edge load angle is zero', async () => {
+    const baseline = computeBushing({
+      ...baseBushingInput,
+      edgeLoadAngleDeg: 40
+    });
+    const zeroAngle = computeBushing({
+      ...baseBushingInput,
+      edgeLoadAngleDeg: 0
+    });
+
+    expect(zeroAngle.edgeDistance.edMinSequence).toBeCloseTo(baseline.edgeDistance.edMinSequence, 9);
+  });
+
+  test('assembly thermal assist reduces install force while keeping removal tied to retained fit', async () => {
+    const baseline = computeBushing({
+      ...baseBushingInput,
+      processRouteId: 'thermal_assist_install'
+    });
+    const assisted = computeBushing({
+      ...baseBushingInput,
+      processRouteId: 'thermal_assist_install',
+      assemblyHousingTemperature: 200,
+      assemblyBushingTemperature: 0
+    });
+
+    expect(assisted.physics.installForce).toBeLessThan(baseline.physics.installForce);
+    expect(assisted.physics.installContactPressure).toBeLessThan(baseline.physics.installContactPressure);
+    expect(assisted.physics.installDeltaEffective).toBeLessThan(baseline.physics.installDeltaEffective);
+    expect(assisted.process.installForceBand.nominal).toBeLessThan(baseline.process.installForceBand.nominal);
+    expect(assisted.process.removalForce).toBeCloseTo(baseline.process.removalForce, 9);
+    expect(assisted.process.assemblyThermalAssistActive).toBeTruthy();
   });
 });

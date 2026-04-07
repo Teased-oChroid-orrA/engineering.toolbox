@@ -63,7 +63,9 @@ export {
 } from '$lib/components/inspector/InspectorOrchestratorGridController';
 export {
   applyRecipe as applyRecipeController2,
+  applyWorkspaceSnapshot as applyWorkspaceSnapshotController2,
   deleteRecipe as deleteRecipeController2,
+  deleteWorkspaceSnapshot as deleteWorkspaceSnapshotController2,
   exportAnalysisBundle as exportAnalysisBundleController,
   exportCsvPreset as exportCsvPresetController,
   exportRecipesCurrent as exportRecipesCurrentController,
@@ -73,6 +75,7 @@ export {
   persistLastStateForDataset as persistLastStateForDatasetController2,
   persistRecipesForDataset as persistRecipesForDatasetController2,
   saveCurrentAsRecipe as saveCurrentAsRecipeController2,
+  saveCurrentAsSnapshot as saveCurrentAsSnapshotController2,
   toggleRecipeFavorite as toggleRecipeFavoriteController2
 } from '$lib/components/inspector/InspectorOrchestratorRecipesController';
 export {
@@ -112,14 +115,16 @@ export {
   downloadText,
   loadLastStateForDataset as loadLastStateForDatasetFromStore,
   loadRecipesForDataset as loadRecipesForDatasetFromStore,
+  loadWorkspaceSnapshots,
   mergeImportedRecipes,
   migrateAndNormalizeRecipeState,
   newRecipeId,
   persistLastStateForDataset as persistLastStateForDatasetToStore,
   persistRecipesForDataset as persistRecipesForDatasetToStore,
+  persistWorkspaceSnapshots,
   toCsvText
 } from '$lib/components/inspector/InspectorRecipesController';
-export type { Recipe, RecipeState } from '$lib/components/inspector/InspectorRecipesController';
+export type { Recipe, RecipeState, WorkspaceSnapshot } from '$lib/components/inspector/InspectorRecipesController';
 export {
   applyDrawerDateExact,
   applyDrawerNumericExact,
