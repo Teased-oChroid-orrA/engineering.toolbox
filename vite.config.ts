@@ -17,13 +17,14 @@ viteLogger.warn = (msg, options) => {
   originalWarn(msg, options);
 };
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(() => ({
   // file:// portability: ensure built asset URLs are relative
   base: './',
   customLogger: viteLogger,
   plugins: [tailwindcss(), sveltekit()],
-  // Bug 1 fix: Force re-bundle dependencies on dev startup to prevent 504 Outdated Optimize Dep
-  optimizeDeps: command === 'serve' ? { force: true } : undefined,
+  // Note: previously `optimizeDeps: { force: true }` ran on every `vite dev` to dodge a one-time
+  // "504 Outdated Optimize Dep" error. That forced a full re-bundle on each startup (slow). If the
+  // 504 recurs, clear the `.vite` cache once (`rm -rf node_modules/.vite`) instead of forcing always.
   // Ensure imported static assets can be inlined when using
   // kit.output.bundleStrategy = 'inline' (portable file:// build).
   // See SvelteKit configuration docs.

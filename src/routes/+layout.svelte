@@ -3,11 +3,10 @@
   import '$lib/styles/themes.css';
   import { page } from '$app/state';
   import { onMount } from 'svelte';
-  import { themeStore } from '$lib/stores/themeStore';
+  import { themeStore, colorModeStore } from '$lib/stores/themeStore';
   import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
   import { toolboxProgress } from '$lib/stores/toolboxProgress';
   import { safeModeStore } from '$lib/stores/safeModeStore';
-  import { AppBar } from '@skeletonlabs/skeleton-svelte';
   import { cn } from '$lib/utils';
   import {
     CONTEXT_MENU_CLEAR_EVENT,
@@ -360,6 +359,7 @@
     }
 
     themeStore.init();
+    colorModeStore.init();
     safeModeStore.init();
     void import('@tauri-apps/api/core')
       .then((mod) => {
@@ -559,7 +559,10 @@
       }}
     ></div>
   {/if}
-  <AppBar
+  <!-- header has an implicit banner role; mouse handlers only drive auto-hide chrome -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <header
+    style="color: var(--text-primary)"
     class={cn(
       'fixed inset-x-0 top-0 z-50 mx-4 mt-2 rounded-2xl glass-panel shadow-2xl transition-[transform,opacity] duration-300 ease-out',
       shellHidden
@@ -585,18 +588,18 @@
       shellHidden = (window.scrollY || 0) > 80;
     }}
   >
-    <AppBar.Toolbar class="px-6 py-3 grid-cols-[auto_1fr_auto]">
-      <AppBar.Lead>
+    <div class="grid grid-cols-[auto_1fr_auto] items-center px-6 py-3">
+      <div>
         <div class="flex items-center gap-3">
           <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 font-bold text-white shadow-lg shadow-indigo-500/30">SC</div>
           <div class="leading-none">
             <div class="font-semibold tracking-wide text-sm">Structural Companion</div>
-            <div class="text-[10px] text-white/40 uppercase tracking-widest mt-1">Desktop • v3.3</div>
+            <div class="text-[10px] uppercase tracking-widest mt-1 opacity-60">Desktop • v3.3</div>
           </div>
         </div>
-      </AppBar.Lead>
+      </div>
 
-      <AppBar.Headline>
+      <div class="min-w-0">
         <div class="relative w-full" bind:this={navHost} data-main-nav-root="true">
           {#if !compactNav}
             <nav class="flex flex-nowrap items-center justify-center gap-1">
@@ -605,9 +608,7 @@
                   href={item.href}
                   class={cn(
                     'rounded-full px-4 py-1.5 text-xs font-medium transition-all duration-300 whitespace-nowrap',
-                    active(item.path)
-                      ? 'bg-white/10 text-white shadow-inner shadow-white/5 border border-white/10'
-                      : 'text-white/50 hover:text-white hover:bg-white/5'
+                    active(item.path) ? 'app-nav-pill-active shadow-inner' : 'app-nav-pill'
                   )}
                 >
                   {item.label}
@@ -624,15 +625,13 @@
               </button>
             </div>
             {#if navMenuOpen}
-              <div class="absolute left-1/2 top-full mt-2 z-[1400] w-56 -translate-x-1/2 rounded-xl border border-white/10 bg-surface-900/95 p-2 shadow-2xl">
+              <div class="absolute left-1/2 top-full mt-2 z-[1400] w-56 -translate-x-1/2 rounded-xl app-menu-surface p-2 shadow-2xl">
                 {#each nav as item}
                   <a
                     href={item.href}
                     class={cn(
                       'block rounded-lg px-3 py-2 text-xs font-medium transition-colors',
-                      active(item.path)
-                        ? 'bg-white/10 text-white border border-white/10'
-                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                      active(item.path) ? 'app-nav-pill-active' : 'app-nav-pill'
                     )}
                     onclick={() => (navMenuOpen = false)}
                   >
@@ -643,13 +642,12 @@
             {/if}
           {/if}
         </div>
-      </AppBar.Headline>
+      </div>
 
-      <AppBar.Trail>
-        <div class="flex items-center gap-2" data-main-nav-root="true">
+      <div class="flex items-center justify-end gap-2" data-main-nav-root="true">
           <ThemeToggle compact={true} />
           <button
-            class={`btn btn-xs rounded-full px-3 py-1.5 text-xs font-medium ${$safeModeStore ? 'variant-soft border border-amber-300/40 text-amber-100' : 'variant-ghost text-white/70'}`}
+            class={`btn btn-xs rounded-full px-3 py-1.5 text-xs font-medium ${$safeModeStore ? 'variant-soft border border-amber-300/40 text-amber-100' : 'variant-ghost opacity-70'}`}
             onclick={() => safeModeStore.toggle()}
           >
             Safe mode {$safeModeStore ? 'On' : 'Off'}
@@ -668,17 +666,17 @@
               </button>
               {#if toolMenuOpen}
                 <div
-                  class="fixed z-[1400] w-72 max-w-[calc(100vw-16px)] rounded-xl border border-white/10 bg-surface-900/95 p-2 shadow-2xl"
+                  class="fixed z-[1400] w-72 max-w-[calc(100vw-16px)] rounded-xl app-menu-surface p-2 shadow-2xl"
                   style={`left:${toolMenuPos.x}px; top:${toolMenuPos.y}px;`}
                 >
                   {#each activeToolMenu.sections as section, sectionIdx}
                     {#if sectionIdx > 0}
-                      <div class="my-1 h-px bg-white/10"></div>
+                      <div class="my-1 h-px" style="background: var(--border-primary)"></div>
                     {/if}
-                    <div class="px-2 py-1 text-[10px] uppercase tracking-widest text-white/45">{section.title}</div>
+                    <div class="px-2 py-1 text-[10px] uppercase tracking-widest opacity-60">{section.title}</div>
                     {#each section.actions as action}
                       <button
-                        class="w-full text-left px-2 py-1 rounded hover:bg-white/10 text-xs flex items-center justify-between"
+                        class="app-nav-pill w-full text-left px-2 py-1 rounded text-xs flex items-center justify-between"
                         disabled={action.disabled}
                         onclick={() => {
                           if (!activeScope || action.disabled) return;
@@ -688,7 +686,7 @@
                       >
                         <span>{action.label}</span>
                         {#if action.checked != null}
-                          <span class={`text-[10px] ${action.checked ? 'text-emerald-300' : 'text-white/35'}`}>{action.checked ? 'ON' : 'OFF'}</span>
+                          <span class={`text-[10px] ${action.checked ? 'text-emerald-400' : 'opacity-50'}`}>{action.checked ? 'ON' : 'OFF'}</span>
                         {/if}
                       </button>
                     {/each}
@@ -698,10 +696,9 @@
             </div>
           {/if}
           <div class="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
-        </div>
-      </AppBar.Trail>
-    </AppBar.Toolbar>
-  </AppBar>
+      </div>
+    </div>
+  </header>
 
   <div class="mx-auto max-w-7xl px-4 pt-24">
   {#if $toolboxProgress.visible && $toolboxProgress.progress < 100}

@@ -32,8 +32,9 @@
 }
 
 /* 2. GLOBAL STYLES */
+/* NOTE: color-scheme and the <body> background/color are owned by
+   src/lib/styles/themes.css so they react to the light/dark mode axis. */
 :root {
-  color-scheme: dark;
   --surface-font-display: "Sora", "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
   --surface-font-data: "IBM Plex Mono", "Roboto Mono", "Menlo", "Consolas", monospace;
   --surface-motion-fast: 180ms;
@@ -54,22 +55,37 @@
   --surface-lab-metric: #7dd3fc;
 }
 
-body {
-  /* Deep Slate Base */
-  background-color: var(--color-surface-950);
-  color: white;
-  
-  /* Neon Horizon Glows */
-  background-image: 
-    radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.15) 0%, transparent 40%),
-    radial-gradient(circle at 100% 100%, rgba(99, 102, 241, 0.15) 0%, transparent 40%);
-  background-attachment: fixed;
-}
+/* body background/color/glow now live in themes.css (mode-aware). */
 
 /* 3. GLASS UTILITIES */
+/* Token-driven app chrome (header/nav/menus) so it adapts to the light/dark axis. */
+@layer components {
+  .app-nav-pill {
+    color: var(--text-secondary);
+    transition: all 0.3s ease;
+  }
+  .app-nav-pill:hover {
+    color: var(--text-primary);
+    background: var(--theme-btn-hover);
+  }
+  .app-nav-pill-active {
+    color: var(--text-primary);
+    background: var(--theme-btn-active);
+    border: 1px solid var(--theme-border-active);
+  }
+  .app-menu-surface {
+    background: color-mix(in srgb, var(--bg-secondary) 96%, transparent);
+    border: 1px solid var(--border-primary);
+    color: var(--text-primary);
+  }
+}
+
 @layer utilities {
   .glass-panel {
-    @apply bg-surface-900/60 backdrop-blur-xl border border-white/15 shadow-2xl shadow-black/50;
+    background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border-primary);
+    box-shadow: 0 25px 50px -12px rgba(2, 6, 23, 0.4);
   }
   
   .glass-card {

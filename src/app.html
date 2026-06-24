@@ -1,12 +1,43 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="./favicon.png" />
     <meta name="viewport" content="width=device-width" />
+    <script>
+      // No-flash theme bootstrap: apply persisted palette + color mode before first paint.
+      // Mirrors src/lib/stores/themeStore.ts (keys, defaults, prefers-color-scheme resolution).
+      (function () {
+        try {
+          var palettes = ['technical', 'studio', 'high-contrast', 'aurora'];
+          var palette = localStorage.getItem('scd.theme.mode.v2');
+          if (palettes.indexOf(palette) === -1) palette = 'technical';
+
+          var cm = localStorage.getItem('scd.color.mode.v1');
+          if (['light', 'dark', 'auto'].indexOf(cm) === -1) cm = 'auto';
+          var resolved = cm;
+          if (cm === 'auto') {
+            resolved =
+              window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+          }
+
+          var root = document.documentElement;
+          root.setAttribute('data-theme', palette);
+          root.classList.add('theme-' + palette);
+          root.setAttribute('data-color-mode', cm);
+          root.setAttribute('data-mode', resolved);
+          root.style.colorScheme = resolved;
+          root.style.setProperty('--boot-bg', resolved === 'light' ? '#f6f8fb' : '#111a2b');
+        } catch (e) {
+          /* localStorage may be unavailable; fall back to CSS defaults (dark). */
+        }
+      })();
+    </script>
     %sveltekit.head%
     <style>
-      html, body { background-color: #020617; margin: 0; }
+      html, body { background-color: var(--boot-bg, #111a2b); margin: 0; }
     </style>
 
     <script>
@@ -57,7 +88,7 @@
       })();
     </script>
 <style>
-      body { background-color: #020617; margin: 0; }
+      body { background-color: var(--boot-bg, #111a2b); margin: 0; }
       #splash {
         position: fixed; inset: 0; z-index: 9999;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -68,6 +99,22 @@
         transition: opacity 0.38s ease-out, transform 0.38s ease-out;
         pointer-events: none;
       }
+      /* Light-mode boot splash: avoid a dark flash before the app mounts. */
+      html[data-mode='light'] #splash {
+        background:
+          radial-gradient(circle at 20% 10%, rgba(2, 132, 199, 0.1), transparent 40%),
+          radial-gradient(circle at 85% 20%, rgba(59, 130, 246, 0.1), transparent 42%),
+          radial-gradient(circle at 50% 120%, rgba(99, 102, 241, 0.08), rgba(246, 248, 251, 1));
+      }
+      html[data-mode='light'] .splash-card {
+        border-color: rgba(15, 28, 46, 0.14);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 248, 251, 0.92));
+        box-shadow: 0 22px 60px rgba(15, 28, 46, 0.14);
+      }
+      html[data-mode='light'] .splash-head { color: rgba(33, 49, 70, 0.82); }
+      html[data-mode='light'] .splash-message { color: rgba(7, 89, 133, 0.92); }
+      html[data-mode='light'] .splash-kernel,
+      html[data-mode='light'] .splash-diagnostics { color: rgba(74, 90, 112, 0.9); }
       #splash.done {
         opacity: 0;
         transform: scale(1.02);
@@ -167,7 +214,7 @@
       @keyframes spin { to { transform: rotate(360deg); } }
     </style>
   </head>
-  <body data-sveltekit-preload-data="tap" class="bg-zinc-950 text-white antialiased selection:bg-indigo-500/30">
+  <body data-sveltekit-preload-data="tap" class="antialiased selection:bg-indigo-500/30">
     <div id="splash">
       <div class="splash-card">
         <div class="splash-head">

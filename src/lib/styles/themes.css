@@ -1,89 +1,198 @@
-/* Global Theme System - unified on Surface theme profiles */
+/* Global Theme System
+ *
+ * Two independent axes:
+ *   - palette  -> [data-theme="technical|studio|high-contrast|aurora"]
+ *   - color    -> [data-mode="dark|light"]  (resolved from light/dark/auto in themeStore)
+ *
+ * Dark is the default (also used for SSR / no-JS). Light variants override via the
+ * higher-specificity [data-mode="light"][data-theme="..."] selectors.
+ */
+
+/* ============================ DARK (default) ============================ */
 
 :root,
-[data-theme="technical"] {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
+[data-theme='technical'],
+[data-mode='dark'][data-theme='technical'] {
+  color-scheme: dark;
+  /* Lifted off near-black for legibility (was #0f172a/#020617). */
+  --bg-primary: #111a2b;
+  --bg-secondary: #1b2740;
   --text-primary: #f1f5f9;
-  --text-secondary: #cbd5e1;
-  --border-primary: rgba(255, 255, 255, 0.1);
+  --text-secondary: #b6c2d4;
+  --border-primary: rgba(148, 173, 209, 0.18);
   --accent-primary: #38bdf8;
-  --theme-border: rgba(255, 255, 255, 0.1);
-  --theme-btn-bg: rgba(2, 6, 23, 0.52);
-  --theme-btn-hover: rgba(255, 255, 255, 0.06);
-  --theme-border-hover: rgba(125, 211, 252, 0.28);
-  --theme-btn-active: rgba(56, 189, 248, 0.16);
-  --theme-border-active: rgba(56, 189, 248, 0.45);
-  --theme-text: rgba(241, 245, 249, 0.72);
-  --theme-text-active: rgba(207, 250, 254, 0.96);
+  --theme-border: rgba(148, 173, 209, 0.18);
+  --theme-btn-bg: rgba(13, 23, 41, 0.55);
+  --theme-btn-hover: rgba(148, 173, 209, 0.1);
+  --theme-border-hover: rgba(125, 211, 252, 0.32);
+  --theme-btn-active: rgba(56, 189, 248, 0.18);
+  --theme-border-active: rgba(56, 189, 248, 0.5);
+  --theme-text: rgba(226, 235, 247, 0.82);
+  --theme-text-active: rgba(224, 247, 255, 0.98);
+  /* Softer glow (was 0.10/0.08). */
   --theme-app-glow:
-    radial-gradient(circle at 12% 18%, rgba(45, 212, 191, 0.1), transparent 34%),
-    radial-gradient(circle at 84% 10%, rgba(56, 189, 248, 0.08), transparent 28%);
+    radial-gradient(circle at 12% 18%, rgba(45, 212, 191, 0.06), transparent 36%),
+    radial-gradient(circle at 84% 10%, rgba(56, 189, 248, 0.05), transparent 30%);
 }
 
-[data-theme="studio"] {
-  --bg-primary: #140b1f;
-  --bg-secondary: #231236;
+[data-theme='studio'],
+[data-mode='dark'][data-theme='studio'] {
+  color-scheme: dark;
+  --bg-primary: #1a1026;
+  --bg-secondary: #2a1840;
   --text-primary: #fdf2f8;
-  --text-secondary: #f5d0fe;
-  --border-primary: rgba(244, 114, 182, 0.18);
+  --text-secondary: #e7c9e8;
+  --border-primary: rgba(244, 114, 182, 0.2);
   --accent-primary: #ec4899;
-  --theme-border: rgba(244, 114, 182, 0.18);
-  --theme-btn-bg: rgba(30, 11, 41, 0.52);
-  --theme-btn-hover: rgba(251, 207, 232, 0.08);
-  --theme-border-hover: rgba(244, 114, 182, 0.32);
-  --theme-btn-active: rgba(236, 72, 153, 0.16);
-  --theme-border-active: rgba(236, 72, 153, 0.45);
-  --theme-text: rgba(253, 242, 248, 0.76);
+  --theme-border: rgba(244, 114, 182, 0.2);
+  --theme-btn-bg: rgba(36, 16, 52, 0.55);
+  --theme-btn-hover: rgba(251, 207, 232, 0.1);
+  --theme-border-hover: rgba(244, 114, 182, 0.34);
+  --theme-btn-active: rgba(236, 72, 153, 0.18);
+  --theme-border-active: rgba(236, 72, 153, 0.5);
+  --theme-text: rgba(253, 242, 248, 0.82);
   --theme-text-active: rgba(255, 228, 240, 0.98);
   --theme-app-glow:
-    radial-gradient(circle at 14% 20%, rgba(236, 72, 153, 0.12), transparent 34%),
-    radial-gradient(circle at 82% 14%, rgba(192, 132, 252, 0.09), transparent 26%);
+    radial-gradient(circle at 14% 20%, rgba(236, 72, 153, 0.08), transparent 36%),
+    radial-gradient(circle at 82% 14%, rgba(192, 132, 252, 0.06), transparent 28%);
 }
 
-[data-theme="high-contrast"] {
+[data-theme='high-contrast'],
+[data-mode='dark'][data-theme='high-contrast'] {
+  color-scheme: dark;
+  /* Intentionally near-black for maximum contrast. */
   --bg-primary: #060606;
-  --bg-secondary: #111111;
-  --text-primary: #f8fafc;
-  --text-secondary: #e5e7eb;
-  --border-primary: rgba(250, 204, 21, 0.22);
+  --bg-secondary: #141414;
+  --text-primary: #ffffff;
+  --text-secondary: #e8e8e8;
+  --border-primary: rgba(250, 204, 21, 0.32);
   --accent-primary: #facc15;
-  --theme-border: rgba(250, 204, 21, 0.2);
-  --theme-btn-bg: rgba(10, 10, 10, 0.72);
-  --theme-btn-hover: rgba(255, 255, 255, 0.08);
-  --theme-border-hover: rgba(250, 204, 21, 0.4);
-  --theme-btn-active: rgba(250, 204, 21, 0.2);
-  --theme-border-active: rgba(250, 204, 21, 0.58);
-  --theme-text: rgba(248, 250, 252, 0.8);
-  --theme-text-active: rgba(255, 251, 235, 0.98);
-  --theme-app-glow:
-    radial-gradient(circle at 12% 18%, rgba(250, 204, 21, 0.08), transparent 30%);
+  --theme-border: rgba(250, 204, 21, 0.3);
+  --theme-btn-bg: rgba(10, 10, 10, 0.78);
+  --theme-btn-hover: rgba(255, 255, 255, 0.1);
+  --theme-border-hover: rgba(250, 204, 21, 0.5);
+  --theme-btn-active: rgba(250, 204, 21, 0.24);
+  --theme-border-active: rgba(250, 204, 21, 0.65);
+  --theme-text: rgba(255, 255, 255, 0.88);
+  --theme-text-active: rgba(255, 251, 235, 1);
+  --theme-app-glow: radial-gradient(circle at 12% 18%, rgba(250, 204, 21, 0.06), transparent 30%);
 }
 
-[data-theme="aurora"] {
-  --bg-primary: #06111f;
-  --bg-secondary: #0d1c30;
+[data-theme='aurora'],
+[data-mode='dark'][data-theme='aurora'] {
+  color-scheme: dark;
+  --bg-primary: #0a1622;
+  --bg-secondary: #102438;
   --text-primary: #ecfeff;
-  --text-secondary: #d1fae5;
-  --border-primary: rgba(110, 231, 183, 0.18);
+  --text-secondary: #bfe9da;
+  --border-primary: rgba(110, 231, 183, 0.2);
   --accent-primary: #34d399;
-  --theme-border: rgba(110, 231, 183, 0.18);
-  --theme-btn-bg: rgba(4, 18, 30, 0.56);
-  --theme-btn-hover: rgba(207, 250, 254, 0.08);
-  --theme-border-hover: rgba(52, 211, 153, 0.34);
-  --theme-btn-active: rgba(16, 185, 129, 0.18);
-  --theme-border-active: rgba(52, 211, 153, 0.48);
-  --theme-text: rgba(236, 254, 255, 0.76);
+  --theme-border: rgba(110, 231, 183, 0.2);
+  --theme-btn-bg: rgba(10, 24, 38, 0.58);
+  --theme-btn-hover: rgba(207, 250, 254, 0.1);
+  --theme-border-hover: rgba(52, 211, 153, 0.36);
+  --theme-btn-active: rgba(16, 185, 129, 0.2);
+  --theme-border-active: rgba(52, 211, 153, 0.52);
+  --theme-text: rgba(236, 254, 255, 0.82);
   --theme-text-active: rgba(220, 252, 231, 0.98);
   --theme-app-glow:
-    radial-gradient(circle at 12% 18%, rgba(56, 189, 248, 0.11), transparent 32%),
-    radial-gradient(circle at 84% 12%, rgba(52, 211, 153, 0.09), transparent 26%);
+    radial-gradient(circle at 12% 18%, rgba(56, 189, 248, 0.07), transparent 34%),
+    radial-gradient(circle at 84% 12%, rgba(52, 211, 153, 0.06), transparent 28%);
 }
+
+/* ============================ LIGHT ============================ */
+
+[data-mode='light'][data-theme='technical'] {
+  color-scheme: light;
+  --bg-primary: #f6f8fb;
+  --bg-secondary: #ffffff;
+  --text-primary: #0f1c2e;
+  --text-secondary: #4a5a70;
+  --border-primary: rgba(15, 28, 46, 0.12);
+  --accent-primary: #0284c7;
+  --theme-border: rgba(15, 28, 46, 0.14);
+  --theme-btn-bg: rgba(255, 255, 255, 0.9);
+  --theme-btn-hover: rgba(2, 132, 199, 0.08);
+  --theme-border-hover: rgba(2, 132, 199, 0.4);
+  --theme-btn-active: rgba(2, 132, 199, 0.14);
+  --theme-border-active: rgba(2, 132, 199, 0.6);
+  --theme-text: rgba(33, 49, 70, 0.86);
+  --theme-text-active: #075985;
+  --theme-app-glow:
+    radial-gradient(circle at 12% 18%, rgba(13, 148, 136, 0.06), transparent 38%),
+    radial-gradient(circle at 84% 10%, rgba(2, 132, 199, 0.06), transparent 32%);
+}
+
+[data-mode='light'][data-theme='studio'] {
+  color-scheme: light;
+  --bg-primary: #fdf4fb;
+  --bg-secondary: #ffffff;
+  --text-primary: #3a0a2c;
+  --text-secondary: #79466a;
+  --border-primary: rgba(192, 38, 128, 0.16);
+  --accent-primary: #db2777;
+  --theme-border: rgba(192, 38, 128, 0.18);
+  --theme-btn-bg: rgba(255, 255, 255, 0.9);
+  --theme-btn-hover: rgba(219, 39, 119, 0.08);
+  --theme-border-hover: rgba(219, 39, 119, 0.4);
+  --theme-btn-active: rgba(219, 39, 119, 0.14);
+  --theme-border-active: rgba(219, 39, 119, 0.6);
+  --theme-text: rgba(58, 10, 44, 0.86);
+  --theme-text-active: #9d174d;
+  --theme-app-glow:
+    radial-gradient(circle at 14% 20%, rgba(219, 39, 119, 0.06), transparent 38%),
+    radial-gradient(circle at 82% 14%, rgba(147, 51, 234, 0.05), transparent 30%);
+}
+
+[data-mode='light'][data-theme='high-contrast'] {
+  color-scheme: light;
+  /* Pure black-on-white for maximum contrast. */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f4f4f5;
+  --text-primary: #000000;
+  --text-secondary: #27272a;
+  --border-primary: rgba(0, 0, 0, 0.32);
+  --accent-primary: #b45309;
+  --theme-border: rgba(0, 0, 0, 0.3);
+  --theme-btn-bg: rgba(255, 255, 255, 0.96);
+  --theme-btn-hover: rgba(0, 0, 0, 0.06);
+  --theme-border-hover: rgba(180, 83, 9, 0.55);
+  --theme-btn-active: rgba(180, 83, 9, 0.16);
+  --theme-border-active: rgba(180, 83, 9, 0.75);
+  --theme-text: rgba(0, 0, 0, 0.9);
+  --theme-text-active: #92400e;
+  --theme-app-glow: none;
+}
+
+[data-mode='light'][data-theme='aurora'] {
+  color-scheme: light;
+  --bg-primary: #f0fdf8;
+  --bg-secondary: #ffffff;
+  --text-primary: #053527;
+  --text-secondary: #2f6b57;
+  --border-primary: rgba(5, 122, 85, 0.16);
+  --accent-primary: #059669;
+  --theme-border: rgba(5, 122, 85, 0.18);
+  --theme-btn-bg: rgba(255, 255, 255, 0.9);
+  --theme-btn-hover: rgba(5, 150, 105, 0.08);
+  --theme-border-hover: rgba(5, 150, 105, 0.4);
+  --theme-btn-active: rgba(5, 150, 105, 0.14);
+  --theme-border-active: rgba(5, 150, 105, 0.6);
+  --theme-text: rgba(5, 53, 39, 0.86);
+  --theme-text-active: #047857;
+  --theme-app-glow:
+    radial-gradient(circle at 12% 18%, rgba(2, 132, 199, 0.05), transparent 36%),
+    radial-gradient(circle at 84% 12%, rgba(5, 150, 105, 0.06), transparent 30%);
+}
+
+/* ============================ GLOBAL ============================ */
 
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   background-image: var(--theme-app-glow);
   background-attachment: fixed;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
