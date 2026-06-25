@@ -73,7 +73,7 @@
     "@formkit/auto-animate": "^0.8.2",
     "@number-flow/svelte": "^0.3.10",
     "@svar-ui/svelte-filter": "^2.4.0",
-    "@tauri-apps/api": "^2.11.3",
+    "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@types/d3": "^7.4.3",
     "clsx": "^2.1.1",
@@ -109,5 +109,11 @@
     "cookie": "^0.7.0",
     "dompurify": "^3.2.4",
     "jspdf": "^4.1.0"
+  },
+  "allowScripts": {
+    "esbuild@0.27.2": true,
+    "fsevents@2.3.3": true,
+    "fsevents@2.3.2": true,
+    "core-js@3.48.0": true
   }
 }
