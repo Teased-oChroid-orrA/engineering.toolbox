@@ -1,0 +1,201 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v0.2.0)'
+        required: false
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Build frontend once, reuse across all platform jobs ─────────────────────
+  build-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: build/
+          retention-days: 1
+
+  # ── Tauri GUI builds (Windows + macOS) ───────────────────────────────────────
+  build-gui:
+    needs: build-frontend
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: nsis,msi
+            artifact-name: gui-windows-x64
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            bundles: dmg,app
+            artifact-name: gui-macos-arm64
+          - platform: macos-13
+            target: x86_64-apple-darwin
+            bundles: dmg,app
+            artifact-name: gui-macos-x64
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: gui-rust-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: gui-rust-${{ matrix.target }}-
+
+      - run: npm ci
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: build/
+
+      - name: Install macOS dependencies
+        if: matrix.platform == 'macos-latest' || matrix.platform == 'macos-13'
+        run: brew install create-dmg
+
+      - name: Build Tauri GUI
+        run: npm run tauri:build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Create portable ZIP (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem "src-tauri/target/${{ matrix.target }}/release" -Filter "*.exe" |
+                   Where-Object { $_.Name -notlike "*-setup*" } |
+                   Select-Object -First 1
+          if ($exe) {
+            Compress-Archive -Path $exe.FullName -DestinationPath "structural-toolbox-portable-windows.zip"
+            Write-Host "Created portable ZIP: structural-toolbox-portable-windows.zip"
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/**
+            structural-toolbox-portable-windows.zip
+          if-no-files-found: warn
+          retention-days: 30
+
+  # ── Headless CLI builds (Linux + macOS + Windows) ────────────────────────────
+  build-cli:
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            binary: bushing
+            artifact: bushing-cli-linux-x64
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            binary: bushing
+            artifact: bushing-cli-macos-arm64
+          - platform: macos-13
+            target: x86_64-apple-darwin
+            binary: bushing
+            artifact: bushing-cli-macos-x64
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary: bushing.exe
+            artifact: bushing-cli-windows-x64
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: cli-rust-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: cli-rust-${{ matrix.target }}-
+
+      - name: Build CLI binary
+        run: cargo build -p bushing-cli --profile release-cli --target ${{ matrix.target }}
+
+      - name: Package CLI (Unix)
+        if: matrix.platform != 'windows-latest'
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release-cli/${{ matrix.binary }} dist/bushing
+          tar -czf ${{ matrix.artifact }}.tar.gz -C dist bushing
+
+      - name: Package CLI (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item "target/${{ matrix.target }}/release-cli/${{ matrix.binary }}" "dist/${{ matrix.binary }}"
+          Compress-Archive -Path "dist/${{ matrix.binary }}" -DestinationPath "${{ matrix.artifact }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ matrix.artifact }}.tar.gz
+            ${{ matrix.artifact }}.zip
+          if-no-files-found: warn
+          retention-days: 30
+
+  # ── GitHub Release ───────────────────────────────────────────────────────────
+  publish:
+    needs: [build-gui, build-cli]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: artifacts/**/*

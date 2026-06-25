@@ -14,6 +14,7 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+bushing-solver = { path = "../crates/bushing-solver" }
 nalgebra = "0.32"
 csv = "1.3"
 tokio = { version = "1", features = ["full"] }

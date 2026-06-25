@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+members = [
+    "src-tauri",
+    "crates/bushing-solver",
+    "cli/bushing-cli",
+]
+
+# CLI release profile — optimised for size. Tauri GUI uses its own defaults.
+[profile.release-cli]
+inherits       = "release"
+opt-level      = "z"
+codegen-units  = 1
+lto            = "fat"
+panic          = "abort"
+strip          = "symbols"

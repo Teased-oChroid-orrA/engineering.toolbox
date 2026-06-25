@@ -1,0 +1,15 @@
+[package]
+name    = "bushing-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Headless bushing solver CLI — offline, zero-admin, stdin/stdout JSON"
+
+[[bin]]
+name = "bushing"
+path = "src/main.rs"
+
+[dependencies]
+bushing-solver = { path = "../../crates/bushing-solver" }
+clap           = { version = "4", features = ["derive"] }
+serde_json     = "1"
+anyhow         = "1"

@@ -185,6 +185,200 @@
     radial-gradient(circle at 84% 12%, rgba(5, 150, 105, 0.06), transparent 30%);
 }
 
+/* ============================ BUSHING TOOLBOX ============================ */
+
+/*
+ * Stress visualization tokens: low→green, mid→amber, high→red.
+ * Canvas background follows --bg-secondary so the SVG panel adapts to mode.
+ * All themes share the same semantic intent; dark/light swap via bg-secondary.
+ */
+:root,
+[data-theme='technical'],
+[data-mode='dark'][data-theme='technical'] {
+  --bushing-stress-low:   #4ade80;
+  --bushing-stress-mid:   #fbbf24;
+  --bushing-stress-high:  #f87171;
+  --bushing-canvas-bg:    var(--bg-secondary);
+  --bushing-grid-line:    var(--border-primary);
+  --bushing-housing-stroke: rgba(203, 213, 225, 0.72);
+  --bushing-body-stroke:    rgba(94, 234, 212, 0.82);
+  --bushing-bore-fill:      rgba(4, 24, 38, 0.96);
+  --bushing-center-line:    rgba(125, 211, 252, 0.36);
+  --bushing-dim-od:         rgba(203, 213, 225, 0.92);
+  --bushing-dim-id:         #5eead4;
+  --bushing-dim-length:     #93c5fd;
+  --bushing-dim-flange:     #c4b5fd;
+  --bushing-dim-cs:         #f0abfc;
+  --bushing-dim-inactive:   rgba(148, 163, 184, 0.72);
+  --bushing-label-primary:  #cbd5e1;
+  --bushing-label-secondary: rgba(203, 213, 225, 0.72);
+  --bushing-hatch-housing:  rgba(107, 127, 147, 0.06);
+  --bushing-hatch-body:     rgba(14, 61, 67, 0.08);
+  --bushing-hatch-flange:   rgba(8, 41, 46, 0.12);
+}
+
+[data-theme='studio'],
+[data-mode='dark'][data-theme='studio'] {
+  --bushing-stress-low:   #4ade80;
+  --bushing-stress-mid:   #fbbf24;
+  --bushing-stress-high:  #f87171;
+  --bushing-canvas-bg:    var(--bg-secondary);
+  --bushing-grid-line:    var(--border-primary);
+  --bushing-housing-stroke: rgba(253, 242, 248, 0.65);
+  --bushing-body-stroke:    rgba(244, 114, 182, 0.85);
+  --bushing-bore-fill:      rgba(26, 6, 20, 0.97);
+  --bushing-center-line:    rgba(244, 114, 182, 0.32);
+  --bushing-dim-od:         rgba(253, 242, 248, 0.88);
+  --bushing-dim-id:         #f0abfc;
+  --bushing-dim-length:     #c084fc;
+  --bushing-dim-flange:     #a78bfa;
+  --bushing-dim-cs:         #fb7185;
+  --bushing-dim-inactive:   rgba(231, 201, 232, 0.58);
+  --bushing-label-primary:  #fdf2f8;
+  --bushing-label-secondary: rgba(231, 201, 232, 0.72);
+  --bushing-hatch-housing:  rgba(80, 12, 56, 0.12);
+  --bushing-hatch-body:     rgba(60, 8, 48, 0.10);
+  --bushing-hatch-flange:   rgba(40, 4, 32, 0.14);
+}
+
+[data-theme='high-contrast'],
+[data-mode='dark'][data-theme='high-contrast'] {
+  --bushing-stress-low:   #22c55e;
+  --bushing-stress-mid:   #eab308;
+  --bushing-stress-high:  #ef4444;
+  --bushing-canvas-bg:    var(--bg-secondary);
+  --bushing-grid-line:    var(--border-primary);
+  --bushing-housing-stroke: rgba(255, 255, 255, 0.88);
+  --bushing-body-stroke:    #facc15;
+  --bushing-bore-fill:      rgba(0, 0, 0, 0.98);
+  --bushing-center-line:    rgba(250, 204, 21, 0.44);
+  --bushing-dim-od:         #ffffff;
+  --bushing-dim-id:         #facc15;
+  --bushing-dim-length:     #a3e635;
+  --bushing-dim-flange:     #fb923c;
+  --bushing-dim-cs:         #f472b6;
+  --bushing-dim-inactive:   rgba(255, 255, 255, 0.52);
+  --bushing-label-primary:  #ffffff;
+  --bushing-label-secondary: rgba(255, 255, 255, 0.78);
+  --bushing-hatch-housing:  rgba(255, 255, 255, 0.04);
+  --bushing-hatch-body:     rgba(250, 204, 21, 0.06);
+  --bushing-hatch-flange:   rgba(250, 204, 21, 0.08);
+}
+
+[data-theme='aurora'],
+[data-mode='dark'][data-theme='aurora'] {
+  --bushing-stress-low:   #4ade80;
+  --bushing-stress-mid:   #fbbf24;
+  --bushing-stress-high:  #f87171;
+  --bushing-canvas-bg:    var(--bg-secondary);
+  --bushing-grid-line:    var(--border-primary);
+  --bushing-housing-stroke: rgba(207, 250, 254, 0.65);
+  --bushing-body-stroke:    rgba(52, 211, 153, 0.88);
+  --bushing-bore-fill:      rgba(5, 20, 32, 0.97);
+  --bushing-center-line:    rgba(56, 189, 248, 0.34);
+  --bushing-dim-od:         rgba(191, 233, 218, 0.92);
+  --bushing-dim-id:         #34d399;
+  --bushing-dim-length:     #67e8f9;
+  --bushing-dim-flange:     #a5f3fc;
+  --bushing-dim-cs:         #6ee7b7;
+  --bushing-dim-inactive:   rgba(110, 231, 183, 0.52);
+  --bushing-label-primary:  #ecfeff;
+  --bushing-label-secondary: rgba(191, 233, 218, 0.72);
+  --bushing-hatch-housing:  rgba(15, 50, 70, 0.10);
+  --bushing-hatch-body:     rgba(5, 80, 60, 0.10);
+  --bushing-hatch-flange:   rgba(5, 60, 50, 0.12);
+}
+
+/* Light mode overrides — canvas uses --bg-secondary which inverts to white/near-white */
+[data-mode='light'][data-theme='technical'] {
+  --bushing-bore-fill:      rgba(246, 248, 251, 0.98);
+  --bushing-housing-stroke: rgba(15, 28, 46, 0.65);
+  --bushing-body-stroke:    rgba(2, 132, 199, 0.88);
+  --bushing-center-line:    rgba(2, 132, 199, 0.26);
+  --bushing-dim-od:         rgba(15, 28, 46, 0.88);
+  --bushing-dim-id:         #0284c7;
+  --bushing-dim-length:     #0369a1;
+  --bushing-dim-flange:     #4f46e5;
+  --bushing-dim-cs:         #7c3aed;
+  --bushing-dim-inactive:   rgba(74, 90, 112, 0.55);
+  --bushing-label-primary:  #0f1c2e;
+  --bushing-label-secondary: rgba(74, 90, 112, 0.82);
+  --bushing-hatch-housing:  rgba(15, 28, 46, 0.06);
+  --bushing-hatch-body:     rgba(2, 132, 199, 0.08);
+  --bushing-hatch-flange:   rgba(79, 70, 229, 0.08);
+}
+
+[data-mode='light'][data-theme='studio'] {
+  --bushing-bore-fill:      rgba(253, 244, 251, 0.98);
+  --bushing-housing-stroke: rgba(58, 10, 44, 0.62);
+  --bushing-body-stroke:    rgba(219, 39, 119, 0.88);
+  --bushing-center-line:    rgba(219, 39, 119, 0.24);
+  --bushing-dim-od:         rgba(58, 10, 44, 0.88);
+  --bushing-dim-id:         #db2777;
+  --bushing-dim-length:     #9d174d;
+  --bushing-dim-flange:     #7c3aed;
+  --bushing-dim-cs:         #be185d;
+  --bushing-dim-inactive:   rgba(121, 70, 106, 0.52);
+  --bushing-label-primary:  #3a0a2c;
+  --bushing-label-secondary: rgba(121, 70, 106, 0.80);
+  --bushing-hatch-housing:  rgba(58, 10, 44, 0.06);
+  --bushing-hatch-body:     rgba(219, 39, 119, 0.08);
+  --bushing-hatch-flange:   rgba(147, 51, 234, 0.08);
+}
+
+[data-mode='light'][data-theme='high-contrast'] {
+  --bushing-bore-fill:      #ffffff;
+  --bushing-housing-stroke: rgba(0, 0, 0, 0.80);
+  --bushing-body-stroke:    #b45309;
+  --bushing-center-line:    rgba(180, 83, 9, 0.32);
+  --bushing-dim-od:         #000000;
+  --bushing-dim-id:         #b45309;
+  --bushing-dim-length:     #166534;
+  --bushing-dim-flange:     #7c3aed;
+  --bushing-dim-cs:         #be185d;
+  --bushing-dim-inactive:   rgba(0, 0, 0, 0.45);
+  --bushing-label-primary:  #000000;
+  --bushing-label-secondary: rgba(0, 0, 0, 0.72);
+  --bushing-hatch-housing:  rgba(0, 0, 0, 0.04);
+  --bushing-hatch-body:     rgba(180, 83, 9, 0.06);
+  --bushing-hatch-flange:   rgba(124, 58, 237, 0.06);
+}
+
+[data-mode='light'][data-theme='aurora'] {
+  --bushing-bore-fill:      rgba(240, 253, 248, 0.98);
+  --bushing-housing-stroke: rgba(5, 53, 39, 0.62);
+  --bushing-body-stroke:    rgba(5, 150, 105, 0.90);
+  --bushing-center-line:    rgba(5, 150, 105, 0.24);
+  --bushing-dim-od:         rgba(5, 53, 39, 0.88);
+  --bushing-dim-id:         #059669;
+  --bushing-dim-length:     #047857;
+  --bushing-dim-flange:     #0891b2;
+  --bushing-dim-cs:         #0d9488;
+  --bushing-dim-inactive:   rgba(47, 107, 87, 0.52);
+  --bushing-label-primary:  #053527;
+  --bushing-label-secondary: rgba(47, 107, 87, 0.80);
+  --bushing-hatch-housing:  rgba(5, 53, 39, 0.06);
+  --bushing-hatch-body:     rgba(5, 150, 105, 0.08);
+  --bushing-hatch-flange:   rgba(8, 145, 178, 0.08);
+}
+
+/* Bushing input card and field styles */
+.bushing-input-card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  transition: border-color 0.15s ease;
+}
+.bushing-input-card:focus-within {
+  border-color: var(--accent-primary);
+}
+.bushing-field-error {
+  color: var(--bushing-stress-high);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
 /* ============================ GLOBAL ============================ */
 
 body {

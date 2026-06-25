@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod bushing;
 mod fastener;
 mod geometry;
 mod inspector;
@@ -250,6 +251,7 @@ fn main() {
             fastener::fastener_verify_stiffness,
             startup_health_event,
             startup_health_get,
+            bushing::bushing_compute,
             // inspector_export_filtered_csv is optional and may be added later
         ])
         .setup({

@@ -192,11 +192,12 @@
   }
 
   function highlightColor(dim: DimensionKey): string {
-    if (!activeDimension(dim)) return 'rgba(148,163,184,0.72)';
-    if (dim === 'od' || dim === 'flangeOd' || dim === 'flangeThk') return '#cbd5e1';
-    if (dim === 'id' || dim === 'intCsDia' || dim === 'intCsDepth') return '#5eead4';
-    if (dim === 'length') return '#93c5fd';
-    return '#f0abfc';
+    if (!activeDimension(dim)) return 'var(--bushing-dim-inactive)';
+    if (dim === 'od' || dim === 'flangeOd' || dim === 'flangeThk') return 'var(--bushing-dim-od)';
+    if (dim === 'id' || dim === 'intCsDia' || dim === 'intCsDepth') return 'var(--bushing-dim-id)';
+    if (dim === 'length') return 'var(--bushing-dim-length)';
+    if (dim === 'extCsDia' || dim === 'extCsDepth') return 'var(--bushing-dim-cs)';
+    return 'var(--bushing-dim-flange)';
   }
 
   function highlightOpacity(dim: DimensionKey): number {
@@ -395,20 +396,20 @@
     style={`transform: scale(${zoom}); transform-origin: center center;`}>
     <defs>
       <pattern id="d3HousingHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
-        <rect width="10" height="10" fill="rgba(107,127,147,0.06)" />
-        <line x1="0" y1="0" x2="0" y2="10" stroke="rgba(203,213,225,0.22)" stroke-width="2" />
+        <rect width="10" height="10" style="fill: var(--bushing-hatch-housing)" />
+        <line x1="0" y1="0" x2="0" y2="10" style="stroke: var(--bushing-housing-stroke); opacity: 0.30" stroke-width="2" />
       </pattern>
       <pattern id="d3BushingHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(-35)">
-        <rect width="10" height="10" fill="rgba(14,61,67,0.08)" />
-        <line x1="0" y1="0" x2="0" y2="10" stroke="rgba(94,234,212,0.26)" stroke-width="2" />
+        <rect width="10" height="10" style="fill: var(--bushing-hatch-body)" />
+        <line x1="0" y1="0" x2="0" y2="10" style="stroke: var(--bushing-body-stroke); opacity: 0.30" stroke-width="2" />
       </pattern>
       <pattern id="d3FlangeHatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(55)">
-        <rect width="8" height="8" fill="rgba(8,41,46,0.12)" />
-        <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(147,197,253,0.26)" stroke-width="1.8" />
+        <rect width="8" height="8" style="fill: var(--bushing-hatch-flange)" />
+        <line x1="0" y1="0" x2="0" y2="8" style="stroke: var(--bushing-dim-length); opacity: 0.30" stroke-width="1.8" />
       </pattern>
     </defs>
 
-    <rect width={SECTION_SIZE} height={SECTION_SIZE} rx="18" fill="rgba(2, 16, 28, 0.96)" />
+    <rect width={SECTION_SIZE} height={SECTION_SIZE} rx="18" style="fill: var(--bushing-canvas-bg)" />
 
     {#if sectionBuild && sectionView && !isLegacyView}
       <g transform={`translate(${sectionView.tx} ${sectionView.ty}) scale(${sectionView.scale} ${sectionView.scale})`} opacity="0.96">
@@ -417,15 +418,15 @@
           y1={sectionBuild.dims.zTop - featureState.length * 0.18}
           x2="0"
           y2={sectionBuild.dims.zBottom + featureState.length * 0.18}
-          stroke="#7dd3fc"
+          style="stroke: var(--bushing-center-line)"
           stroke-width={1 / sectionView.scale}
           stroke-dasharray={`${8 / sectionView.scale} ${8 / sectionView.scale}`}
-          opacity="0.38" />
+          opacity="0.72" />
         <path
           data-dimension-target="od"
           d={sectionBuild.paths.leftHousingPath}
           fill="url(#d3HousingHatch)"
-          stroke={highlightColor('od')}
+          style="stroke: {highlightColor('od')}"
           stroke-width={(selectedDimension === 'od' ? 1.8 : 1.1) / sectionView.scale}
           opacity={highlightOpacity('od')}
           cursor="pointer"
@@ -434,7 +435,7 @@
           data-dimension-target="od"
           d={sectionBuild.paths.rightHousingPath}
           fill="url(#d3HousingHatch)"
-          stroke={highlightColor('od')}
+          style="stroke: {highlightColor('od')}"
           stroke-width={(selectedDimension === 'od' ? 1.8 : 1.1) / sectionView.scale}
           opacity={highlightOpacity('od')}
           cursor="pointer"
@@ -443,7 +444,7 @@
           data-dimension-target="od"
           d={sectionBuild.paths.leftBushingPath}
           fill={featureState.isFlanged ? 'url(#d3FlangeHatch)' : 'url(#d3BushingHatch)'}
-          stroke={highlightColor('od')}
+          style="stroke: {highlightColor('od')}"
           stroke-width={(activeDimension('od') ? 1.8 : 1.1) / sectionView.scale}
           opacity={highlightOpacity('od')}
           cursor="pointer"
@@ -452,7 +453,7 @@
           data-dimension-target="od"
           d={sectionBuild.paths.rightBushingPath}
           fill="url(#d3BushingHatch)"
-          stroke={highlightColor('od')}
+          style="stroke: {highlightColor('od')}"
           stroke-width={(activeDimension('od') ? 1.8 : 1.1) / sectionView.scale}
           opacity={highlightOpacity('od')}
           cursor="pointer"
@@ -460,8 +461,7 @@
         <path
           data-dimension-target="id"
           d={sectionBuild.paths.boreVoidPath}
-          fill="rgba(4, 24, 38, 0.96)"
-          stroke={highlightColor('id')}
+          style="fill: var(--bushing-bore-fill); stroke: {highlightColor('id')}"
           stroke-width={(activeDimension('id') ? 1.6 : 1.0) / sectionView.scale}
           opacity={0.92}
           cursor="pointer"
@@ -472,7 +472,7 @@
             y1={sectionParams.zBottom}
             x2={-sectionParams.rOuter}
             y2={sectionParams.zExt}
-            stroke={highlightColor('od')}
+            style="stroke: {highlightColor('od')}"
             stroke-width={(activeDimension('od') ? 6 : 5) / sectionView.scale}
             stroke-linecap="round"
             opacity="0.001"
@@ -483,7 +483,7 @@
             y1={sectionParams.zBottom}
             x2={sectionParams.rOuter}
             y2={sectionParams.zExt}
-            stroke={highlightColor('od')}
+            style="stroke: {highlightColor('od')}"
             stroke-width={(activeDimension('od') ? 6 : 5) / sectionView.scale}
             stroke-linecap="round"
             opacity="0.001"
@@ -494,7 +494,7 @@
             y1={sectionParams.zBottom}
             x2={-sectionParams.rInner}
             y2={sectionParams.zInt}
-            stroke={highlightColor('id')}
+            style="stroke: {highlightColor('id')}"
             stroke-width={(activeDimension('id') ? 6 : 5) / sectionView.scale}
             stroke-linecap="round"
             opacity="0.001"
@@ -505,7 +505,7 @@
             y1={sectionParams.zBottom}
             x2={sectionParams.rInner}
             y2={sectionParams.zInt}
-            stroke={highlightColor('id')}
+            style="stroke: {highlightColor('id')}"
             stroke-width={(activeDimension('id') ? 6 : 5) / sectionView.scale}
             stroke-linecap="round"
             opacity="0.001"
@@ -517,7 +517,7 @@
               y1={sectionParams.zFlangeTop}
               x2={sectionParams.flangeR}
               y2={sectionParams.zFlangeTop}
-              stroke={highlightColor('flangeOd')}
+              style="stroke: {highlightColor('flangeOd')}"
               stroke-width={(activeDimension('flangeOd') ? 6 : 5) / sectionView.scale}
               stroke-linecap="round"
               opacity="0.001"
@@ -528,7 +528,7 @@
               y1={sectionParams.zFlangeTop}
               x2={-sectionParams.flangeR}
               y2={sectionParams.zTop}
-              stroke={highlightColor('flangeThk')}
+              style="stroke: {highlightColor('flangeThk')}"
               stroke-width={(activeDimension('flangeThk') ? 6 : 5) / sectionView.scale}
               stroke-linecap="round"
               opacity="0.001"
@@ -539,7 +539,7 @@
               y1={sectionParams.zFlangeTop}
               x2={sectionParams.flangeR}
               y2={sectionParams.zTop}
-              stroke={highlightColor('flangeThk')}
+              style="stroke: {highlightColor('flangeThk')}"
               stroke-width={(activeDimension('flangeThk') ? 6 : 5) / sectionView.scale}
               stroke-linecap="round"
               opacity="0.001"
@@ -552,7 +552,7 @@
               y1={sectionParams.zTop}
               x2={sectionParams.extTop}
               y2={sectionParams.zTop}
-              stroke={highlightColor('extCsDia')}
+              style="stroke: {highlightColor('extCsDia')}"
               stroke-width={(activeDimension('extCsDia') ? 6 : 5) / sectionView.scale}
               stroke-linecap="round"
               opacity="0.001"
@@ -563,7 +563,7 @@
               y1={sectionParams.zTop}
               x2={-sectionParams.rOuter}
               y2={sectionParams.zExt}
-              stroke={highlightColor('extCsDepth')}
+              style="stroke: {highlightColor('extCsDepth')}"
               stroke-width={(activeDimension('extCsDepth') ? 6 : 5) / sectionView.scale}
               stroke-linecap="round"
               opacity="0.001"
@@ -574,7 +574,7 @@
               y1={sectionParams.zTop}
               x2={sectionParams.rOuter}
               y2={sectionParams.zExt}
-              stroke={highlightColor('extCsDepth')}
+              style="stroke: {highlightColor('extCsDepth')}"
               stroke-width={(activeDimension('extCsDepth') ? 6 : 5) / sectionView.scale}
               stroke-linecap="round"
               opacity="0.001"
@@ -587,7 +587,7 @@
               y1={sectionParams.innerTopZ}
               x2={sectionParams.intTop}
               y2={sectionParams.innerTopZ}
-              stroke={highlightColor('intCsDia')}
+              style="stroke: {highlightColor('intCsDia')}"
               stroke-width={(activeDimension('intCsDia') ? 6 : 5) / sectionView.scale}
               stroke-linecap="round"
               opacity="0.001"
@@ -598,7 +598,7 @@
               y1={sectionParams.innerTopZ}
               x2={-sectionParams.rInner}
               y2={sectionParams.zInt}
-              stroke={highlightColor('intCsDepth')}
+              style="stroke: {highlightColor('intCsDepth')}"
               stroke-width={(activeDimension('intCsDepth') ? 6 : 5) / sectionView.scale}
               stroke-linecap="round"
               opacity="0.001"
@@ -609,7 +609,7 @@
               y1={sectionParams.innerTopZ}
               x2={sectionParams.rInner}
               y2={sectionParams.zInt}
-              stroke={highlightColor('intCsDepth')}
+              style="stroke: {highlightColor('intCsDepth')}"
               stroke-width={(activeDimension('intCsDepth') ? 6 : 5) / sectionView.scale}
               stroke-linecap="round"
               opacity="0.001"
@@ -627,57 +627,52 @@
           y1={sectionBuild.dims.zTop - featureState.length * 0.18}
           x2="0"
           y2={sectionBuild.dims.zBottom + featureState.length * 0.18}
-          stroke="rgba(125,211,252,0.36)"
+          style="stroke: var(--bushing-center-line)"
           stroke-width={0.95 / sectionView.scale}
           stroke-dasharray={`${8 / sectionView.scale} ${8 / sectionView.scale}`} />
         <path
           d={sectionBuild.paths.leftHousingPath}
-          fill="rgba(148,163,184,0.08)"
-          stroke="rgba(203,213,225,0.88)"
+          style="fill: var(--bushing-hatch-housing); stroke: var(--bushing-housing-stroke)"
           stroke-width={1.05 / sectionView.scale} />
         <path
           d={sectionBuild.paths.rightHousingPath}
-          fill="rgba(148,163,184,0.08)"
-          stroke="rgba(203,213,225,0.88)"
+          style="fill: var(--bushing-hatch-housing); stroke: var(--bushing-housing-stroke)"
           stroke-width={1.05 / sectionView.scale} />
         <path
           d={sectionBuild.paths.leftBushingPath}
-          fill="rgba(45,212,191,0.08)"
-          stroke="rgba(94,234,212,0.92)"
+          style="fill: var(--bushing-hatch-body); stroke: var(--bushing-body-stroke)"
           stroke-width={1.15 / sectionView.scale} />
         <path
           d={sectionBuild.paths.rightBushingPath}
-          fill="rgba(45,212,191,0.08)"
-          stroke="rgba(94,234,212,0.92)"
+          style="fill: var(--bushing-hatch-body); stroke: var(--bushing-body-stroke)"
           stroke-width={1.15 / sectionView.scale} />
         <path
           d={sectionBuild.paths.boreVoidPath}
-          fill="rgba(2, 16, 28, 0.98)"
-          stroke="rgba(148,163,184,0.24)"
+          style="fill: var(--bushing-bore-fill); stroke: var(--bushing-dim-inactive)"
           stroke-width={0.8 / sectionView.scale} />
       </g>
     {/if}
 
-    <text x="22" y="26" fill="#cbd5e1" font-size="12" font-family="ui-monospace, SFMono-Regular">2D Section</text>
-    <text x="30" y="242" fill="#cbd5e1" font-size="10" font-family="ui-monospace, SFMono-Regular">{isLegacyView ? 'Legacy outline housing' : 'Housing section'}</text>
-    <text x="30" y="258" fill="#5eead4" font-size="10" font-family="ui-monospace, SFMono-Regular">{isLegacyView ? 'Legacy outline bushing + through-bore' : 'Bushing wall + through-bore'}</text>
-    <text x="30" y={SECTION_SIZE - 42} fill="rgba(203,213,225,0.72)" font-size="10" font-family="ui-monospace, SFMono-Regular">{isLegacyView ? 'Legacy view reduces to clean outlines only.' : 'Section shows profile. Top inset carries face diameters.'}</text>
+    <text x="22" y="26" style="fill: var(--bushing-label-primary)" font-size="12" font-family="ui-monospace, SFMono-Regular">2D Section</text>
+    <text x="30" y="242" style="fill: var(--bushing-label-primary)" font-size="10" font-family="ui-monospace, SFMono-Regular">{isLegacyView ? 'Legacy outline housing' : 'Housing section'}</text>
+    <text x="30" y="258" style="fill: var(--bushing-dim-id)" font-size="10" font-family="ui-monospace, SFMono-Regular">{isLegacyView ? 'Legacy outline bushing + through-bore' : 'Bushing wall + through-bore'}</text>
+    <text x="30" y={SECTION_SIZE - 42} style="fill: var(--bushing-label-secondary)" font-size="10" font-family="ui-monospace, SFMono-Regular">{isLegacyView ? 'Legacy view reduces to clean outlines only.' : 'Section shows profile. Top inset carries face diameters.'}</text>
 
     {#if showViews && topPlanView && !isLegacyView}
       <g>
-        <rect x={topPlanView.panel.x} y={topPlanView.panel.y} width={topPlanView.panel.w} height={topPlanView.panel.h} rx="12" fill="rgba(8, 22, 36, 0.52)" stroke="rgba(148,163,184,0.16)" />
-        <text x={topPlanView.panel.x + 12} y={topPlanView.panel.y + 16} fill="#cbd5e1" font-size="10" font-family="ui-monospace, SFMono-Regular">Top View</text>
-        <line x1={topPlanView.cx - 64} y1={topPlanView.cy} x2={topPlanView.cx + 64} y2={topPlanView.cy} stroke="#60a5fa" stroke-width="1" stroke-dasharray="7 6" opacity="0.24" />
-        <line x1={topPlanView.cx} y1={topPlanView.cy - 64} x2={topPlanView.cx} y2={topPlanView.cy + 64} stroke="#60a5fa" stroke-width="1" stroke-dasharray="7 6" opacity="0.24" />
-        <circle data-dimension-target="od" cx={topPlanView.cx} cy={topPlanView.cy} r={topPlanView.rHousingOuter} fill="url(#d3HousingHatch)" stroke="rgba(203,213,225,0.55)" stroke-width="1" cursor="pointer" {...interactiveAttrs('od')} />
-        <circle data-dimension-target="od" cx={topPlanView.cx} cy={topPlanView.cy} r={topPlanView.rHousingOpening} fill="rgba(4, 24, 38, 0.96)" stroke={highlightColor('od')} stroke-width={activeDimension('od') ? '1.4' : '1'} opacity={highlightOpacity('od')} cursor="pointer" {...interactiveAttrs('od')} />
+        <rect x={topPlanView.panel.x} y={topPlanView.panel.y} width={topPlanView.panel.w} height={topPlanView.panel.h} rx="12" style="fill: var(--bushing-canvas-bg); stroke: var(--bushing-grid-line)" stroke-width="1" opacity="0.88" />
+        <text x={topPlanView.panel.x + 12} y={topPlanView.panel.y + 16} style="fill: var(--bushing-label-primary)" font-size="10" font-family="ui-monospace, SFMono-Regular">Top View</text>
+        <line x1={topPlanView.cx - 64} y1={topPlanView.cy} x2={topPlanView.cx + 64} y2={topPlanView.cy} style="stroke: var(--bushing-center-line)" stroke-width="1" stroke-dasharray="7 6" opacity="0.5" />
+        <line x1={topPlanView.cx} y1={topPlanView.cy - 64} x2={topPlanView.cx} y2={topPlanView.cy + 64} style="stroke: var(--bushing-center-line)" stroke-width="1" stroke-dasharray="7 6" opacity="0.5" />
+        <circle data-dimension-target="od" cx={topPlanView.cx} cy={topPlanView.cy} r={topPlanView.rHousingOuter} fill="url(#d3HousingHatch)" style="stroke: var(--bushing-housing-stroke)" stroke-width="1" opacity="0.72" cursor="pointer" {...interactiveAttrs('od')} />
+        <circle data-dimension-target="od" cx={topPlanView.cx} cy={topPlanView.cy} r={topPlanView.rHousingOpening} style="fill: var(--bushing-bore-fill); stroke: {highlightColor('od')}" stroke-width={activeDimension('od') ? '1.4' : '1'} opacity={highlightOpacity('od')} cursor="pointer" {...interactiveAttrs('od')} />
         <circle
           data-dimension-target={outerFaceDimension}
           cx={topPlanView.cx}
           cy={topPlanView.cy}
           r={topPlanView.rBushingOuter}
-          fill={featureState.isFlanged ? 'url(#d3FlangeHatch)' : featureState.extCs ? 'rgba(240,171,252,0.14)' : 'url(#d3BushingHatch)'}
-          stroke={highlightColor(outerFaceDimension)}
+          fill={featureState.isFlanged ? 'url(#d3FlangeHatch)' : featureState.extCs ? 'url(#d3FlangeHatch)' : 'url(#d3BushingHatch)'}
+          style="stroke: {highlightColor(outerFaceDimension)}"
           stroke-width={activeDimension(outerFaceDimension) ? '1.5' : '1'}
           opacity={highlightOpacity(outerFaceDimension)}
           cursor="pointer"
@@ -687,33 +682,32 @@
           cx={topPlanView.cx}
           cy={topPlanView.cy}
           r={topPlanView.rBushingInner}
-          fill="rgba(2, 16, 28, 0.98)"
-          stroke={highlightColor(innerFaceDimension)}
+          style="fill: var(--bushing-bore-fill); stroke: {highlightColor(innerFaceDimension)}"
           stroke-width={activeDimension(innerFaceDimension) ? '1.5' : '1'}
           opacity={highlightOpacity(innerFaceDimension)}
           cursor="pointer"
           {...interactiveAttrs(innerFaceDimension)} />
 
-        <line x1={topPlanView.cx + topPlanView.rHousingOpening} y1={topPlanView.cy - 24} x2={topPlanView.panel.x + topPlanView.panel.w + 8} y2={topPlanView.cy - 24} stroke="rgba(203,213,225,0.24)" stroke-width="1" />
-        <line x1={topPlanView.cx + topPlanView.rBushingOuter} y1={topPlanView.cy} x2={topPlanView.panel.x + topPlanView.panel.w + 8} y2={topPlanView.cy} stroke="rgba(203,213,225,0.24)" stroke-width="1" />
-        <line x1={topPlanView.cx + topPlanView.rBushingInner} y1={topPlanView.cy + 24} x2={topPlanView.panel.x + topPlanView.panel.w + 8} y2={topPlanView.cy + 24} stroke="rgba(203,213,225,0.24)" stroke-width="1" />
+        <line x1={topPlanView.cx + topPlanView.rHousingOpening} y1={topPlanView.cy - 24} x2={topPlanView.panel.x + topPlanView.panel.w + 8} y2={topPlanView.cy - 24} style="stroke: var(--bushing-grid-line)" stroke-width="1" opacity="0.5" />
+        <line x1={topPlanView.cx + topPlanView.rBushingOuter} y1={topPlanView.cy} x2={topPlanView.panel.x + topPlanView.panel.w + 8} y2={topPlanView.cy} style="stroke: var(--bushing-grid-line)" stroke-width="1" opacity="0.5" />
+        <line x1={topPlanView.cx + topPlanView.rBushingInner} y1={topPlanView.cy + 24} x2={topPlanView.panel.x + topPlanView.panel.w + 8} y2={topPlanView.cy + 24} style="stroke: var(--bushing-grid-line)" stroke-width="1" opacity="0.5" />
 
-        <text data-dimension-target="od" x={topPlanView.panel.x + topPlanView.panel.w + 12} y={topPlanView.cy - 24} fill={highlightColor('od')} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('od')} cursor="pointer" {...interactiveAttrs('od')}>Hole open {featureState.bore.toFixed(3)}"</text>
-        <text data-dimension-target={outerFaceDimension} x={topPlanView.panel.x + topPlanView.panel.w + 12} y={topPlanView.cy} fill={highlightColor(outerFaceDimension)} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity(outerFaceDimension)} cursor="pointer" {...interactiveAttrs(outerFaceDimension)}>
+        <text data-dimension-target="od" x={topPlanView.panel.x + topPlanView.panel.w + 12} y={topPlanView.cy - 24} style="fill: {highlightColor('od')}" font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('od')} cursor="pointer" {...interactiveAttrs('od')}>Hole open {featureState.bore.toFixed(3)}"</text>
+        <text data-dimension-target={outerFaceDimension} x={topPlanView.panel.x + topPlanView.panel.w + 12} y={topPlanView.cy} style="fill: {highlightColor(outerFaceDimension)}" font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity(outerFaceDimension)} cursor="pointer" {...interactiveAttrs(outerFaceDimension)}>
           {featureState.isFlanged ? `Flange face ${topPlanView.outerFaceDia.toFixed(3)}"` : featureState.extCs ? `CS face ${topPlanView.outerFaceDia.toFixed(3)}"` : `OD band ${topPlanView.outerFaceDia.toFixed(3)}"`}
         </text>
-        <text data-dimension-target={innerFaceDimension} x={topPlanView.panel.x + topPlanView.panel.w + 12} y={topPlanView.cy + 24} fill={highlightColor(innerFaceDimension)} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity(innerFaceDimension)} cursor="pointer" {...interactiveAttrs(innerFaceDimension)}>
+        <text data-dimension-target={innerFaceDimension} x={topPlanView.panel.x + topPlanView.panel.w + 12} y={topPlanView.cy + 24} style="fill: {highlightColor(innerFaceDimension)}" font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity(innerFaceDimension)} cursor="pointer" {...interactiveAttrs(innerFaceDimension)}>
           {featureState.intCs ? `Int CS open ${topPlanView.innerFaceDia.toFixed(3)}"` : `Through ID ${topPlanView.innerFaceDia.toFixed(3)}"`}
         </text>
 
-        <text data-dimension-target="length" x={topPlanView.panel.x} y={topPlanView.panel.y + topPlanView.panel.h + 14} fill={highlightColor('length')} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('length')} cursor="pointer" {...interactiveAttrs('length')}>Length {dimensionalLabels.length}"</text>
+        <text data-dimension-target="length" x={topPlanView.panel.x} y={topPlanView.panel.y + topPlanView.panel.h + 14} style="fill: {highlightColor('length')}" font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('length')} cursor="pointer" {...interactiveAttrs('length')}>Length {dimensionalLabels.length}"</text>
         {#if featureState.isFlanged}
-          <text data-dimension-target="flangeThk" x={topPlanView.panel.x + 96} y={topPlanView.panel.y + topPlanView.panel.h + 14} fill={highlightColor('flangeThk')} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('flangeThk')} cursor="pointer" {...interactiveAttrs('flangeThk')}>Flange thk {dimensionalLabels.flangeThk}"</text>
+          <text data-dimension-target="flangeThk" x={topPlanView.panel.x + 96} y={topPlanView.panel.y + topPlanView.panel.h + 14} style="fill: {highlightColor('flangeThk')}" font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('flangeThk')} cursor="pointer" {...interactiveAttrs('flangeThk')}>Flange thk {dimensionalLabels.flangeThk}"</text>
         {:else if featureState.extCs}
-          <text data-dimension-target="extCsDepth" x={topPlanView.panel.x + 96} y={topPlanView.panel.y + topPlanView.panel.h + 14} fill={highlightColor('extCsDepth')} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('extCsDepth')} cursor="pointer" {...interactiveAttrs('extCsDepth')}>Ext CS depth {dimensionalLabels.extCsDepth}"</text>
+          <text data-dimension-target="extCsDepth" x={topPlanView.panel.x + 96} y={topPlanView.panel.y + topPlanView.panel.h + 14} style="fill: {highlightColor('extCsDepth')}" font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('extCsDepth')} cursor="pointer" {...interactiveAttrs('extCsDepth')}>Ext CS depth {dimensionalLabels.extCsDepth}"</text>
         {/if}
         {#if featureState.intCs}
-          <text data-dimension-target="intCsDepth" x={topPlanView.panel.x + 196} y={topPlanView.panel.y + topPlanView.panel.h + 14} fill={highlightColor('intCsDepth')} font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('intCsDepth')} cursor="pointer" {...interactiveAttrs('intCsDepth')}>Int CS depth {dimensionalLabels.intCsDepth}"</text>
+          <text data-dimension-target="intCsDepth" x={topPlanView.panel.x + 196} y={topPlanView.panel.y + topPlanView.panel.h + 14} style="fill: {highlightColor('intCsDepth')}" font-size="8.5" font-family="ui-monospace, SFMono-Regular" opacity={highlightOpacity('intCsDepth')} cursor="pointer" {...interactiveAttrs('intCsDepth')}>Int CS depth {dimensionalLabels.intCsDepth}"</text>
         {/if}
       </g>
     {/if}
